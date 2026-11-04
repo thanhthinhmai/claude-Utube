@@ -1,0 +1,10 @@
+{
+  "integration": "claude",
+  "default_integration": "claude",
+  "script_type": "sh",
+  "integration_settings": {
+    "claude": {
+      "invoke_separator": "-"
+    }
+  }
+}
