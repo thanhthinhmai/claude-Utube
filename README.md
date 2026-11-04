@@ -16,6 +16,13 @@ Mở Claude Code trong thư mục này và chạy lần lượt (duyệt kết q
 /speckit-converge
 ```
 
+Không phải lúc nào cũng cần đủ 7 bước. Claude tự chọn một trong 3 mức tuỳ độ lớn của yêu cầu:
+- **Trực tiếp:** sửa nhỏ, không cần spec.
+- **Nhẹ:** specify → plan → tasks → implement.
+- **Đầy đủ:** cả 7 bước.
+
+Bạn có thể nói rõ mức muốn dùng, ví dụ: "làm mức nhẹ".
+
 Hiến pháp chung đã viết sẵn ở `.specify/memory/constitution.md`. Sửa bằng `/speckit-constitution` nếu cần.
 Xem `CLAUDE.md` để biết quy trình đầy đủ.
 

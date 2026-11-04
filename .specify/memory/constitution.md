@@ -8,6 +8,7 @@ Vi phạm một nguyên tắc **PHẢI** được coi là lỗi nghiêm trọng 
 
 ### I. Spec là nguồn sự thật
 - Mọi tính năng **PHẢI** bắt đầu từ `spec.md` (cái gì và vì sao). Không viết code khi chưa có spec đã duyệt.
+- Ngoại lệ duy nhất là thay đổi ở **mức Trực tiếp** theo định nghĩa trong `CLAUDE.md`: sửa nhỏ, đã rõ, tối đa 1–2 file, không đổi hành vi chính. Những thay đổi này vẫn **PHẢI** được kiểm chứng (nguyên tắc IV).
 - Spec **KHÔNG ĐƯỢC** nhắc công nghệ. Công nghệ chỉ nằm trong `plan.md`.
 - Khi yêu cầu thay đổi: sửa spec trước, rồi mới sửa plan, tasks và code.
 
@@ -37,7 +38,10 @@ Vi phạm một nguyên tắc **PHẢI** được coi là lỗi nghiêm trọng 
 
 ## Quy trình làm việc
 
-1. `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` → `/speckit-implement` → `/speckit-converge`.
+1. Chọn mức quy trình theo `CLAUDE.md`:
+   - **Trực tiếp:** sửa rồi kiểm chứng.
+   - **Nhẹ:** `/speckit-specify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-implement`.
+   - **Đầy đủ:** `/speckit-specify` → `/speckit-clarify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-analyze` → `/speckit-implement` → `/speckit-converge`.
 2. Người dùng duyệt kết quả sau mỗi bước rồi mới chạy bước tiếp theo.
 3. Mỗi tính năng nằm trên nhánh riêng `NNN-ten-tinh-nang` và thư mục riêng `specs/NNN-ten-tinh-nang/`.
 4. Commit sau mỗi giai đoạn trong `tasks.md` hoàn thành.
@@ -47,4 +51,7 @@ Vi phạm một nguyên tắc **PHẢI** được coi là lỗi nghiêm trọng 
 - Hiến pháp này có hiệu lực cao hơn mọi hướng dẫn khác trong dự án.
 - Muốn sửa hiến pháp thì phải ghi lý do, được người dùng duyệt và tăng số phiên bản.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-04
+**Version**: 1.1.0 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-04
+
+### Lịch sử sửa đổi
+- 1.1.0: Thêm 3 mức quy trình (Trực tiếp, Nhẹ, Đầy đủ) để tiết kiệm token cho thay đổi nhỏ.

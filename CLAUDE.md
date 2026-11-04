@@ -4,11 +4,35 @@ Dự án này làm theo **Spec-Driven Development** của [GitHub Spec Kit](http
 
 ## Luật bắt buộc
 - Đọc `.specify/memory/constitution.md` trước khi lập kế hoạch hoặc viết code. Hiến pháp có hiệu lực cao nhất.
-- Không viết code cho một tính năng khi chưa có `specs/<feature>/spec.md`, `plan.md` và `tasks.md` đã được người dùng duyệt.
+- Trước khi làm, **chọn mức quy trình** theo bảng dưới và báo cho người dùng một dòng, ví dụ: "Mức: Nhẹ, vì chỉ sửa 2 file". Người dùng có thể yêu cầu đổi mức.
+- Ở mức Nhẹ và Đầy đủ: không viết code khi spec và plan chưa được người dùng duyệt.
 - Chạy từng lệnh một. Sau mỗi lệnh, dừng lại tóm tắt kết quả và chờ người dùng duyệt.
 - Chỗ nào chưa rõ thì hỏi, không đoán.
 
-## Quy trình cho mỗi tính năng
+## Chọn mức quy trình (để tiết kiệm token)
+
+| Mức | Khi nào | Các bước |
+|---|---|---|
+| **Trực tiếp** | Sửa bug nhỏ đã rõ nguyên nhân, đổi chữ hoặc CSS, đổi cấu hình; ≤ 1–2 file và không đổi hành vi chính | Sửa luôn, chạy test hoặc chạy thử, báo kết quả. Không tạo spec |
+| **Nhẹ** | Tính năng nhỏ, ~1–5 file, yêu cầu đã rõ, không đổi dữ liệu hay API dùng chung | `/speckit-specify` → `/speckit-plan` → `/speckit-tasks` → `/speckit-implement` |
+| **Đầy đủ** | Tính năng hoặc ứng dụng mới, game hoặc module mới, đổi dữ liệu hoặc API, yêu cầu còn mơ hồ, hoặc người dùng yêu cầu | Cả 7 bước ở bảng dưới |
+
+Quy tắc nâng mức:
+- Đang ở mức Trực tiếp mà thấy cần sửa hơn 2 file hoặc đổi hành vi chính → dừng lại, đề xuất chuyển sang mức Nhẹ.
+- Đang ở mức Nhẹ mà spec còn từ 2 chỗ `[NEEDS CLARIFICATION]` trở lên, hoặc tasks vượt khoảng 15 việc → đề xuất chuyển sang mức Đầy đủ.
+- Đang không chắc giữa hai mức → chọn mức cao hơn.
+
+Ở mức Nhẹ:
+- Spec chỉ cần user story P1, yêu cầu chính và tiêu chí thành công đo được.
+- Bỏ qua `research.md` và `contracts/` nếu không cần.
+- Sau khi implement, tự đối chiếu nhanh với tiêu chí thành công thay cho `/speckit-converge`.
+
+Mẹo chung để tiết kiệm token:
+- Chỉ dùng `/speckit-checklist` khi người dùng yêu cầu.
+- Mỗi tính năng nên làm trong một phiên mới.
+- Đọc tài liệu theo từng phần cần thiết, không đọc lại cả file khi không cần.
+
+## Quy trình đầy đủ
 | Bước | Lệnh | Kết quả |
 |---|---|---|
 | 1 | `/speckit-specify <mô tả>` | `specs/NNN-x/spec.md` + nhánh mới |
