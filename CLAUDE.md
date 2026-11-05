@@ -1,6 +1,15 @@
 # CLAUDE.md
 
-Dự án này làm theo **Spec-Driven Development** của [GitHub Spec Kit](https://github.com/github/spec-kit).
+**claude-Utube** là một xưởng phim cho Claude. Xưởng xây bằng **Spec-Driven Development** của [GitHub Spec Kit](https://github.com/github/spec-kit).
+
+## Các luồng làm việc
+| Người dùng muốn | Luồng |
+|---|---|
+| Xây hoặc sửa skill, công cụ, cấu trúc của xưởng | Spec-kit (bên dưới) |
+| Học phong cách của một kênh YouTube | Skill học phong cách (sẽ xây ở một tính năng sau) |
+| Làm một bộ phim | Quy trình làm phim của thư viện (sẽ nối vào ở một tính năng sau). Không tạo spec cho từng phim |
+
+Khi một luồng chưa được xây, nói rõ với người dùng thay vì làm tạm.
 
 ## Luật bắt buộc
 - Đọc `.specify/memory/constitution.md` trước khi lập kế hoạch hoặc viết code. Hiến pháp có hiệu lực cao nhất.

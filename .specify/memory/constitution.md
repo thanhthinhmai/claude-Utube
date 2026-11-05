@@ -1,40 +1,57 @@
-# Hiến pháp dự án (Spec Project)
+# Hiến pháp dự án claude-Utube
 
-Bộ nguyên tắc bất biến cho mọi tính năng: web app, tool hay game. Các lệnh
-`/speckit-plan`, `/speckit-analyze` và `/speckit-converge` đều kiểm tra theo file này.
-Vi phạm một nguyên tắc **PHẢI** được coi là lỗi nghiêm trọng nhất.
+claude-Utube là một **xưởng phim cho Claude**. Xưởng có hai việc: học phong cách hình ảnh và âm thanh từ các kênh YouTube, và làm phim bằng code theo phong cách đó hoặc theo các phong cách có sẵn trong thư viện.
+
+Các lệnh `/speckit-plan`, `/speckit-analyze` và `/speckit-converge` đều kiểm tra theo file này. Vi phạm một nguyên tắc **PHẢI** được coi là lỗi nghiêm trọng nhất.
 
 ## Nguyên tắc cốt lõi
 
 ### I. Spec là nguồn sự thật
 - Mọi tính năng **PHẢI** bắt đầu từ `spec.md` (cái gì và vì sao). Không viết code khi chưa có spec đã duyệt.
-- Ngoại lệ duy nhất là thay đổi ở **mức Trực tiếp** theo định nghĩa trong `CLAUDE.md`: sửa nhỏ, đã rõ, tối đa 1–2 file, không đổi hành vi chính. Những thay đổi này vẫn **PHẢI** được kiểm chứng (nguyên tắc IV).
 - Spec **KHÔNG ĐƯỢC** nhắc công nghệ. Công nghệ chỉ nằm trong `plan.md`.
 - Khi yêu cầu thay đổi: sửa spec trước, rồi mới sửa plan, tasks và code.
+- Ngoại lệ duy nhất là thay đổi ở **mức Trực tiếp** theo định nghĩa trong `CLAUDE.md`. Những thay đổi này vẫn **PHẢI** được kiểm chứng (nguyên tắc IV).
 
 ### II. Không đoán
 - Mọi chỗ mơ hồ **PHẢI** được đánh dấu `[NEEDS CLARIFICATION: câu hỏi]` và hỏi người dùng.
 - Không tự thêm tính năng "có thể cần sau này" (YAGNI).
 
 ### III. MVP trước, chia theo user story
-- User story được xếp ưu tiên P1, P2, P3. P1 **PHẢI** tự chạy được và tự test được, tạo thành một MVP.
+- User story được xếp ưu tiên P1, P2, P3. P1 **PHẢI** tự chạy được và tự test được.
 - Làm xong và kiểm chứng xong một story rồi mới chuyển sang story tiếp theo.
 
 ### IV. Đo được, kiểm chứng được
-- Mỗi tiêu chí thành công **PHẢI** đo được bằng số liệu, ví dụ thời gian, FPS, số bước thao tác, tỷ lệ lỗi. Không dùng các từ như "đẹp" hay "nhanh".
-- Logic quan trọng **PHẢI** có test tự động. Với UI và game, **PHẢI** có thêm bước chạy thử thật, chụp màn hình hoặc quay lại để đối chiếu.
-- Không được báo "xong" khi chưa chạy kiểm chứng. Kết quả kiểm chứng ghi rõ: đạt, đạt một phần, hoặc thất bại.
+- Mỗi tiêu chí thành công **PHẢI** đo được bằng số liệu. Không dùng các từ như "đẹp" hay "giống".
+- Logic quan trọng **PHẢI** có test tự động. Với hình, âm thanh và phim, **PHẢI** có thêm kiểm tra bằng số liệu (khung hình, màu, độ lớn âm thanh, thời gian) và xem thử thật.
+- Không được báo "xong" khi chưa chạy kiểm chứng. Kết quả kiểm chứng ghi rõ: đạt, đạt một phần, hoặc thất bại. Bước nào không chạy được trong môi trường hiện tại thì **PHẢI** nói rõ.
 
 ### V. Đơn giản
-- Bắt đầu với cấu trúc tối thiểu: tối đa 3 project hoặc package, dùng framework trực tiếp, không bọc thêm lớp trừu tượng khi chưa cần.
+- Bắt đầu với cấu trúc tối thiểu, dùng công cụ trực tiếp, không bọc thêm lớp trừu tượng khi chưa cần.
 - Mọi độ phức tạp vượt mức **PHẢI** được giải thích trong mục "Complexity Tracking" của `plan.md`.
 
-## Ràng buộc bổ sung
+### VI. Thư viện gốc được giữ nguyên
+- Thư viện phong cách bên ngoài (lemo-opuscar) **PHẢI** được giữ nguyên để cập nhật được từ bản gốc. Không sửa file bên trong nó.
+- Mọi phần mở rộng (phong cách riêng, công cụ, skill) nằm **bên ngoài** thư viện, trong thư mục của dự án.
 
-- **Bảo mật:** không commit secret hay API key. Dữ liệu người dùng phải được kiểm tra hợp lệ ở biên hệ thống.
-- **Hiệu năng (mặc định):** web tương tác dưới 200 ms, game giữ 60 FPS trên máy tầm trung. Từng spec có thể ghi đè con số này.
-- **Tài sản:** font, hình, âm thanh và mô hình phải có giấy phép rõ ràng (ví dụ CC0, MIT) và được ghi nguồn.
-- **Ngôn ngữ:** tài liệu spec viết bằng tiếng Việt hoặc tiếng Anh. Code và tên biến dùng tiếng Anh.
+### VII. Một bộ máy dựng hình
+- Toàn dự án dùng **một** bộ máy dựng hình chính. Bộ máy nào được chốt trong `plan.md` của tính năng đầu tiên cần dựng hình, kèm so sánh trong `research.md`.
+- Thêm bộ máy thứ hai chỉ khi có lý do ghi trong "Complexity Tracking" và được người dùng duyệt.
+
+### VIII. Học phong cách bằng đo, không bằng cảm nhận
+- Học phong cách từ kênh YouTube theo phương pháp của claude-animated-shorts: xem đủ mọi khung hình, đo bằng công cụ, rút ra luật kèm con số. Chỉ lấy **phương pháp** và **style bible**, không lấy code dựng hình của repo đó.
+- Kết luận nào cũng **PHẢI** có số đo hoặc khung hình làm bằng chứng. Kết luận nào sai khi kiểm tra lại thì **PHẢI** được sửa.
+- Phong cách học được **PHẢI** lưu theo định dạng phong cách của thư viện (khung 11 mục), để dùng giống như phong cách có sẵn.
+
+### IX. Spec-kit cho phần mềm, không cho từng phim
+- Quy trình spec-kit dùng để xây xưởng: skill, công cụ, cấu trúc.
+- Mỗi bộ phim đi theo quy trình làm phim của thư viện (brief → treatment → dựng → kiểm tra), **không** tạo spec cho từng phim.
+
+## Bản quyền và nội dung
+
+- Video tải từ kênh tham chiếu chỉ để học nội bộ: **không** đăng lại, **không** gửi đi, **không** commit vào repo.
+- Phim làm ra chỉ học **phong cách**. Câu chuyện, nhân vật, giọng đọc và nhạc **PHẢI** là của mình. Không nêu tên kênh tham chiếu trong phim.
+- Tài sản bên thứ ba (font, hình, nhạc, mô hình, dữ liệu) chỉ dùng loại có giấy phép rõ ràng (CC0, CC BY, OFL, MIT) và **PHẢI** ghi vào `CREDITS`.
+- Không commit secret, API key hay file media nặng vào repo.
 
 ## Quy trình làm việc
 
@@ -51,7 +68,9 @@ Vi phạm một nguyên tắc **PHẢI** được coi là lỗi nghiêm trọng 
 - Hiến pháp này có hiệu lực cao hơn mọi hướng dẫn khác trong dự án.
 - Muốn sửa hiến pháp thì phải ghi lý do, được người dùng duyệt và tăng số phiên bản.
 
-**Version**: 1.1.0 | **Ratified**: 2026-11-04 | **Last Amended**: 2026-11-04
+**Version**: 2.0.0 | **Ratified**: 2026-11-05 | **Last Amended**: 2026-11-05
 
 ### Lịch sử sửa đổi
-- 1.1.0: Thêm 3 mức quy trình (Trực tiếp, Nhẹ, Đầy đủ) để tiết kiệm token cho thay đổi nhỏ.
+- 2.0.0: Hiến pháp riêng cho claude-Utube. Thêm nguyên tắc VI–IX và mục bản quyền, nội dung.
+- 1.1.0: Thêm 3 mức quy trình (Trực tiếp, Nhẹ, Đầy đủ) để tiết kiệm token.
+- 1.0.0: Hiến pháp chung ban đầu.

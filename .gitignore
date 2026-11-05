@@ -3,3 +3,10 @@ dist/
 .env
 .env.*
 .DS_Store
+
+# Reference videos and media (study only, never commit)
+references/
+*.mp4
+*.mov
+*.webm
+*.wav
