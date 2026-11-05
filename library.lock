@@ -1,0 +1,3 @@
+# Thư viện phong cách mà xưởng dùng. Đổi LIB_COMMIT để nâng phiên bản, rồi chạy: sh bin/studio setup
+LIB_REPO=https://github.com/lemomo-ai/lemo-opuscar.git
+LIB_COMMIT=bebbbe1aa92a3cb4bb6f83500e61b23a17d1aa00

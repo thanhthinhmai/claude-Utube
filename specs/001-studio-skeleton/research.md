@@ -29,12 +29,13 @@
 
 - **Decision**:
   1. Tạo repo tạm `lib/.lemo-opuscar.tmp`, chạy `git init`, thêm remote.
-  2. Bật sparse-checkout với cùng mẫu loại trừ như `setup.sh` của thư viện: `/*`, `!/styles/*/demo/`, `!/styleboard/`, `!/docs/frames/`, `!/docs/cover.jpg`, `!/docs/opuscar98.jpg`, `!/styles/*/poster.jpg`.
-  3. Chạy `git fetch --depth 1 origin <SHA>`, rồi `checkout --detach FETCH_HEAD`.
-  4. Xong mới đổi tên thành `lib/lemo-opuscar`.
+  2. Bật sparse checkout bằng cách ghi thẳng `.git/info/sparse-checkout` (`core.sparseCheckout=true`, `core.sparseCheckoutCone=false`) với cùng mẫu loại trừ như `setup.sh` của thư viện: `/*`, `!/styles/*/demo/`, `!/styleboard/`, `!/docs/frames/`, `!/docs/cover.jpg`, `!/docs/opuscar98.jpg`, `!/styles/*/poster.jpg`. Cách này chạy với mọi bản git ≥ 2.25, không cần `sparse-checkout set --no-cone` (≥ 2.35).
+  3. Bật tải từng phần (`remote.origin.promisor`, `partialclonefilter=blob:none`) để chỉ tải file nằm trong phần sparse; máy chủ không hỗ trợ thì tải đủ, kết quả vẫn đúng.
+  4. Chạy `git fetch --depth 1 origin <SHA>`, rồi `checkout --detach <SHA>`.
+  5. Xong mới đổi tên thành `lib/lemo-opuscar`.
 
-  Nếu máy chủ không cho fetch theo SHA: fetch toàn bộ rồi checkout SHA. Nếu git < 2.35 (không có `--no-cone`): tải đủ thư viện và in cảnh báo.
-- **Rationale**: Tải vào thư mục tạm rồi đổi tên giúp không bao giờ để lại thư viện dở dang (Edge case "bị ngắt giữa chừng"). Bỏ demo giúp nhẹ hơn nhiều so với 114 MB.
+  Nếu máy chủ không cho fetch theo SHA: fetch toàn bộ rồi checkout SHA.
+- **Rationale**: Tải vào thư mục tạm rồi đổi tên giúp không bao giờ để lại thư viện dở dang (Edge case "bị ngắt giữa chừng"). Bỏ demo và tải từng phần: đo thật được 17 MB file + 15 MB `.git`, so với 114 MB của bản đầy đủ, mất khoảng 2 giây.
 - **Đánh dấu**: `git config studio.managed true` trong repo thư viện. **Không** đặt `lemo.managed`, vì khi có cờ đó, `setup.sh` của thư viện sẽ tự `reset --hard` về `main` và phá phiên bản đã ghim.
 
 ## 4. Cài gói của thư viện (`deps`)
@@ -49,7 +50,7 @@
 
 | Công cụ | Lệnh đọc phiên bản | Tối thiểu | Ghi chú |
 |---|---|---|---|
-| git | `git --version` | 2.25 | < 2.35 vẫn được, nhưng cảnh báo là sẽ tải đủ demo |
+| git | `git --version` | 2.25 | |
 | Node | `node --version` | 20 | |
 | ffmpeg | `ffmpeg -version` dòng 1 | 7 | Bản build ghi theo ngày (`N-…`, `2024-…`) → "không đọc được phiên bản", chỉ cảnh báo |
 | Python | `python3 --version` | 3.11 | Đạt nếu có `uv` dù Python thấp hơn (uv tự tải Python) |
