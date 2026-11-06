@@ -14,6 +14,7 @@
 - Q: Phim demo có thuộc tính năng này không? → A: Không. Tách thành tính năng riêng; tính năng này kết thúc ở phong cách đã lưu cùng khung chứng minh.
 - Q: Bước phân tích 9 khía cạnh nên do nhiều agent song song hay một agent làm lần lượt? → A: 3 agent song song, mỗi agent một nhóm: hình (màu, viền, ánh sáng, chất liệu, nhân vật), chuyển động và chiều sâu, âm thanh và kịch bản.
 - Q: Bản phong cách viết bằng ngôn ngữ nào? → A: `STYLE.md` (và các file phong cách khác) bằng tiếng Anh để khớp thư viện; mọi bản tóm tắt trình người dùng duyệt bằng tiếng Việt (ngôn ngữ người dùng).
+- Q: Sau khi lưu phong cách, làm gì với video và âm thanh tham chiếu đã tải? → A: Hỏi người dùng một lần ở cuối, mặc định xoá; số liệu đo dạng số luôn được giữ cùng phong cách.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -87,6 +88,7 @@ Xưởng vẽ **một khung hình bằng code** theo bản phong cách, đặt *
 - **FR-002**: Khi nhận từ một kênh, xưởng MUST lấy mặc định 12 video gần nhất (người dùng đổi được, trong khoảng 3–30).
 - **FR-003**: Xưởng MUST ưu tiên tiếng gốc của video và ghi lại tiếng đã dùng.
 - **FR-004**: Video và âm thanh tham chiếu MUST chỉ nằm trong thư mục tham chiếu của dự án, MUST NOT vào version control, MUST NOT bị gửi đi hay đăng lại.
+- **FR-004a**: Sau khi lưu phong cách, xưởng MUST hỏi người dùng một lần có giữ video và âm thanh tham chiếu của bộ đó không; mặc định (người dùng không chọn giữ) là **xoá**. Chỉ xoá file thuộc bộ tham chiếu vừa học. Số liệu đo dạng số không bị xoá.
 
 **Đo**
 - **FR-005**: Xưởng MUST phân tích **100%** khung hình của **phần được đo** của mỗi video. Video ≤ 3 phút: phần được đo là toàn bộ video. Video > 3 phút: phần được đo là một đoạn đại diện tổng cộng 3 phút (người dùng đổi được), gồm 60 giây đầu và các đoạn rải đều trong phần còn lại; hồ sơ MUST ghi rõ các đoạn đã đo.
@@ -132,8 +134,8 @@ Xưởng vẽ **một khung hình bằng code** theo bản phong cách, đặt *
 - **SC-003**: **100%** luật trong bản phong cách dẫn tới ít nhất một bằng chứng; **0** tên kênh, tên người, câu thoại nguyên văn trong bản phong cách.
 - **SC-004**: Khung chứng minh so với khung gốc: chênh lệch độ sáng trung bình **≤ 0,05**, độ bão hoà trung vị **≤ 0,08**, tỷ lệ điểm ảnh rất tối **≤ 5 điểm phần trăm**, và **≥ 4/6** màu chủ đạo có màu gần tương ứng.
 - **SC-005**: Đo một bộ khoảng 18 phút video (tương đương 20 video ngắn) hoàn tất trong **dưới 60 phút** trên máy thông thường, không tính thời gian tải.
-- **SC-006**: Sau toàn bộ quy trình, version control có **0** file video hay âm thanh tham chiếu.
-- **SC-007**: Người dùng chỉ phải dừng duyệt **đúng 2 lần** trong quy trình (không tính câu hỏi ban đầu nếu thiếu thông tin).
+- **SC-006**: Sau toàn bộ quy trình, version control có **0** file video hay âm thanh tham chiếu; khi người dùng không chọn giữ, thư mục tham chiếu còn **0** file của bộ vừa học.
+- **SC-007**: Người dùng chỉ phải dừng duyệt **đúng 2 lần** trong quy trình (không tính câu hỏi ban đầu nếu thiếu thông tin và câu hỏi giữ hay xoá video tham chiếu ở cuối).
 - **SC-008**: Phong cách đã lưu xuất hiện trong danh mục phong cách riêng và luồng làm phim chọn được nó **ngay lần đầu** gọi tên.
 
 ## Assumptions
