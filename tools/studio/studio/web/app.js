@@ -42,6 +42,24 @@ const ERR = {
   bad_host: "Request blocked (wrong host).", not_local: "Request blocked (not from this machine).",
 };
 const errText = (body, status) => ERR[body?.error?.code] || `Error ${status}`;
+const fold = (s) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const stylePrompt = (name) => `Make a 40-second film in the ${name} style about …`;
+const useBtn = (name) => `<button class="primary use" data-name="${esc(name)}">Use this style</button>`;
+async function copyPrompt(btn) {
+  const text = stylePrompt(btn.dataset.name);
+  const box = btn.parentElement;
+  box.querySelector(".copied, .prompt-box")?.remove();
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.insertAdjacentHTML("afterend", '<span class="copied">✓ Copied: paste it into Claude Code</span>');
+  } catch {   // clipboard blocked: show the prompt so it can be copied by hand
+    btn.insertAdjacentHTML("afterend", `<textarea class="prompt-box" readonly rows="2" aria-label="Prompt to copy">${esc(text)}</textarea>`);
+    const t = box.querySelector(".prompt-box"); t.focus(); t.select();
+  }
+}
+function wireUse(root) {
+  root.querySelectorAll("button.use").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); copyPrompt(b); }));
+}
 const badge = (s) => `<span class="badge s-${esc(s)}">${esc(STATUS[s] || s)}</span>`;
 async function get(path) {
   const r = await fetch(API + path);
@@ -256,20 +274,95 @@ async function pageSet(name) {
 
 async function pageStyles() {
   const { styles } = await get("/styles");
-  $app.innerHTML = `${head("Library", "My styles", "Styles you learned and saved in my-styles/, ready for making films.")}${styles.length ? `<div class="grid">${styles.map((s) => `<a class="panel card" href="#/styles/${esc(s.slug)}">
+  $app.innerHTML = `${head("Browse", "My styles", "Styles you learned and saved in my-styles/, ready for making films.")}${styles.length ? `<div class="grid">${styles.map((s) => `<a class="panel card" href="#/styles/${esc(s.slug)}">
       ${s.has_styleframe ? `<img src="${API}/styles/${esc(s.slug)}/styleframe" alt="">` : ""}
-      <p><strong>${esc(s.en || s.slug)}</strong><br><span class="muted">based on ${esc(s.based_on || "–")}${s.source === "learned" ? " · learned from videos" : ""}</span></p></a>`).join("")}</div>`
+      <p><strong>${esc(s.en || s.slug)}</strong><br><span class="muted">based on ${esc(s.based_on || "–")}${s.source === "learned" ? " · learned from videos" : ""}</span></p>
+      <div class="use-row">${useBtn(s.en || s.slug)}</div></a>`).join("")}</div>`
     : `<p class="panel muted">No styles yet. Learn one by telling Claude: “Learn the style of the channel …”.</p>`}`;
+  wireUse($app);
 }
 
 async function pageStyle(slug) {
   const s = await get(`/styles/${encodeURIComponent(slug)}`);
   const ref = s.reference || {};
-  $app.innerHTML = `${back("#/styles", "Styles")}${head(esc(slug), esc(s.en || slug), `Base technique ${esc(s.based_on || "–")} · ${s.source === "learned" ? `learned from ${ref.videos ?? "?"} videos, ${num(ref.measured_seconds, 0)} seconds measured` : "custom style"}${s.created ? ` · saved ${esc(s.created)}` : ""}`)}
+  $app.innerHTML = `${back("#/styles", "Styles")}${head(esc(slug), esc(s.en || slug), `Base technique ${s.based_on_in_library ? `<a href="#/library/${esc(s.based_on)}">${esc(s.based_on)}</a>` : esc(s.based_on || "–")} · ${s.source === "learned" ? `learned from ${ref.videos ?? "?"} videos, ${num(ref.measured_seconds, 0)} seconds measured` : "custom style"}${s.created ? ` · saved ${esc(s.created)}` : ""}`)}
+    <div class="use-row">${useBtn(s.en || slug)}</div>
     ${s.has_styleframe ? `<p><img class="shot" data-zoom src="${API}/styles/${esc(slug)}/styleframe" alt="Proof frame"></p>` : ""}
     <h2>STYLE.md</h2><div class="panel md">${s.style_html}</div>
     ${s.evidence_html ? `<h2>Evidence</h2><div class="panel md">${s.evidence_html}</div>` : ""}`;
-  zoomable($app);
+  zoomable($app); wireUse($app);
+}
+
+// ---------- style library (004) ----------
+let libHash = "#/library";
+async function pageLibrary() {
+  const lib = await get("/library");
+  const params = new URLSearchParams(location.hash.split("?")[1] || "");
+  let group = params.get("group") || "", q = params.get("q") || "";
+  if (!lib.installed) {
+    $app.innerHTML = `${head("Browse", "Library", "")}<p class="notice">The style library is not installed yet. Run <code>sh bin/studio setup</code>, then reload this page.</p>`;
+    return;
+  }
+  const n = lib.styles.length;
+  $app.innerHTML = `${head("Browse", "Library", `${n} styles from the pinned library (version ${esc(lib.version)}). Pick one, then make a film with it in Claude Code.`)}
+    ${lib.posters.have < lib.posters.total ? `<p class="notice">Posters: ${lib.posters.have}/${lib.posters.total}. Run <code>sh bin/studio setup</code> to download the rest.</p>` : ""}
+    ${lib.skipped ? `<p class="muted">${lib.skipped} style${lib.skipped === 1 ? " was" : "s were"} skipped because their files are missing or broken.</p>` : ""}
+    <div class="lib-tools">
+      <label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="lib-q" type="search" placeholder="Search by name or use…" value="${esc(q)}" aria-label="Search styles"></label>
+      <div class="chips" id="lib-groups"></div>
+    </div>
+    <p class="muted" id="lib-count"></p>
+    <div class="lib-grid" id="lib-grid"></div>`;
+  const chips = document.getElementById("lib-groups"), grid = document.getElementById("lib-grid"), count = document.getElementById("lib-count");
+  const card = (s) => `<article class="panel lib-card" data-slug="${esc(s.slug)}" tabindex="0">
+      ${s.has_poster ? `<img src="${API}/library/styles/${esc(s.slug)}/poster" alt="" loading="lazy" decoding="async">`
+        : `<div class="poster-ph"><span>${esc(s.en)}</span></div>`}
+      <div class="lib-body"><p class="lib-num">#${esc(s.num)} · ${esc(s.category)}</p>
+        <h3>${esc(s.en)}</h3>
+        <p class="lib-film"><em>${esc(s.film)}</em></p><p class="muted lib-line">${esc(s.line)}</p>
+        <p class="pills">${s.uses.map((u) => `<span class="pill">${esc(u)}</span>`).join("")}</p>
+        <div class="use-row">${useBtn(s.en)}</div></div></article>`;
+  const draw = () => {
+    const words = fold(q).split(/\s+/).filter(Boolean);
+    const hits = lib.styles.filter((s) => (!group || s.category === group)
+      && words.every((w) => fold([s.en, s.cn, s.slug, ...s.uses].join(" ")).includes(w)));
+    chips.innerHTML = [{ name: "", count: n }, ...lib.groups].map((g) =>
+      `<button class="chip ${g.name === group ? "on" : ""}" data-g="${esc(g.name)}">${esc(g.name || "All")} <span>${g.count}</span></button>`).join("");
+    count.textContent = hits.length === n ? "" : `${hits.length} of ${n} styles`;
+    grid.innerHTML = hits.length ? hits.map(card).join("")
+      : `<div class="panel empty-results"><p>No styles match.</p><button id="lib-clear">Clear filters</button></div>`;
+    const qs = new URLSearchParams(); if (group) qs.set("group", group); if (q) qs.set("q", q);
+    libHash = "#/library" + (qs.toString() ? "?" + qs : "");
+    if (location.hash !== libHash) history.replaceState(null, "", libHash);
+    chips.querySelectorAll(".chip").forEach((c) => (c.onclick = () => { group = c.dataset.g; draw(); }));
+    document.getElementById("lib-clear")?.addEventListener("click", () => { group = ""; q = ""; document.getElementById("lib-q").value = ""; draw(); });
+    grid.querySelectorAll(".lib-card").forEach((c) => {
+      const open = () => { location.hash = `#/library/${c.dataset.slug}`; };
+      c.onclick = open; c.onkeydown = (e) => { if (e.key === "Enter" && e.target === c) open(); };
+    });
+    wireUse(grid);
+  };
+  document.getElementById("lib-q").addEventListener("input", (e) => { q = e.target.value; draw(); });
+  draw();
+}
+
+async function pageLibStyle(slug) {
+  const s = await get(`/library/styles/${encodeURIComponent(slug)}`);
+  $app.innerHTML = `${back(libHash, "Library")}${head(`#${esc(s.num)} · ${esc(s.category)}`, esc(s.en), `${esc(s.cn)} · <code>${esc(s.slug)}</code>`)}
+    <div class="split"><div>
+      ${s.has_poster ? `<img class="shot" data-zoom src="${API}/library/styles/${esc(s.slug)}/poster" alt="Poster of ${esc(s.en)}">`
+        : `<div class="poster-ph big"><span>${esc(s.en)}</span></div>`}
+      <h2>Style rules (STYLE.md)</h2><div class="panel md">${s.style_html}</div>
+    </div><aside class="aside panel"><p class="section-title">Demo film</p>
+      <p style="font-weight:600;margin:0 0 4px"><em>${esc(s.film)}</em></p>
+      <p class="muted" style="margin:0 0 12px">${esc(s.line)}${s.dur ? ` (${num(s.dur, 1)} s)` : ""}</p>
+      ${s.github_url ? `<p><a href="${esc(s.github_url)}" target="_blank" rel="noopener">Watch the demo film on GitHub ↗</a></p>` : ""}
+      <p class="section-title" style="margin-top:18px">Good for</p>
+      <p class="pills">${s.uses.map((u) => `<span class="pill">${esc(u)}</span>`).join("")}</p>
+      <div class="use-row">${useBtn(s.en)}</div>
+    </aside></div>`;
+  zoomable($app); wireUse($app);
 }
 
 // ---------- router, live updates, waiting badge, notifications ----------
@@ -277,6 +370,7 @@ const routes = [
   [/^#\/?(\?.*)?$/, pageJobs, "jobs"], [/^#\/jobs\/([^/?]+)$/, pageJob, "jobs"], [/^#\/reviews\/([^/?]+)$/, pageReview, "jobs"],
   [/^#\/films$/, pageFilms, "films"], [/^#\/films\/([^/?]+)$/, pageFilm, "films"],
   [/^#\/sets$/, pageSets, "sets"], [/^#\/sets\/([^/?]+)$/, pageSet, "sets"],
+  [/^#\/library(\?.*)?$/, pageLibrary, "library"], [/^#\/library\/([^/?]+)$/, pageLibStyle, "library"],
   [/^#\/styles$/, pageStyles, "styles"], [/^#\/styles\/([^/?]+)$/, pageStyle, "styles"],
 ];
 let rendering = null;
@@ -326,7 +420,7 @@ function onChange() {           // coalesce bursts of events into one refresh
     refreshPending(true);
     const h = location.hash || "#/";
     const editing = document.activeElement && document.activeElement.id === "note";
-    if (!editing && !/^#\/(films|sets|styles)/.test(h)) route();
+    if (!editing && !/^#\/(films|sets|styles|library)/.test(h)) route();
   }, 300);
 }
 function connect() {

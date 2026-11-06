@@ -155,6 +155,20 @@ def create_app() -> FastAPI:
     def styleframe(slug: str):
         return FileResponse(resources.styleframe(slug), media_type="image/jpeg")
 
+    # ---------- style library (004) ----------
+    @app.get(api + "/library")
+    def get_library():
+        return resources.library()
+
+    @app.get(api + "/library/styles/{slug}")
+    def get_library_style(slug: str):
+        return resources.library_style(slug)
+
+    @app.get(api + "/library/styles/{slug}/poster")
+    def library_poster(slug: str):
+        return FileResponse(resources.library_poster(slug), media_type="image/jpeg",
+                            headers={"Cache-Control": "max-age=86400"})
+
     # ---------- live events ----------
     def snapshot() -> dict:
         snap = {}

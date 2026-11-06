@@ -57,12 +57,42 @@ class Project:
             "ref": "proof/out/ref.jpg", "ours": "proof/out/ours_r1_0.jpg"}))
         st = d / "my-styles" / "demo-style"
         st.mkdir(parents=True)
-        (st / "style.json").write_text(json.dumps({"slug": "demo-style", "en": "Demo Style", "based_on": "scifi-toon",
+        (st / "style.json").write_text(json.dumps({"slug": "demo-style", "en": "Demo Style", "based_on": "art-deco",
                                                    "source": "learned", "reference": {"videos": 5, "measured_seconds": 900}}))
         (st / "STYLE.md").write_text("# Demo Style — Style Prompt\n\n| a | b |\n|---|---|\n| 1 | 2 |\n<img src=x onerror=alert(1)>\n")
         (st / "EVIDENCE.md").write_text("# Evidence\n")
         jpg(st / "styleframe.jpg")
+        self.make_library()
         (d / "secret.txt").write_text("do not serve")
+
+    SHA = "bebbbe1aa92a3cb4bb6f83500e61b23a17d1aa00"
+
+    def make_library(self):
+        """A small fake style library (004): two good styles, the template, a broken one, a bad name."""
+        lib = self.dir / "lib" / "lemo-opuscar"
+        (lib / ".git").mkdir(parents=True)
+        (lib / ".git" / "HEAD").write_text(self.SHA + "\n")
+        (self.dir / "library.lock").write_text("LIB_REPO=https://github.com/lemomo-ai/lemo-opuscar.git\nLIB_COMMIT=" + self.SHA + "\n")
+        s = lib / "styles"
+        for slug, num, cat, poster in (("art-deco", "18", "Graphic & Type", True), ("woodcut", "7", "Print & Printmaking", False)):
+            (s / slug).mkdir(parents=True)
+            (s / slug / "style.json").write_text(json.dumps({
+                "slug": slug, "num": num, "en": slug.replace("-", " ").title(), "cn": "装饰", "category_en": cat,
+                "category_cn": "x", "film": f"{slug} film", "line": "One sentence.", "line_cn": "x",
+                "uses": ["Galas", "Invitations"], "frame_sec": 1.0, "dur": 58.4}))
+            (s / slug / "STYLE.md").write_text(f"# {slug}\n<script>alert(1)</script>\n")
+            if poster:
+                jpg(s / slug / "poster.jpg", (200, 160, 40))
+        (s / "_template").mkdir()
+        (s / "_template" / "style.json").write_text('{"en": "My Style"}')
+        (s / "_template" / "STYLE.md").write_text("tpl")
+        (s / "broken").mkdir()
+        (s / "broken" / "style.json").write_text("{not json")
+        (s / "broken" / "STYLE.md").write_text("x")
+        (s / "BadName").mkdir()
+        (s / "BadName" / "style.json").write_text('{"en": "Bad"}')
+        (s / "BadName" / "STYLE.md").write_text("x")
+        (lib / "AGENTS.md").write_text("secret library file")
 
     def cli(self, *args, timeout=30):
         return subprocess.run([PY, CLI, *args], capture_output=True, text=True, timeout=timeout, env=os.environ.copy())

@@ -55,7 +55,11 @@ sh bin/studio ui status    # / ui stop
 Khi Claude bắt đầu học phong cách hoặc làm phim, giao diện tự bật chạy nền và Claude in link. Trên giao diện:
 - **Việc**: bước đang chạy, tiến độ, nhật ký, lỗi; việc chờ duyệt được làm nổi bật, tab trình duyệt hiện `(n) chờ duyệt` và có thông báo.
 - **Duyệt**: đọc tóm tắt phong cách (lần 1), xem khung gốc cạnh khung vẽ bằng code kèm số đo (lần 2), bấm Đồng ý / Yêu cầu sửa. Claude nhận quyết định ngay; vẫn có thể trả lời trong khung chat như cũ, quyết định đầu tiên được giữ.
-- **Phim**, **Hồ sơ đo**, **Phong cách**: xem phim đã render (có phụ đề), số đo của bộ tham chiếu, phong cách đã lưu.
+- **Library**: 66 phong cách của thư viện với poster, lọc theo nhóm, tìm theo tên hoặc mục đích dùng, đọc luật đầy đủ; nút **Use this style** chép sẵn câu lệnh để dán vào Claude Code. Phim mẫu xem trên GitHub qua link.
+- **My styles**: phong cách bạn đã học, có Use this style và link tới phong cách nền trong Library.
+- **Films**, **Measurements**: xem phim đã render (có phụ đề), số đo của bộ tham chiếu.
+
+`sh bin/studio setup` tải thêm poster của 66 phong cách (khoảng 22 MB), không tải phim mẫu. Máy đã cài trước đây chỉ cần chạy lại `setup`.
 
 Máy chủ chỉ nghe `127.0.0.1`, không cần tài khoản. API v1 cho công cụ khác: `/api/v1/docs` (xem `specs/003-studio-ui/contracts/api-v1.md`).
 
@@ -81,7 +85,8 @@ Máy chủ chỉ nghe `127.0.0.1`, không cần tài khoản. API v1 cho công c
 | — | Hiến pháp dự án (`.specify/memory/constitution.md`) | v2.0.0 |
 | 001 | Khung xưởng phim | Xong |
 | 002 | Skill học phong cách từ kênh YouTube | Xong |
-| 003 | Giao diện web + API v1 (theo dõi việc, duyệt, xem kết quả) | Xong (chờ chạy thử trên máy người dùng) |
+| 003 | Giao diện web + API v1 (theo dõi việc, duyệt, xem kết quả) | Xong |
+| 004 | Thư viện phong cách trên Film Studio | Xong (chờ chạy thử trên máy người dùng) |
 
 ## Nguồn tham khảo
 - [github/spec-kit](https://github.com/github/spec-kit): quy trình, template và script (MIT, xem `.specify/LICENSE-spec-kit`).

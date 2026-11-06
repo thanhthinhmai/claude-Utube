@@ -35,10 +35,11 @@ U="$W/upstream lib"
 mkdir -p "$U/core/render" "$U/styles/a/demo" "$U/styles/_template" "$U/plugin/skills/lemo-opuscar/scripts"
 echo agents > "$U/AGENTS.md"; echo r > "$U/core/render/video.mjs"; echo '{}' > "$U/package-lock.json"
 echo a > "$U/styles/a/STYLE.md"; echo demo > "$U/styles/a/demo/x.js"; echo tpl > "$U/styles/_template/STYLE.md"
+echo jpg-a > "$U/styles/a/poster.jpg"
 printf '#!/bin/sh\necho "LEMO_HOME=$LEMO_OPUSCAR_HOME ARGS=$*"\n' > "$U/plugin/skills/lemo-opuscar/scripts/setup.sh"
 $G -C "$U" init -q && $G -C "$U" add -A && $G -C "$U" commit -qm c1
 C1=$(git -C "$U" rev-parse HEAD)
-mkdir -p "$U/styles/b"; echo b > "$U/styles/b/STYLE.md"
+mkdir -p "$U/styles/b"; echo b > "$U/styles/b/STYLE.md"; echo jpg-b > "$U/styles/b/poster.jpg"
 $G -C "$U" add -A && $G -C "$U" commit -qm c2
 C2=$(git -C "$U" rev-parse HEAD)
 
@@ -68,6 +69,44 @@ check "đánh dấu studio.managed" [ "$(git -C "$L" config --get studio.managed
 check "không đặt lemo.managed" [ -z "$(git -C "$L" config --get lemo.managed || true)" ]
 check "không còn thư mục tạm" [ ! -e "$P/lib/.lemo-opuscar.tmp" ]
 check "báo sẵn sàng" has "xưởng sẵn sàng"
+check "máy mới có poster (004)" [ -f "$L/styles/a/poster.jpg" ]
+check "máy mới báo đã có poster" has "đã có poster: 1/1"
+
+# Máy cài trước 004: danh sách sparse cũ, chưa có poster
+old_install() {
+  printf '%s\n' '/*' '!/styles/*/demo/' '!/styleboard/' '!/docs/frames/' '!/docs/cover.jpg' '!/docs/opuscar98.jpg' '!/styles/*/poster.jpg' \
+    > "$L/.git/info/sparse-checkout"
+  git -C "$L" sparse-checkout reapply 2>/dev/null
+}
+old_install
+check "giả máy cũ: không có poster" [ ! -e "$L/styles/a/poster.jpg" ]
+INODE=$(ls -di "$L/.git" | cut -d' ' -f1)
+run setup
+check "máy cũ: setup mã 0" rc_is 0
+check "máy cũ: nhận poster" [ -f "$L/styles/a/poster.jpg" ]
+check "máy cũ: không tải lại thư viện" [ "$(ls -di "$L/.git" | cut -d' ' -f1)" = "$INODE" ]
+check "máy cũ: vẫn không có demo" [ ! -e "$L/styles/a/demo" ]
+check "thư viện không bị sửa (SC-007)" [ -z "$(git -C "$L" status --porcelain)" ]
+run setup
+check "đã có poster: chạy lại không tải gì" sh -c '! printf "%s" "$1" | grep -q "tải poster"' _ "$OUT"
+
+# Tải poster lỗi: git giả hỏng ở bước sparse-checkout
+REALGIT=$(command -v git)
+printf '#!/bin/sh\ncase " $* " in *" sparse-checkout "*) echo "fatal: unable to access" >&2; exit 128 ;; esac\nexec "%s" "$@"\n' "$REALGIT" > "$FAKE/git"
+chmod +x "$FAKE/git"
+old_install
+run setup
+check "poster lỗi: setup vẫn mã 0" rc_is 0
+check "poster lỗi: báo chưa tải được" has "poster chưa tải được"
+check "poster lỗi: thư viện vẫn dùng được" [ -f "$L/styles/a/STYLE.md" ]
+mv "$L" "$W/lib-saved"
+run setup
+check "poster lỗi ở lần cài đầu: mã 0, thư viện có" sh -c '[ "$1" -eq 0 ] && [ -f "$2/styles/a/STYLE.md" ]' _ "$RC" "$L"
+check "poster lỗi ở lần cài đầu: báo chưa tải được" has "poster chưa tải được"
+rm -rf "$L"; mv "$W/lib-saved" "$L"
+rm -f "$FAKE/git"
+run setup
+check "có mạng lại: setup lấy được poster" [ -f "$L/styles/a/poster.jpg" ]
 
 mv "$U" "$U.off"
 run setup
@@ -137,6 +176,7 @@ run status --json
 check "sẵn sàng → mã 0" rc_is 0
 check "JSON hợp lệ" json_ok
 check "đếm phong cách thư viện = 2 (bỏ _template)" has '"library_styles":2'
+check "đếm poster = 2" has '"library_posters":2'
 check "đếm phong cách riêng = 0, phim = 0" has '"my_styles":0,"films":0'
 mkdir -p "$P/my-styles/night" "$P/films/coffee"; echo s > "$P/my-styles/night/STYLE.md"
 run status --json
