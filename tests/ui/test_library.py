@@ -75,6 +75,13 @@ class Library(unittest.TestCase):
         self.assertLess(time.time() - t, 0.5)
         self.assertEqual(len(r["styles"]), 66)
 
+    def test_ui_files_are_revalidated(self):  # an old cached app.js once hid the Library page
+        for path in ("/", "/app.js", "/style.css"):
+            r = self.c.get(path)
+            self.assertEqual((r.status_code, r.headers.get("cache-control")), (200, "no-cache"), path)
+            again = self.c.get(path, headers={"If-None-Match": r.headers["etag"]})
+            self.assertEqual(again.status_code, 304, path)
+
     def test_my_styles_link_to_library(self):  # FR-013
         self.assertTrue(self.c.get("/api/v1/styles").json()["styles"][0]["based_on_in_library"])
         self.assertTrue(self.c.get("/api/v1/styles/demo-style").json()["based_on_in_library"])
