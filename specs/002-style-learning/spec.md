@@ -13,6 +13,7 @@
 - Q: Giới hạn độ dài video? → A: Mọi độ dài. Video ≤ 3 phút đo toàn bộ; video dài hơn đo một đoạn đại diện (mặc định 3 phút gồm phần mở đầu và các đoạn rải đều), đo đủ mọi khung trong đoạn đó.
 - Q: Phim demo có thuộc tính năng này không? → A: Không. Tách thành tính năng riêng; tính năng này kết thúc ở phong cách đã lưu cùng khung chứng minh.
 - Q: Bước phân tích 9 khía cạnh nên do nhiều agent song song hay một agent làm lần lượt? → A: 3 agent song song, mỗi agent một nhóm: hình (màu, viền, ánh sáng, chất liệu, nhân vật), chuyển động và chiều sâu, âm thanh và kịch bản.
+- Q: Bản phong cách viết bằng ngôn ngữ nào? → A: `STYLE.md` (và các file phong cách khác) bằng tiếng Anh để khớp thư viện; mọi bản tóm tắt trình người dùng duyệt bằng tiếng Việt (ngôn ngữ người dùng).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -102,6 +103,7 @@ Xưởng vẽ **một khung hình bằng code** theo bản phong cách, đặt *
 - **FR-014**: Bản phong cách MUST theo khung 11 mục của thư viện; mỗi luật MUST dẫn tới ít nhất một con số trong hồ sơ đo hoặc một khung hình cụ thể.
 - **FR-015**: Bản phong cách MUST NOT chứa tên kênh, tên người, tên nhân vật, câu thoại nguyên văn hay tiêu đề video của kênh gốc. Xưởng MUST kiểm tra điều này trước khi trình duyệt và trước khi lưu.
 - **FR-016**: Xưởng MUST dừng chờ người dùng duyệt bản phong cách (duyệt lần 1) trước khi chứng minh.
+- **FR-016a**: Bản phong cách và các file của phong cách MUST viết bằng tiếng Anh (như phong cách thư viện). Mọi bản tóm tắt trình người dùng duyệt (lần 1 và lần 2) MUST viết bằng ngôn ngữ của người dùng, mặc định tiếng Việt.
 
 **Chứng minh và lưu**
 - **FR-017**: Xưởng MUST dựng một khung hình bằng code theo bản phong cách và tạo ảnh ghép gốc–dựng lại kèm bảng chênh lệch các chỉ số của FR-006 và bảng màu.
