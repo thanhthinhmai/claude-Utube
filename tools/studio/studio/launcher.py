@@ -1,6 +1,7 @@
 """Start the web server in the background, check it, stop it (research.md §7)."""
 import json
 import os
+import re
 import signal
 import socket
 import subprocess
@@ -71,31 +72,57 @@ def code_stamp() -> str:
     return str(max((f.stat().st_mtime_ns for f in files), default=0))
 
 
-def _orphans() -> list:
-    """Studio servers of THIS project that server.json does not know about (left from an older run)."""
+def _servers() -> list:
+    """(pid, port) of every studio server started from this code folder, whatever project it serves."""
     try:
         out = subprocess.run(["ps", "-ww", "-eo", "pid=,args="], capture_output=True, text=True, timeout=5).stdout
     except (OSError, subprocess.SubprocessError):
         return []
-    known = (info() or {}).get("pid")
     mine = f"--app-dir {TOOLS} "
-    pids = []
+    found = []
     for line in out.splitlines():
         pid, _, args = line.strip().partition(" ")
-        if "studio.server:app" in args and mine in args + " " and pid.isdigit() and int(pid) not in (known, os.getpid()):
-            pids.append(int(pid))
-    return pids
+        if "studio.server:app" in args and mine in args + " " and pid.isdigit():
+            m = re.search(r"--port (\d+)", args)
+            found.append((int(pid), int(m.group(1)) if m else None))
+    return found
+
+
+def _owner(port):
+    """Project folder a server serves; "" for an older server that does not say; None if it does not answer."""
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/v1/health", timeout=1.0) as r:
+            d = json.loads(r.read())
+    except Exception:
+        return None
+    return d.get("root", "") if d.get("app") == APP_ID else None
+
+
+def _orphans() -> list:
+    """Studio servers of THIS project that server.json does not know about (left from an older run).
+    A server of another project that shares this code (e.g. the tests' throwaway projects) is left alone."""
+    known = (info() or {}).get("pid")
+    root = str(store.root())
+    return [pid for pid, port in _servers()
+            if pid not in (known, os.getpid()) and _owner(port) in (root, "")]
+
+
+def _stuck(i) -> bool:
+    """server.json's server still runs but no longer answers (e.g. a shutdown that hung)."""
+    pid = (i or {}).get("pid")
+    return _pid_alive(pid) and not _health(i.get("port")) and pid in [p for p, _ in _servers()]
 
 
 def _kill(pid: int):
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except OSError:
-        return
-    for _ in range(50):
-        if not _pid_alive(pid):
+    for sig, tries in ((signal.SIGTERM, 50), (signal.SIGKILL, 10)):   # an open browser can hold a stop forever
+        try:
+            os.kill(pid, sig)
+        except OSError:
             return
-        time.sleep(0.1)
+        for _ in range(tries):
+            if not _pid_alive(pid):
+                return
+            time.sleep(0.1)
 
 
 def ensure(timeout: float = 5.0) -> dict:
@@ -108,13 +135,16 @@ def ensure(timeout: float = 5.0) -> dict:
             if i.get("code") == code_stamp():
                 return i
             _kill(i["pid"])               # code changed since it started (git pull): restart
+        elif _stuck(i):
+            _kill(i["pid"])
         log = open(store.state_dir() / "server.log", "ab")
         for port in ports():
             if not _free(port):
                 continue
             env = dict(os.environ, STUDIO_ROOT=str(store.root()))
             p = subprocess.Popen([sys.executable, "-m", "uvicorn", "studio.server:app", "--app-dir", str(TOOLS),
-                                  "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning"],
+                                  "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning",
+                                  "--timeout-graceful-shutdown", "1"],
                                  env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
             t0 = time.time()
             while time.time() - t0 < timeout:
@@ -139,7 +169,7 @@ def stop() -> bool:
         _kill(pid)
         stopped = True
     i = info()
-    if i and alive(i):               # only ever signal our own server
+    if i and (alive(i) or _stuck(i)):   # only ever signal our own server
         _kill(i["pid"])
         stopped = True
     info_path().unlink(missing_ok=True)

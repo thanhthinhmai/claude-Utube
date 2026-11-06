@@ -9,7 +9,7 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 
 | Phương thức · Đường dẫn | Trả về | Lỗi |
 |---|---|---|
-| `GET /health` | `{ok, version}` | |
+| `GET /health` | `{ok, version, app, root}` | `root`: project folder the server serves (the launcher only stops servers of its own project) |
 | `GET /jobs?status=&kind=` | `{jobs: [Job]}`, mới nhất trước | |
 | `GET /jobs/{id}` | `Job` kèm `reviews: [Review]` | `404 not_found` |
 | `GET /reviews?status=pending` | `{reviews: [Review]}` | |
