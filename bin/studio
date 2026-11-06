@@ -84,6 +84,31 @@ check_tools() {
   else
     probe python 3.11 "$pl" "cài Python 3.11+ hoặc uv: https://docs.astral.sh/uv/"
   fi
+  check_browser
+}
+# Thư viện hệ thống mà trình duyệt chạy ngầm (chụp khung, render phim) cần trên Ubuntu 24.04 / WSL
+APT_BROWSER_LIBS='libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2t64'
+# Chỉ trên Linux và chỉ khi đã cài gói của thư viện (sh bin/studio deps): trình duyệt có chạy được không
+check_browser() {
+  [ "$(uname -s 2>/dev/null)" = Linux ] || return 0
+  [ -d "$LIB/node_modules/playwright-core" ] || return 0
+  exe=${PLAYWRIGHT_CHROME:-}
+  if [ -z "$exe" ]; then
+    base=${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}
+    for f in "$base"/chromium_headless_shell-*/chrome-*/headless_shell "$base"/chromium_headless_shell-*/chrome-*/chrome-headless-shell; do
+      if [ -x "$f" ]; then exe=$f; fi
+    done
+  fi
+  if [ -z "$exe" ] || [ ! -x "$exe" ]; then
+    add_tool browser '' libs missing "chưa có trình duyệt chạy ngầm: sh bin/studio deps"; return 0
+  fi
+  command -v ldd >/dev/null 2>&1 || return 0
+  miss=$(ldd "$exe" 2>/dev/null | awk '/not found/ {print $1}' | tr '\n' ' ')
+  if [ -n "$miss" ]; then
+    add_tool browser '' libs missing "thiếu thư viện hệ thống: ${miss}→ Ubuntu/WSL: sudo apt-get install -y $APT_BROWSER_LIBS"
+  else
+    add_tool browser ok libs ok ''
+  fi
 }
 state_label() {
   case $1 in
@@ -94,7 +119,8 @@ print_tools() {
   echo "Công cụ hệ thống:"
   printf '%s' "$TOOLS" | while IFS='|' read -r n f m s h; do
     case $s in ok) mk='✓' ;; unknown) mk='?' ;; *) mk='✗' ;; esac
-    printf '  %s %-7s %-8s cần ≥ %-5s %s\n' "$mk" "$n" "${f:--}" "$m" "$(state_label "$s")"
+    if [ "$n" = browser ]; then need='đủ thư viện'; else need="≥ $m"; fi
+    printf '  %s %-7s %-8s cần %-7s %s\n' "$mk" "$n" "${f:--}" "$need" "$(state_label "$s")"
     if [ -n "$h" ]; then printf '      → %s\n' "$h"; fi
   done
 }

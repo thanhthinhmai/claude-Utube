@@ -8,7 +8,7 @@ from pathlib import Path
 from . import names, refset
 from .refset import MEDIA_EXT, StepError, UsageError
 
-PRIVATE_KEYS = {"title", "channel", "handle", "origin", "src_name", "set", "skipped"}
+PRIVATE_KEYS = {"title", "channel", "handle", "origin", "source_id", "src_name", "set", "skipped"}
 SOURCE_EXT = {".html", ".js", ".mjs", ".css", ".json", ".svg", ".woff", ".woff2", ".ttf", ".otf", ".txt", ".md"}
 RASTER_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".avif"}
 
@@ -156,7 +156,7 @@ def clean(name: str, keep: bool = False) -> int:
             print(f"− {t.relative_to(d)}")
     data = refset.load(name)
     for v in data["videos"]:
-        for k in ("origin", "title", "channel", "handle", "src_name", "src_size"):
+        for k in ("origin", "source_id", "title", "channel", "handle", "src_name", "src_size"):
             v.pop(k, None)
     data["source"]["inputs"] = []
     data["media_removed"] = datetime.date.today().isoformat()
