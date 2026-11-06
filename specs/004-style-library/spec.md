@@ -86,8 +86,8 @@ Thanh bên có hai mục riêng: "Library" (phong cách của thư viện) và "
 
 - **FR-001**: `sh bin/studio setup` MUST tải thêm poster của mọi phong cách thư viện ở phiên bản đang ghim, cùng lúc với phần thư viện hiện có, và MUST NOT tải phim mẫu hay mã nguồn phim mẫu.
 - **FR-002**: Máy đã `setup` trước tính năng này MUST nhận được poster chỉ bằng cách chạy lại `sh bin/studio setup`, không phải xoá thư viện hay tải lại từ đầu.
-- **FR-003**: Lỗi khi tải poster MUST NOT làm hỏng phần thư viện cần để làm phim; `setup` MUST báo rõ poster chưa tải được.
-- **FR-004**: Việc tải MUST NOT sửa file nào trong thư viện (hiến pháp VI); `sh bin/studio status` MUST báo có poster hay chưa (ví dụ "posters: 66/66").
+- **FR-003**: Lỗi khi tải poster MUST NOT làm hỏng phần thư viện cần để làm phim, kể cả ở lần cài đầu tiên; `setup` MUST báo rõ poster chưa tải được.
+- **FR-004**: Việc tải MUST NOT sửa file nào trong thư viện (hiến pháp VI); `sh bin/studio status` MUST báo có poster hay chưa (ví dụ "poster: 66/66").
 
 **Trang Library**
 
@@ -132,7 +132,7 @@ Thanh bên có hai mục riêng: "Library" (phong cách của thư viện) và "
 
 - Thư viện ghim (`library.lock`) có sẵn poster cho mỗi phong cách trong kho của thư viện; thông tin thẻ lấy từ file mô tả có sẵn của từng phong cách. Dung lượng poster được đo ở bước plan.
 - Phim mẫu không có trong máy; người dùng xem phim mẫu trên GitHub qua link (cần mạng).
-- Thanh bên: Jobs, Films, rồi nhóm Library gồm "Library", "My styles", "Measurements". Trang phong cách riêng ở 003 giữ nguyên, thêm nút "Use this style" và link tới phong cách nền.
+- Thanh bên: Jobs, Films, rồi nhóm "Browse" gồm "Library", "My styles", "Measurements". Trang phong cách riêng ở 003 giữ nguyên, thêm nút "Use this style" và link tới phong cách nền.
 - Câu lệnh mẫu: "Make a 40-second film in the <tên> style about …". Người dùng tự sửa thời lượng và nội dung.
 - Chỉ một người dùng trên máy của họ, như 003; không cần tài khoản.
 - Ngoài phạm vi: phát phim mẫu trong giao diện, so sánh hai phong cách, chỉnh sửa phong cách, bắt đầu làm phim từ giao diện, thư viện 98 phong cách đầy đủ ngoài bản ghim.

@@ -23,7 +23,8 @@ Thay đổi ở điểm đã có:
 ## `sh bin/studio setup` (thay đổi)
 
 - Danh sách sparse không còn loại `styles/*/poster.jpg`; vẫn loại `styles/*/demo/`, `styleboard/`, `docs/frames/`, `docs/cover.jpg`, `docs/opuscar98.jpg`.
-- Thư viện đã có (`ok`/`outdated`) mà danh sách sparse khác hoặc thiếu poster: in `↓ đang tải poster của phong cách…`, ghi danh sách, `git sparse-checkout reapply`.
+- Lần cài đầu tải thư viện **chưa kèm** poster (danh sách cũ), rồi chạy bước poster bên dưới; lỗi poster không làm hỏng lần cài.
+- Thư viện vừa cài, `ok` hoặc `outdated` mà danh sách sparse khác hoặc thiếu poster: in `↓ đang tải poster của phong cách…`, ghi danh sách, `git sparse-checkout reapply`.
   - Thành công: `✓ đã có poster: 66/66`.
   - Lỗi: `✗ poster chưa tải được (mất mạng?). Làm phim vẫn được; chạy lại: sh bin/studio setup`. Không đổi mã thoát của `setup`.
 

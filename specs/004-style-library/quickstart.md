@@ -17,6 +17,7 @@ sh tests/ui/run.sh       # API /library…, tên lạ bị từ chối, OpenAPI 
 2. `sh bin/studio status` → `poster: 66/66`. `git -C lib/lemo-opuscar status --short` không in gì (SC-007).
 3. `sh bin/studio ui`, mở URL, bấm **Library**:
    - 66 thẻ, mỗi thẻ có poster (SC-001). Trang hiện xong < 2 s (SC-003, đo bằng tab Network/Performance của trình duyệt).
+   - Bấm giờ: từ lúc mở trang tới lúc mở được Art Deco bằng ô tìm ≤ 10 s (SC-002).
    - Chọn nhóm "Hand-drawn & Painting" → 8 thẻ. Gõ `deco` → Art Deco. Tải lại trang → vẫn đúng bộ lọc (FR-008).
    - Bấm Art Deco → luật đầy đủ, link GitHub mở đúng thư mục ở commit `bebbbe1`.
    - Bấm **Use this style** → "Copied"; dán vào Claude Code thấy `Make a 40-second film in the Art Deco style about …` (SC-004).

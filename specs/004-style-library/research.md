@@ -20,7 +20,7 @@ Bản tải thử trong thư mục tạm: kho `lemo-opuscar` ở commit ghim `be
 
 Thử trên bản tải thử: đổi `.git/info/sparse-checkout` rồi chạy `git sparse-checkout reapply`. Git tự lấy các file còn thiếu (kho tải từng phần tự hỏi máy chủ), `git status` sạch.
 
-- **Decision**: Trong `setup`, nếu thư viện ở trạng thái `ok` hoặc `outdated` mà danh sách sparse khác `SPARSE` **hoặc** số poster ít hơn số phong cách, thì ghi danh sách mới và chạy `reapply`. Lỗi (mất mạng) → báo "✗ poster chưa tải được: chạy lại sh bin/studio setup khi có mạng", mã thoát vẫn theo phần thư viện (phần làm phim không hỏng). Lần sau điều kiện "thiếu poster" vẫn đúng nên `setup` thử lại.
+- **Decision**: Lần cài đầu vẫn tải với danh sách cũ (không poster), rồi dùng chung bước poster. Trong `setup`, nếu thư viện vừa cài, ở trạng thái `ok` hoặc `outdated` mà danh sách sparse khác `SPARSE` **hoặc** số poster ít hơn số phong cách, thì ghi danh sách mới và chạy `reapply`. Lỗi (mất mạng) → báo "✗ poster chưa tải được: chạy lại sh bin/studio setup khi có mạng", mã thoát vẫn theo phần thư viện (phần làm phim không hỏng). Lần sau điều kiện "thiếu poster" vẫn đúng nên `setup` thử lại.
 - **Rationale**: Không tải lại thư viện; dùng đúng cơ chế git đang dùng.
 - **Alternatives considered**: Xoá và tải lại thư viện: chậm, mất `node_modules` đã cài; tải poster riêng qua HTTP: thêm một kênh tải và không khớp phiên bản ghim một cách tự nhiên.
 
