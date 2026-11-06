@@ -14,6 +14,7 @@ Khi test thật (tính năng 002), những chỗ khó nhất là: duyệt phong 
 ### Session 2026-11-06
 
 - Q: Giao diện nên chạy khi nào? → A: Tự bật chạy nền khi một việc học phong cách hoặc làm phim bắt đầu (nếu chưa chạy), và Claude in đường link để mở; lệnh mở bằng tay vẫn có để xem kết quả cũ.
+- Q: Khi có việc chờ duyệt, xưởng báo bằng cách nào? → A: Làm nổi bật việc và đánh dấu tiêu đề tab, cộng thêm thông báo của trình duyệt (hiện ở góc màn hình hệ điều hành); không có âm thanh.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -103,6 +104,7 @@ Người dùng xem kết quả ngay trên giao diện:
 
 **Duyệt**
 - **FR-006**: Khi việc học phong cách tới lần duyệt 1 hoặc 2, xưởng MUST tạo một yêu cầu duyệt chứa đủ nội dung của US2 (lần 1: tóm tắt, 10 luật kèm số, kết luận đã sửa, cảnh báo, kỹ thuật nền; lần 2: ảnh gốc, ảnh tự vẽ, bảng 4 chỉ số kèm ngưỡng, số vòng sửa, ghi chú).
+- **FR-006a**: Khi có yêu cầu duyệt mới, giao diện MUST: làm nổi bật việc đó trong danh sách; ghi số việc chờ duyệt vào tiêu đề tab (ví dụ "(1) chờ duyệt"); và gửi một thông báo của trình duyệt dẫn thẳng tới trang duyệt, nếu người dùng đã cho phép thông báo. Lần đầu, giao diện MUST hỏi quyền thông báo kèm giải thích ngắn; người dùng từ chối thì vẫn có hai cách báo kia. Không phát âm thanh.
 - **FR-007**: Người dùng MUST đưa được một quyết định cho mỗi yêu cầu duyệt: Đồng ý · Yêu cầu sửa (bắt buộc kèm góp ý) · và riêng lần 2 khi đã hết vòng sửa: Chấp nhận dù chưa đạt · Dừng.
 - **FR-008**: Quyết định đưa trên giao diện MUST làm việc đang chạy đi tiếp mà người dùng không phải gõ trong khung chat, khi phiên Claude của việc đó còn mở.
 - **FR-009**: Quyết định trong khung chat MUST vẫn dùng được và MUST được ghi lại trên giao diện kèm nguồn ("khung chat").
@@ -143,6 +145,7 @@ Người dùng xem kết quả ngay trên giao diện:
 - **SC-001**: Mở được giao diện từ trình duyệt Windows bằng **1 lệnh**, trong **dưới 5 giây**.
 - **SC-002**: Một việc vừa bắt đầu xuất hiện trên giao diện trong **dưới 5 giây**; mỗi lần đổi bước hiện lên trong **dưới 5 giây**.
 - **SC-003**: Từ lúc bấm "Đồng ý" hay "Yêu cầu sửa" tới lúc việc tiếp tục chạy: **dưới 10 giây**, khi phiên Claude còn mở.
+- **SC-003a**: Thông báo chờ duyệt hiện trong **dưới 10 giây** kể từ khi việc tới bước duyệt, khi giao diện đang mở trong một tab (kể cả tab không được chọn).
 - **SC-004**: Duyệt lần 1 và lần 2 cần **0 lệnh** và **0 lần mở file** ngoài giao diện.
 - **SC-005**: Xem phim, hồ sơ đo và phong cách riêng cần **0 lệnh** ngoài giao diện.
 - **SC-006**: **0** yêu cầu từ máy khác trong mạng được phục vụ; **0** yêu cầu tới tệp ngoài thư mục của xưởng được phục vụ.
