@@ -15,14 +15,16 @@ ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
 LIB_REL=lib/lemo-opuscar
 LIB="$ROOT/$LIB_REL"
 TMP="$ROOT/lib/.lemo-opuscar.tmp"
-# Giống setup.sh của thư viện: bỏ demo, gallery và ảnh lớn
+# Bỏ demo, gallery và ảnh lớn; giữ poster của từng phong cách (giao diện Library, 004)
 SPARSE='/*
 !/styles/*/demo/
 !/styleboard/
 !/docs/frames/
 !/docs/cover.jpg
-!/docs/opuscar98.jpg
-!/styles/*/poster.jpg'
+!/docs/opuscar98.jpg'
+# Lần cài đầu chưa lấy poster, để lỗi tải poster không làm hỏng thư viện (poster lấy ở bước sau)
+SPARSE_BASE="$SPARSE
+!/styles/*/poster.jpg"
 
 usage() {
   sed -n '2,11s/^# \{0,1\}//p' "$0"
@@ -168,7 +170,7 @@ install_fresh() {
   git -C "$TMP" config remote.origin.partialclonefilter blob:none
   git -C "$TMP" config core.sparseCheckout true
   git -C "$TMP" config core.sparseCheckoutCone false
-  printf '%s\n' "$SPARSE" > "$TMP/.git/info/sparse-checkout"
+  printf '%s\n' "$SPARSE_BASE" > "$TMP/.git/info/sparse-checkout"
   if fetch_commit "$TMP"; then
     trap - INT TERM
     if [ -d "$LIB" ]; then rmdir "$LIB"; fi      # chỉ khi rỗng (trạng thái missing)
@@ -182,12 +184,38 @@ install_fresh() {
   return 1
 }
 short() { printf '%.7s' "$1"; }
+# get_posters: thêm poster vào bản sao thư viện (đổi danh sách sparse, không sửa file thư viện).
+# Lỗi → trả lại danh sách cũ để lần setup sau thử lại; không đổi mã thoát của setup.
+get_posters() {
+  sp="$LIB/.git/info/sparse-checkout"
+  if [ "$(cat "$sp" 2>/dev/null)" = "$SPARSE" ]; then
+    echo "✓ poster: $(count_posters "$LIB/styles")/$(count_styles "$LIB/styles")"; return 0
+  fi
+  echo "↓ đang tải poster của phong cách…"
+  old=$(cat "$sp" 2>/dev/null || true)
+  printf '%s\n' "$SPARSE" > "$sp"
+  if git -C "$LIB" sparse-checkout reapply >"$LIB/.git/studio-posters.log" 2>&1; then
+    echo "✓ đã có poster: $(count_posters "$LIB/styles")/$(count_styles "$LIB/styles")"
+  else
+    printf '%s\n' "$old" > "$sp"
+    echo "✗ poster chưa tải được (mất mạng?). Làm phim vẫn được; chạy lại: sh bin/studio setup"
+  fi
+}
 
 # ---------- đếm ----------
 count_styles() {  # thư mục con có STYLE.md, trừ _template
   n=0
   for d in "$1"/*/; do
     [ -f "${d}STYLE.md" ] || continue
+    case $(basename "$d") in _template) continue ;; esac
+    n=$((n + 1))
+  done
+  echo "$n"
+}
+count_posters() {  # phong cách (trừ _template) có poster.jpg
+  n=0
+  for d in "$1"/*/; do
+    [ -f "${d}STYLE.md" ] && [ -f "${d}poster.jpg" ] || continue
     case $(basename "$d") in _template) continue ;; esac
     n=$((n + 1))
   done
@@ -232,6 +260,7 @@ cmd_setup() {
       rc=1 ;;
   esac
   lib_state
+  if [ "$LSTATE" = ok ]; then get_posters; fi
   echo
   if [ "$LSTATE" = ok ] && [ "$TOOLS_BAD" -eq 0 ] && [ "$rc" -eq 0 ]; then
     echo "✓ xưởng sẵn sàng. Gói của thư viện cài khi phim cần: sh bin/studio deps [voice] [music]"
@@ -251,7 +280,8 @@ cmd_status() {
   read_lock
   check_tools
   if command -v git >/dev/null 2>&1; then lib_state; else LSTATE=missing; LIB_FOUND=''; fi
-  if [ "$LSTATE" = missing ] || [ "$LSTATE" = foreign ]; then n_lib=0; else n_lib=$(count_styles "$LIB/styles"); fi
+  if [ "$LSTATE" = missing ] || [ "$LSTATE" = foreign ]; then n_lib=0; n_post=0
+  else n_lib=$(count_styles "$LIB/styles"); n_post=$(count_posters "$LIB/styles"); fi
   n_my=$(count_styles "$ROOT/my-styles")
   n_films=$(count_dirs "$ROOT/films")
   deps=false
@@ -270,7 +300,7 @@ cmd_status() {
         sep=','
       done
     }
-    printf '],"counts":{"library_styles":%s,"my_styles":%s,"films":%s},"deps_core":%s}\n' "$n_lib" "$n_my" "$n_films" "$deps"
+    printf '],"counts":{"library_styles":%s,"library_posters":%s,"my_styles":%s,"films":%s},"deps_core":%s}\n' "$n_lib" "$n_post" "$n_my" "$n_films" "$deps"
   else
     echo "Xưởng: $ROOT"
     case $LSTATE in
@@ -281,7 +311,7 @@ cmd_status() {
       foreign) echo "  ✗ thư viện   $LIB_REL không phải thư viện do xưởng quản lý" ;;
     esac
     print_tools
-    echo "  Phong cách thư viện: $n_lib · phong cách riêng: $n_my · phim: $n_films"
+    echo "  Phong cách thư viện: $n_lib · poster: $n_post/$n_lib · phong cách riêng: $n_my · phim: $n_films"
     if [ "$deps" = true ]; then echo "  Gói lõi của thư viện: đã cài"; else echo "  Gói lõi của thư viện: chưa cài (cần khi làm phim) → sh bin/studio deps"; fi
     if [ "$ready" = true ]; then echo "✓ sẵn sàng"; else echo "✗ chưa sẵn sàng"; fi
   fi

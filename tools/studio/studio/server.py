@@ -28,6 +28,16 @@ class DecisionIn(BaseModel):
     note: Optional[str] = Field(default=None, max_length=4000)
 
 
+class FreshStaticFiles(StaticFiles):
+    """UI files: the browser must re-check them on every load (answered with a cheap 304 when unchanged),
+    so a `git pull` never leaves an old app.js running against a new page."""
+
+    async def get_response(self, path, scope):
+        resp = await super().get_response(path, scope)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="claude-Utube studio API", version=VERSION,
                   openapi_url="/api/v1/openapi.json", docs_url="/api/v1/docs", redoc_url=None)
@@ -155,6 +165,20 @@ def create_app() -> FastAPI:
     def styleframe(slug: str):
         return FileResponse(resources.styleframe(slug), media_type="image/jpeg")
 
+    # ---------- style library (004) ----------
+    @app.get(api + "/library")
+    def get_library():
+        return resources.library()
+
+    @app.get(api + "/library/styles/{slug}")
+    def get_library_style(slug: str):
+        return resources.library_style(slug)
+
+    @app.get(api + "/library/styles/{slug}/poster")
+    def library_poster(slug: str):
+        return FileResponse(resources.library_poster(slug), media_type="image/jpeg",
+                            headers={"Cache-Control": "max-age=86400"})
+
     # ---------- live events ----------
     def snapshot() -> dict:
         snap = {}
@@ -198,7 +222,7 @@ def create_app() -> FastAPI:
         return StreamingResponse(gen(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
-    app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
+    app.mount("/", FreshStaticFiles(directory=WEB, html=True), name="web")
     return app
 
 

@@ -157,6 +157,38 @@ video { width: 100%; max-height: 70vh; background: #000; border-radius: var(--ra
 .lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: grid; place-items: center; z-index: 20; cursor: zoom-out; }
 .lightbox img { max-width: 96vw; max-height: 94vh; border-radius: 8px; }
 
+/* ---------- thư viện phong cách (004) ---------- */
+.lib-tools { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
+.search { position: relative; display: block; max-width: 420px; }
+.search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+.search input { width: 100%; padding: 9px 12px 9px 38px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.search input:focus { outline: 2px solid var(--accent-line); border-color: var(--accent); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { padding: 5px 12px; border-radius: 999px; font-size: 13px; font-weight: 500; }
+.chip span { color: var(--muted); font-weight: 400; margin-left: 2px; }
+.chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-ink); }
+.chip.on span { color: var(--accent-ink); }
+.lib-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); margin-top: 8px; }
+.lib-card { padding: 0; overflow: hidden; display: flex; flex-direction: column; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+.lib-card:hover, .lib-card:focus-visible { border-color: var(--accent-line); box-shadow: 0 4px 16px rgba(124, 58, 237, .10); outline: none; }
+.lib-card img, .poster-ph { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: var(--hover); }
+.poster-ph { display: grid; place-items: center; background: linear-gradient(135deg, var(--accent-soft), var(--hover));
+             color: var(--accent-ink); font-weight: 600; text-align: center; padding: 12px; }
+.poster-ph.big { border-radius: var(--radius); font-size: 22px; }
+.lib-body { padding: 12px 16px 16px; display: flex; flex-direction: column; flex: 1; }
+.lib-body h3 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+.lib-num { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--accent); letter-spacing: .02em; }
+.lib-film { margin: 0; font-size: 13.5px; }
+.lib-line { margin: 2px 0 8px; font-size: 13px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.pills { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 12px; }
+.pill { padding: 1px 9px; border-radius: 999px; font-size: 12px; background: var(--hover); color: var(--muted); border: 1px solid var(--line); }
+.use-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; }
+.use-row .copied { color: var(--ok); font-size: 12.5px; }
+.prompt-box { min-height: 0; font-size: 13px; }
+.empty-results { grid-column: 1 / -1; text-align: center; }
+code { font: 12.5px ui-monospace, "SF Mono", Consolas, monospace; background: var(--hover); padding: 1px 5px; border-radius: 4px; }
+.card .use-row { margin: 8px 4px 0; }
+
 /* ---------- màn hình hẹp: thanh bên thành thanh trên ---------- */
 @media (max-width: 980px) { .split { grid-template-columns: 1fr; } .aside { position: static; } }
 @media (max-width: 760px) {
@@ -165,7 +197,7 @@ video { width: 100%; max-height: 70vh; background: #000; border-radius: var(--ra
           padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
   .side::-webkit-scrollbar { display: none; }
   .brand { padding: 0; font-size: 16px; } .brand span:last-child { display: none; }
-  nav { flex-direction: row; } nav a { padding: 6px 10px; white-space: nowrap; } .label, .side-foot { display: none; }
+  nav { flex-direction: row; } .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; } .chip { flex: none; } nav a { padding: 6px 10px; white-space: nowrap; } .label, .side-foot { display: none; }
   main { padding: 20px 16px 60px; }
   h1 { font-size: 23px; }
   .pair, .prompts { grid-template-columns: 1fr; } .job { grid-template-columns: 1fr; } .badge { justify-self: start; }

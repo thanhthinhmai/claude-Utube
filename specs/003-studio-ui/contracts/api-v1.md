@@ -25,11 +25,14 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 | `GET /sets/{set}/sheets` | `{sheets: [file]}` hoặc `{removed: true}` | |
 | `GET /sets/{set}/sheets/{file}` | `image/jpeg` | `404` · `400 bad_name` |
 | `GET /sets/{set}/proof/{file}` | `image/jpeg` | `404` · `400 bad_name` |
-| `GET /styles` | `{styles: [style.json + slug]}` | |
-| `GET /styles/{slug}` | `style.json`, `style_html`, `evidence_html` | `404` |
+| `GET /styles` | `{styles: [style.json + slug + based_on_in_library]}` | |
+| `GET /styles/{slug}` | `style.json`, `style_html`, `evidence_html`, `based_on_in_library` | `404` |
 | `GET /styles/{slug}/styleframe` | `image/jpeg` | `404` |
+| `GET /library` | `{installed, version, styles: [LibraryStyle], groups: [{name, count}], posters: {have, total}, skipped}` (004) | |
+| `GET /library/styles/{slug}` | `LibraryStyle` kèm `style_html` (004) | `404 not_found` · `400 bad_name` |
+| `GET /library/styles/{slug}/poster` | `image/jpeg`, `Cache-Control: max-age=86400`, `ETag` (004) | `404` · `400 bad_name` |
 | `GET /events` | `text/event-stream`: `job.updated`, `review.created`, `review.decided` với `data: {"id": "…"}`; `: ping` mỗi 15 s | |
 
 **Phi chức năng:**
-- Không điểm truy cập nào trả nội dung tệp ngoài `films/`, `references/`, `my-styles/`, `tools/studio/studio/web/`.
+- Không điểm truy cập nào trả nội dung tệp ngoài `films/`, `references/`, `my-styles/`, `lib/lemo-opuscar/styles/` (chỉ `style.json`, `STYLE.md`, `poster.jpg`; 004), `tools/studio/studio/web/`.
 - Mã tài nguyên: `[a-z0-9-]{1,60}`; tên ảnh ghép `v\d{2}_\d{4}\.jpg`; tên ảnh chứng minh `(ref|ours_r\d+_[\d.]+)\.jpg`.

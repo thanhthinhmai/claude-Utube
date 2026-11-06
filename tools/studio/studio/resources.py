@@ -160,7 +160,8 @@ def styles() -> list:
     for p in sorted(base.glob("*/style.json")) if base.exists() else []:
         if NAME.match(p.parent.name):
             meta = store.read_json(p) or {}
-            out.append({**meta, "slug": p.parent.name, "has_styleframe": (p.parent / "styleframe.jpg").is_file()})
+            out.append({**meta, "slug": p.parent.name, "has_styleframe": (p.parent / "styleframe.jpg").is_file(),
+                        "based_on_in_library": in_library(meta.get("based_on"))})
     return out
 
 
@@ -171,6 +172,7 @@ def style(slug: str) -> dict:
         raise StudioError("not_found", f"không có phong cách \"{slug}\"", 404)
     read = lambda f: (d / f).read_text(encoding="utf-8", errors="replace") if (d / f).is_file() else ""  # noqa: E731
     return {**meta, "slug": slug, "has_styleframe": (d / "styleframe.jpg").is_file(),
+            "based_on_in_library": in_library(meta.get("based_on")),
             "style_html": to_html(read("STYLE.md")), "evidence_html": to_html(read("EVIDENCE.md"))}
 
 
@@ -180,3 +182,105 @@ def styleframe(slug: str) -> Path:
 
 def escape(s: str) -> str:
     return html.escape(s or "")
+
+
+# ---------- style library (004) ----------
+LIB_FIELDS = ("num", "en", "cn", "film", "line", "uses", "dur")
+
+
+def lib_dir() -> Path:
+    return store.root() / "lib" / "lemo-opuscar"
+
+
+def _lib_commit() -> str:
+    head = (lib_dir() / ".git" / "HEAD")
+    try:
+        sha = head.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+    return sha if re.fullmatch(r"[0-9a-f]{40}", sha) else ""
+
+
+def _github_base() -> str:
+    """https://github.com/<owner>/<repo> from library.lock, or "" when the library is not on GitHub."""
+    try:
+        lock = (store.root() / "library.lock").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    m = re.search(r"^LIB_REPO=https://github\.com/([\w.-]+)/([\w.-]+?)(?:\.git)?/?\s*$", lock, re.M)
+    return f"https://github.com/{m.group(1)}/{m.group(2)}" if m else ""
+
+
+def _lib_entry(d: Path, base: str, sha: str):
+    """One library style as served by the API, or None when its files are missing or broken."""
+    try:
+        meta = store.read_json(d / "style.json")
+    except (OSError, ValueError):
+        meta = None
+    if not isinstance(meta, dict) or not meta.get("en") or not (d / "STYLE.md").is_file():
+        return None
+    out = {"slug": d.name, **{k: meta.get(k) for k in LIB_FIELDS}}
+    out["num"] = str(out["num"] or "")
+    out["uses"] = [str(u) for u in (out["uses"] or []) if u]
+    out["dur"] = out["dur"] or 0
+    out["category"] = meta.get("category_en") or "Other"
+    out["has_poster"] = (d / "poster.jpg").is_file()
+    out["github_url"] = f"{base}/tree/{sha}/styles/{d.name}" if base and sha else None
+    return out
+
+
+def _num_key(s: dict):
+    return (int(s["num"]) if s["num"].isdigit() else 10**6, s["slug"])
+
+
+def library() -> dict:
+    styles_dir = lib_dir() / "styles"
+    if not styles_dir.is_dir():
+        return {"installed": False, "version": "", "styles": [], "groups": [], "posters": {"have": 0, "total": 0}, "skipped": 0}
+    base, sha = _github_base(), _lib_commit()
+    styles, skipped = [], 0
+    for d in sorted(p for p in styles_dir.iterdir() if p.is_dir()):
+        if d.name == "_template" or d.name.startswith("."):
+            continue
+        entry = _lib_entry(d, base, sha) if NAME.match(d.name) else None
+        if entry is None:
+            skipped += 1
+        else:
+            styles.append(entry)
+    styles.sort(key=_num_key)
+    groups = {}
+    for s in styles:
+        groups[s["category"]] = groups.get(s["category"], 0) + 1
+    return {"installed": True, "version": sha[:7], "styles": styles,
+            "groups": [{"name": k, "count": v} for k, v in groups.items()],
+            "posters": {"have": sum(s["has_poster"] for s in styles), "total": len(styles)}, "skipped": skipped}
+
+
+def _lib_style_dir(slug: str) -> Path:
+    check_name(slug)
+    if slug == "_template":
+        raise StudioError("not_found", "không có phong cách này trong thư viện", 404)
+    return _inside(lib_dir() / "styles", slug)
+
+
+def library_style(slug: str) -> dict:
+    d = _lib_style_dir(slug)
+    entry = _lib_entry(d, _github_base(), _lib_commit()) if d.is_dir() else None
+    if entry is None:
+        raise StudioError("not_found", f"không có phong cách \"{slug}\" trong thư viện", 404)
+    entry["style_html"] = to_html((d / "STYLE.md").read_text(encoding="utf-8", errors="replace"))
+    return entry
+
+
+def library_poster(slug: str) -> Path:
+    d = _lib_style_dir(slug)
+    if not d.is_dir() or _lib_entry(d, "", "") is None:
+        raise StudioError("not_found", f"không có phong cách \"{slug}\" trong thư viện", 404)
+    return _need(d / "poster.jpg")
+
+
+def in_library(slug) -> bool:
+    if not isinstance(slug, str) or not NAME.match(slug) or slug == "_template":
+        return False
+    d = lib_dir() / "styles" / slug
+    return d.is_dir() and _lib_entry(d, "", "") is not None

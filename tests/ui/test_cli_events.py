@@ -37,6 +37,27 @@ class CliAndEvents(unittest.TestCase):
         self.assertEqual(self.p.cli("ui", "stop").returncode, 0)
         self.assertEqual(self.p.cli("ui", "status").returncode, 1)
 
+    def test_ui_replaces_stale_servers(self):  # old server on the first port / code changed after git pull
+        sj = self.p.dir / ".studio" / "server.json"
+        self.assertEqual(self.p.cli("ui").returncode, 0)
+        first = json.loads(sj.read_text())
+        self.assertEqual(self.p.cli("ui").returncode, 0)
+        self.assertEqual(json.loads(sj.read_text())["pid"], first["pid"])          # unchanged code: same server
+        sj.write_text(json.dumps({**first, "code": "0"}))                          # pretend the code changed
+        self.assertEqual(self.p.cli("ui").returncode, 0)
+        second = json.loads(sj.read_text())
+        self.assertNotEqual(second["pid"], first["pid"])
+        self.assertEqual(second["port"], first["port"])                            # old one gone, port reused
+        sj.unlink()                                                                # forgotten server (orphan)
+        out = self.p.cli("ui")
+        self.assertEqual(json.loads(sj.read_text())["port"], first["port"], out.stdout)
+        third = json.loads(sj.read_text())["pid"]
+        self.assertNotEqual(third, second["pid"])
+        sj.unlink()
+        self.assertIn("đã tắt", self.p.cli("ui", "stop").stdout)                   # stop finds it without server.json
+        with self.assertRaises(OSError):
+            os.kill(third, 0)
+
     def test_job_commands(self):
         jid, _ = self.start_job()
         self.assertEqual(self.p.cli("job", "step", jid, "Đo video", "--progress", "3/5").returncode, 0)
