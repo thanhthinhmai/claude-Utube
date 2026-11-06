@@ -5,6 +5,8 @@
 #   sh bin/studio deps [voice] [music]  cài gói của thư viện (Node, Python, giọng, nhạc) vào lib/lemo-opuscar
 #   sh bin/studio deps learn [--extra]  cài công cụ học phong cách vào tools/.venv (--extra: tải video, chép lời)
 #   sh bin/studio learn <lệnh> …        học phong cách: fetch | measure | transcribe | summary | check-names | compare | save | clean
+#   sh bin/studio deps ui               cài giao diện web (tools/.venv)
+#   sh bin/studio ui [open|status|stop] mở / xem / tắt giao diện; job … · review …: sổ việc và duyệt (xem specs/003)
 #   sh bin/studio help
 # Mã thoát: 0 = sẵn sàng / xong · 1 = chưa sẵn sàng / thất bại · 2 = sai cách dùng hoặc library.lock sai.
 set -eu
@@ -23,7 +25,7 @@ SPARSE='/*
 !/styles/*/poster.jpg'
 
 usage() {
-  sed -n '2,9s/^# \{0,1\}//p' "$0"
+  sed -n '2,11s/^# \{0,1\}//p' "$0"
 }
 
 die2() { echo "✗ $*" >&2; exit 2; }
@@ -301,6 +303,11 @@ deps_learn() {
   for a in "$@"; do
     case $a in --extra) extra=1 ;; *) echo "✗ không hiểu \"$a\" (dùng: deps learn [--extra])" >&2; exit 2 ;; esac
   done
+  if [ "$extra" -eq 1 ]; then deps_tiers learn learn-extra; else deps_tiers learn; fi
+}
+
+# Cài các tầng tools/requirements-<tầng>.txt vào venv riêng của xưởng
+deps_tiers() {
   # Venv riêng của xưởng: không cài gì vào lib/ (hiến pháp VI)
   if [ ! -x "$VENV/bin/python" ] || ! "$VENV/bin/python" -c pass 2>/dev/null; then
     rm -rf "$VENV"
@@ -310,9 +317,7 @@ deps_learn() {
       "$py" -m venv "$VENV"
     fi
   fi
-  tiers=learn
-  if [ "$extra" -eq 1 ]; then tiers="learn learn-extra"; fi
-  for t in $tiers; do
+  for t in "$@"; do
     req="$ROOT/tools/requirements-$t.txt"
     sig="$(cksum < "$req" | cut -d' ' -f1)-$("$VENV/bin/python" -V 2>&1)"
     if [ "$(cat "$VENV/.studio-$t" 2>/dev/null || true)" = "$sig" ]; then echo "✓ $t đã cài"; continue; fi
@@ -324,6 +329,14 @@ deps_learn() {
   done
 }
 
+# Lệnh của giao diện và sổ việc (tools/studio): ui · job · review
+cmd_studio() {
+  if [ ! -x "$VENV/bin/python" ] || ! "$VENV/bin/python" -c 'import fastapi, uvicorn' 2>/dev/null; then
+    echo "✗ chưa cài giao diện. Chạy: sh bin/studio deps ui" >&2; exit 1
+  fi
+  STUDIO_ROOT="$ROOT" exec "$VENV/bin/python" "$ROOT/tools/studio/studio_cli.py" "$@"
+}
+
 cmd_learn() {
   if [ ! -x "$VENV/bin/python" ]; then
     echo "✗ chưa cài công cụ học phong cách. Chạy: sh bin/studio deps learn" >&2; exit 1
@@ -333,6 +346,7 @@ cmd_learn() {
 
 cmd_deps() {
   if [ "${1:-}" = learn ]; then shift; deps_learn "$@"; return 0; fi
+  if [ "${1:-}" = ui ]; then deps_tiers ui; return 0; fi
   read_lock
   lib_state
   if [ "$LSTATE" != ok ]; then
@@ -347,6 +361,7 @@ case ${1:-} in
   status) shift; cmd_status "$@" ;;
   deps) shift; cmd_deps "$@" ;;
   learn) shift; cmd_learn "$@" ;;
+  ui | job | review) cmd_studio "$@" ;;
   help | -h | --help) usage ;;
   '') usage >&2; exit 2 ;;
   *) echo "✗ lệnh lạ: $1" >&2; usage >&2; exit 2 ;;

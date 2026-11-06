@@ -18,11 +18,13 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 | `GET /films` | `{films: [{name, has_video, has_poster, has_subtitles, rendering}]}` | |
 | `GET /films/{name}` | `{name, credits, treatment_html, …}` | `404` |
 | `GET /films/{name}/video` | `video/mp4`, hỗ trợ `Range` (206) | `404` |
-| `GET /films/{name}/poster` · `/subtitles.vtt` | ảnh · WebVTT | `404` |
+| `GET /films/{name}/poster` | `image/jpeg` | `404` |
+| `GET /films/{name}/subtitles.vtt` | WebVTT (chuyển từ `.srt`) | `404` |
 | `GET /sets` | `{sets: [{set, videos, measured, media_removed}]}` | |
 | `GET /sets/{set}` | `summary`, `videos[]` (không có `origin`, `title`, `channel`) | `404` |
 | `GET /sets/{set}/sheets` | `{sheets: [file]}` hoặc `{removed: true}` | |
-| `GET /sets/{set}/sheets/{file}` · `/proof/{file}` | `image/jpeg` | `404` · `400 bad_name` |
+| `GET /sets/{set}/sheets/{file}` | `image/jpeg` | `404` · `400 bad_name` |
+| `GET /sets/{set}/proof/{file}` | `image/jpeg` | `404` · `400 bad_name` |
 | `GET /styles` | `{styles: [style.json + slug]}` | |
 | `GET /styles/{slug}` | `style.json`, `style_html`, `evidence_html` | `404` |
 | `GET /styles/{slug}/styleframe` | `image/jpeg` | `404` |
