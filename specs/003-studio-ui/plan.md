@@ -9,7 +9,7 @@ Ba phần:
 
 1. **Sổ việc và yêu cầu duyệt** (`tools/studio/`, Python): lưu trạng thái trong `.studio/` (không vào git), ghi nguyên tử. Lệnh `sh bin/studio job …` để Claude ghi việc và bước, và `sh bin/studio review …` để gửi yêu cầu duyệt rồi **chờ chặn** (`review wait`) tới khi có quyết định từ giao diện hoặc khung chat. Quyết định đầu tiên thắng nhờ tạo file độc quyền.
 2. **Máy chủ** FastAPI + uvicorn chỉ nghe `127.0.0.1`: API `/api/v1/…` có tài liệu OpenAPI tự sinh, Server-Sent Events cho cập nhật trực tiếp, phục vụ phim, ảnh và hồ sơ đo theo **mã tài nguyên**, không theo đường dẫn tự do. Kiểm `Host` và bắt buộc header riêng cho mọi lệnh ghi (chống DNS rebinding và CSRF). `job start` tự bật máy chủ chạy nền; `ui stop` tắt.
-3. **Giao diện** HTML + JavaScript thuần, không bước build, tiếng Việt: danh sách việc, trang việc, trang duyệt lần 1 và lần 2, trang phim, hồ sơ đo, phong cách riêng; tiêu đề tab và thông báo trình duyệt khi có việc chờ duyệt.
+3. **Giao diện** HTML + JavaScript thuần, không bước build, tiếng Anh (FR-021): danh sách việc, trang việc, trang duyệt lần 1 và lần 2, trang phim, hồ sơ đo, phong cách riêng; tiêu đề tab và thông báo trình duyệt khi có việc chờ duyệt.
 
 Cập nhật skill `style-learn` (bước 0–10) và luồng làm phim trong `CLAUDE.md` để ghi việc, bọc lệnh dài bằng `job run`, và đưa 2 lần duyệt qua `review request` / `review wait`.
 
@@ -73,7 +73,7 @@ tools/studio/
     ├── resources.py             # phim, bộ tham chiếu, phong cách: tìm và kiểm đường dẫn
     ├── server.py                # FastAPI app: /api/v1, SSE, tệp tĩnh, bảo mật
     ├── launcher.py              # bật nền, kiểm còn sống, tắt
-    └── web/                     # index.html, app.js, style.css (tiếng Việt)
+    └── web/                     # index.html, app.js, style.css (tiếng Anh)
 tests/ui/
 ├── run.sh
 └── test_*.py

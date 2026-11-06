@@ -107,3 +107,4 @@ MVP = Phase 1 + 2 + US1 (thấy việc chạy trên giao diện). Sau đó là U
 - FR-020a: máy chủ chạy tiến trình riêng (`start_new_session`); `job …`/`review …` chỉ ghi tệp trong `.studio/`, nên tắt giao diện (`ui stop`) không làm hỏng việc đang chạy (kiểm trong `test_job_start_launches_ui_once`).
 - `test_browser.py` tự bỏ qua khi không có `node` hoặc `playwright-core` của thư viện; đặt `STUDIO_CHROME=<đường dẫn>` nếu trình duyệt của Playwright nằm chỗ khác.
 - Giao diện đổi sang kiểu "Creative Flow" theo yêu cầu người dùng: thanh bên có biểu tượng, nền xám nhạt, thẻ trắng, điểm nhấn tím, nút chính màu đen, nhãn nhỏ chữ hoa phía trên tiêu đề, trang trống có thẻ gợi ý câu lệnh. Đã chụp kiểm tra desktop sáng và điện thoại tối.
+- Chữ trên giao diện đổi sang tiếng Anh theo yêu cầu người dùng (FR-021 cập nhật); lỗi API hiển thị theo `code`, API và CLI giữ thông báo tiếng Việt.

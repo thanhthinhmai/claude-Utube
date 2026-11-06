@@ -128,7 +128,7 @@ Người dùng xem kết quả ngay trên giao diện:
 **Vận hành**
 - **FR-020**: Người dùng MUST mở được giao diện bằng một lệnh của xưởng; lệnh in ra địa chỉ để mở trong trình duyệt. Nếu giao diện đã chạy, lệnh không mở bản thứ hai mà chỉ in địa chỉ.
 - **FR-020a**: Khi một việc học phong cách hoặc làm phim bắt đầu, xưởng MUST tự bật giao diện chạy nền nếu chưa chạy, và Claude MUST in đường link giao diện (kèm đường link tới đúng việc đó) vào khung chat. Giao diện chạy nền MUST không làm chậm hay chặn việc đang chạy, và MUST tắt được bằng một lệnh.
-- **FR-021**: Giao diện MUST dùng tiếng Việt cho mọi chữ hiển thị.
+- **FR-021**: Giao diện MUST dùng tiếng Anh cho mọi chữ cố định (nhãn, nút, thông báo, lỗi; lỗi API hiển thị theo `code`). Nội dung do Claude viết (bước, nhật ký, tóm tắt, STYLE.md) giữ nguyên ngôn ngữ gốc. *(Đổi từ tiếng Việt theo yêu cầu người dùng, 2026-11-06.)*
 
 ### Key Entities
 
