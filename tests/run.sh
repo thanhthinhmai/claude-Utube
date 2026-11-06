@@ -155,6 +155,25 @@ run status
 check "status chạy offline" rc_is 0
 mv "$U.off" "$U"
 
+echo "== trình duyệt chạy ngầm (thư viện hệ thống, Linux)"
+if [ "$(uname -s)" = Linux ]; then
+  run status --json
+  check "chưa cài deps → không có dòng browser" sh -c '! printf "%s" "$1" | grep -q "\"name\":\"browser\""' _ "$OUT"
+  mkdir -p "$L/node_modules/playwright-core" "$W/.cache/ms-playwright/chromium_headless_shell-1/chrome-linux"
+  printf '#!/bin/sh\n' > "$W/.cache/ms-playwright/chromium_headless_shell-1/chrome-linux/headless_shell"
+  chmod +x "$W/.cache/ms-playwright/chromium_headless_shell-1/chrome-linux/headless_shell"
+  printf '#!/bin/sh\necho "\tlibnss3.so => not found"\necho "\tlibc.so.6 => /lib/libc.so.6"\n' > "$FAKE/ldd"; chmod +x "$FAKE/ldd"
+  run status --json
+  check "thiếu libnss3 → browser missing, chưa sẵn sàng" has '"name":"browser","found":"","min":"libs","state":"missing"'
+  check "gợi ý lệnh apt-get kèm tên thư viện thiếu" has 'libnss3.so → Ubuntu/WSL: sudo apt-get install -y libnss3'
+  check "thiếu thư viện → mã 1" rc_is 1
+  printf '#!/bin/sh\necho "\tlibc.so.6 => /lib/libc.so.6"\n' > "$FAKE/ldd"
+  run status --json
+  check "đủ thư viện → browser ok, sẵn sàng" has '"name":"browser","found":"ok","min":"libs","state":"ok"'
+  check "đủ thư viện → mã 0" rc_is 0
+  rm -rf "$L/node_modules" "$W/.cache" "$FAKE/ldd"
+fi
+
 echo "== gitignore (SC-005)"
 echo v > "$P/films/coffee/out.mp4"; echo v > "$P/references/clip.mp4"; echo v > "$P/references/notes.txt"
 ST=$(git -C "$P" status --porcelain --untracked-files=all)
