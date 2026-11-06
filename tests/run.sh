@@ -89,6 +89,14 @@ check "máy cũ: vẫn không có demo" [ ! -e "$L/styles/a/demo" ]
 check "thư viện không bị sửa (SC-007)" [ -z "$(git -C "$L" status --porcelain)" ]
 run setup
 check "đã có poster: chạy lại không tải gì" sh -c '! printf "%s" "$1" | grep -q "tải poster"' _ "$OUT"
+# setup bị ngắt giữa chừng: danh sách mới đã ghi nhưng chưa reapply → vẫn thiếu poster
+old_install
+printf '%s\n' '/*' '!/styles/*/demo/' '!/styleboard/' '!/docs/frames/' '!/docs/cover.jpg' '!/docs/opuscar98.jpg' \
+  > "$L/.git/info/sparse-checkout"
+check "giả setup bị ngắt: danh sách mới, chưa có poster" [ ! -e "$L/styles/a/poster.jpg" ]
+run setup
+check "danh sách mới mà thiếu poster: setup tải lại" has "đã có poster: 1/1"
+check "danh sách mới mà thiếu poster: có poster" [ -f "$L/styles/a/poster.jpg" ]
 
 # Tải poster lỗi: git giả hỏng ở bước sparse-checkout
 REALGIT=$(command -v git)

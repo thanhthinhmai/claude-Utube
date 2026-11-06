@@ -104,3 +104,11 @@
 
 - Tải poster lỗi được giả bằng `git` giả trong PATH của test (chỉ hỏng ở `sparse-checkout`), không thêm móc kiểm thử vào `bin/studio`.
 - Thẻ trong My styles: chữ "based on" là chữ thường (thẻ đã là một link); link tới phong cách nền nằm ở trang chi tiết.
+
+## Phase 7: Convergence
+
+- [X] T022 Trong `tools/studio/studio/web/app.js`, đổi thẻ của trang `#/styles` từ `<a>` (đang chứa `<button>`) thành `<article>` mở trang chi tiết khi bấm/Enter như thẻ Library; chữ "based on <x>" trên thẻ là link `#/library/<x>` khi `based_on_in_library` (bấm link không mở trang chi tiết); thêm kiểm vào `tests/ui/browser_check.cjs` per FR-013, US3/AC2 (partial)
+- [X] T023 Đổi nút quay lại của trang `#/styles/<slug>` trong `tools/studio/studio/web/app.js` từ "Styles" thành "My styles" per FR-012 (partial)
+- [X] T024 Đổi nhãn nhóm trên tiêu đề trang `#/sets` trong `tools/studio/studio/web/app.js` từ "Library" thành "Browse" (trùng tên mục Library) per FR-016 (contradicts)
+- [X] T025 Trong `_lib_style_dir` của `tools/studio/studio/resources.py`, kiểm `_template` trước `check_name` để `/library/styles/_template` và `/poster` trả `404 not_found`; sửa `tests/ui/test_library.py` kiểm đúng 404 per contracts/api-library.md (contradicts)
+- [X] T026 Trong `get_posters` của `bin/studio`, khi danh sách sparse đã là `SPARSE` mà `count_posters` < `count_styles`, vẫn chạy bước `reapply` (không in ✓); thêm kiểm vào `tests/run.sh` per T003, research §2 (partial)

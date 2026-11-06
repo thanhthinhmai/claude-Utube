@@ -257,9 +257,9 @@ def library() -> dict:
 
 
 def _lib_style_dir(slug: str) -> Path:
-    check_name(slug)
-    if slug == "_template":
+    if slug == "_template":            # the library's template folder is never a style (before check_name: 404, not 400)
         raise StudioError("not_found", "không có phong cách này trong thư viện", 404)
+    check_name(slug)
     return _inside(lib_dir() / "styles", slug)
 
 

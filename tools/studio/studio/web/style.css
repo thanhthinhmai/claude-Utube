@@ -151,6 +151,8 @@ figcaption { font-size: 13px; color: var(--muted); margin-top: 6px; }
 video { width: 100%; max-height: 70vh; background: #000; border-radius: var(--radius); display: block; }
 .card { color: inherit; display: block; padding: 10px 10px 14px; }
 .card:hover { border-color: var(--accent-line); text-decoration: none; }
+.my-card { cursor: pointer; }
+.my-card:focus-visible { border-color: var(--accent-line); outline: none; }
 .card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; background: var(--hover); display: block; }
 .card p { margin: 10px 4px 0; }
 .lightbox[hidden] { display: none; }
