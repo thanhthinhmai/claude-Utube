@@ -58,6 +58,22 @@ class CliAndEvents(unittest.TestCase):
         with self.assertRaises(OSError):
             os.kill(third, 0)
 
+    def test_other_projects_server_left_alone(self):  # tests must never stop the user's real server
+        self.assertEqual(self.p.cli("ui").returncode, 0)
+        other = json.loads((self.p.dir / ".studio" / "server.json").read_text())
+        b = Project(ports="18810-18819")                    # second project, same code folder
+        try:
+            t = time.time()
+            self.assertEqual(b.cli("ui").returncode, 0)
+            self.assertLess(time.time() - t, 5)
+            self.assertEqual(b.cli("ui", "stop").returncode, 0)
+        finally:
+            b.close()                                       # also gives the env back to self.p
+        os.kill(other["pid"], 0)                            # still running
+        with urllib.request.urlopen(f"http://127.0.0.1:{other['port']}/api/v1/health") as r:
+            self.assertEqual(json.loads(r.read())["root"], str(self.p.dir.resolve()))
+        self.assertEqual(self.p.cli("ui", "stop").returncode, 0)
+
     def test_job_commands(self):
         jid, _ = self.start_job()
         self.assertEqual(self.p.cli("job", "step", jid, "Đo video", "--progress", "3/5").returncode, 0)
