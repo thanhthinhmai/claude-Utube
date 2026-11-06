@@ -9,6 +9,12 @@
 
 Khi test thật (tính năng 002), những chỗ khó nhất là: duyệt phong cách bằng cách đọc chữ trong khung chat; mở ảnh so sánh và phim bằng lệnh; không biết việc đang chạy tới đâu. Giai đoạn 1 giải quyết đúng những chỗ đó cho **một người dùng trên chính máy của họ**. Giai đoạn 2 (tính năng sau) mới đưa xưởng tới khách hàng qua internet; vì vậy giao diện lập trình (API) của giai đoạn 1 phải đủ rõ và ổn định để giai đoạn 2 dùng lại.
 
+## Clarifications
+
+### Session 2026-11-06
+
+- Q: Giao diện nên chạy khi nào? → A: Tự bật chạy nền khi một việc học phong cách hoặc làm phim bắt đầu (nếu chưa chạy), và Claude in đường link để mở; lệnh mở bằng tay vẫn có để xem kết quả cũ.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Theo dõi việc đang chạy (Priority: P1)
@@ -76,7 +82,7 @@ Người dùng xem kết quả ngay trên giao diện:
 ### Edge Cases
 
 - Khung chat (phiên Claude) bị đóng trong lúc việc đang chờ duyệt: giao diện vẫn nhận quyết định và lưu lại; việc hiện "chờ tiếp tục" cùng hướng dẫn mở lại phiên để chạy tiếp; quyết định đã lưu được dùng ngay khi tiếp tục.
-- Giao diện chưa mở khi việc tới bước duyệt: quyết định vẫn có thể đưa qua khung chat như hiện nay; mở giao diện sau vẫn thấy đúng trạng thái.
+- Giao diện bị tắt hoặc không bật được (ví dụ cổng bị chiếm) khi việc tới bước duyệt: quyết định vẫn có thể đưa qua khung chat như hiện nay; mở giao diện sau vẫn thấy đúng trạng thái.
 - Hai cửa sổ giao diện cùng mở một trang duyệt: chỉ quyết định đầu tiên được nhận.
 - Việc bị dừng giữa chừng (tắt máy, đóng terminal): việc hiện "không còn hoạt động" khi không có cập nhật quá một khoảng thời gian, không treo mãi ở "đang chạy".
 - Phim chưa render xong: trang phim hiện tiến độ thay vì trình phát.
@@ -118,7 +124,8 @@ Người dùng xem kết quả ngay trên giao diện:
 - **FR-019**: Giao diện MUST chỉ phục vụ tệp nằm trong các thư mục của xưởng (phim, bộ tham chiếu, phong cách riêng); yêu cầu ngoài các thư mục đó MUST bị từ chối.
 
 **Vận hành**
-- **FR-020**: Người dùng MUST mở được giao diện bằng một lệnh của xưởng; lệnh in ra địa chỉ để mở trong trình duyệt.
+- **FR-020**: Người dùng MUST mở được giao diện bằng một lệnh của xưởng; lệnh in ra địa chỉ để mở trong trình duyệt. Nếu giao diện đã chạy, lệnh không mở bản thứ hai mà chỉ in địa chỉ.
+- **FR-020a**: Khi một việc học phong cách hoặc làm phim bắt đầu, xưởng MUST tự bật giao diện chạy nền nếu chưa chạy, và Claude MUST in đường link giao diện (kèm đường link tới đúng việc đó) vào khung chat. Giao diện chạy nền MUST không làm chậm hay chặn việc đang chạy, và MUST tắt được bằng một lệnh.
 - **FR-021**: Giao diện MUST dùng tiếng Việt cho mọi chữ hiển thị.
 
 ### Key Entities
