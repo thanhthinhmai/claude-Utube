@@ -5,6 +5,14 @@
 **Status**: Draft
 **Input**: User description: "Skill học phong cách (style learning). Người dùng đưa một kênh YouTube (hoặc danh sách link video, hoặc file video có sẵn trên máy) và muốn xưởng học được "phong cách" của kênh đó để làm phim mới cùng phong cách nhưng nội dung của riêng mình. Theo phương pháp của claude-animated-shorts: thu thập 10–20 video gần nhất kèm tiếng gốc; xem đủ mọi khung hình chứ không lấy mẫu vài khung; đo bằng công cụ (chuyển động camera, cắt cảnh, màu sắc/độ sáng/tương phản/bão hoà, âm thanh: độ lớn, tốc độ đọc, khoảng lặng; lời thoại để tìm công thức kịch bản); phân tích theo nhiều khía cạnh (màu, viền, ánh sáng, chất liệu, nhân vật, chiều sâu, chuyển động, âm thanh, kịch bản); kiểm tra chéo số liệu với mắt nhìn và sửa kết luận sai; viết thành phong cách theo khung 11 mục của thư viện (mỗi luật kèm con số); chứng minh bằng một khung hình vẽ bằng code đặt cạnh khung gốc; làm phim demo 15–30 giây với chủ đề khác kênh gốc; lưu vào my-styles/ để dùng như phong cách thư viện. Người dùng duyệt 2 lần: sau bản phong cách và sau khung hình so sánh. Bản quyền: video tham chiếu chỉ học nội bộ, không commit, không đăng lại, không nêu tên kênh trong phim, không sao chép kịch bản hay nhân vật."
 
+## Clarifications
+
+### Session 2026-11-06
+
+- Q: Nguồn video tham chiếu? → A: Cả hai: xưởng tự tải từ link kênh hoặc link video, và vẫn nhận file người dùng đặt sẵn trong thư mục tham chiếu.
+- Q: Giới hạn độ dài video? → A: Mọi độ dài. Video ≤ 3 phút đo toàn bộ; video dài hơn đo một đoạn đại diện (mặc định 3 phút gồm phần mở đầu và các đoạn rải đều), đo đủ mọi khung trong đoạn đó.
+- Q: Phim demo có thuộc tính năng này không? → A: Không. Tách thành tính năng riêng; tính năng này kết thúc ở phong cách đã lưu cùng khung chứng minh.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Đo bộ video tham chiếu (Priority: P1)
@@ -57,21 +65,6 @@ Xưởng vẽ **một khung hình bằng code** theo bản phong cách, đặt *
 
 ---
 
-### User Story 4 - Phim demo của phong cách (Priority: P4)
-
-Sau khi lưu, xưởng làm một phim demo [NEEDS CLARIFICATION: phim demo 15–30 giây có thuộc tính năng này không, hay tách thành tính năng riêng? Phim demo tốn 30–60 phút và nhiều token mỗi lần] với chủ đề khác hẳn kênh gốc, để chứng minh phong cách dùng được cho nội dung mới.
-
-**Why this priority**: Kiểm chứng cuối cùng, nhưng phong cách đã dùng được từ P3.
-
-**Independent Test**: Phim demo có độ dài 15–30 giây, chủ đề khác kênh gốc, và đạt các chỉ số của phong cách khi đo bằng chính công cụ đo của P1.
-
-**Acceptance Scenarios**:
-
-1. **Given** phong cách đã lưu, **When** làm phim demo, **Then** phim dài 15–30 giây, không chứa tên kênh, câu thoại, nhân vật hay cảnh của kênh gốc.
-2. **Given** phim demo xong, **When** đo phim bằng công cụ của P1, **Then** các chỉ số chính nằm trong khoảng của bộ tham chiếu.
-
----
-
 ### Edge Cases
 
 - Kênh có ít hơn số video mặc định: dùng hết số video có, báo rõ, và cảnh báo nếu dưới 5 video (kết luận kém tin cậy).
@@ -87,13 +80,14 @@ Sau khi lưu, xưởng làm một phim demo [NEEDS CLARIFICATION: phim demo 15�
 ### Functional Requirements
 
 **Thu thập**
-- **FR-001**: Xưởng MUST nhận bộ video tham chiếu từ [NEEDS CLARIFICATION: nguồn nào? (a) chỉ file người dùng tự đặt vào thư mục tham chiếu; (b) xưởng tự tải từ link kênh hoặc video; (c) cả hai. Tự tải tiện hơn nhưng có thể trái điều khoản của nền tảng video, và không chạy được ở môi trường chặn nền tảng đó].
+- **FR-001**: Xưởng MUST nhận bộ video tham chiếu từ (a) link một kênh, (b) danh sách link video, hoặc (c) file người dùng đã đặt trong thư mục tham chiếu; được trộn (a)/(b) với (c).
+- **FR-001a**: Trước khi tự tải, xưởng MUST nói rõ sẽ tải bao nhiêu video, từ đâu, và nhắc người dùng chịu trách nhiệm về quyền sử dụng. Nếu môi trường chặn nền tảng video, xưởng MUST báo rõ và đề nghị người dùng đặt file vào thư mục tham chiếu.
 - **FR-002**: Khi nhận từ một kênh, xưởng MUST lấy mặc định 12 video gần nhất (người dùng đổi được, trong khoảng 3–30).
 - **FR-003**: Xưởng MUST ưu tiên tiếng gốc của video và ghi lại tiếng đã dùng.
 - **FR-004**: Video và âm thanh tham chiếu MUST chỉ nằm trong thư mục tham chiếu của dự án, MUST NOT vào version control, MUST NOT bị gửi đi hay đăng lại.
 
 **Đo**
-- **FR-005**: Xưởng MUST phân tích **100%** khung hình của mỗi video [NEEDS CLARIFICATION: giới hạn độ dài video? (a) chỉ video ngắn ≤ 3 phút; (b) mọi độ dài nhưng video dài chỉ đo một đoạn đại diện; (c) mọi độ dài, đo toàn bộ. Video dài làm số khung tăng rất nhanh: 20 video × 20 phút ≈ 720.000 khung].
+- **FR-005**: Xưởng MUST phân tích **100%** khung hình của **phần được đo** của mỗi video. Video ≤ 3 phút: phần được đo là toàn bộ video. Video > 3 phút: phần được đo là một đoạn đại diện tổng cộng 3 phút (người dùng đổi được), gồm 60 giây đầu và các đoạn rải đều trong phần còn lại; hồ sơ MUST ghi rõ các đoạn đã đo.
 - **FR-006**: Cho mỗi khung, xưởng MUST đo: độ dịch chuyển camera so với khung trước; có phải lần cắt cảnh không; độ sáng trung bình, độ tương phản, độ bão hoà; phần trăm điểm ảnh rất tối và rất sáng.
 - **FR-007**: Cho mỗi video, xưởng MUST đo: bảng màu chủ đạo (tối thiểu 6 màu, kèm tỷ lệ); số lần cắt cảnh và độ dài trung bình mỗi cảnh; tỷ lệ khung camera đứng yên; độ lớn âm thanh tổng thể; tốc độ đọc (từ/giây); tổng thời gian lặng; thời điểm lời đầu tiên.
 - **FR-008**: Xưởng MUST chép lời mỗi video kèm mốc thời gian từng từ, bằng ngôn ngữ gốc.
@@ -116,9 +110,6 @@ Sau khi lưu, xưởng làm một phim demo [NEEDS CLARIFICATION: phim demo 15�
 - **FR-021**: Tên và mã của phong cách MUST NOT trùng phong cách thư viện hoặc phong cách riêng đã có, và MUST NOT chứa tên kênh gốc.
 - **FR-022**: Sau khi lưu, luồng làm phim MUST tìm thấy và dùng được phong cách mới như một phong cách riêng.
 
-**Phim demo** (phạm vi tuỳ câu trả lời ở User Story 4)
-- **FR-023**: Phim demo MUST dài 15–30 giây, chủ đề khác kênh gốc, và được đo lại bằng công cụ đo của xưởng.
-
 ### Key Entities
 
 - **Bộ tham chiếu**: tập video của một kênh, mỗi video có nguồn, tiếng đã dùng, trạng thái (đã đo / bỏ qua kèm lý do). Chỉ nằm trên máy.
@@ -133,7 +124,7 @@ Sau khi lưu, xưởng làm một phim demo [NEEDS CLARIFICATION: phim demo 15�
 
 ### Measurable Outcomes
 
-- **SC-001**: Hồ sơ đo phủ **100%** khung hình của mọi video được nhận (số khung đã đo = số khung của video).
+- **SC-001**: Hồ sơ đo phủ **100%** khung hình của phần được đo của mọi video (số khung đã đo = số khung của phần đó).
 - **SC-002**: Với bộ video kiểm thử có đặc điểm biết trước: phát hiện cắt cảnh đúng **≥ 95%** và báo nhầm **≤ 5%**; tốc độ đọc sai lệch **≤ 10%**; độ sáng trung bình sai lệch **≤ 0,02** (trên thang 0–1).
 - **SC-003**: **100%** luật trong bản phong cách dẫn tới ít nhất một bằng chứng; **0** tên kênh, tên người, câu thoại nguyên văn trong bản phong cách.
 - **SC-004**: Khung chứng minh so với khung gốc: chênh lệch độ sáng trung bình **≤ 0,05**, độ bão hoà trung vị **≤ 0,08**, tỷ lệ điểm ảnh rất tối **≤ 5 điểm phần trăm**, và **≥ 4/6** màu chủ đạo có màu gần tương ứng.
@@ -149,4 +140,6 @@ Sau khi lưu, xưởng làm một phim demo [NEEDS CLARIFICATION: phim demo 15�
 - Khung 11 mục và định dạng phong cách riêng lấy theo thư viện ở phiên bản đã ghim (tính năng 001).
 - Phân tích theo khía cạnh có thể chạy song song nhiều agent; mỗi agent chỉ đọc hồ sơ đo và chỉ ghi báo cáo của khía cạnh mình.
 - Thời gian tải video và chép lời lần đầu (tải mô hình) không tính vào SC-005.
-- Phim demo và media chứng minh nặng không vào version control (theo `.gitignore` của 001); phong cách lưu phần nguồn và số liệu.
+- Media chứng minh nặng không vào version control (theo `.gitignore` của 001); phong cách lưu phần nguồn và số liệu.
+- Phim demo của phong cách nằm ngoài phạm vi; sẽ là một tính năng riêng, dùng luồng làm phim có sẵn.
+- Tự tải chỉ chạy được ở môi trường cho phép truy cập nền tảng video (ví dụ máy người dùng); trong môi trường bị chặn, dùng file đặt sẵn.

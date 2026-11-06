@@ -13,13 +13,13 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
 - [x] All acceptance scenarios are defined
 - [x] Edge cases are identified
-- [ ] Scope is clearly bounded
+- [x] Scope is clearly bounded
 - [x] Dependencies and assumptions identified
 
 ## Feature Readiness
@@ -33,3 +33,4 @@
 
 - Lượt kiểm tra 1: còn 3 chỗ `[NEEDS CLARIFICATION]` (nguồn video FR-001, giới hạn độ dài FR-005, phạm vi phim demo US4). Hai mục "No NEEDS CLARIFICATION" và "Scope is clearly bounded" chưa đạt cho tới khi người dùng trả lời.
 - Không nhắc công cụ cụ thể; "khung 11 mục của thư viện" là phụ thuộc đã chốt ở hiến pháp VIII.
+- Lượt kiểm tra 2 (2026-11-06): người dùng trả lời Q1: B, Q2: B, Q3: A. Đã ghi vào mục Clarifications, FR-001/001a, FR-005, SC-001, Assumptions; bỏ User Story 4 và FR-023. Tất cả mục đạt.
