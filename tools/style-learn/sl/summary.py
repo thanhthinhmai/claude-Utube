@@ -21,7 +21,7 @@ METRICS = {
     "lufs": lambda p: (p["audio"] or {}).get("lufs"),
     "lra": lambda p: (p["audio"] or {}).get("lra"),
     "silence_per_min": lambda p: ((p["audio"] or {}).get("silence_total") or 0) / max(sum(b - a for a, b in p["segments"]), 1e-6) * 60 if p["audio"] else None,
-    "first_voice_t": lambda p: (p["speech"] or {}).get("first_word_t") if p.get("speech") else (p["audio"] or {}).get("first_voice_t"),
+    "first_voice_t": lambda p: (p.get("speech") or {}).get("first_word_t", (p["audio"] or {}).get("first_voice_t")),
     "speech_rate": lambda p: (p["speech"] or {}).get("rate") if p.get("speech") else None,
 }
 
@@ -84,6 +84,8 @@ def build(name: str) -> dict:
         "dispersion_warnings": disp,
         "skipped": [{"id": v["id"], "reason": v.get("skip_reason", "")} for v in data["videos"] if v.get("state") == "skipped"],
         "low_count_warning": len(profs) < 5,
+        "no_speech": [v["id"] for v in data["videos"] if v.get("state") == "transcribed"
+                      and not ((refset.read_json(d / "profile" / v["id"] / "video.json").get("speech") or {}).get("words"))],
         "audio_unverified": [v["id"] for v in data["videos"] if v.get("state") in ("measured", "transcribed")
                              and v.get("audio_original") is not True],
     }
@@ -97,6 +99,8 @@ def to_markdown(s: dict) -> str:
            f"Video đã đo: {s['videos_measured']} · tổng thời lượng đo: {s['measured_seconds']} s · định dạng chính: {s['majority_orientation']}", ""]
     if s["low_count_warning"]:
         out += ["⚠️ Dưới 5 video: kết luận kém tin cậy.", ""]
+    if s.get("no_speech"):
+        out += ["ℹ️ Không phát hiện lời nói (chỉ nhạc hoặc tiếng động): " + ", ".join(s["no_speech"]), ""]
     if s.get("audio_unverified"):
         out += ["⚠️ Chưa xác định được đây là tiếng gốc (có thể là bản lồng tiếng): " + ", ".join(s["audio_unverified"]), ""]
     if s["dispersion_warnings"]:

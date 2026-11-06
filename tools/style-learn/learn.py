@@ -49,9 +49,12 @@ def cmd_transcribe(a):
         refset.write_json(out / "words.json", tr)
         prof = refset.read_json(out / "video.json")
         r = speech.rate(tr["words"], tr["language"])
-        if r and tr["words"]:
+        if r:
             r["first_word_t"] = tr["words"][0]["start"]
             r["language"] = tr["language"]
+        else:      # music or noise only: Whisper's language guess means nothing here
+            r = {"words": 0, "rate": None, "unit": None, "language": None,
+                 "note": tr.get("note") or "không phát hiện lời nói"}
         prof["speech"] = r
         refset.write_json(out / "video.json", prof)
         v["state"] = "transcribed"

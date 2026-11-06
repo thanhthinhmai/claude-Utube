@@ -9,6 +9,16 @@ NOTICE = ("Lưu ý: video tham chiếu chỉ để học phong cách trong máy 
           "Bạn chịu trách nhiệm về quyền sử dụng nội dung tải về.")
 
 
+def audio_original(info: dict, afmt: dict):
+    """True when the chosen audio is the original track: marked "original", or the video has only one audio
+    language (nothing was dubbed). None when there are several languages and none is marked."""
+    if "original" in (afmt.get("format_note") or "").lower():
+        return True
+    langs = {f.get("language") for f in (info.get("formats") or [])
+             if f.get("vcodec") == "none" and f.get("acodec") not in (None, "none") and f.get("language")}
+    return True if len(langs) <= 1 else None
+
+
 def check_count(n: int) -> int:
     if not 3 <= n <= 30:
         raise UsageError("--count phải trong khoảng 3–30")
@@ -98,13 +108,12 @@ def fetch_urls(name: str, kind: str, urls, count: int = 12, max_seconds: float =
         dst = vdir / f"{vid}{src.suffix}"
         src.rename(dst)
         afmt = next((f for f in (info.get("requested_formats") or []) if f.get("vcodec") == "none"), {}) or {}
-        note = (afmt.get("format_note") or "").lower()
         lang = afmt.get("language") or info.get("language") or "unknown"
         data["videos"].append({
             "id": vid, "file": dst.name, "origin": url, "title": info.get("title"),
             "channel": info.get("channel") or info.get("uploader"),
             "handle": info.get("uploader_id") or info.get("channel_id"),
-            "audio_language": lang, "audio_original": ("original" in note) if note else None,
+            "audio_language": lang, "audio_original": audio_original(info, afmt),
             "state": "fetched", "source_sig": refset.source_sig(dst)})
         log(f"✓ {vid} ← {info.get('title', '')[:60]}")
     refset.save(name, data)
