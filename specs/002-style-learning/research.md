@@ -80,6 +80,7 @@
   - Danh sách cấm = tên kênh, uploader, `@handle` và tiêu đề video từ info JSON, cộng tên do người dùng thêm (`--deny`).
   - Báo lỗi khi file phong cách chứa một mục cấm (không phân biệt hoa thường, so cả bản bỏ dấu), hoặc chứa **chuỗi 6 từ liên tiếp** có trong bất kỳ bản chép lời nào.
   - Tên kênh từ 3 từ trở lên: chặn thêm mọi cụm 2 từ liền nhau (trừ cụm chỉ gồm từ chung như studio, official, tv), để "Mèo Lười Night" cũng bị chặn khi kênh là "Mèo Lười Studio".
+  - Tên riêng trong bản chép lời: từ viết hoa không ở đầu câu, lặp từ 2 lần trở lên, cũng bị chặn (tên người dẫn, nhân vật).
   - Mã thoát 1 kèm vị trí. `save` gọi lại bước này và từ chối nếu lỗi.
 - **Rationale**: SC-003 đòi 0 tên và 0 câu thoại nguyên văn. Chuỗi 6 từ đủ dài để không bắt nhầm cụm thông dụng.
 
@@ -96,6 +97,7 @@
 | `styleframe/` | `index.html` cùng file nguồn nhỏ của khung chứng minh |
 | `styleframe.jpg` | Khung tự vẽ đã duyệt |
 
+  `styleframe/` chỉ nhận mã nguồn dạng chữ và font; ảnh raster trong `proof/` (ngoài `out/`) làm `save` từ chối, vì có thể là khung của video gốc.
   **Không lưu**: video, âm thanh, bản chép lời, bảng ảnh, ảnh ghép có khung gốc. Những thứ này ở lại `references/<set>/` (mặc định bị xoá ở bước cuối).
 - **Rationale**: SC-006, FR-015, FR-020; luồng làm phim của 001 đọc `my-styles/README.md` như danh mục `~/lemo-my-styles/README.md` của thư viện.
 - **`based_on`**: thư viện yêu cầu mỗi phong cách riêng có kỹ thuật gốc. Skill chọn phong cách thư viện có engine gần nhất (ví dụ phong cách 2D vẽ bằng Canvas, hay phong cách 3D) và ghi lý do vào `EVIDENCE.md`.

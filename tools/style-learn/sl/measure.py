@@ -81,7 +81,7 @@ def analyze(path: Path, max_seconds: float = 180, sheet_dir: Path = None, vid: s
         "frames_expected": probe.expected_frames(meta, segs), "frames_measured": n,
         "cuts": [ts[i] for i in ev["cuts"]], "flashes": [ts[i] for i in ev["flashes"]],
         "soft_transitions": [[ts[a], ts[b]] for a, b in ev["soft"]],
-        "shot_len": {"median": round(float(np.median(bounds)), 3), "min": round(min(bounds), 3),
+        "shot_len": {"mean": round(float(np.mean(bounds)), 3), "median": round(float(np.median(bounds)), 3), "min": round(min(bounds), 3),
                      "max": round(max(bounds), 3)},
         "cuts_per_min": round(len(ev["cuts"]) / measured_s * 60, 3),
         "still_ratio": round(sum(v < motion.STILL_PX_720 for v in m720) / len(m720), 4) if m720 else None,
@@ -132,6 +132,8 @@ def measure_set(name: str, only=None, log=print) -> list:
             if (out / "sheets").exists():
                 shutil.rmtree(out / "sheets")
             r = analyze(path, data.get("max_seconds", 180), out / "sheets", v["id"], prog)
+            r["profile"]["audio_language"] = v.get("audio_language", "unknown")
+            r["profile"]["audio_original"] = v.get("audio_original")
             write_profile(out, r)
             m = r["meta"]
             v.update({k: m[k] for k in ("width", "height", "fps", "duration", "orientation")},
@@ -142,6 +144,11 @@ def measure_set(name: str, only=None, log=print) -> list:
         except refset.StepError as e:
             v.update(state="skipped", skip_reason=str(e), source_sig=sig)
             log(f"✗ {v['id']} bỏ qua: {e}")
+        except OSError as e:                         # disk full, permissions: stop cleanly, keep what is done
+            (out / "frames.csv.tmp").unlink(missing_ok=True)
+            refset.save(name, data)
+            raise refset.StepError(f"lỗi ghi file khi đo {v['id']} ({e.strerror or e}). Phần đã đo được giữ; "
+                                   f"giải phóng chỗ rồi chạy lại để đo tiếp")
         refset.save(name, data)                     # after every video, so an interrupted run resumes
     return done
 

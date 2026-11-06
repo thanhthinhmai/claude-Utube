@@ -34,7 +34,9 @@ Mã 0 khi sạch; mã 1 kèm `file:dòng: "<chuỗi>" (lý do)` cho mỗi vi ph�
 
 Ghi `proof/compare.json` và `proof/compare.jpg` (trái: gốc, phải: tự vẽ, dưới: bảng chỉ số). Mã 0 khi `pass`, 1 khi chưa đạt.
 
-## `learn save <set> --slug S --en "Name" [--cn "名"] --based-on SLUG`
+## `learn save <set> --slug S --en "Name" [--cn "名"] --based-on SLUG [--accept-proof]`
+
+`--accept-proof`: chỉ dùng khi người dùng đã chấp nhận một khung chứng minh chưa đạt ngưỡng ở lần duyệt 2 (FR-018); thiếu cờ này mà `compare.json` chưa `pass` thì từ chối.
 
 Kiểm tra slug, chạy lại `check-names` trên mọi file trong `style/`, chép gói vào `my-styles/<slug>/`, thêm dòng vào `my-styles/README.md`. Từ chối (mã 1) nếu slug trùng, có vi phạm tên, hoặc gói chứa file media hay bản chép lời.
 

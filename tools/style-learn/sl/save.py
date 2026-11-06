@@ -9,8 +9,8 @@ from . import names, refset
 from .refset import MEDIA_EXT, StepError, UsageError
 
 PRIVATE_KEYS = {"title", "channel", "handle", "origin", "src_name", "set", "skipped"}
-SOURCE_EXT = {".html", ".js", ".mjs", ".css", ".json", ".svg", ".png", ".jpg", ".jpeg", ".webp", ".woff", ".woff2",
-              ".ttf", ".otf", ".txt", ".md"}
+SOURCE_EXT = {".html", ".js", ".mjs", ".css", ".json", ".svg", ".woff", ".woff2", ".ttf", ".otf", ".txt", ".md"}
+RASTER_EXT = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".tif", ".tiff", ".avif"}
 
 
 def lib_dir() -> Path:
@@ -78,6 +78,10 @@ def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bo
     if not ours or not ours.exists():
         raise StepError("không thấy ảnh khung chứng minh (ours) ghi trong compare.json")
 
+    raster = [p for p in _proof_sources(proof) if p.suffix.lower() in RASTER_EXT]
+    if raster:      # could be a frame of the reference video: only code-drawn sources go into the style
+        raise StepError("proof/ có ảnh raster ngoài proof/out/ (có thể là khung của video gốc), không được lưu vào phong cách: "
+                        + ", ".join(str(p.relative_to(d)) for p in raster) + ". Vẽ bằng code, hoặc chuyển vào proof/out/")
     pkg_files = [p for p in style.rglob("*") if p.is_file()] + _proof_sources(proof)
     bad = [p for p in pkg_files if p.suffix.lower() in MEDIA_EXT or p.name == "words.json"
            or (p.parent != style and p.suffix.lower() not in SOURCE_EXT)]

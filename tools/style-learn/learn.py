@@ -139,6 +139,8 @@ def main(argv=None) -> int:
         print(f"✗ {e}", file=sys.stderr); return 1
     except BrokenPipeError:                      # output piped into head/less and closed early
         sys.stderr.close(); return 0
+    except OSError as e:
+        print(f"✗ lỗi đọc/ghi file: {e}", file=sys.stderr); return 1
 
 
 if __name__ == "__main__":

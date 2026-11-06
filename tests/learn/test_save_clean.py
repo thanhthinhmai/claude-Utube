@@ -62,6 +62,12 @@ class SaveClean(unittest.TestCase):
         self.assertEqual(self.call(accept=True), 0)
         self.assertEqual(self.call(), 1)                                   # slug now taken
 
+    def test_rejects_raster_in_proof(self):  # Constitution (copyright), T035
+        Image.new("RGB", (8, 8)).save(self.d / "proof" / "texture.png")
+        self.assertEqual(self.call(), 1)
+        (self.d / "proof" / "texture.png").unlink()
+        self.assertEqual(self.call(), 0)
+
     def test_saved_package_and_catalog(self):  # SC-008
         self.assertEqual(self.call(), 0)
         s = self.p.dir / "my-styles" / "night-ink"

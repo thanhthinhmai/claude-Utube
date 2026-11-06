@@ -41,6 +41,14 @@ class Names(unittest.TestCase):
         self.assertTrue(self.check("Narration: The soldiers marched across the old iron gate."))
         self.assertEqual(self.check("They marched across the old iron gate."), [])   # only 5 words match
 
+    def test_names_from_transcript(self):  # FR-015, T036
+        words = "we met Alice at the harbour . Later Alice said Bob was late . Later we left".split()
+        refset.write_json(refset.profile_dir("names-set", "v02") / "words.json",
+                          {"words": [{"word": w, "start": i, "end": i + .5} for i, w in enumerate(words)]})
+        self.assertTrue(self.check("A heroine like alice walks in."))     # twice, mid-sentence
+        self.assertEqual(self.check("Bob style hats."), [])                # only once
+        self.assertEqual(self.check("Later the camera rests."), [])        # sentence start, not a name
+
     def test_strings_and_cli_exit(self):
         self.assertTrue(names.check_strings("names-set", ["meo-luoi-studio"]))
         self.f.write_text("clean\n", encoding="utf-8")
