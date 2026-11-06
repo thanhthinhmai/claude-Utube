@@ -1,0 +1,178 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="/core/fonts/fonts.css">
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>
+</head><body>
+<canvas id="c"></canvas>
+<script type="module">
+import { ss, mulberry } from '/core/lib.js';
+
+const W = innerWidth, H = innerHeight;
+const cv = document.getElementById('c'); cv.width = W; cv.height = H;
+const ctx = cv.getContext('2d');
+const S = W / 1280;                          // layout designed at 1280×720
+const bg = new OffscreenCanvas(W, H), b = bg.getContext('2d');
+window.DUR = 4;
+
+// ---------- helpers ----------
+function grad(c, x0, y0, x1, y1, stops) {
+  const g = c.createLinearGradient(x0 * S, y0 * S, x1 * S, y1 * S);
+  stops.forEach(([o, col]) => g.addColorStop(o, col)); return g;
+}
+function rect(c, x, y, w, h, fill) { c.fillStyle = fill; c.fillRect(x * S, y * S, w * S, h * S); }
+function poly(c, pts, fill, edge) {
+  c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x * S, y * S) : c.moveTo(x * S, y * S)); c.closePath();
+  c.fillStyle = fill; c.fill(); if (edge) { c.strokeStyle = edge; c.lineWidth = 1.2 * S; c.stroke(); }
+}
+function rrect(c, x, y, w, h, r, fill, edge) {
+  c.beginPath(); c.roundRect(x * S, y * S, w * S, h * S, r * S); c.fillStyle = fill; c.fill();
+  if (edge) { c.strokeStyle = edge; c.lineWidth = 1.2 * S; c.stroke(); }
+}
+
+// ---------- background set (drawn once, then blurred) ----------
+function drawSet() {
+  // back wall: lit grey left, dark navy right
+  b.fillStyle = grad(b, 0, 0, 0, 470, [[0, '#6c6d70'], [0.5, '#9a9b9e'], [1, '#a6a7aa']]); b.fillRect(0, 0, W, 470 * S);
+  rect(b, 640, 0, 640, 470, grad(b, 640, 0, 1280, 0, [[0, '#333444'], [1, '#22222d']]));
+  // pegboard with tool silhouettes on the navy wall
+  rrect(b, 720, 70, 330, 210, 4, '#1f2230', '#2a2e3e');
+  const r = mulberry(7);
+  for (let i = 0; i < 9; i++) {
+    const x = 745 + i * 34, h = 50 + r() * 70;
+    rrect(b, x, 95, 10, h, 4, i % 3 ? '#3a3f52' : '#5a4a3a');
+  }
+  // tall shelf of old radios on the grey wall
+  rect(b, 70, 120, 230, 300, '#5d5f63');
+  for (let s = 0; s < 3; s++) {
+    rect(b, 70, 200 + s * 95, 230, 8, '#3c3d41');
+    for (let k = 0; k < 3; k++) {
+      const col = ['#8a7a63', '#6c6f74', '#a39276'][(s + k) % 3];
+      rrect(b, 85 + k * 72, 145 + s * 95, 60, 52, 6, col, '#4a4b4f');
+      b.fillStyle = '#3a3b3f'; b.beginPath(); b.arc((105 + k * 72) * S, (171 + s * 95) * S, 12 * S, 0, 7); b.fill();
+    }
+  }
+  // window with blue evening light
+  rect(b, 380, 90, 200, 220, '#3a4458');
+  rect(b, 392, 102, 176, 196, grad(b, 0, 102, 0, 298, [[0, '#566583'], [1, '#3f4a63']]));
+  rect(b, 477, 102, 6, 196, '#3a4458'); rect(b, 392, 196, 176, 6, '#3a4458');
+  // floor
+  b.fillStyle = grad(b, 0, 470, 0, 720, [[0, '#7a6e62'], [1, '#5a5048']]); b.fillRect(0, 470 * S, W, 250 * S);
+  // far pendant lamp (will blur into a warm glow)
+  b.fillStyle = '#9b8761'; b.beginPath(); b.ellipse(1010 * S, 150 * S, 60 * S, 34 * S, 0, Math.PI, 0); b.fill();
+  rect(b, 1009, 0, 2, 118, '#2a2a30');
+  const glow = b.createRadialGradient(1010 * S, 165 * S, 0, 1010 * S, 165 * S, 160 * S);
+  glow.addColorStop(0, 'rgba(230,190,120,0.35)'); glow.addColorStop(1, 'rgba(230,190,120,0)');
+  b.fillStyle = glow; b.fillRect(0, 0, W, H);
+}
+
+// ---------- figures ----------
+// Black sphere head, stick limbs, mitten hands, white dot eyes, pale rim.
+function figure(x, y, h, o) {
+  const hr = 0.165 * h;                      // head radius → about 3 heads tall
+  const hx = x, hy = y - h + hr;
+  const path = new Path2D();
+  // torso block (clothes) drawn separately; skin parts here
+  path.arc(hx * S, hy * S, hr * S, 0, Math.PI * 2);
+  const limbs = new Path2D();
+  const arm = (ax, ay, bx, by) => { limbs.moveTo(ax * S, ay * S); limbs.lineTo(bx * S, by * S); };
+  o.arms.forEach(a => arm(...a));
+  // rim first (pale, under the black)
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(225,228,236,0.75)'; ctx.lineWidth = (0.06 * h + 3) * S; ctx.stroke(limbs);
+  ctx.lineWidth = 3 * S; ctx.stroke(path);
+  // torso
+  if (o.shirt) { rrect(ctx, x - 0.2 * h, hy + hr * 0.92, 0.4 * h, 0.36 * h, 0.08 * h, o.shirt); }
+  ctx.fillStyle = '#0b0b0f'; ctx.fill(path);
+  ctx.strokeStyle = '#0b0b0f'; ctx.lineWidth = 0.06 * h * S; ctx.stroke(limbs);
+  o.hands.forEach(([px, py]) => { ctx.beginPath(); ctx.arc(px * S, py * S, 0.045 * h * S, 0, 7); ctx.fill(); });
+  // hair / accessory
+  if (o.hair) o.hair(hx, hy, hr);
+  // face: two white dots, thin brow arcs
+  const ex = hr * 0.36, ey = hy + hr * 0.1 + (o.look?.[1] || 0), lx = (o.look?.[0] || 0);
+  ctx.fillStyle = '#f2efe8';
+  for (const s of [-1, 1]) {
+    ctx.beginPath(); ctx.ellipse((hx + lx + s * ex) * S, ey * S, hr * 0.085 * S, hr * 0.11 * S, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(242,239,232,0.9)'; ctx.lineWidth = 2 * S;
+    ctx.beginPath(); ctx.arc((hx + lx + s * ex) * S, (ey - hr * 0.08) * S, hr * 0.17 * S,
+      Math.PI * (1.25 + (o.worried ? s * 0.06 : 0)), Math.PI * (1.75 + (o.worried ? s * 0.06 : 0))); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// ---------- speech tag: rounded sans, feathered dark smudge, fast fade ----------
+function tag(text, x, y, t0, t, tint = '#f3efe6') {
+  const a = ss((t - t0) / 0.09);
+  if (a <= 0) return;
+  ctx.save(); ctx.globalAlpha = a;
+  ctx.font = `600 ${42 * S}px Fredoka`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const lines = text.split('\n'), lh = 47 * S;
+  const w = Math.max(...lines.map(l => ctx.measureText(l).width));
+  ctx.filter = `blur(${18 * S}px)`; ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.beginPath(); ctx.ellipse(x * S, y * S + (lines.length - 1) * lh / 2, w / 2 + 14 * S, lh * lines.length / 2 + 6 * S, 0, 0, 7); ctx.fill();
+  ctx.filter = 'none';
+  ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(20,18,22,0.7)'; ctx.lineWidth = 4 * S;
+  lines.forEach((l, i) => { ctx.strokeText(l, x * S, y * S + i * lh); });
+  ctx.fillStyle = tint; lines.forEach((l, i) => ctx.fillText(l, x * S, y * S + i * lh));
+  ctx.restore();
+}
+
+window.TEXTS = t => t >= 0.3 ? [{ id: 'tag1', text: 'Is it the tubes\nor the dial?', x0: 20 * S, y0: 125 * S, x1: 320 * S, y1: 220 * S }] : [];
+
+window.render = (t) => {
+  ctx.drawImage(bg, 0, 0);
+  // near pendant lamp (sharp)
+  rect(ctx, 579, 0, 2, 118, '#1d1d22');
+  ctx.fillStyle = '#9a865f'; ctx.beginPath(); ctx.ellipse(580 * S, 150 * S, 62 * S, 36 * S, 0, Math.PI, 0); ctx.fill();
+  ctx.fillStyle = 'rgba(255,226,170,0.55)'; ctx.beginPath(); ctx.ellipse(580 * S, 150 * S, 52 * S, 6 * S, 0, 0, 7); ctx.fill();
+  const lg = ctx.createRadialGradient(580 * S, 200 * S, 0, 580 * S, 260 * S, 380 * S);
+  lg.addColorStop(0, 'rgba(240,205,140,0.16)'); lg.addColorStop(1, 'rgba(240,205,140,0)');
+  ctx.fillStyle = lg; ctx.fillRect(0, 0, W, H);
+
+  // figure A: repairer behind the bench (olive work shirt, yellow pencil behind ear)
+  const tilt = Math.sin(t * 1.3) * 2;
+  figure(400, 600, 420, {
+    shirt: '#4d5a45',
+    arms: [[330, 400, 345, 500], [470, 400, 455, 500]], hands: [[345, 500], [455, 500]],
+    look: [6 + tilt, 4], worried: false,
+    hair: (hx, hy, hr) => { ctx.fillStyle = '#0b0b0f'; ctx.beginPath(); ctx.ellipse(hx * S, (hy - hr * 0.8) * S, hr * 0.7 * S, hr * 0.35 * S, 0, 0, 7); ctx.fill();
+      ctx.save(); ctx.translate((hx + hr * 0.95) * S, (hy - hr * 0.2) * S); ctx.rotate(-0.5);
+      ctx.fillStyle = '#e2c447'; ctx.fillRect(-4 * S, -26 * S, 8 * S, 46 * S); ctx.restore(); },
+  });
+  // figure B: visitor at right holding a mug (coral scarf accent)
+  figure(890, 610, 430, {
+    shirt: '#5a5e6c',
+    arms: [[815, 400, 790, 500], [965, 400, 930, 455]], hands: [[790, 500], [930, 455]],
+    look: [-10, 6], worried: true,
+    hair: (hx, hy, hr) => { ctx.fillStyle = '#0b0b0f'; ctx.beginPath(); ctx.arc((hx + hr * 0.55) * S, (hy - hr * 0.95) * S, hr * 0.3 * S, 0, 7); ctx.fill(); },
+  });
+  rrect(ctx, 830, 372, 120, 20, 10, '#c8584a');                 // scarf
+  rrect(ctx, 912, 432, 40, 46, 6, '#d8d3c8');                 // mug
+
+  // workbench: light top, navy front
+  poly(ctx, [[90, 492], [1190, 492], [1220, 520], [60, 520]], '#d6d7da', '#b4b5b8');
+  rect(ctx, 70, 520, 1140, 160, grad(ctx, 0, 520, 0, 680, [[0, '#3a3e56'], [1, '#30344a']]));
+  for (let i = 1; i < 4; i++) rect(ctx, 70 + i * 285, 530, 3, 140, '#22253a');
+  // radio being repaired, screwdriver, small parts
+  rrect(ctx, 300, 438, 170, 60, 8, '#a08a68', '#7d6a4f');
+  ctx.fillStyle = '#e9e3d4'; ctx.beginPath(); ctx.arc(330 * S, 468 * S, 16 * S, 0, 7); ctx.fill();
+  rect(ctx, 360, 452, 95, 32, '#6e5c45');
+  rect(ctx, 500, 485, 70, 5, '#b8b6b0'); rect(ctx, 560, 482, 26, 10, '#c8463c');
+  rrect(ctx, 640, 470, 46, 22, 4, '#1a1b20');                 // phone face down
+
+  // vignette
+  const v = ctx.createRadialGradient(W / 2, H * 0.46, H * 0.25, W / 2, H / 2, W * 0.62);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,0.42)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+
+  tag('Is it the tubes\nor the dial?', 170, 150, 0.3, t);
+};
+
+drawSet();
+// blur the background set (depth of field)
+const tmp = new OffscreenCanvas(W, H), tc = tmp.getContext('2d');
+tc.filter = `blur(${5 * S}px)`; tc.drawImage(bg, 0, 0); b.clearRect(0, 0, W, H); b.drawImage(tmp, 0, 0);
+await document.fonts.load(`600 42px Fredoka`); await document.fonts.ready;
+window.READY = true;
+</script>
+</body></html>

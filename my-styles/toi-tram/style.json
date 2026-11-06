@@ -1,0 +1,19 @@
+{
+ "line": "Flat-black, round-headed figures act small everyday dramas in muted, vignetted vector rooms, speaking through soft captions beside their heads.",
+ "line_cn": "",
+ "borrows": [],
+ "slug": "toi-tram",
+ "en": "Quiet Night",
+ "cn": "",
+ "based_on": "scifi-toon",
+ "library_version": "bebbbe1",
+ "created": "2026-11-06",
+ "source": "learned",
+ "reference": {
+  "videos": 5,
+  "measured_seconds": 900.0,
+  "formats": [
+   "landscape"
+  ]
+ }
+}
