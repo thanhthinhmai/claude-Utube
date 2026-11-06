@@ -93,7 +93,7 @@ Xưởng vẽ **một khung hình bằng code** theo bản phong cách, đặt *
 **Đo**
 - **FR-005**: Xưởng MUST phân tích **100%** khung hình của **phần được đo** của mỗi video. Video ≤ 3 phút: phần được đo là toàn bộ video. Video > 3 phút: phần được đo là một đoạn đại diện tổng cộng 3 phút (người dùng đổi được), gồm 60 giây đầu và các đoạn rải đều trong phần còn lại; hồ sơ MUST ghi rõ các đoạn đã đo.
 - **FR-006**: Cho mỗi khung, xưởng MUST đo: độ dịch chuyển camera so với khung trước; có phải lần cắt cảnh không; độ sáng trung bình, độ tương phản, độ bão hoà; phần trăm điểm ảnh rất tối và rất sáng.
-- **FR-007**: Cho mỗi video, xưởng MUST đo: bảng màu chủ đạo (tối thiểu 6 màu, kèm tỷ lệ); số lần cắt cảnh và độ dài trung bình mỗi cảnh; tỷ lệ khung camera đứng yên; độ lớn âm thanh tổng thể; tốc độ đọc (từ/giây); tổng thời gian lặng; thời điểm lời đầu tiên.
+- **FR-007**: Cho mỗi video, xưởng MUST đo: bảng màu chủ đạo (6 màu lớn nhất kèm tỷ lệ; ít hơn chỉ khi phần được đo có ít hơn 6 màu phân biệt được, và ghi rõ); số lần cắt cảnh và độ dài trung bình mỗi cảnh; tỷ lệ khung camera đứng yên; độ lớn âm thanh tổng thể; tốc độ đọc (từ/giây); tổng thời gian lặng; thời điểm lời đầu tiên.
 - **FR-008**: Xưởng MUST chép lời mỗi video kèm mốc thời gian từng từ, bằng ngôn ngữ gốc.
 - **FR-009**: Xưởng MUST tạo bảng ảnh: mỗi 2 giây video thành một ảnh ghép đủ mọi khung trong 2 giây đó, để nhìn lại được mọi khung.
 - **FR-010**: Hồ sơ đo MUST có tổng hợp cho cả bộ: trung vị, thấp nhất, cao nhất của mỗi chỉ số.
@@ -129,7 +129,7 @@ Xưởng vẽ **một khung hình bằng code** theo bản phong cách, đặt *
 
 ### Measurable Outcomes
 
-- **SC-001**: Hồ sơ đo phủ **100%** khung hình của phần được đo của mọi video (số khung đã đo = số khung của phần đó).
+- **SC-001**: Hồ sơ đo phủ **100%** khung hình của phần được đo của mọi video: với video đo toàn bộ, số khung đã đo **bằng đúng** số khung của video; với video đo theo đoạn, mỗi đoạn lệch tối đa **±1 khung** do làm tròn ở điểm cắt.
 - **SC-002**: Với bộ video kiểm thử có đặc điểm biết trước: phát hiện cắt cảnh đúng **≥ 95%** và báo nhầm **≤ 5%**; tốc độ đọc sai lệch **≤ 10%**; độ sáng trung bình sai lệch **≤ 0,02** (trên thang 0–1).
 - **SC-003**: **100%** luật trong bản phong cách dẫn tới ít nhất một bằng chứng; **0** tên kênh, tên người, câu thoại nguyên văn trong bản phong cách.
 - **SC-004**: Khung chứng minh so với khung gốc: chênh lệch độ sáng trung bình **≤ 0,05**, độ bão hoà trung vị **≤ 0,08**, tỷ lệ điểm ảnh rất tối **≤ 5 điểm phần trăm**, và **≥ 4/6** màu chủ đạo có màu gần tương ứng.

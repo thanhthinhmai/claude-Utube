@@ -19,7 +19,7 @@
 - [ ] T005 Viết `tools/style-learn/sl/refset.py`: đọc/ghi `set.json` theo data-model.md (slug `[a-z0-9-]` 3–40 ký tự; `max_seconds` mặc định 180, giới hạn 30–1800; `state` `fetched → measured → transcribed` hoặc `skipped` kèm `skip_reason`; `source_sig = size:mtime`); ghi file nguyên tử
 - [ ] T006 [P] Viết `tools/style-learn/sl/probe.py`: ffprobe (`width,height,fps,duration,nb_frames`), `orientation`, chọn `segments` theo research.md §2 (≤ 180 s toàn bộ; > 180 s: 60 s đầu + 4 × 30 s cách đều), số khung mong đợi
 - [ ] T007 [P] Viết `tools/style-learn/sl/frames.py`: sinh từng khung numpy `H×320×3` qua `ffmpeg -ss -t … scale=320:-2:flags=area,format=rgb24 -f rawvideo` cho mỗi đoạn, kèm thời điểm gốc
-- [ ] T008 Tạo `tests/learn/make_fixtures.py` (ffmpeg `lavfi`, 30 fps): `cuts.mp4` (5 cắt cứng, 1 chớp sáng 4 khung, 1 hoà tan 12 khung), `pan_fast.mp4` (2 px/khung ở rộng 320), `pan_slow.mp4` (0,3 px/khung ở 720), `flat.mp4` (màu đặc, luma biết trước), `long.mp4` (300 s, để kiểm `segments`), `tone.mp4` (âm 1 kHz có 2 khoảng lặng 0,5 s và 1 s), `portrait.mp4` (1080×1920); và `tests/learn/run.sh` gọi `python -m unittest discover tests/learn`
+- [ ] T008 Tạo `tests/learn/make_fixtures.py` (ffmpeg `lavfi`, 30 fps): `cuts.mp4` (5 cắt cứng, 1 chớp sáng 4 khung, 1 hoà tan 12 khung), `pan_fast.mp4` (2 px/khung ở rộng 320), `pan_slow.mp4` (0,3 px/khung ở 720), `flat.mp4` (màu đặc, luma biết trước), `long.mp4` (300 s, để kiểm `segments`), `tone.mp4` (âm 1 kHz có 2 khoảng lặng 0,5 s và 1 s), `portrait.mp4` (1080×1920); tuỳ chọn `--perf` tạo bộ khoảng 18 phút (20 video 54 s, có cắt, pan, màu thay đổi) cho SC-005; và `tests/learn/run.sh` gọi `python -m unittest discover tests/learn`
 
 **Checkpoint**: Đọc được video và chọn được phần được đo.
 
@@ -31,22 +31,22 @@
 
 ### Tests for User Story 1
 
-- [ ] T009 [P] [US1] `tests/learn/test_probe_frames.py`: số khung đọc = mong đợi ±1 mỗi đoạn (SC-001); `long.mp4` → 5 đoạn, tổng 180 s; `portrait.mp4` → `orientation=portrait`, ảnh 320×568
+- [ ] T009 [P] [US1] `tests/learn/test_probe_frames.py`: số khung đọc = mong đợi đúng bằng với video đo toàn bộ, ±1 mỗi đoạn với video đo theo đoạn (SC-001); `long.mp4` → 5 đoạn, tổng 180 s; `portrait.mp4` → `orientation=portrait`, ảnh 320×568
 - [ ] T010 [P] [US1] `tests/learn/test_motion.py`: `pan_fast` đo 2 px/khung ±10% đúng hướng; `pan_slow` tính là đứng yên (ngưỡng `motion·720 < 0,5`); `cuts.mp4` phát hiện 5/5 cắt, 0 báo nhầm, chớp sáng vào `flashes`, hoà tan vào `soft_transitions` (SC-002)
-- [ ] T011 [P] [US1] `tests/learn/test_color_audio.py`: `flat.mp4` luma sai ≤ 0,02, `dark`/`bright` đúng; bảng màu của khung 3 màu đặc ra đúng 3 màu ΔE < 5; `tone.mp4` LUFS là số hữu hạn, khoảng lặng tổng 1,5 s ±0,1, `silence_count = 2`
+- [ ] T011 [P] [US1] `tests/learn/test_color_audio.py`: `flat.mp4` luma sai ≤ 0,02, `dark`/`bright` đúng; bảng màu của khung 3 màu đặc ra đúng 3 màu ΔE < 5 kèm `palette_note`; video nhiều màu (dải màu) ra đủ 6 màu; `tone.mp4` LUFS là số hữu hạn, khoảng lặng tổng 1,5 s ±0,1, `silence_count = 2`
 - [ ] T012 [P] [US1] `tests/learn/test_speech.py`: tốc độ đọc từ `words.json` giả (40 từ trong 10 s, 1 khoảng ngắt 1 s) = 4,44 từ/s ±10%; đơn vị `chars/s` với văn bản tiếng Trung giả
-- [ ] T013 [US1] `tests/learn/test_pipeline.py`: `fetch --files` 3 video → `set.json` đúng; `measure` ghi `frames.csv` (đúng thứ tự cột của profile-schema.md), `video.json` (`schema: "style-learn/1"`), bảng ảnh mỗi 2 giây; video hỏng → `skipped`, video khác vẫn đo; chạy lại không đo lại video đã xong (FR-011); `summary.json` có `median/min/max`, `low_count_warning=true` khi < 5 video
+- [ ] T013 [US1] `tests/learn/test_pipeline.py`: `fetch --files` 3 video → `set.json` đúng; `measure` ghi `frames.csv` (đúng thứ tự cột của profile-schema.md), `video.json` (`schema: "style-learn/1"`), bảng ảnh mỗi 2 giây; video hỏng → `skipped`, video khác vẫn đo; chạy lại không đo lại video đã xong (FR-011); `summary.json` có `median/min/max`, `low_count_warning=true` khi < 5 video; `fetch --channel --count 2` hoặc `31` → mã 2 (FR-002, giới hạn 3–30)
 
 ### Implementation for User Story 1
 
 - [ ] T014 [P] [US1] Viết `tools/style-learn/sl/motion.py`: phase correlation (Hann, nội suy parabol, độ tin cậy đỉnh, `motion_ok` khi ≥ 0,05) và phát hiện cắt, chớp sáng, hoà tan theo research.md §5
-- [ ] T015 [P] [US1] Viết `tools/style-learn/sl/color.py`: luma Rec.709, tương phản, bão hoà HSV, `dark` (< 0,06), `bright` (> 0,94), sRGB→Lab D65, k-means k = 8 seed cố định 25 vòng, bỏ cụm < 2%, ΔE76
+- [ ] T015 [P] [US1] Viết `tools/style-learn/sl/color.py`: luma Rec.709, tương phản, bão hoà HSV, `dark` (< 0,06), `bright` (> 0,94), sRGB→Lab D65, k-means k = 8 seed cố định 25 vòng, gộp cụm ΔE76 < 5, giữ 6 cụm lớn nhất (`palette_note` khi ít hơn), ΔE76
 - [ ] T016 [P] [US1] Viết `tools/style-learn/sl/audio.py`: `ebur128` (I, LRA) trên các đoạn; RMS 50 ms ở 16 kHz, lặng < −45 dBFS ≥ 250 ms; `first_voice_t`
 - [ ] T017 [P] [US1] Viết `tools/style-learn/sl/speech.py`: tốc độ đọc từ `words.json` (research.md §8); hàm chép lời bằng faster-whisper chỉ nạp khi gọi (thiếu gói → lỗi rõ ràng)
 - [ ] T018 [P] [US1] Viết `tools/style-learn/sl/sheets.py`: ảnh ghép mỗi 2 giây, lưới 10 cột, ô 128 px (ngang) / 72 px (dọc), nhãn thời gian, JPEG q80, tên `<id>_<NNNN>.jpg`
 - [ ] T019 [US1] Viết `tools/style-learn/sl/measure.py`: đo một video trong một lượt đọc khung (motion, color, sheets), ghi `frames.csv` và `video.json` (data-model.md VideoProfile); ghi vào file tạm rồi đổi tên; cập nhật `state` và `source_sig`
 - [ ] T020 [US1] Viết `tools/style-learn/sl/summary.py`: gộp theo `orientation`, `majority_orientation`, `dispersion_warnings`, `skipped`, `low_count_warning`; ghi `summary.json` và `summary.md`
-- [ ] T021 [US1] Viết `tools/style-learn/sl/fetch.py`: `--files` (chép vào `videos/`), `--videos`/`--channel` qua yt-dlp (nạp khi gọi; `--playlist-end`, ≤ 720p, `--write-info-json`, ghi `audio_language`, `title`, `channel`); in thông báo FR-001a trước khi tải; nền tảng bị chặn hoặc thiếu yt-dlp → mã 1 kèm hướng dẫn `--files`
+- [ ] T021 [US1] Viết `tools/style-learn/sl/fetch.py`: `--files` (chép vào `videos/`), `--videos`/`--channel` qua yt-dlp (`--count` mặc định 12, ngoài 3–30 → mã 2) (nạp khi gọi; `--playlist-end`, ≤ 720p, `--write-info-json`, ghi `audio_language`, `title`, `channel`); in thông báo FR-001a trước khi tải; nền tảng bị chặn hoặc thiếu yt-dlp → mã 1 kèm hướng dẫn `--files`
 - [ ] T022 [US1] Nối các lệnh `fetch`, `measure`, `transcribe`, `summary` trong `tools/style-learn/learn.py` theo contracts/learn-cli.md (in tiến độ khung/giây)
 
 **Checkpoint**: US1 chạy và test độc lập được.
@@ -60,7 +60,7 @@
 - [ ] T023 [P] [US2] `tests/learn/test_names.py`: bắt tên kênh, `@handle`, tiêu đề, tên có dấu viết không dấu, chuỗi 6 từ trùng bản chép lời; không bắt cụm 5 từ; mã thoát 0/1 và vị trí `file:dòng` (SC-003)
 - [ ] T024 [US2] Viết `tools/style-learn/sl/names.py` và lệnh `check-names` theo research.md §12
 - [ ] T025 [P] [US2] Viết `.claude/skills/style-learn/templates/aspect-report.md` (Claim · Evidence · Confidence; mục cho từng khía cạnh của nhóm), `corrections.md` (before · after · evidence · found_by), `review-vi.md` (tóm tắt duyệt tiếng Việt: bản chất, 10 luật quan trọng kèm số, kết luận đã sửa, cảnh báo)
-- [ ] T026 [US2] Viết `.claude/skills/style-learn/SKILL.md`: kích hoạt, bước 0–6 của contracts/skill-flow.md; lời gọi 3 agent song song kèm phạm vi đọc/ghi; quy tắc kiểm tra chéo; khung 11 mục (đọc `lib/lemo-opuscar/styles/_template/STYLE.md`); `(evidence: …)` cho mọi luật; chạy `check-names`; dừng **duyệt 1**
+- [ ] T026 [US2] Viết `.claude/skills/style-learn/SKILL.md`: kích hoạt, bước 0–6 của contracts/skill-flow.md; lời gọi 3 agent song song kèm phạm vi đọc/ghi; quy tắc kiểm tra chéo; khung 11 mục (đọc `lib/lemo-opuscar/styles/_template/STYLE.md`); `(evidence: …)` cho mọi luật; phụ đề hay chữ cháy vào hình của kênh **không** được coi là chữ của phong cách trừ khi người dùng xác nhận; chạy `check-names`; dừng **duyệt 1**
 
 **Checkpoint**: US1 và US2 hoạt động.
 
@@ -71,9 +71,9 @@
 **Independent Test**: test `compare`, `save`, `clean` xanh; sau `save`, `my-styles/README.md` có dòng mới.
 
 - [ ] T027 [P] [US3] `tests/learn/test_compare.py`: hai ảnh tổng hợp gần nhau → `pass`; lệch độ sáng 0,1 → `fail` với `luma_diff` đúng; `palette_matched` đếm đúng; `compare.jpg` được tạo (SC-004)
-- [ ] T028 [P] [US3] `tests/learn/test_save_clean.py`: `save` từ chối slug trùng thư viện giả hoặc `my-styles/`, gói có `.mp4`/`words.json`, vi phạm tên; khi đạt thì chép đúng file theo research.md §13, `measurements/summary.json` không có `title/channel/origin/id`, thêm đúng một dòng vào `my-styles/README.md` (SC-008); `clean` chỉ xoá trong `references/<set>/`, giữ số liệu, mặc định xoá media (SC-006)
+- [ ] T028 [P] [US3] `tests/learn/test_save_clean.py`: `save` từ chối slug trùng thư viện giả hoặc `my-styles/`, slug hay tên chứa tên kênh (FR-021), gói có `.mp4`/`words.json`, vi phạm tên; khi đạt thì chép đúng file theo research.md §13, `measurements/summary.json` không có `title/channel/origin/id`, thêm đúng một dòng vào `my-styles/README.md` (SC-008); `clean` chỉ xoá trong `references/<set>/`, giữ số liệu, mặc định xoá media (SC-006)
 - [ ] T029 [US3] Viết `tools/style-learn/sl/compare.py` và lệnh `compare` (ngưỡng SC-004, ghép ảnh trái–phải kèm bảng chỉ số, `round`)
-- [ ] T030 [US3] Viết `tools/style-learn/sl/save.py` và các lệnh `save`, `clean` theo contracts/learn-cli.md
+- [ ] T030 [US3] Viết `tools/style-learn/sl/save.py` và các lệnh `save`, `clean` theo contracts/learn-cli.md; `save` chạy `check-names` trên cả slug, `--en`, `--cn` (FR-021)
 - [ ] T031 [US3] Hoàn thiện `.claude/skills/style-learn/SKILL.md` bước 7–10: chọn khung gốc tiêu biểu; viết `proof/index.html` theo hợp đồng `render(t)` (URL tuyệt đối `/core/lib.js`); chụp bằng `cd $LIB && node core/render/still.mjs <proof> 0 --size WxH --out <proof>/out`; `compare`, tối đa 2 vòng sửa; dừng **duyệt 2**; `save`; hỏi giữ hay xoá (mặc định xoá) → `clean`; thiếu `node`/deps thì dừng ở bước 7 và báo
 
 ## Phase 6: Polish & Cross-Cutting Concerns

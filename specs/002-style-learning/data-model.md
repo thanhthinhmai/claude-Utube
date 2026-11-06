@@ -49,7 +49,7 @@ Một dòng mỗi khung đã đo:
 - `cuts: [t]`, `flashes: [t]`, `soft_transitions: [[a,b]]`, `shot_len: {median, min, max}`
 - `still_ratio` (khung đứng yên ÷ khung có `motion_ok`), `motion_720: {p50, p90, max}` (px/khung ở 720p)
 - `luma`, `contrast`, `sat`, `dark`, `bright`: mỗi cái `{p2, p50, p98}`
-- `palette: [{hex, lab, share}]` (≥ 6 màu khi đủ dữ liệu)
+- `palette: [{hex, lab, share}]`: 6 cụm lớn nhất; ít hơn chỉ khi sau khi gộp (ΔE76 < 5) còn ít hơn 6 cụm, kèm `palette_note`
 - `audio: {lufs, lra, silence_total, silence_count, first_voice_t}`
 - `speech: {words, rate, unit: "words/s"|"chars/s", pause_total} | null`
 - `sheets: [file]`

@@ -32,7 +32,7 @@
 
 ## 6. Màu
 
-- **Decision**: Mỗi khung tính: luma Rec.709 (0–1) trung bình; tương phản = độ lệch chuẩn luma; bão hoà HSV trung vị; `dark% = luma < 0,06`, `bright% = luma > 0,94`. Bảng màu: lấy mẫu mỗi 10 khung, 400 điểm ảnh mỗi khung, chuyển sang Lab (D65), k-means k = 8 (seed cố định, 25 vòng). Báo hex và tỷ lệ, bỏ cụm < 2%.
+- **Decision**: Mỗi khung tính: luma Rec.709 (0–1) trung bình; tương phản = độ lệch chuẩn luma; bão hoà HSV trung vị; `dark% = luma < 0,06`, `bright% = luma > 0,94`. Bảng màu: lấy mẫu mỗi 10 khung, 400 điểm ảnh mỗi khung, chuyển sang Lab (D65), k-means k = 8 (seed cố định, 25 vòng). Gộp các cụm gần như trùng nhau (ΔE76 < 5). Báo hex và tỷ lệ của **6 cụm lớn nhất** (luôn đủ 6 trừ khi chỉ còn ít hơn 6 cụm sau khi gộp; khi đó ghi `palette_note`).
 - **SC-004, so màu gần**: khoảng cách ΔE76 < 15 giữa cặp màu ghép theo kiểu tham lam (greedy).
 - **Rationale**: Lab cho khoảng cách màu gần với mắt người; k-means tự viết dài khoảng 30 dòng.
 
