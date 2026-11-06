@@ -9,6 +9,12 @@
 
 Xưởng đã có sẵn 66 phong cách của thư viện trên máy, nhưng muốn biết có những phong cách nào thì người dùng phải đọc file hoặc hỏi Claude. Tính năng 003 cố ý để thư viện ngoài phạm vi. Tính năng này cho người dùng **nhìn và chọn** phong cách ngay trên Film Studio, rồi mang lựa chọn đó sang Claude Code để làm phim. Giao diện vẫn chỉ xem; việc làm phim vẫn bắt đầu trong Claude Code.
 
+## Clarifications
+
+### Session 2026-11-06
+
+- Q: Phong cách riêng hiện chung trong Library hay để mục riêng? → A: Hai mục riêng ở thanh bên: "Library" chỉ gồm phong cách của thư viện; "My styles" là trang phong cách riêng đã có ở 003. Các mặc định còn lại (câu lệnh mẫu 40 giây, thứ tự) giữ nguyên.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Xem và tìm phong cách trong thư viện (Priority: P1)
@@ -45,19 +51,20 @@ Người dùng mở trang Library và thấy một lưới thẻ, mỗi thẻ l�
 
 ---
 
-### User Story 3 - Phong cách riêng hiện cùng thư viện (Priority: P3)
+### User Story 3 - Phong cách riêng ở mục riêng, nối với thư viện (Priority: P3)
 
-Phong cách riêng trong `my-styles/` (ví dụ Quiet Night) hiện trong cùng trang Library, có nhãn "My style" và có bộ lọc riêng "My styles". Thẻ dùng khung chứng minh làm ảnh, ghi phong cách nền của thư viện mà nó dựa vào. Bấm vào mở trang phong cách riêng đã có ở 003; "Use this style" cũng chạy với phong cách riêng.
+Thanh bên có hai mục riêng: "Library" (phong cách của thư viện) và "My styles" (phong cách riêng trong `my-styles/`, ví dụ Quiet Night, là trang đã có ở 003). Trang My styles có thêm nút "Use this style" giống thư viện, và mỗi phong cách riêng ghi phong cách nền của thư viện nó dựa vào, bấm vào là mở phong cách nền đó trong Library.
 
-**Why this priority**: Gom mọi lựa chọn vào một chỗ; phong cách riêng đã xem được ở 003 nên ít gấp hơn.
+**Why this priority**: Giữ hai nguồn tách bạch cho dễ nhìn; phong cách riêng đã xem được ở 003 nên chỉ cần nối thêm.
 
-**Independent Test**: Với một phong cách riêng trong `my-styles/`, trang Library hiện nó ở đầu lưới với nhãn "My style"; bộ lọc "My styles" chỉ còn phong cách riêng.
+**Independent Test**: Với Quiet Night (dựa trên scifi-toon): mục "My styles" chỉ có phong cách riêng; trang Library không có Quiet Night; trên trang Quiet Night, bấm "based on" mở trang scifi-toon trong Library; "Use this style" chép câu lệnh có "Quiet Night".
 
 **Acceptance Scenarios**:
 
-1. **Given** có phong cách riêng, **When** mở Library, **Then** phong cách riêng đứng đầu lưới, có nhãn "My style", ảnh là khung chứng minh, và ghi "based on <phong cách nền>".
-2. **Given** chọn bộ lọc "My styles", **When** nhìn lưới, **Then** chỉ còn phong cách riêng.
-3. **Given** không có phong cách riêng nào, **When** mở Library, **Then** không có nhãn hay bộ lọc "My styles" trống gây nhầm; có một dòng gợi ý cách học phong cách mới.
+1. **Given** có phong cách riêng, **When** mở "My styles", **Then** chỉ thấy phong cách riêng; **When** mở "Library", **Then** chỉ thấy phong cách thư viện.
+2. **Given** một phong cách riêng dựa trên một phong cách thư viện, **When** bấm tên phong cách nền, **Then** mở trang chi tiết phong cách nền đó trong Library.
+3. **Given** một phong cách riêng, **When** bấm "Use this style", **Then** câu lệnh chép ra chứa tên phong cách riêng.
+4. **Given** không có phong cách riêng nào, **When** mở "My styles", **Then** thấy hướng dẫn ngắn cách học phong cách mới (như 003).
 
 ---
 
@@ -94,8 +101,8 @@ Phong cách riêng trong `my-styles/` (ví dụ Quiet Night) hiện trong cùng 
 
 **Phong cách riêng**
 
-- **FR-012**: Phong cách riêng MUST hiện trong cùng lưới, đứng trước phong cách thư viện, có nhãn "My style", ảnh là khung chứng minh và dòng "based on <phong cách nền>"; MUST có bộ lọc "My styles" khi có ít nhất một phong cách riêng.
-- **FR-013**: Bấm thẻ phong cách riêng MUST mở trang phong cách riêng đã có; mục "Styles" riêng ở thanh bên MUST được gộp vào "Library" để không có hai nơi liệt kê phong cách.
+- **FR-012**: Thanh bên MUST có hai mục riêng: "Library" chỉ liệt kê phong cách thư viện; "My styles" (đổi tên từ "Styles" của 003) chỉ liệt kê phong cách riêng.
+- **FR-013**: Trang danh sách và trang chi tiết của My styles MUST có "Use this style" (như FR-010); tên phong cách nền MUST là link tới trang chi tiết của phong cách đó trong Library khi phong cách nền có trong thư viện.
 
 **Giao diện lập trình và an toàn**
 
@@ -106,7 +113,7 @@ Phong cách riêng trong `my-styles/` (ví dụ Quiet Night) hiện trong cùng 
 ### Key Entities
 
 - **Library style**: một phong cách của thư viện ở phiên bản ghim. Thuộc tính: tên thư mục (mã), số thứ tự, tên tiếng Anh, tên tiếng Trung, nhóm, tên phim mẫu, câu mô tả, mục đích dùng, có poster hay không, luật (STYLE.md), link GitHub.
-- **My style**: phong cách riêng đã có ở 003 (`my-styles/<mã>/`). Thêm vào danh sách chung với nhãn riêng, phong cách nền và khung chứng minh.
+- **My style**: phong cách riêng đã có ở 003 (`my-styles/<mã>/`), ở mục riêng; liên kết tới phong cách nền trong Library.
 - **Style prompt**: câu lệnh mẫu chép ra cho Claude Code, chứa tên phong cách và chỗ trống cho nội dung phim.
 
 ## Success Criteria *(mandatory)*
@@ -125,7 +132,7 @@ Phong cách riêng trong `my-styles/` (ví dụ Quiet Night) hiện trong cùng 
 
 - Thư viện ghim (`library.lock`) có sẵn poster cho mỗi phong cách trong kho của thư viện; thông tin thẻ lấy từ file mô tả có sẵn của từng phong cách. Dung lượng poster được đo ở bước plan.
 - Phim mẫu không có trong máy; người dùng xem phim mẫu trên GitHub qua link (cần mạng).
-- Thanh bên đổi thành: Jobs, Films, rồi nhóm Library gồm "Library" (phong cách thư viện và phong cách riêng) và "Measurements". Trang phong cách riêng ở 003 giữ nguyên, chỉ đổi đường quay lại thành "Library".
+- Thanh bên: Jobs, Films, rồi nhóm Library gồm "Library", "My styles", "Measurements". Trang phong cách riêng ở 003 giữ nguyên, thêm nút "Use this style" và link tới phong cách nền.
 - Câu lệnh mẫu: "Make a 40-second film in the <tên> style about …". Người dùng tự sửa thời lượng và nội dung.
 - Chỉ một người dùng trên máy của họ, như 003; không cần tài khoản.
 - Ngoài phạm vi: phát phim mẫu trong giao diện, so sánh hai phong cách, chỉnh sửa phong cách, bắt đầu làm phim từ giao diện, thư viện 98 phong cách đầy đủ ngoài bản ghim.
