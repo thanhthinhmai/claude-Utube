@@ -1,8 +1,9 @@
 """Transcription (optional, faster-whisper) and speaking rate (research.md §8)."""
 import re
 import subprocess
-import tempfile
 from pathlib import Path
+
+import numpy as np
 
 from .probe import is_whole
 from .refset import StepError
@@ -27,24 +28,36 @@ def rate(words: list, language: str = None):
             "pause_total": round(pause, 3)}
 
 
+def decode_16k(path: Path, span=None) -> np.ndarray:
+    """Mono float32 samples at 16 kHz, decoded by ffmpeg (what Whisper expects)."""
+    cmd = ["ffmpeg", "-v", "error", "-nostdin"]
+    if span:
+        cmd += ["-ss", f"{span[0]:.4f}", "-t", f"{span[1] - span[0]:.4f}"]
+    r = subprocess.run(cmd + ["-i", str(path), "-vn", "-ac", "1", "-ar", "16000", "-f", "f32le", "-"], capture_output=True)
+    if r.returncode != 0:
+        raise StepError(f"ffmpeg không đọc được âm thanh: {r.stderr.decode(errors='replace').strip()[:200]}")
+    return np.frombuffer(r.stdout, np.float32).copy()
+
+
 def transcribe(path: Path, meta: dict, segs: list, model: str = "small", lang: str = None) -> dict:
     try:
         from faster_whisper import WhisperModel
     except ImportError:
         raise StepError("chưa cài faster-whisper. Chạy: sh bin/studio deps learn --extra")
+    if not meta.get("has_audio"):
+        return {"language": lang, "words": [], "note": "video không có tiếng"}
     m = WhisperModel(model, compute_type="int8")
     words, language = [], lang
     whole = is_whole(segs, meta["duration"])
-    with tempfile.TemporaryDirectory() as td:
-        for a, b in segs:
-            wav = Path(td) / "a.wav"
-            cmd = ["ffmpeg", "-v", "error", "-y", "-nostdin"]
-            if not whole:
-                cmd += ["-ss", f"{a:.4f}", "-t", f"{b - a:.4f}"]
-            subprocess.run(cmd + ["-i", str(path), "-vn", "-ac", "1", "-ar", "16000", str(wav)], check=True)
-            segments, info = m.transcribe(str(wav), language=lang, word_timestamps=True)
-            language = language or info.language
-            for s in segments:
-                for w in s.words or []:
-                    words.append({"word": w.word.strip(), "start": round(a + w.start, 3), "end": round(a + w.end, 3)})
+    for a, b in segs:
+        audio = decode_16k(path, None if whole else (a, b))
+        if audio.size == 0:
+            continue
+        # Pass samples, not a file path: faster-whisper then never opens the file with PyAV,
+        # whose 19.x release breaks it (TypeError: metadata_errors)
+        segments, info = m.transcribe(audio, language=lang, word_timestamps=True)
+        language = language or info.language
+        for s in segments:
+            for w in s.words or []:
+                words.append({"word": w.word.strip(), "start": round(a + w.start, 3), "end": round(a + w.end, 3)})
     return {"language": language, "words": words}

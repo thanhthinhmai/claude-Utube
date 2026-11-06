@@ -1,3 +1,4 @@
 # Tuỳ chọn: tải video và chép lời. Cài: sh bin/studio deps learn --extra
 yt-dlp
 faster-whisper
+av<19   # av 19 bỏ tuỳ chọn mà faster-whisper 1.2 dùng khi mở file (TypeError: metadata_errors)
