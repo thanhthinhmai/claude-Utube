@@ -12,6 +12,7 @@
 - Q: Nguồn video tham chiếu? → A: Cả hai: xưởng tự tải từ link kênh hoặc link video, và vẫn nhận file người dùng đặt sẵn trong thư mục tham chiếu.
 - Q: Giới hạn độ dài video? → A: Mọi độ dài. Video ≤ 3 phút đo toàn bộ; video dài hơn đo một đoạn đại diện (mặc định 3 phút gồm phần mở đầu và các đoạn rải đều), đo đủ mọi khung trong đoạn đó.
 - Q: Phim demo có thuộc tính năng này không? → A: Không. Tách thành tính năng riêng; tính năng này kết thúc ở phong cách đã lưu cùng khung chứng minh.
+- Q: Bước phân tích 9 khía cạnh nên do nhiều agent song song hay một agent làm lần lượt? → A: 3 agent song song, mỗi agent một nhóm: hình (màu, viền, ánh sáng, chất liệu, nhân vật), chuyển động và chiều sâu, âm thanh và kịch bản.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -96,7 +97,7 @@ Xưởng vẽ **một khung hình bằng code** theo bản phong cách, đặt *
 - **FR-011**: Việc đo MUST tiếp tục được sau khi bị ngắt: video đã đo xong không đo lại.
 
 **Phân tích và viết phong cách**
-- **FR-012**: Xưởng MUST phân tích theo 9 khía cạnh: màu, viền, ánh sáng, chất liệu, nhân vật, chiều sâu, chuyển động, âm thanh, kịch bản; mỗi khía cạnh một báo cáo riêng có bằng chứng.
+- **FR-012**: Xưởng MUST phân tích theo 9 khía cạnh: màu, viền, ánh sáng, chất liệu, nhân vật, chiều sâu, chuyển động, âm thanh, kịch bản; mỗi khía cạnh một báo cáo riêng có bằng chứng. Việc phân tích MUST chia thành 3 nhóm chạy song song, mỗi nhóm một agent: **hình** (màu, viền, ánh sáng, chất liệu, nhân vật), **chuyển động và chiều sâu**, **âm thanh và kịch bản**.
 - **FR-013**: Xưởng MUST kiểm tra chéo mỗi kết luận với số đo **và** với bảng ảnh; kết luận sai MUST được sửa và ghi vào nhật ký sửa (trước, sau, bằng chứng).
 - **FR-014**: Bản phong cách MUST theo khung 11 mục của thư viện; mỗi luật MUST dẫn tới ít nhất một con số trong hồ sơ đo hoặc một khung hình cụ thể.
 - **FR-015**: Bản phong cách MUST NOT chứa tên kênh, tên người, tên nhân vật, câu thoại nguyên văn hay tiêu đề video của kênh gốc. Xưởng MUST kiểm tra điều này trước khi trình duyệt và trước khi lưu.
@@ -138,7 +139,7 @@ Xưởng vẽ **một khung hình bằng code** theo bản phong cách, đặt *
 - Người dùng chịu trách nhiệm về quyền sử dụng video tham chiếu; xưởng chỉ dùng chúng để học nội bộ và không phát tán.
 - Bộ video tham chiếu thuộc một phong cách tương đối đồng nhất; nếu không, người dùng chọn nhóm video.
 - Khung 11 mục và định dạng phong cách riêng lấy theo thư viện ở phiên bản đã ghim (tính năng 001).
-- Phân tích theo khía cạnh có thể chạy song song nhiều agent; mỗi agent chỉ đọc hồ sơ đo và chỉ ghi báo cáo của khía cạnh mình.
+- Mỗi agent phân tích chỉ đọc hồ sơ đo và bảng ảnh, và chỉ ghi báo cáo của nhóm mình (không sửa file của agent khác).
 - Thời gian tải video và chép lời lần đầu (tải mô hình) không tính vào SC-005.
 - Media chứng minh nặng không vào version control (theo `.gitignore` của 001); phong cách lưu phần nguồn và số liệu.
 - Phim demo của phong cách nằm ngoài phạm vi; sẽ là một tính năng riêng, dùng luồng làm phim có sẵn.
