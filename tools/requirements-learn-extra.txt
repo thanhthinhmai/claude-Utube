@@ -1,0 +1,3 @@
+# Tuỳ chọn: tải video và chép lời. Cài: sh bin/studio deps learn --extra
+yt-dlp
+faster-whisper

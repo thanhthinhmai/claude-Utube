@@ -23,3 +23,8 @@ references/*
 *.wav
 *.mp3
 *.m4a
+
+# Style-learning tools venv
+tools/.venv/
+__pycache__/
+*.pyc

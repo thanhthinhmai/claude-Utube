@@ -20,7 +20,7 @@
 
 ## 4. Chuyển động camera
 
-- **Decision**: Phase correlation trên ảnh xám đã nhân cửa sổ Hann. Lấy đỉnh của `IFFT(F1·conj(F2)/|F1·conj(F2)|)`, nội suy dưới điểm ảnh bằng parabol 3 điểm. Chuẩn hoá: `motion = hypot(dx, dy) / W` (tỷ lệ chiều rộng mỗi khung), và quy ra điểm ảnh ở 720p để so với số liệu của claude-animated-shorts. **Đứng yên** khi `motion·720 < 0,5`. Độ tin cậy là độ cao đỉnh; dưới 0,05 thì đánh dấu `motion_ok=false` (khung có cảnh chuyển động phức tạp).
+- **Decision**: Phase correlation trên ảnh xám đã nhân cửa sổ Hann. Lấy đỉnh của `IFFT(F1·conj(F2)/|F1·conj(F2)|)`, nội suy dưới điểm ảnh theo Foroosh et al. (2002). Khi code đã đo: nội suy parabol đo pan 0,13 px/khung thành 0,058 px (thiếu 57%), Foroosh đo 0,150 px (sai 12%). Chuẩn hoá: `motion = hypot(dx, dy) / W` (tỷ lệ chiều rộng mỗi khung), và quy ra điểm ảnh ở 720p để so với số liệu của claude-animated-shorts. **Đứng yên** khi `motion·720 < 0,5`. Độ tin cậy là độ cao đỉnh; dưới 0,05 thì đánh dấu `motion_ok=false` (khung có cảnh chuyển động phức tạp).
 - **Rationale**: Dùng numpy FFT là đủ, không cần OpenCV. Có ghi chú về bài học "camera di chuyển chậm 65% thời gian": ngưỡng 0,5 px phải được kiểm bằng video pan chậm (test pan 0,3 px/khung và 2 px/khung).
 - **Giới hạn đã biết**: không đo zoom hay xoay. Báo cáo ghi rõ; nhóm agent chuyển động kiểm bằng mắt.
 
@@ -32,7 +32,7 @@
 
 ## 6. Màu
 
-- **Decision**: Mỗi khung tính: luma Rec.709 (0–1) trung bình; tương phản = độ lệch chuẩn luma; bão hoà HSV trung vị; `dark% = luma < 0,06`, `bright% = luma > 0,94`. Bảng màu: lấy mẫu mỗi 10 khung, 400 điểm ảnh mỗi khung, chuyển sang Lab (D65), k-means k = 8 (seed cố định, 25 vòng). Gộp các cụm gần như trùng nhau (ΔE76 < 5). Báo hex và tỷ lệ của **6 cụm lớn nhất** (luôn đủ 6 trừ khi chỉ còn ít hơn 6 cụm sau khi gộp; khi đó ghi `palette_note`).
+- **Decision**: Mỗi khung tính: luma Rec.709 (0–1) trung bình; tương phản = độ lệch chuẩn luma; bão hoà HSV trung vị; `dark% = luma < 0,06`, `bright% = luma > 0,94`. Bảng màu: lấy mẫu mỗi 10 khung, 400 điểm ảnh mỗi khung, chuyển sang Lab (D65), k-means k = 8 (seed cố định, 25 vòng). Gộp các cụm gần như trùng nhau (ΔE76 < 5); bỏ cụm < 1% điểm ảnh (nhiễu nén ở mép màu, đo thấy 0,2–0,4% trên video 3 dải màu). Báo hex và tỷ lệ của **6 cụm lớn nhất** (luôn đủ 6 trừ khi chỉ còn ít hơn 6 cụm sau khi gộp; khi đó ghi `palette_note`).
 - **SC-004, so màu gần**: khoảng cách ΔE76 < 15 giữa cặp màu ghép theo kiểu tham lam (greedy).
 - **Rationale**: Lab cho khoảng cách màu gần với mắt người; k-means tự viết dài khoảng 30 dòng.
 
