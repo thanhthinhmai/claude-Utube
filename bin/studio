@@ -3,6 +3,8 @@
 #   sh bin/studio setup                 đưa thư viện về đúng phiên bản trong library.lock, báo công cụ còn thiếu
 #   sh bin/studio status [--json]       trạng thái xưởng (không dùng mạng, không ghi file)
 #   sh bin/studio deps [voice] [music]  cài gói của thư viện (Node, Python, giọng, nhạc) vào lib/lemo-opuscar
+#   sh bin/studio deps learn [--extra]  cài công cụ học phong cách vào tools/.venv (--extra: tải video, chép lời)
+#   sh bin/studio learn <lệnh> …        học phong cách: fetch | measure | transcribe | summary | check-names | compare | save | clean
 #   sh bin/studio help
 # Mã thoát: 0 = sẵn sàng / xong · 1 = chưa sẵn sàng / thất bại · 2 = sai cách dùng hoặc library.lock sai.
 set -eu
@@ -21,7 +23,7 @@ SPARSE='/*
 !/styles/*/poster.jpg'
 
 usage() {
-  sed -n '2,7s/^# \{0,1\}//p' "$0"
+  sed -n '2,9s/^# \{0,1\}//p' "$0"
 }
 
 die2() { echo "✗ $*" >&2; exit 2; }
@@ -258,7 +260,53 @@ cmd_status() {
   if [ "$ready" = true ]; then exit 0; else exit 1; fi
 }
 
+VENV="$ROOT/tools/.venv"
+
+# Python ≥ 3.11 để tạo venv khi không có uv
+find_py() {
+  for c in python3.12 python3.13 python3.11 python3; do
+    if "$c" -c 'import sys; sys.exit(sys.version_info < (3, 11))' 2>/dev/null; then echo "$c"; return 0; fi
+  done
+  return 1
+}
+
+deps_learn() {
+  extra=0
+  for a in "$@"; do
+    case $a in --extra) extra=1 ;; *) echo "✗ không hiểu \"$a\" (dùng: deps learn [--extra])" >&2; exit 2 ;; esac
+  done
+  # Venv riêng của xưởng: không cài gì vào lib/ (hiến pháp VI)
+  if [ ! -x "$VENV/bin/python" ] || ! "$VENV/bin/python" -c pass 2>/dev/null; then
+    rm -rf "$VENV"
+    if command -v uv >/dev/null 2>&1; then uv venv --quiet --python 3.12 "$VENV"
+    else
+      py=$(find_py) || { echo "✗ cần Python 3.11+ (hoặc cài uv: https://docs.astral.sh/uv/)" >&2; exit 1; }
+      "$py" -m venv "$VENV"
+    fi
+  fi
+  tiers=learn
+  if [ "$extra" -eq 1 ]; then tiers="learn learn-extra"; fi
+  for t in $tiers; do
+    req="$ROOT/tools/requirements-$t.txt"
+    sig="$(cksum < "$req" | cut -d' ' -f1)-$("$VENV/bin/python" -V 2>&1)"
+    if [ "$(cat "$VENV/.studio-$t" 2>/dev/null || true)" = "$sig" ]; then echo "✓ $t đã cài"; continue; fi
+    echo "↓ cài $t…"
+    if command -v uv >/dev/null 2>&1; then uv pip install --quiet --python "$VENV/bin/python" -r "$req"
+    else "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check -r "$req"; fi
+    printf '%s\n' "$sig" > "$VENV/.studio-$t"
+    echo "✓ đã cài $t"
+  done
+}
+
+cmd_learn() {
+  if [ ! -x "$VENV/bin/python" ]; then
+    echo "✗ chưa cài công cụ học phong cách. Chạy: sh bin/studio deps learn" >&2; exit 1
+  fi
+  exec "$VENV/bin/python" "$ROOT/tools/style-learn/learn.py" "$@"
+}
+
 cmd_deps() {
+  if [ "${1:-}" = learn ]; then shift; deps_learn "$@"; return 0; fi
   read_lock
   lib_state
   if [ "$LSTATE" != ok ]; then
@@ -272,6 +320,7 @@ case ${1:-} in
   setup) shift; cmd_setup "$@" ;;
   status) shift; cmd_status "$@" ;;
   deps) shift; cmd_deps "$@" ;;
+  learn) shift; cmd_learn "$@" ;;
   help | -h | --help) usage ;;
   '') usage >&2; exit 2 ;;
   *) echo "✗ lệnh lạ: $1" >&2; usage >&2; exit 2 ;;
