@@ -38,7 +38,7 @@ running (updated_at cũ hơn 600 s) ⇒ hiển thị inactive
 | `job_id` | string | việc tồn tại |
 | `kind` | enum | `style-1` · `style-2` |
 | `created_at` | string | |
-| `summary_md` | string | ≤ 200 KB; bản tóm tắt tiếng Việt (template `review-vi.md`) |
+| `summary_md` | string | ≤ 200 KB; bản tóm tắt tiếng Việt (template `review-vi.md`). Với `style-2`: ghi chú của Claude về những gì số đo không bắt được (FR-006) |
 | `set` | string | mã bộ tham chiếu |
 | `compare` | object\|null | `style-2`: chép từ `proof/compare.json` (`luma_diff`, `sat_median_diff`, `dark_diff_pp`, `palette_matched`, `palette_needed`, `pass`, `round`, `ref`, `ours`) |
 | `final_round` | bool | `style-2`: đã hết vòng sửa |

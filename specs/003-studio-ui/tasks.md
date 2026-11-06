@@ -33,7 +33,7 @@
 
 **Independent Test**: `job start` → máy chủ tự bật → trang Việc thấy việc; `job step` → bước đổi trong < 5 s; `job fail` → trạng thái lỗi và thông báo.
 
-- [ ] T013 [P] [US1] `tests/ui/test_jobs_api.py`: `GET /jobs` (mới nhất trước, lọc `status`/`kind`), `GET /jobs/{id}`, 404, danh sách 50 việc < 2 s (SC-008)
+- [ ] T013 [P] [US1] `tests/ui/test_jobs_api.py`: `GET /jobs` (mới nhất trước, lọc `status`/`kind`), `GET /jobs/{id}`, 404, danh sách 50 việc < 2 s (SC-008); mọi đường dẫn trong `openapi.json` có tiền tố `/api/v1` và khớp danh sách ở contracts/api-v1.md, mỗi đường dẫn được ít nhất một test gọi tới (SC-007)
 - [ ] T014 [P] [US1] `tests/ui/test_cli_jobs.py`: `job start` in mã và URL, bật máy chủ < 5 s (SC-001, SC-002) và không bật bản thứ hai; `job step --progress 3/5`; `progress` sai → mã 2; `job run` giữ mã thoát, gửi nhịp sống (khoảng nhịp rút ngắn khi kiểm thử), 50 dòng cuối vào nhật ký; `job done/fail/stop`; `ui status/stop`
 - [ ] T015 [P] [US1] `tests/ui/test_events.py`: SSE gửi `job.updated` trong < 5 s sau `job step`; có `: ping`
 - [ ] T016 [US1] Viết `tools/studio/studio/launcher.py`: `ensure()` (đọc `server.json`, kiểm `pid` và `/health`, chọn cổng 8787–8799, chạy `uvicorn` tách hẳn, đợi tối đa 5 s), `status()`, `stop()` (chỉ tắt đúng máy chủ của xưởng)
@@ -78,7 +78,7 @@
 
 - [ ] T030 [P] Cập nhật `README.md` (giao diện: `deps ui`, `ui`, ảnh chụp mô tả), `CLAUDE.md` (cấu trúc: `tools/studio/`, `.studio/`, `tests/ui/`)
 - [ ] T031 [P] Kiểm thử trình duyệt tuỳ chọn `tests/ui/test_browser.py`: dùng `playwright-core` của thư viện mở trang Việc và trang Duyệt, bấm Đồng ý; bỏ qua nếu không có trình duyệt
-- [ ] T032 Chạy `sh tests/ui/run.sh`, `sh tests/run.sh`, `sh tests/learn/run.sh`; chạy thật máy chủ trong phiên này và chụp các trang để xem; ghi kết quả (đạt / chưa chạy được kèm lý do) vào cuối file này
+- [ ] T032 Chạy `sh tests/ui/run.sh`, `sh tests/run.sh`, `sh tests/learn/run.sh`; chạy thật máy chủ trong phiên này và chụp các trang để xem; ghi kết quả (đạt / chưa chạy được kèm lý do) vào cuối file này, kể cả FR-020a (máy chủ chạy tiến trình riêng, việc chỉ ghi file)
 
 ## Dependencies & Execution Order
 
