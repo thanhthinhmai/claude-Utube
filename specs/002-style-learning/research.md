@@ -79,6 +79,7 @@
 - **Decision**:
   - Danh sách cấm = tên kênh, uploader, `@handle` và tiêu đề video từ info JSON, cộng tên do người dùng thêm (`--deny`).
   - Báo lỗi khi file phong cách chứa một mục cấm (không phân biệt hoa thường, so cả bản bỏ dấu), hoặc chứa **chuỗi 6 từ liên tiếp** có trong bất kỳ bản chép lời nào.
+  - Tên kênh từ 3 từ trở lên: chặn thêm mọi cụm 2 từ liền nhau (trừ cụm chỉ gồm từ chung như studio, official, tv), để "Mèo Lười Night" cũng bị chặn khi kênh là "Mèo Lười Studio".
   - Mã thoát 1 kèm vị trí. `save` gọi lại bước này và từ chối nếu lỗi.
 - **Rationale**: SC-003 đòi 0 tên và 0 câu thoại nguyên văn. Chuỗi 6 từ đủ dài để không bắt nhầm cụm thông dụng.
 

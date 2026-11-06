@@ -8,7 +8,7 @@ Mỗi yêu cầu đi đúng **một** luồng:
 | Người dùng muốn | Luồng |
 |---|---|
 | Làm một bộ phim, video, clip (theo phong cách thư viện hoặc phong cách riêng) | **Làm phim** (bên dưới). Không tạo spec cho từng phim |
-| Học phong cách của một kênh YouTube hoặc một video mẫu | **Học phong cách**: **chưa có** (tính năng 002). Báo người dùng là chưa xây, không làm tạm |
+| Học phong cách của một kênh YouTube, danh sách video hoặc file video mẫu | **Học phong cách**: làm theo skill `.claude/skills/style-learn/SKILL.md`. Không tạo spec |
 | Xây hoặc sửa skill, công cụ, cấu trúc của xưởng | **Spec-kit** (các mục bên dưới) |
 
 ### Luồng làm phim
@@ -64,7 +64,8 @@ Mẹo chung để tiết kiệm token:
 Lệnh phụ: `/speckit-checklist <lĩnh vực>` tạo checklist kiểm tra chất lượng spec (UX, bảo mật…). `/speckit-constitution` dùng để sửa hiến pháp.
 
 ## Cấu trúc
-- `bin/studio`: `setup` · `status [--json]` · `deps [voice] [music]`; test: `sh tests/run.sh`
+- `bin/studio`: `setup` · `status [--json]` · `deps [voice] [music]` · `deps learn [--extra]` · `learn <lệnh>`; test: `sh tests/run.sh`, `sh tests/learn/run.sh`
+- `tools/style-learn/`: công cụ đo và lưu phong cách (venv riêng `tools/.venv`, không vào git); skill `.claude/skills/style-learn/`
 - `library.lock`: phiên bản thư viện đã ghim; `lib/lemo-opuscar/`: thư viện (không vào git, không sửa)
 - `my-styles/`: phong cách riêng (vào git) · `films/`: phim (không vào git) · `references/`: video tham chiếu (không vào git) · `tools/`: công cụ tự viết
 - `.specify/memory/constitution.md`: hiến pháp

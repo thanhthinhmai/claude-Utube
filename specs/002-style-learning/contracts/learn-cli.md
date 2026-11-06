@@ -40,4 +40,4 @@ Kiểm tra slug, chạy lại `check-names` trên mọi file trong `style/`, ch�
 
 ## `learn clean <set> [--keep]`
 
-Không có `--keep`: xoá `videos/`, `profile/*/words.json`, `profile/*/sheets/`, `proof/compare.jpg` của bộ `<set>`; giữ `set.json` (đã bỏ `origin`, `title`) và số liệu. Chỉ xoá trong `references/<set>/`. In danh sách và dung lượng đã xoá.
+Không có `--keep`: xoá `videos/`, `profile/*/words.json`, `profile/*/sheets/`, `proof/compare.jpg` và mọi ảnh trong `proof/out/` không phải ảnh tự vẽ (`ours_*`, ví dụ khung gốc `ref.jpg`) của bộ `<set>`; giữ `set.json` (đã bỏ `origin`, `title`) và số liệu. Chỉ xoá trong `references/<set>/`. In danh sách và dung lượng đã xoá.
