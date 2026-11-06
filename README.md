@@ -44,6 +44,21 @@ Video tham chiếu chỉ để học trên máy: không vào git, không đăng 
 
 Các lệnh lẻ: `sh bin/studio learn fetch | measure | transcribe | summary | check-names | compare | save | clean` (xem `specs/002-style-learning/contracts/learn-cli.md`).
 
+## Giao diện theo dõi và duyệt
+
+```sh
+sh bin/studio deps ui      # cài FastAPI + uvicorn vào tools/.venv (một lần)
+sh bin/studio ui           # mở giao diện, in URL (http://localhost:8787…)
+sh bin/studio ui status    # / ui stop
+```
+
+Khi Claude bắt đầu học phong cách hoặc làm phim, giao diện tự bật chạy nền và Claude in link. Trên giao diện:
+- **Việc**: bước đang chạy, tiến độ, nhật ký, lỗi; việc chờ duyệt được làm nổi bật, tab trình duyệt hiện `(n) chờ duyệt` và có thông báo.
+- **Duyệt**: đọc tóm tắt phong cách (lần 1), xem khung gốc cạnh khung vẽ bằng code kèm số đo (lần 2), bấm Đồng ý / Yêu cầu sửa. Claude nhận quyết định ngay; vẫn có thể trả lời trong khung chat như cũ, quyết định đầu tiên được giữ.
+- **Phim**, **Hồ sơ đo**, **Phong cách**: xem phim đã render (có phụ đề), số đo của bộ tham chiếu, phong cách đã lưu.
+
+Máy chủ chỉ nghe `127.0.0.1`, không cần tài khoản. API v1 cho công cụ khác: `/api/v1/docs` (xem `specs/003-studio-ui/contracts/api-v1.md`).
+
 ## Cấu trúc
 
 | Đường dẫn | Nội dung | Vào git |
@@ -54,9 +69,10 @@ Các lệnh lẻ: `sh bin/studio learn fetch | measure | transcribe | summary | 
 | `my-styles/` | Phong cách riêng | ✓ |
 | `films/` | Phim | ✗ |
 | `references/` | Video tham chiếu để học | ✗ |
-| `tools/` | Công cụ tự viết (`tools/style-learn/`; venv `tools/.venv` không vào git) | ✓ |
+| `tools/` | Công cụ tự viết (`tools/style-learn/`, `tools/studio/`; venv `tools/.venv` không vào git) | ✓ |
+| `.studio/` | Sổ việc, yêu cầu duyệt, trạng thái máy chủ giao diện | ✗ |
 | `specs/` | Spec, plan, tasks của từng tính năng | ✓ |
-| `tests/run.sh`, `tests/learn/run.sh` | Test của `bin/studio` và công cụ học phong cách (offline) | ✓ |
+| `tests/run.sh`, `tests/learn/run.sh`, `tests/ui/run.sh` | Test của `bin/studio`, công cụ học phong cách và giao diện (offline) | ✓ |
 
 ## Trạng thái
 
@@ -64,8 +80,8 @@ Các lệnh lẻ: `sh bin/studio learn fetch | measure | transcribe | summary | 
 |---|---|---|
 | — | Hiến pháp dự án (`.specify/memory/constitution.md`) | v2.0.0 |
 | 001 | Khung xưởng phim | Xong |
-| 002 | Skill học phong cách từ kênh YouTube | Xong (chờ chạy thật với YouTube trên máy người dùng) |
-| 003 | Dùng phong cách riêng như phong cách thư viện | Chưa bắt đầu |
+| 002 | Skill học phong cách từ kênh YouTube | Xong |
+| 003 | Giao diện web + API v1 (theo dõi việc, duyệt, xem kết quả) | Xong (chờ chạy thử trên máy người dùng) |
 
 ## Nguồn tham khảo
 - [github/spec-kit](https://github.com/github/spec-kit): quy trình, template và script (MIT, xem `.specify/LICENSE-spec-kit`).

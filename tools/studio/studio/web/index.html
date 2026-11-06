@@ -4,21 +4,27 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Xưởng phim</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%23e8553a'/%3E%3Cpath d='M5 4l7 4-7 4z' fill='white'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cdefs%3E%3ClinearGradient id='g' x2='1' y2='1'%3E%3Cstop stop-color='%23a855f7'/%3E%3Cstop offset='1' stop-color='%23ec4899'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='16' height='16' rx='4' fill='url(%23g)'/%3E%3Cpath d='M6 4.5l5 3.5-5 3.5z' fill='white'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="top">
-  <a class="brand" href="#/">Xưởng phim</a>
-  <nav>
-    <a href="#/" data-nav="jobs">Việc</a>
-    <a href="#/films" data-nav="films">Phim</a>
-    <a href="#/sets" data-nav="sets">Hồ sơ đo</a>
-    <a href="#/styles" data-nav="styles">Phong cách</a>
-  </nav>
-  <span id="live" class="live" title="Kết nối cập nhật trực tiếp">●</span>
-</header>
-<main id="app" aria-live="polite"></main>
+<div class="shell">
+  <aside class="side">
+    <a class="brand" href="#/"><span class="logo">X</span><span>Xưởng phim</span></a>
+    <nav>
+      <a href="#/" data-nav="jobs"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6"/></svg><span>Việc</span><b id="nav-count" class="count" hidden></b></a>
+      <a href="#/films" data-nav="films"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/></svg><span>Phim</span></a>
+      <p class="label">Thư viện</p>
+      <a href="#/styles" data-nav="styles"><svg viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><path d="M12 2a10 10 0 1 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.4A5.6 5.6 0 0 0 22 10c0-4.4-4.5-8-10-8z"/></svg><span>Phong cách</span></a>
+      <a href="#/sets" data-nav="sets"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg><span>Hồ sơ đo</span></a>
+    </nav>
+    <div class="side-foot">
+      <a href="/api/v1/docs" target="_blank" rel="noopener"><svg viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg><span>API docs</span></a>
+      <div class="owner"><span class="avatar">C</span><span><strong>Máy này</strong><small id="live" class="live" title="Kết nối cập nhật trực tiếp">Đang kết nối…</small></span></div>
+    </div>
+  </aside>
+  <main id="app" aria-live="polite"></main>
+</div>
 <div id="lightbox" class="lightbox" hidden><img alt=""></div>
 <script src="app.js"></script>
 </body>
