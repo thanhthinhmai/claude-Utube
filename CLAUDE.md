@@ -19,6 +19,13 @@ Mỗi yêu cầu đi đúng **một** luồng:
    - Phong cách riêng: đọc danh mục `my-styles/README.md` và lưu vào `my-styles/<slug>/`, **thay cho** `~/lemo-my-styles/`.
    - Cài gói của thư viện bằng `sh bin/studio deps [voice] [music]`, **không** chạy thẳng `setup.sh` của thư viện (nó sẽ tải một bản thư viện khác vào `~/lemo-opuscar`).
 3. Không sửa file nào trong `lib/` (hiến pháp VI). Muốn dùng phiên bản thư viện mới thì đổi `library.lock` theo quy trình spec-kit.
+4. **Ghi việc lên giao diện** (`specs/003-studio-ui/contracts/skill-integration.md`):
+   - Khi đã có tên phim: `sh bin/studio job start --kind film --name <tên> --film <tên>`; lưu dòng đầu (mã việc) vào `films/<tên>/.job`; in dòng `URL: …` cho người dùng ("Theo dõi trên giao diện: <URL>").
+   - Đầu mỗi giai đoạn (treatment, look, giọng, nhạc, hình, mix, render): `sh bin/studio job step <mã> "<giai đoạn>"`.
+   - Lệnh dài (render, mux, tạo giọng): bọc bằng `sh bin/studio job run <mã> --step "<giai đoạn>" -- <lệnh…>`.
+   - Xong: `sh bin/studio job done <mã> --film <tên>`; lỗi không tự sửa được: `sh bin/studio job fail <mã> "<lỗi>"`.
+   - Storyboard (nếu người dùng yêu cầu) vẫn duyệt trong khung chat.
+   - `job start` báo chưa cài giao diện (mã 1): bỏ qua các lệnh `job`, làm phim như cũ, gợi ý một lần `sh bin/studio deps ui`.
 
 ## Luật bắt buộc
 - Đọc `.specify/memory/constitution.md` trước khi lập kế hoạch hoặc viết code. Hiến pháp có hiệu lực cao nhất.
@@ -64,7 +71,8 @@ Mẹo chung để tiết kiệm token:
 Lệnh phụ: `/speckit-checklist <lĩnh vực>` tạo checklist kiểm tra chất lượng spec (UX, bảo mật…). `/speckit-constitution` dùng để sửa hiến pháp.
 
 ## Cấu trúc
-- `bin/studio`: `setup` · `status [--json]` · `deps [voice] [music]` · `deps learn [--extra]` · `learn <lệnh>`; test: `sh tests/run.sh`, `sh tests/learn/run.sh`
+- `bin/studio`: `setup` · `status [--json]` · `deps [voice] [music]` · `deps learn [--extra]` · `learn <lệnh>` · `deps ui` · `ui [open|status|stop]` · `job …` · `review …`; test: `sh tests/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`
+- `tools/studio/`: giao diện web và API v1 (chỉ `127.0.0.1`), sổ việc và yêu cầu duyệt trong `.studio/` (không vào git)
 - `tools/style-learn/`: công cụ đo và lưu phong cách (venv riêng `tools/.venv`, không vào git); skill `.claude/skills/style-learn/`
 - `library.lock`: phiên bản thư viện đã ghim; `lib/lemo-opuscar/`: thư viện (không vào git, không sửa)
 - `my-styles/`: phong cách riêng (vào git) · `films/`: phim (không vào git) · `references/`: video tham chiếu (không vào git) · `tools/`: công cụ tự viết

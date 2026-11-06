@@ -28,3 +28,6 @@ references/*
 tools/.venv/
 __pycache__/
 *.pyc
+
+# Studio UI runtime state (jobs, reviews, server pid)
+.studio/

@@ -13,6 +13,11 @@ Bạn đang ở dự án claude-Utube. Đọc `.specify/memory/constitution.md` 
 
 **Chỉ dừng chờ duyệt đúng 2 lần**: bước 6 và bước 8. Ngoài ra chỉ hỏi ở bước 0 khi thiếu thông tin, và câu giữ hay xoá video ở bước 10.
 
+**Giao diện và sổ việc** (tính năng 003, `specs/003-studio-ui/contracts/skill-integration.md`):
+- Mọi bước dưới đây đều ghi vào sổ việc bằng `sh bin/studio job …`, để người dùng theo dõi trên giao diện web. Hai lần duyệt đi qua `sh bin/studio review …`, để người dùng bấm nút trên giao diện.
+- Nếu `sh bin/studio job start` báo chưa cài giao diện (mã 1), **không dừng**: bỏ qua mọi lệnh `job` và `review`, và duyệt trong khung chat như cũ. Gợi ý người dùng một lần: `sh bin/studio deps ui`.
+- Lưu mã việc vào biến `JOB` ở bước 0 và dùng lại; nếu shell đổi, đọc lại từ `references/<set>/style/.job`.
+
 **Luôn nhớ:**
 - Không chép câu thoại, tên kênh, tên người, tên nhân vật hay tiêu đề video vào bất kỳ file nào ngoài `references/`.
 - Không mở phong cách thư viện nào trước bước 5, để bản phong cách được rút ra từ số đo chứ không từ một phong cách có sẵn.
@@ -29,21 +34,35 @@ Gộp vào **một** tin nhắn những gì yêu cầu chưa nói:
 
 Những gì không hỏi thì dùng mặc định. Sau đó không hỏi thêm.
 
+Khi đã có tên bộ, mở việc và **in đường link giao diện cho người dùng**:
+
+```sh
+mkdir -p references/<set>/style
+sh bin/studio job start --kind learn --name <set> --set <set> | tee references/<set>/style/.job.out
+JOB=$(head -1 references/<set>/style/.job.out); echo "$JOB" > references/<set>/style/.job
+```
+
+Báo người dùng dòng `URL: …` mà lệnh in ra: *"Theo dõi và duyệt trên giao diện: <URL>"*.
+
 ## 1. Thu thập và đo
 
 ```sh
 sh bin/studio deps learn            # lần đầu; thêm --extra nếu cần tải video hoặc chép lời
-sh bin/studio learn fetch <set> --channel <URL> --count 12      # hoặc --videos URL… / --files PATH…
-sh bin/studio learn measure <set>
-sh bin/studio learn transcribe <set>     # cần --extra; nếu không cài được, ghi "chưa có lời" và đi tiếp
-sh bin/studio learn summary <set>
+sh bin/studio job run $JOB --step "Tải video" -- sh bin/studio learn fetch <set> --channel <URL> --count 12   # hoặc --videos / --files
+sh bin/studio job run $JOB --step "Đo video" -- sh bin/studio learn measure <set>
+sh bin/studio job run $JOB --step "Chép lời" -- sh bin/studio learn transcribe <set>   # cần --extra; không cài được thì ghi "chưa có lời"
+sh bin/studio job run $JOB --step "Tổng hợp" -- sh bin/studio learn summary <set>
 ```
+
+`job run` giữ nguyên đầu ra và mã thoát của lệnh bên trong, và gửi nhịp sống mỗi 30 giây để việc không bị coi là "không còn hoạt động".
 
 - `fetch` tự in lời nhắc quyền sử dụng; nhắc lại cho người dùng một dòng.
 - Nếu tải bị chặn (mã 1): báo người dùng đặt video vào `references/<set>/videos/`, rồi chạy `fetch <set> --files references/<set>/videos/*`.
 - Lỗi khác: đọc thông báo, sửa nguyên nhân, chạy lại. `measure` tự tiếp tục từ chỗ dừng.
 
 ## 2. Báo nhanh hồ sơ đo (không dừng)
+
+`sh bin/studio job step $JOB "Báo hồ sơ đo"` ở đầu bước.
 
 Từ `references/<set>/profile/summary.md`, báo cho người dùng 3–5 dòng: số video, định dạng chính, vài con số nổi bật.
 
@@ -53,6 +72,8 @@ Nêu cảnh báo nếu có, kèm đề nghị:
 - **nhiều định dạng** (dọc và ngang lẫn lộn).
 
 ## 3. Phân tích bằng 3 agent song song
+
+`sh bin/studio job step $JOB "Phân tích (3 agent)"` ở đầu bước.
 
 Gọi **3 agent trong cùng một tin nhắn** (công cụ Agent). Mỗi agent:
 - **Chỉ đọc:** `references/<set>/profile/summary.json`, `references/<set>/profile/*/video.json`, ảnh trong `references/<set>/profile/*/sheets/`, và template `.claude/skills/style-learn/templates/aspect-report.md`.
@@ -74,6 +95,8 @@ Prompt cho mỗi agent phải có:
 
 ## 4. Kiểm tra chéo
 
+`sh bin/studio job step $JOB "Kiểm tra chéo"` ở đầu bước.
+
 Đọc 3 báo cáo. Với **mỗi** kết luận:
 - So với con số tương ứng trong `summary.json` hoặc `video.json`.
 - Mở đúng ảnh và ô được dẫn để tự xem.
@@ -86,6 +109,8 @@ Các lỗi đã từng gặp (từ claude-animated-shorts), cần kiểm riêng:
 - Nhận xét về hình dáng (ví dụ đầu "hình trứng") phải đo trên ít nhất 10 khung, không đoán qua một khung.
 
 ## 5. Viết bản phong cách
+
+`sh bin/studio job step $JOB "Viết bản phong cách"` ở đầu bước.
 
 1. **Chọn `based_on`:** phong cách thư viện có **kỹ thuật** gần nhất (2D Canvas, nét cọ, 3D three.js…). Đọc `lib/lemo-opuscar/styles/README.md` rồi chỉ đọc `STYLE.md` của 2–3 ứng viên. Lấy kỹ thuật dựng (engine), **không lấy luật**.
 2. **Viết `references/<set>/style/STYLE.md`** theo đúng 11 mục của `lib/lemo-opuscar/styles/_template/STYLE.md` (đọc template đó, kể cả phần hướng dẫn trong comment):
@@ -103,11 +128,26 @@ Các lỗi đã từng gặp (từ claude-animated-shorts), cần kiểm riêng:
 
 ## 6. ⏸ Duyệt lần 1
 
-Viết bản tóm tắt theo `.claude/skills/style-learn/templates/review-vi.md`, gửi người dùng và **dừng chờ**.
-- Có góp ý: sửa `STYLE.md` (ghi lại thay đổi trong `EVIDENCE.md`), chạy lại `check-names`, rồi trình lại.
-- Người dùng đồng ý: sang bước 7.
+Viết bản tóm tắt theo `.claude/skills/style-learn/templates/review-vi.md` vào `references/<set>/style/review-1.md`, rồi gửi yêu cầu duyệt:
+
+```sh
+sh bin/studio review request $JOB --kind style-1 --set <set> --summary references/<set>/style/review-1.md
+```
+
+Lệnh in mã duyệt (dòng 1, gọi là `RID`) và `URL: …`. Gửi người dùng **cùng bản tóm tắt** trong khung chat, kèm: *"Duyệt trên giao diện: <URL>. Hoặc bấm Esc rồi trả lời ở đây."* Rồi **chờ**:
+
+```sh
+sh bin/studio review wait $RID        # chặn tới 9 phút; mã 3 = chưa có quyết định → chạy lại đúng lệnh này
+```
+
+- Mã 0: lệnh in JSON quyết định `{value, note, source}`. Làm theo `value`.
+- Người dùng bấm Esc và trả lời trong khung chat: ghi lại bằng `sh bin/studio review decide $RID --value approve|revise --note "<góp ý>" --source chat` rồi làm theo. Mã 4 = đã có quyết định trên giao diện: đọc bằng `sh bin/studio review status $RID` và theo quyết định đó.
+- `revise`: sửa `STYLE.md` theo `note` (ghi lại thay đổi trong `EVIDENCE.md`), chạy lại `check-names`, viết lại `review-1.md`, rồi gửi một yêu cầu **mới** `style-1` và chờ lại.
+- `approve`: sang bước 7.
 
 ## 7. Khung chứng minh
+
+`sh bin/studio job step $JOB "Khung chứng minh vòng <n>"` ở mỗi vòng.
 
 1. **Chọn khung gốc:** khung có độ sáng, bão hoà, độ tối gần trung vị của bộ nhất (xem `frames.csv`), trong một cảnh tiêu biểu. Nếu người dùng muốn chọn thì cho họ chọn. Trích khung đó:
    ```sh
@@ -130,14 +170,23 @@ Viết bản tóm tắt theo `.claude/skills/style-learn/templates/review-vi.md`
 
 ## 8. ⏸ Duyệt lần 2
 
-Gửi người dùng (bằng ngôn ngữ của họ):
-- ảnh `references/<set>/proof/compare.jpg` (gốc bên trái, tự vẽ bên phải);
-- bảng 4 chỉ số kèm ngưỡng;
-- nếu chưa đạt: chỉ số nào chưa đạt và vì sao.
+Viết vào `references/<set>/style/review-2.md` (ngôn ngữ của người dùng): ghi chú về những gì số đo **không** bắt được (bố cục, dáng nhân vật, chữ trên màn hình…), và nếu chưa đạt thì chỉ số nào chưa đạt và vì sao. Rồi gửi yêu cầu duyệt; thêm `--final-round` khi đã dùng hết 2 vòng sửa mà chưa đạt:
 
-Rồi **dừng chờ**. Người dùng chấp nhận một khung chưa đạt thì bước 9 thêm `--accept-proof`.
+```sh
+sh bin/studio review request $JOB --kind style-2 --set <set> --summary references/<set>/style/review-2.md [--final-round]
+sh bin/studio review wait $RID        # như bước 6
+```
+
+Giao diện tự hiện ảnh gốc và ảnh tự vẽ cạnh nhau cùng bảng 4 chỉ số (từ `proof/compare.json`). Trong khung chat, gửi người dùng URL, bảng 4 chỉ số và đường dẫn `references/<set>/proof/compare.jpg`.
+
+- `approve`: sang bước 9.
+- `revise`: sửa trang theo `note`, chụp lại (vẫn tính trong giới hạn 2 vòng sửa), gửi yêu cầu `style-2` mới.
+- `accept_anyway` (chỉ có khi `--final-round`): bước 9 thêm `--accept-proof`.
+- `stop`: `sh bin/studio job stop $JOB`, báo người dùng bản nháp còn ở `references/<set>/style/`, và dừng.
 
 ## 9. Lưu
+
+`sh bin/studio job step $JOB "Lưu phong cách"`.
 
 Chọn `slug` và tên tiếng Anh (cùng tên tiếng Trung nếu người dùng muốn). Không được chứa tên kênh hay tên người.
 
@@ -156,7 +205,9 @@ sh bin/studio learn clean <set>          # mặc định, hoặc khi người d�
 sh bin/studio learn clean <set> --keep   # chỉ khi người dùng nói giữ
 ```
 
+Đóng việc: `sh bin/studio job done $JOB --style <slug>`. Lỗi không tự sửa được ở bất kỳ bước nào: `sh bin/studio job fail $JOB "<lỗi ngắn>"` rồi báo người dùng.
+
 Cuối cùng báo cho người dùng:
-- phong cách nằm ở `my-styles/<slug>/` và đã có trong danh mục `my-styles/README.md`;
+- phong cách nằm ở `my-styles/<slug>/` và đã có trong danh mục `my-styles/README.md`; xem trên giao diện ở mục **Phong cách**;
 - cách dùng: *"Làm phim 30 giây theo phong cách <tên> về …"*;
 - nhắc commit `my-styles/<slug>/` nếu họ muốn lưu lên git.
