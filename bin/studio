@@ -188,9 +188,10 @@ short() { printf '%.7s' "$1"; }
 # Lỗi → trả lại danh sách cũ để lần setup sau thử lại; không đổi mã thoát của setup.
 get_posters() {
   sp="$LIB/.git/info/sparse-checkout"
-  if [ "$(cat "$sp" 2>/dev/null)" = "$SPARSE" ]; then
-    echo "✓ poster: $(count_posters "$LIB/styles")/$(count_styles "$LIB/styles")"; return 0
-  fi
+  have=$(count_posters "$LIB/styles"); total=$(count_styles "$LIB/styles")
+  if [ "$(cat "$sp" 2>/dev/null)" = "$SPARSE" ] && [ "$have" -ge "$total" ]; then
+    echo "✓ poster: $have/$total"; return 0
+  fi                      # list changed, or still missing posters (e.g. an earlier setup was interrupted)
   echo "↓ đang tải poster của phong cách…"
   old=$(cat "$sp" 2>/dev/null || true)
   printf '%s\n' "$SPARSE" > "$sp"

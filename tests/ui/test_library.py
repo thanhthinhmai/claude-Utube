@@ -56,6 +56,8 @@ class Library(unittest.TestCase):
             self.assertIn(r.status_code, (400, 404), path)
             self.assertNotIn(b"secret library file", r.content, path)
             self.assertNotIn(b"do not serve", r.content, path)
+        for path in ("/api/v1/library/styles/_template", "/api/v1/library/styles/_template/poster"):
+            self.assertEqual(self.c.get(path).status_code, 404, path)               # contracts/api-library.md
 
     def test_not_installed(self):  # edge case: no library yet
         shutil.rmtree(self.p.dir / "lib")
