@@ -3,10 +3,23 @@ dist/
 .env
 .env.*
 .DS_Store
+*.tmp
+*.swp
 
-# Reference videos and media (study only, never commit)
-references/
+# Style library (fetched by `sh bin/studio setup`, pinned in library.lock)
+lib/
+
+# Films and reference videos stay on this machine only
+films/*
+!films/README.md
+references/*
+!references/README.md
+
+# Media files are never committed
 *.mp4
 *.mov
 *.webm
+*.mkv
 *.wav
+*.mp3
+*.m4a

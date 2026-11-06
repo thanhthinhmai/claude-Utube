@@ -3,13 +3,22 @@
 **claude-Utube** là một xưởng phim cho Claude. Xưởng xây bằng **Spec-Driven Development** của [GitHub Spec Kit](https://github.com/github/spec-kit).
 
 ## Các luồng làm việc
+Mỗi yêu cầu đi đúng **một** luồng:
+
 | Người dùng muốn | Luồng |
 |---|---|
-| Xây hoặc sửa skill, công cụ, cấu trúc của xưởng | Spec-kit (bên dưới) |
-| Học phong cách của một kênh YouTube | Skill học phong cách (sẽ xây ở một tính năng sau) |
-| Làm một bộ phim | Quy trình làm phim của thư viện (sẽ nối vào ở một tính năng sau). Không tạo spec cho từng phim |
+| Làm một bộ phim, video, clip (theo phong cách thư viện hoặc phong cách riêng) | **Làm phim** (bên dưới). Không tạo spec cho từng phim |
+| Học phong cách của một kênh YouTube hoặc một video mẫu | **Học phong cách**: **chưa có** (tính năng 002). Báo người dùng là chưa xây, không làm tạm |
+| Xây hoặc sửa skill, công cụ, cấu trúc của xưởng | **Spec-kit** (các mục bên dưới) |
 
-Khi một luồng chưa được xây, nói rõ với người dùng thay vì làm tạm.
+### Luồng làm phim
+1. Chạy `sh bin/studio status`. Nếu chưa sẵn sàng thì chạy `sh bin/studio setup` và báo người dùng công cụ còn thiếu (xưởng không tự cài phần mềm hệ thống).
+2. Đọc `lib/lemo-opuscar/AGENTS.md` và làm theo, **ở chế độ skill** của thư viện, với các điểm thay thế sau:
+   - `LIB` = đường dẫn tuyệt đối tới `lib/lemo-opuscar`. Chạy công cụ thư viện từ `$LIB`; `build.sh` ghi `LIB=<đường dẫn>` ở đầu, không dùng `../..`.
+   - Thư mục phim = `films/<tên>/` của dự án (chữ thường, số, gạch nối). Nội dung `films/` không vào git.
+   - Phong cách riêng: đọc danh mục `my-styles/README.md` và lưu vào `my-styles/<slug>/`, **thay cho** `~/lemo-my-styles/`.
+   - Cài gói của thư viện bằng `sh bin/studio deps [voice] [music]`, **không** chạy thẳng `setup.sh` của thư viện (nó sẽ tải một bản thư viện khác vào `~/lemo-opuscar`).
+3. Không sửa file nào trong `lib/` (hiến pháp VI). Muốn dùng phiên bản thư viện mới thì đổi `library.lock` theo quy trình spec-kit.
 
 ## Luật bắt buộc
 - Đọc `.specify/memory/constitution.md` trước khi lập kế hoạch hoặc viết code. Hiến pháp có hiệu lực cao nhất.
@@ -55,6 +64,9 @@ Mẹo chung để tiết kiệm token:
 Lệnh phụ: `/speckit-checklist <lĩnh vực>` tạo checklist kiểm tra chất lượng spec (UX, bảo mật…). `/speckit-constitution` dùng để sửa hiến pháp.
 
 ## Cấu trúc
+- `bin/studio`: `setup` · `status [--json]` · `deps [voice] [music]`; test: `sh tests/run.sh`
+- `library.lock`: phiên bản thư viện đã ghim; `lib/lemo-opuscar/`: thư viện (không vào git, không sửa)
+- `my-styles/`: phong cách riêng (vào git) · `films/`: phim (không vào git) · `references/`: video tham chiếu (không vào git) · `tools/`: công cụ tự viết
 - `.specify/memory/constitution.md`: hiến pháp
 - `.specify/templates/`: mẫu cho spec, plan, tasks, checklist
 - `.specify/scripts/bash/`: script tạo nhánh và thư mục tính năng

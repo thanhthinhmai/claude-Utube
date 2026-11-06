@@ -1,0 +1,278 @@
+#!/bin/sh
+# claude-Utube: lệnh quản lý xưởng phim.
+#   sh bin/studio setup                 đưa thư viện về đúng phiên bản trong library.lock, báo công cụ còn thiếu
+#   sh bin/studio status [--json]       trạng thái xưởng (không dùng mạng, không ghi file)
+#   sh bin/studio deps [voice] [music]  cài gói của thư viện (Node, Python, giọng, nhạc) vào lib/lemo-opuscar
+#   sh bin/studio help
+# Mã thoát: 0 = sẵn sàng / xong · 1 = chưa sẵn sàng / thất bại · 2 = sai cách dùng hoặc library.lock sai.
+set -eu
+
+ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
+LIB_REL=lib/lemo-opuscar
+LIB="$ROOT/$LIB_REL"
+TMP="$ROOT/lib/.lemo-opuscar.tmp"
+# Giống setup.sh của thư viện: bỏ demo, gallery và ảnh lớn
+SPARSE='/*
+!/styles/*/demo/
+!/styleboard/
+!/docs/frames/
+!/docs/cover.jpg
+!/docs/opuscar98.jpg
+!/styles/*/poster.jpg'
+
+usage() {
+  sed -n '2,7s/^# \{0,1\}//p' "$0"
+}
+
+die2() { echo "✗ $*" >&2; exit 2; }
+
+# ---------- library.lock ----------
+read_lock() {
+  LIB_REPO=''; LIB_COMMIT=''
+  if [ -f "$ROOT/library.lock" ]; then
+    LIB_REPO=$(tr -d '\r' < "$ROOT/library.lock" | sed -n 's/^LIB_REPO=//p' | head -n 1)
+    LIB_COMMIT=$(tr -d '\r' < "$ROOT/library.lock" | sed -n 's/^LIB_COMMIT=//p' | head -n 1)
+  fi
+  LIB_REPO=${STUDIO_LIB_REPO:-$LIB_REPO}
+  LIB_COMMIT=${STUDIO_LIB_COMMIT:-$LIB_COMMIT}
+  [ -n "$LIB_REPO" ] || die2 "library.lock thiếu LIB_REPO"
+  case $LIB_COMMIT in
+    '' | *[!0-9a-f]*) die2 "library.lock: LIB_COMMIT phải là SHA 40 ký tự hex (đang là \"$LIB_COMMIT\")" ;;
+  esac
+  [ ${#LIB_COMMIT} -eq 40 ] || die2 "library.lock: LIB_COMMIT phải đúng 40 ký tự (đang có ${#LIB_COMMIT})"
+}
+
+# ---------- công cụ ----------
+# Lấy MAJOR.MINOR đầu tiên trong một dòng; rỗng nếu không có
+ver_of() {
+  printf '%s\n' "$1" | sed -n 's/[^0-9]*\([0-9][0-9]*\)\.\([0-9][0-9]*\).*/\1.\2/p' | head -n 1
+}
+# ver_ge FOUND MIN: đúng nếu FOUND >= MIN (so MAJOR rồi MINOR)
+ver_ge() {
+  f1=${1%%.*}; f2=${1#*.}; if [ "$f2" = "$1" ]; then f2=0; fi
+  m1=${2%%.*}; m2=${2#*.}; if [ "$m2" = "$2" ]; then m2=0; fi
+  if [ "$f1" -gt "$m1" ]; then return 0; fi
+  if [ "$f1" -lt "$m1" ]; then return 1; fi
+  [ "$f2" -ge "$m2" ]
+}
+# Dòng đầu của "<lệnh> <đối số>", rỗng nếu lệnh không có
+vline() {
+  if command -v "$1" >/dev/null 2>&1; then "$@" 2>&1 | head -n 1 || true; fi
+}
+add_tool() {  # name found min state hint
+  TOOLS="${TOOLS}$1|$2|$3|$4|$5
+"
+  case $4 in missing | old) TOOLS_BAD=$((TOOLS_BAD + 1)) ;; esac
+}
+probe() {  # name min line hint
+  if [ -z "$3" ]; then add_tool "$1" '' "$2" missing "$4"; return 0; fi
+  pv=$(ver_of "$3")
+  if [ -z "$pv" ]; then add_tool "$1" '' "$2" unknown "không đọc được phiên bản (\"$3\"); cần ≥ $2"
+  elif ver_ge "$pv" "$2"; then add_tool "$1" "$pv" "$2" ok ''
+  else add_tool "$1" "$pv" "$2" old "$4"; fi
+}
+check_tools() {
+  TOOLS=''; TOOLS_BAD=0
+  probe git 2.25 "$(vline git --version)" "cài hoặc nâng cấp git: https://git-scm.com/downloads"
+  probe node 20 "$(vline node --version)" "cài Node 20+: https://nodejs.org"
+  probe ffmpeg 7 "$(vline ffmpeg -version)" "cài ffmpeg 7+ (Ubuntu 24.04 chỉ có 6.1, dùng bản static: https://johnvansickle.com/ffmpeg/)"
+  pl=$(vline python3 --version); pyv=$(ver_of "$pl")
+  if command -v uv >/dev/null 2>&1 && { [ -z "$pyv" ] || ! ver_ge "$pyv" 3.11; }; then
+    add_tool python "$pyv" 3.11 ok "dùng uv (uv tự tải Python phù hợp)"
+  else
+    probe python 3.11 "$pl" "cài Python 3.11+ hoặc uv: https://docs.astral.sh/uv/"
+  fi
+}
+state_label() {
+  case $1 in
+    ok) echo 'có' ;; missing) echo 'thiếu' ;; old) echo 'quá cũ' ;; unknown) echo 'không rõ' ;;
+  esac
+}
+print_tools() {
+  echo "Công cụ hệ thống:"
+  printf '%s' "$TOOLS" | while IFS='|' read -r n f m s h; do
+    case $s in ok) mk='✓' ;; unknown) mk='?' ;; *) mk='✗' ;; esac
+    printf '  %s %-7s %-8s cần ≥ %-5s %s\n' "$mk" "$n" "${f:--}" "$m" "$(state_label "$s")"
+    if [ -n "$h" ]; then printf '      → %s\n' "$h"; fi
+  done
+}
+
+# ---------- thư viện ----------
+# LSTATE: missing | foreign | modified | outdated | ok ; LIB_FOUND = commit hiện tại
+lib_state() {
+  LIB_FOUND=''; MODIFIED=''
+  if [ ! -d "$LIB" ] || [ -z "$(ls -A "$LIB" 2>/dev/null)" ]; then LSTATE=missing; return 0; fi
+  # Phải là repo riêng (không để git leo lên repo của dự án) và do xưởng quản lý
+  if [ ! -d "$LIB/.git" ] || [ "$(git -C "$LIB" config --get studio.managed 2>/dev/null || true)" != true ]; then
+    LSTATE=foreign; return 0
+  fi
+  LIB_FOUND=$(git -C "$LIB" rev-parse HEAD 2>/dev/null || true)
+  # npm install của thư viện có thể ghi lại package-lock.json: không coi là sửa
+  MODIFIED=$(git -C "$LIB" status --porcelain --untracked-files=no 2>/dev/null | grep -v ' package-lock.json$' || true)
+  if [ -n "$MODIFIED" ]; then LSTATE=modified
+  elif [ "$LIB_FOUND" != "$LIB_COMMIT" ]; then LSTATE=outdated
+  else LSTATE=ok; fi
+}
+# fetch_commit DIR: lấy LIB_COMMIT về DIR và checkout (detached)
+fetch_commit() {
+  if ! git -C "$1" fetch --quiet --depth 1 origin "$LIB_COMMIT" 2>"$1/.git/studio-fetch.log"; then
+    # Máy chủ không cho fetch theo SHA: lấy đủ lịch sử rồi tìm commit
+    if [ -f "$1/.git/shallow" ]; then
+      git -C "$1" fetch --quiet --unshallow origin 2>>"$1/.git/studio-fetch.log" || return 1
+    else
+      git -C "$1" fetch --quiet origin 2>>"$1/.git/studio-fetch.log" || return 1
+    fi
+  fi
+  git -C "$1" cat-file -e "$LIB_COMMIT^{commit}" 2>/dev/null || { echo "commit $LIB_COMMIT không có trên $LIB_REPO" >>"$1/.git/studio-fetch.log"; return 1; }
+  git -C "$1" -c advice.detachedHead=false checkout --quiet --detach "$LIB_COMMIT" 2>>"$1/.git/studio-fetch.log"
+}
+install_fresh() {
+  rm -rf "$TMP"
+  mkdir -p "$TMP"
+  trap 'rm -rf "$TMP"' INT TERM
+  git -C "$TMP" init --quiet
+  git -C "$TMP" remote add origin "$LIB_REPO"
+  git -C "$TMP" config studio.managed true      # KHÔNG đặt lemo.managed: setup.sh của thư viện sẽ reset về main
+  # Tải từng phần: chỉ lấy file cần cho phần sparse (máy chủ không hỗ trợ thì tải đủ, vẫn đúng)
+  git -C "$TMP" config remote.origin.promisor true
+  git -C "$TMP" config remote.origin.partialclonefilter blob:none
+  git -C "$TMP" config core.sparseCheckout true
+  git -C "$TMP" config core.sparseCheckoutCone false
+  printf '%s\n' "$SPARSE" > "$TMP/.git/info/sparse-checkout"
+  if fetch_commit "$TMP"; then
+    trap - INT TERM
+    if [ -d "$LIB" ]; then rmdir "$LIB"; fi      # chỉ khi rỗng (trạng thái missing)
+    mv "$TMP" "$LIB"
+    return 0
+  fi
+  echo "✗ tải thư viện thất bại (mất mạng, hoặc LIB_REPO / LIB_COMMIT sai):" >&2
+  sed 's/^/    /' "$TMP/.git/studio-fetch.log" >&2 || true
+  rm -rf "$TMP"
+  trap - INT TERM
+  return 1
+}
+short() { printf '%.7s' "$1"; }
+
+# ---------- đếm ----------
+count_styles() {  # thư mục con có STYLE.md, trừ _template
+  n=0
+  for d in "$1"/*/; do
+    [ -f "${d}STYLE.md" ] || continue
+    case $(basename "$d") in _template) continue ;; esac
+    n=$((n + 1))
+  done
+  echo "$n"
+}
+count_dirs() {
+  n=0
+  for d in "$1"/*/; do if [ -d "$d" ]; then n=$((n + 1)); fi; done
+  echo "$n"
+}
+json_str() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
+
+# ---------- lệnh ----------
+cmd_setup() {
+  read_lock
+  check_tools
+  print_tools
+  echo
+  if ! command -v git >/dev/null 2>&1; then
+    echo "✗ cần git để tải thư viện."; exit 1
+  fi
+  rc=0
+  lib_state
+  case $LSTATE in
+    missing)
+      echo "↓ đang tải thư viện vào $LIB_REL (phiên bản $(short "$LIB_COMMIT"))…"
+      if install_fresh; then echo "✓ đã tải thư viện."; else rc=1; fi ;;
+    outdated)
+      echo "↻ cập nhật thư viện từ $(short "$LIB_FOUND") lên $(short "$LIB_COMMIT")…"
+      if fetch_commit "$LIB"; then echo "✓ đã cập nhật thư viện."
+      else echo "✗ cập nhật thất bại:"; sed 's/^/    /' "$LIB/.git/studio-fetch.log"; rc=1; fi ;;
+    ok)
+      echo "✓ thư viện đã đúng phiên bản $(short "$LIB_COMMIT"), không cần tải." ;;
+    foreign)
+      echo "✗ $LIB_REL có nội dung nhưng không phải thư viện do xưởng quản lý. Không xoá gì."
+      echo "  → đổi tên hoặc xoá thư mục đó, rồi chạy lại: sh bin/studio setup"
+      rc=1 ;;
+    modified)
+      echo "✗ thư viện có thay đổi cục bộ, không ghi đè:"
+      printf '%s\n' "$MODIFIED" | sed 's/^/    /'
+      echo "  → thư viện phải giữ nguyên (hiến pháp VI). Bỏ thay đổi: git -C $LIB_REL checkout -- ."
+      rc=1 ;;
+  esac
+  lib_state
+  echo
+  if [ "$LSTATE" = ok ] && [ "$TOOLS_BAD" -eq 0 ] && [ "$rc" -eq 0 ]; then
+    echo "✓ xưởng sẵn sàng. Gói của thư viện cài khi phim cần: sh bin/studio deps [voice] [music]"
+  else
+    [ "$LSTATE" = ok ] || rc=1
+    if [ "$TOOLS_BAD" -gt 0 ]; then echo "✗ còn $TOOLS_BAD công cụ thiếu hoặc quá cũ (xem → ở trên). Xưởng không tự cài phần mềm hệ thống."; rc=1; fi
+    echo "✗ xưởng chưa sẵn sàng."
+  fi
+  exit "$rc"
+}
+
+cmd_status() {
+  json=0
+  for a in "$@"; do
+    case $a in --json) json=1 ;; *) echo "✗ không hiểu \"$a\"" >&2; usage >&2; exit 2 ;; esac
+  done
+  read_lock
+  check_tools
+  if command -v git >/dev/null 2>&1; then lib_state; else LSTATE=missing; LIB_FOUND=''; fi
+  if [ "$LSTATE" = missing ] || [ "$LSTATE" = foreign ]; then n_lib=0; else n_lib=$(count_styles "$LIB/styles"); fi
+  n_my=$(count_styles "$ROOT/my-styles")
+  n_films=$(count_dirs "$ROOT/films")
+  deps=false
+  if [ -d "$LIB/node_modules" ] && [ -d "$LIB/.venv" ]; then deps=true; fi
+  ready=false
+  if [ "$LSTATE" = ok ] && [ "$TOOLS_BAD" -eq 0 ]; then ready=true; fi
+
+  if [ "$json" -eq 1 ]; then
+    printf '{"ready":%s,"library":{"path":%s,"state":%s,"commit_expected":%s,"commit_found":%s},"tools":[' \
+      "$ready" "$(json_str "$LIB_REL")" "$(json_str "$LSTATE")" "$(json_str "$LIB_COMMIT")" "$(json_str "$LIB_FOUND")"
+    printf '%s' "$TOOLS" | {
+      sep=''
+      while IFS='|' read -r n f m s h; do
+        printf '%s{"name":%s,"found":%s,"min":%s,"state":%s,"hint":%s}' "$sep" \
+          "$(json_str "$n")" "$(json_str "$f")" "$(json_str "$m")" "$(json_str "$s")" "$(json_str "$h")"
+        sep=','
+      done
+    }
+    printf '],"counts":{"library_styles":%s,"my_styles":%s,"films":%s},"deps_core":%s}\n' "$n_lib" "$n_my" "$n_films" "$deps"
+  else
+    echo "Xưởng: $ROOT"
+    case $LSTATE in
+      ok) echo "  ✓ thư viện   $LIB_REL @ $(short "$LIB_FOUND") (đúng phiên bản)" ;;
+      missing) echo "  ✗ thư viện   chưa có → sh bin/studio setup" ;;
+      outdated) echo "  ✗ thư viện   $(short "$LIB_FOUND"), cần $(short "$LIB_COMMIT") → sh bin/studio setup" ;;
+      modified) echo "  ✗ thư viện   có thay đổi cục bộ → git -C $LIB_REL checkout -- ." ;;
+      foreign) echo "  ✗ thư viện   $LIB_REL không phải thư viện do xưởng quản lý" ;;
+    esac
+    print_tools
+    echo "  Phong cách thư viện: $n_lib · phong cách riêng: $n_my · phim: $n_films"
+    if [ "$deps" = true ]; then echo "  Gói lõi của thư viện: đã cài"; else echo "  Gói lõi của thư viện: chưa cài (cần khi làm phim) → sh bin/studio deps"; fi
+    if [ "$ready" = true ]; then echo "✓ sẵn sàng"; else echo "✗ chưa sẵn sàng"; fi
+  fi
+  if [ "$ready" = true ]; then exit 0; else exit 1; fi
+}
+
+cmd_deps() {
+  read_lock
+  lib_state
+  if [ "$LSTATE" != ok ]; then
+    echo "✗ thư viện chưa sẵn sàng ($LSTATE). Chạy trước: sh bin/studio setup" >&2; exit 1
+  fi
+  # Đặt LEMO_OPUSCAR_HOME, nếu không trình cài của thư viện sẽ tải một bản khác vào ~/lemo-opuscar
+  LEMO_OPUSCAR_HOME="$LIB" exec sh "$LIB/plugin/skills/lemo-opuscar/scripts/setup.sh" deps "$@"
+}
+
+case ${1:-} in
+  setup) shift; cmd_setup "$@" ;;
+  status) shift; cmd_status "$@" ;;
+  deps) shift; cmd_deps "$@" ;;
+  help | -h | --help) usage ;;
+  '') usage >&2; exit 2 ;;
+  *) echo "✗ lệnh lạ: $1" >&2; usage >&2; exit 2 ;;
+esac
