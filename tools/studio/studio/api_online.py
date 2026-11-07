@@ -1,15 +1,18 @@
-"""Online-only API: accounts and film jobs (specs/007 contracts/api-online.md). Later phases add uploads, admin."""
+"""Online-only API: accounts, film and learn jobs, uploads (specs/007 contracts/api-online.md). Later phases add admin."""
+import json
 import os
+import subprocess
 import re
 import secrets
 import shutil
-from typing import Literal, Optional
+from pathlib import Path
+from typing import List, Literal, Optional
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, File, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from . import accounts, jobs, moderation, quotas, ratelimit, resources, reviews
+from . import accounts, db, jobs, moderation, quotas, ratelimit, resources, reviews, store
 from .store import StudioError
 
 router = APIRouter(prefix="/api/v1")
@@ -113,7 +116,14 @@ def reset(body: ResetIn):
 def get_me(request: Request):
     a = me(request)
     return {**accounts.public(a), "quota": quotas.summary(a),
-            "limits": {"film_max_seconds": quotas.settings()["film_max_seconds"]}}
+            "limits": limits()}
+
+
+def limits() -> dict:
+    s = quotas.settings()
+    return {"film_max_seconds": s["film_max_seconds"], "learn_max_videos": s["learn_max_videos"],
+            "upload_max_mb": s["upload_max_mb"], "upload_max_minutes": s["upload_max_minutes"],
+            "rights_text": RIGHTS_TEXT}
 
 
 @router.put("/me")
@@ -133,11 +143,27 @@ def delete_me(body: DeleteIn, request: Request, response: Response):
 
 # ---------- film jobs ----------
 class JobIn(BaseModel):
-    kind: Literal["film"]
-    style: str = Field(max_length=60)
-    idea: str = Field(min_length=3, max_length=2000)
-    seconds: int = Field(ge=1, le=3600)
+    kind: Literal["film", "learn"]
+    # film
+    style: Optional[str] = Field(default=None, max_length=60)
+    idea: Optional[str] = Field(default=None, min_length=3, max_length=2000)
+    seconds: Optional[int] = Field(default=None, ge=1, le=3600)
     review_treatment: bool = False
+    # learn
+    source: Optional[Literal["youtube", "upload"]] = None
+    channel: Optional[str] = Field(default=None, max_length=300)
+    count: Optional[int] = Field(default=None, ge=1, le=100)
+    rights_confirmed: bool = False
+    uploads: Optional[List[str]] = Field(default=None, max_length=20)
+
+
+# what the customer ticks before a YouTube fetch (constitution 2.1.0, "Bản quyền và nội dung")
+RIGHTS_TEXT = ("I confirm that I have the right to use the videos of this channel, or that I use them only to study "
+               "their style. The studio keeps them private, never shows or shares them, and deletes them after learning.")
+RIGHTS_VERSION = "2.1.0"
+CHANNEL = re.compile(r"^https://(www\.|m\.)?youtube\.com/(@[\w.-]{1,100}|channel/[\w-]{10,40}|c/[\w.-]{1,100})/?$")
+UPLOAD_ID = re.compile(r"^u-[0-9a-f]{16}$")
+VIDEO_EXT = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi"}
 
 
 def film_name(idea: str) -> str:
@@ -162,6 +188,10 @@ def post_job(body: JobIn, request: Request):
     a = me(request)
     if not a["email_verified_at"]:
         raise StudioError("unverified", "hãy xác minh email trước khi giao việc", 403)
+    if body.kind == "learn":
+        return post_learn(body, a)
+    if not (body.style and body.idea and body.seconds):
+        raise StudioError("invalid", "việc làm phim cần style, idea và seconds", 422)
     s = quotas.settings()
     if not resources.NAME.match(body.style or "") or not style_exists(body.style):
         raise StudioError("style_not_found", f"không có phong cách \"{body.style}\"", 404)
@@ -225,4 +255,124 @@ def delete_film(name: str, request: Request):
         if j["status"] not in jobs.FINAL and j["links"].get("film") == name:
             raise StudioError("in_use", "phim đang được một việc dùng", 409)
     shutil.rmtree(d)
+    return Response(status_code=204)
+
+
+# ---------- learning a style (US2) ----------
+def channel_url(text: str) -> str:
+    t = (text or "").strip()
+    if t.startswith("@"):
+        t = "https://www.youtube.com/" + t
+    if not CHANNEL.match(t):
+        raise StudioError("invalid", "hãy nhập địa chỉ kênh YouTube, ví dụ https://www.youtube.com/@ten-kenh", 422)
+    return t.rstrip("/")
+
+
+def upload_dir(owner: str) -> Path:
+    return db.data_dir() / "uploads" / owner
+
+
+def upload_meta(owner: str, upload_id: str) -> dict:
+    """An upload of this customer; another customer's is simply not found."""
+    if not UPLOAD_ID.match(upload_id or ""):
+        raise StudioError("not_found", "không có tệp tải lên này", 404)
+    meta = store.read_json(upload_dir(owner) / f"{upload_id}.json")
+    if not meta or not (upload_dir(owner) / meta["file"]).is_file() or meta.get("job"):
+        raise StudioError("not_found", "không có tệp tải lên này", 404)
+    return meta
+
+
+def post_learn(body: JobIn, a) -> dict:
+    s = quotas.settings()
+    set_name = f"learn-{secrets.token_hex(3)}"
+    if body.source == "youtube":
+        if not body.rights_confirmed:
+            raise StudioError("rights_required", "hãy xác nhận quyền dùng video của kênh trước khi học", 422)
+        url = channel_url(body.channel)
+        count = body.count or 5
+        if count > s["learn_max_videos"]:
+            raise StudioError("too_many_videos", f"học tối đa {s['learn_max_videos']} video mỗi lần", 422)
+        inp, name = {"kind": "learn", "source": "youtube", "channel": url, "count": count, "set": set_name}, \
+            f"Learn a style from {count} videos of a channel"
+    elif body.source == "upload":
+        ids = list(dict.fromkeys(body.uploads or []))
+        if not ids or len(ids) > s["learn_max_videos"]:
+            raise StudioError("too_many_videos", f"cần 1–{s['learn_max_videos']} video tải lên", 422)
+        for u in ids:
+            upload_meta(a["id"], u)
+        inp, name = {"kind": "learn", "source": "upload", "uploads": ids, "set": set_name}, \
+            f"Learn a style from {len(ids)} uploaded video{'s' if len(ids) > 1 else ''}"
+    else:
+        raise StudioError("invalid", "nguồn phải là youtube hoặc upload", 422)
+    ratelimit.hit("job_account", a["id"])
+    j = quotas.reserve(a, "learn", name, {"set": set_name}, inp)
+    if body.source == "youtube":
+        with db.tx() as con:
+            con.execute("INSERT INTO rights VALUES (?, ?, ?, ?, ?)", (a["id"], j["id"], inp["channel"], store.now_iso(),
+                                                                     RIGHTS_VERSION))
+    else:
+        for u in inp["uploads"]:          # an upload belongs to one job from now on
+            mp = upload_dir(a["id"]) / f"{u}.json"
+            meta = store.read_json(mp)
+            meta["job"] = j["id"]
+            store.write_json(mp, meta)
+    return view(j, a)
+
+
+@router.post("/uploads", status_code=201)
+def post_upload(request: Request, file: UploadFile = File(...)):
+    """One reference video. It is never served back (FR-018); only a learn job of the same customer uses it."""
+    a = me(request)
+    s = quotas.settings()
+    ext = Path(file.filename or "").suffix.lower()
+    if ext not in VIDEO_EXT:
+        raise StudioError("bad_video", "chỉ nhận tệp video (mp4, mov, mkv, webm, m4v, avi)", 422)
+    d = upload_dir(a["id"])
+    d.mkdir(parents=True, exist_ok=True)
+    uid = f"u-{secrets.token_hex(8)}"
+    dest, limit, size = d / f"{uid}{ext}", s["upload_max_mb"] * 1024 * 1024, 0
+    with open(dest, "wb") as out:
+        while True:
+            chunk = file.file.read(1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > limit:
+                out.close()
+                dest.unlink(missing_ok=True)
+                raise StudioError("too_large", f"tệp tối đa {s['upload_max_mb']} MB", 413)
+            out.write(chunk)
+    try:
+        p = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=codec_type", "-of", "json",
+                            str(dest)], capture_output=True, text=True, timeout=60)
+        info = json.loads(p.stdout or "{}")
+        seconds = float(info.get("format", {}).get("duration") or 0)
+        has_video = any(x.get("codec_type") == "video" for x in info.get("streams", []))
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        seconds, has_video = 0, False
+    if not has_video or seconds <= 0:
+        dest.unlink(missing_ok=True)
+        raise StudioError("bad_video", "không đọc được video trong tệp này", 422)
+    if seconds > s["upload_max_minutes"] * 60:
+        dest.unlink(missing_ok=True)
+        raise StudioError("too_long", f"mỗi video dài tối đa {s['upload_max_minutes']} phút", 422)
+    store.write_json(d / f"{uid}.json", {"id": uid, "file": dest.name, "seconds": round(seconds, 2), "bytes": size,
+                                         "created_at": store.now_iso(), "job": None})
+    return {"upload_id": uid, "seconds": round(seconds, 2)}
+
+
+@router.delete("/styles/{slug}", status_code=204)
+def delete_style(slug: str, request: Request):
+    a = me(request)
+    d = resources.style_dir(slug)
+    if not (d / "style.json").is_file():
+        raise StudioError("not_found", f"không có phong cách \"{slug}\"", 404)
+    for j in jobs.all_jobs(a["id"]):
+        if j["status"] not in jobs.FINAL and (j.get("input") or {}).get("style") == slug:
+            raise StudioError("in_use", "phong cách đang được một việc dùng", 409)
+    shutil.rmtree(d)
+    readme = d.parent / "README.md"
+    if readme.is_file():                  # drop its line from the catalog the film agent reads
+        lines = [x for x in readme.read_text(encoding="utf-8").splitlines(True) if not x.startswith(f"| {slug} |")]
+        readme.write_text("".join(lines), encoding="utf-8")
     return Response(status_code=204)

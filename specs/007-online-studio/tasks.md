@@ -186,33 +186,38 @@
 
 **Independent Test**: `sh tests/online/run.sh -k us2` đạt.
 
-- [ ] T028 [P] [US2] Tạo `tests/online/test_us2.py`. Tác tử giả có thêm cờ `--learn`: tạo `references/<set>/videos/a.mp4`, ảnh ghép, yêu cầu duyệt style-1 rồi style-2 (thoát mã 10 mỗi lần), và lưu `my-styles/<slug>/`. Test kiểm:
+- [X] T028 [P] [US2] Tạo `tests/online/test_us2.py`. Tác tử giả có thêm cờ `--learn`: tạo `references/<set>/videos/a.mp4`, ảnh ghép, yêu cầu duyệt style-1 rồi style-2 (thoát mã 10 mỗi lần), và lưu `my-styles/<slug>/`. Test kiểm:
   - Nguồn YouTube mà thiếu `rights_confirmed` thì `422 rights_required`; có xác nhận thì RightsConfirmation được lưu.
   - Hai lần duyệt Approve trên web thì việc nối lại phiên và xong.
   - Phong cách có trong `GET /styles` và dùng được ở `POST /jobs` loại film.
-- [ ] T029 [P] [US2] Tạo `tests/online/test_media_gone.py` cho FR-018, FR-019 và SC-004:
+- [X] T029 [P] [US2] Tạo `tests/online/test_media_gone.py` cho FR-018, FR-019 và SC-004:
   - Sau khi việc học xong, dừng hoặc lỗi, và sau một lượt dọn, không còn tệp `.mp4 .mkv .webm .mov .m4a .wav .mp3 .opus` nào trong `/data/jobs/<id>` hay `/data/accounts/*/references`. Cũng không còn ảnh ghép (`profile/*/sheets/`) hay lời chép (`transcripts/`), và mỗi bộ tham chiếu còn ≤ 6 ảnh trong `proof/` (FR-018, FR-019, SC-004).
   - Trong lúc việc học còn chạy, `GET /sets/{set}/sheets` trả danh sách ảnh; sau khi kết thúc thì trả `{removed: true}`.
   - Thử mọi đường `/api/v1/sets/*` và `/uploads/*` với tên tệp video đều trả 404.
   - Tác vụ dọn xoá được tệp sót được tạo giả với thời gian kết thúc cách đây hơn 1 giờ.
-- [ ] T030 [US2] Trong `tools/studio/studio/api_online.py`, thêm:
+- [X] T030 [US2] Trong `tools/studio/studio/api_online.py`, thêm:
   - `POST /uploads`: multipart; kiểm dung lượng ≤ `upload_max_mb`, độ dài ≤ `upload_max_minutes` bằng `ffprobe`, và định dạng video; lưu vào `/data/uploads/<owner>/<id>`; chỉ chủ của tệp dùng được.
   - `POST /jobs` loại `learn` với `source` `youtube` (`channel`, `count ≤ learn_max_videos`, `rights_confirmed`) hoặc `upload` (`uploads[]`), và tạo RightsConfirmation.
   - `DELETE /styles/{slug}` (`409 in_use` khi một việc đang dùng).
-- [ ] T031 [US2] Trong `tools/runner/worker.py`, thêm cho việc học:
+- [X] T031 [US2] Trong `tools/runner/worker.py`, thêm cho việc học:
   - Chép các tệp tải lên vào `/work/references/<set>/videos/`.
   - Với nguồn YouTube, dùng thêm mạng `jobnet-yt`. Tạo mạng này trong `deploy/compose.yaml` kèm một bộ lọc ra ngoài (ví dụ squid hoặc tinyproxy) chỉ cho `*.youtube.com`, `*.googlevideo.com`, `*.ytimg.com`.
   - Khi xong, chép `my-styles/<slug>` về `/data/accounts/<owner>/`. Từ `references/<set>` chỉ chép số đo (`profile/*.json`, summary) và tối đa 6 ảnh `proof/`; **không** chép video, ảnh ghép hay lời chép (hiến pháp 2.1.0).
-- [ ] T032 [US2] Trong `tools/runner/agent.py`, thêm lời nhắc học phong cách: làm theo skill `style-learn` với nguồn đã cho; tải bằng `sh bin/studio learn fetch` (YouTube) hoặc dùng video có sẵn; duyệt bằng `review request` (style-1, style-2) rồi kết thúc lượt; viết mọi tóm tắt bằng tiếng Anh. Khi nối lại phiên, đưa quyết định và góp ý vào tin nhắn.
-- [ ] T033 [US2] Trong `tools/runner/worker.py`, thêm tác vụ dọn mỗi 15 phút (R10):
+- [X] T032 [US2] Trong `tools/runner/agent.py`, thêm lời nhắc học phong cách: làm theo skill `style-learn` với nguồn đã cho; tải bằng `sh bin/studio learn fetch` (YouTube) hoặc dùng video có sẵn; duyệt bằng `review request` (style-1, style-2) rồi kết thúc lượt; viết mọi tóm tắt bằng tiếng Anh. Khi nối lại phiên, đưa quyết định và góp ý vào tin nhắn.
+- [X] T033 [US2] Trong `tools/runner/worker.py`, thêm tác vụ dọn mỗi 15 phút (R10):
   - Với Job `learn` đã kết thúc, chạy `sh bin/studio learn clean <set>` trong thư mục việc, rồi xoá mọi tệp có phần mở rộng âm thanh hay video (kể cả tệp tải lên của việc đó), ảnh ghép `profile/*/sheets/` và lời chép `transcripts/`.
   - Ghi `media_removed_at`.
   - Dừng các việc `waiting_review` quá `review_timeout_days`, gửi thư review_timeout.
-- [ ] T034 [US2] Trong `tools/studio/studio/web/app.js`, thêm:
+- [X] T034 [US2] Trong `tools/studio/studio/web/app.js`, thêm:
   - Trang **Learn a style**: chọn nguồn (YouTube channel và số video, kèm ô xác nhận quyền bắt buộc với đúng câu chữ của hiến pháp 2.1.0; hoặc tải lên nhiều video, có thanh tiến độ).
   - Trang duyệt style-1 và style-2 dùng lại của 003.
 
   Không có thẻ `<video>` nào trỏ tới bộ tham chiếu.
+
+Ghi chú khi làm (2026-11-07):
+- T031: bộ tham chiếu nằm sẵn trong thư mục của khách trong lúc học. Container chỉ được gắn đúng bộ đó (`-v …/references/<set>:/work/references/<set>`), để khách duyệt ảnh ghép trên web. Khi kết thúc thì quét xoá tại chỗ, thay cho việc chép số đo về sau. Tệp tải lên được chép vào `/work/uploads/`, rồi tác tử chạy `learn fetch --files`.
+- T033: không gọi `learn clean`. Worker tự quét bằng Python (`sweep` trong worker.py): xoá âm thanh và video, ảnh ghép, lời chép, `words.json`, `compare.jpg`, và xoá tên kênh khỏi `set.json`. Giữ số đo và tối đa 6 khung bằng chứng, kể cả khung gốc để so sánh (FR-018 cho phép). Worker cũng không cần cài công cụ học.
+- `deploy/compose.yaml` hiện chỉ có `proxy`, `egress` (tinyproxy chỉ cho các tên miền YouTube) và hai mạng nội bộ. Phase 8 thêm web, worker, Caddy và bộ lọc socket Docker.
 
 **Checkpoint**: US1 và US2 chạy độc lập.
 

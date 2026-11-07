@@ -107,6 +107,12 @@ def samples() -> dict:
                             "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-shortest", str(p)],
                            check=True)
         out[name] = p
+    f = TMP / "frame.jpg"
+    if not f.exists():
+        import subprocess
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=orange:s=160x90:d=1",
+                        "-frames:v", "1", str(f)], check=True)
+    out["frame"] = f
     return out
 
 

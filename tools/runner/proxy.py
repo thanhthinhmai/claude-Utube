@@ -273,7 +273,8 @@ def create_app() -> FastAPI:
     @app.post("/internal/reviews/request", status_code=201)
     def review_request(body: ReviewIn, request: Request):
         job, _ = job_of(request)
-        r = reviews.create(job["id"], body.kind, body.set, body.summary, body.final_round)
+        with store.as_account(job["owner"]):        # style-2 reads the customer's set (proof/compare.json)
+            r = reviews.create(job["id"], body.kind, body.set, body.summary, body.final_round)
         return {"id": r["id"]}
 
     @app.get("/internal/reviews/{rid}")

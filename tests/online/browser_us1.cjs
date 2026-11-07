@@ -46,6 +46,12 @@ const readLine = () => new Promise((res) => process.stdin.once("data", (d) => re
   const renderSeen = Date.now();
   await page.waitForSelector("text=Download the film", { timeout: 60000 });
   const href = await page.getAttribute("text=Download the film", "href");
+  // Learn a style (US2): the rights box carries the constitution's wording; the upload form is one click away
+  await page.goto(`${base}/#/learn`);
+  await page.waitForSelector("text=I confirm that I have the right");
+  await page.click("text=From my own videos");
+  await page.waitForSelector("#files", { state: "visible" });
+  if (await page.locator("video").count()) throw new Error("a <video> on the learn page");
   await browser.close();
   console.log(JSON.stringify({ order_ms: (tMail - t0) + (tSubmit - tBack), render_seen: renderSeen / 1000, href, wide, errors }));
 })().catch((e) => { console.error(e); process.exit(1); });

@@ -30,6 +30,44 @@ import proxy  # noqa: E402
 log = logging.getLogger("studio.worker")
 EXIT_REVIEW = 10
 LUFS, LUFS_TOL, PEAK_MAX = -14.0, 1.0, -1.0
+MEDIA_EXT = {".mp4", ".mkv", ".webm", ".mov", ".m4v", ".avi", ".m4a", ".wav", ".mp3", ".opus", ".aac", ".flac", ".ogg"}
+PROOF_KEEP = 6
+PRIVATE = ("origin", "source_id", "title", "channel", "handle", "src_name", "src_size")
+
+
+def sweep(d: Path) -> int:
+    """Remove what must not outlive learning (FR-018, FR-019, R10): audio and video, contact sheets,
+    transcripts. Keeps the measurements and at most PROOF_KEEP proof frames. Returns how many files went."""
+    if not d.exists():
+        return 0
+    gone = 0
+    for f in [x for x in d.rglob("*") if x.is_file() or x.is_symlink()]:
+        parts = set(f.relative_to(d).parts[:-1])
+        if f.suffix.lower() in MEDIA_EXT or "sheets" in parts or "transcripts" in parts or f.name == "words.json":
+            f.unlink(missing_ok=True)
+            gone += 1
+    for sub in [x for x in d.rglob("*") if x.is_dir() and x.name in ("sheets", "transcripts", "videos")]:
+        shutil.rmtree(sub, ignore_errors=True)
+    out = d / "proof" / "out"
+    if out.is_dir():
+        frames = sorted(out.glob("*.jpg"), key=lambda f: (not f.name.startswith("ref"), f.stat().st_mtime), reverse=True)
+        keep = ([f for f in frames if f.name.startswith("ref")][:1]
+                + [f for f in frames if not f.name.startswith("ref")])[:PROOF_KEEP]
+        for f in out.iterdir():
+            if f not in keep:
+                shutil.rmtree(f) if f.is_dir() else f.unlink()
+                gone += 1
+    (d / "proof" / "compare.jpg").unlink(missing_ok=True)
+    data = store.read_json(d / "set.json")
+    if data is not None:
+        for v in data.get("videos", []):
+            for k in PRIVATE:
+                v.pop(k, None)
+        if isinstance(data.get("source"), dict):
+            data["source"]["inputs"] = []
+        data["media_removed"] = store.now_iso()[:10]
+        store.write_json(d / "set.json", data)
+    return gone
 
 
 def env_seconds(name: str, default: float) -> float:
@@ -43,9 +81,19 @@ class LocalRunner:
 
     def __init__(self):
         self.cmd = shlex.split(os.environ.get("STUDIO_AGENT_CMD") or f"{shlex.quote(sys.executable)} {HERE / 'agent.py'}")
-        self.lib = store.project_root() / "lib" / "lemo-opuscar"
+        self.studio = store.project_root()                   # what /studio is inside a container
+        self.lib = self.studio / "lib" / "lemo-opuscar"
 
-    def start(self, job_id: str, work: Path, env: dict):
+    def root(self, work: Path) -> str:
+        return str(work)
+
+    def start(self, job_id: str, work: Path, env: dict, mounts: dict = None, network: str = None):
+        """`mounts` {path in the job folder: folder under /data}: links here, bind mounts in Docker."""
+        for rel, target in (mounts or {}).items():
+            link = work / rel
+            link.parent.mkdir(parents=True, exist_ok=True)
+            if not link.is_symlink():
+                link.symlink_to(target, target_is_directory=True)
         base = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "TZ") if k in os.environ}
         env = {**base, **env, "STUDIO_WORK": str(work), "HOME": str(work / ".home")}
         with open(work / ".agent.log", "ab") as out:       # the child keeps its own copy of the file
@@ -63,7 +111,7 @@ class LocalRunner:
                 pass
             handle.wait()
 
-    def exec(self, work: Path, make_cmd, timeout: float = 900):
+    def exec(self, work: Path, make_cmd, timeout: float = 900, network: str = None):
         """Run a check (ffmpeg, readcheck) on the job folder; `make_cmd(root, lib)` builds the command."""
         p = subprocess.run(make_cmd(str(work), str(self.lib)), cwd=work, capture_output=True, text=True, timeout=timeout)
         return p.returncode, p.stdout + p.stderr
@@ -72,6 +120,7 @@ class LocalRunner:
 class DockerRunner:
     """A locked-down container per run (contracts/runner.md: Limits, Network)."""
     name = "docker"
+    studio = Path("/studio")
     lib = "/studio/lib/lemo-opuscar"
 
     def __init__(self):
@@ -80,23 +129,32 @@ class DockerRunner:
         if not self.image.startswith("studio-job:"):
             raise SystemExit("STUDIO_JOB_IMAGE must be a studio-job:* image")
         self.network = os.environ.get("STUDIO_JOB_NETWORK", "jobnet")
+        self.network_yt = os.environ.get("STUDIO_JOB_NETWORK_YT", "jobnet-yt")   # proxy + the YouTube-only egress filter
         self.cpus = os.environ.get("STUDIO_JOB_CPUS", "4")
         self.memory = os.environ.get("STUDIO_JOB_MEMORY", "8g")
         self.host_data = os.environ.get("STUDIO_HOST_DATA")        # /data as the Docker host sees it
 
+    def _host(self, path: Path) -> Path:
+        return Path(self.host_data) / Path(path).relative_to(db.data_dir()) if self.host_data else Path(path)
+
     def _mount(self, work: Path) -> str:
-        host = Path(self.host_data) / work.relative_to(db.data_dir()) if self.host_data else work
-        return f"{host}:/work"
+        return f"{self._host(work)}:/work"
+
+    def root(self, work: Path) -> str:
+        return "/work"
 
     def _flags(self, work: Path, network: str = None) -> list:
         return ["--user", "1000:1000", "--read-only", "--tmpfs", "/tmp:rw,size=2g", "--cap-drop", "ALL",
                 "--security-opt", "no-new-privileges", "--pids-limit", "512", "--cpus", self.cpus,
                 "--memory", self.memory, "--network", network or self.network, "-v", self._mount(work), "-w", "/work"]
 
-    def start(self, job_id: str, work: Path, env: dict):
+    def start(self, job_id: str, work: Path, env: dict, mounts: dict = None, network: str = None):
         name = f"studio-{job_id}-{int(time.time())}"
         env = {**env, "STUDIO_WORK": "/work", "HOME": "/work/.home"}
-        cmd = [self.docker, "run", "-d", "--name", name, "--label", f"studio.job={job_id}", *self._flags(work)]
+        cmd = [self.docker, "run", "-d", "--name", name, "--label", f"studio.job={job_id}", *self._flags(work, network)]
+        for rel, target in (mounts or {}).items():
+            (work / rel).mkdir(parents=True, exist_ok=True)
+            cmd += ["-v", f"{self._host(target)}:/work/{rel}"]
         for k, v in env.items():
             cmd += ["-e", f"{k}={v}"]
         subprocess.run(cmd + [self.image], check=True, capture_output=True, text=True)
@@ -187,6 +245,7 @@ class Worker:
         self.runs = {}
         self.watchdog = env_seconds("STUDIO_WATCHDOG_S", 1800)      # no answer from Claude for 30 min
         self.run_limit = env_seconds("STUDIO_RUN_LIMIT_S", 3600)    # one run at most 60 min
+        self.clean_every = env_seconds("STUDIO_CLEAN_S", 900)
 
     # ----- helpers -----
     def work_dir(self, job_id: str) -> Path:
@@ -199,6 +258,8 @@ class Worker:
 
     def failed(self, job_id: str, error: str, by: str = "studio") -> None:
         j = quotas.fail(job_id, error, by)
+        if job_id not in self.runs:
+            self.purge(j)
         refund = ("Your credit was given back." if by == "studio" and not j.get("charged")
                   else "This job used one credit.")
         self.notify(j, "job_failed", error=error, refund=refund)
@@ -255,15 +316,46 @@ class Worker:
             (work / ".resume.json").unlink(missing_ok=True)
         token = proxy.issue(j["id"])
         env = {"ANTHROPIC_BASE_URL": self.proxy_url, "ANTHROPIC_API_KEY": token, "STUDIO_MODE": "online",
-               "STUDIO_JOB": j["id"], "STUDIO_PROXY": self.proxy_url, "STUDIO_MODEL": s["model"]}
+               "STUDIO_JOB": j["id"], "STUDIO_PROXY": self.proxy_url, "STUDIO_MODEL": s["model"],
+               "STUDIO_ROOT": self.runner.root(work)}          # `learn …` and the film tools work in the job folder
+        mounts, network = self.prepare(j, work)
+        if network:
+            env.update(HTTPS_PROXY=os.environ.get("STUDIO_EGRESS", "http://egress:8888"),
+                       HTTP_PROXY=os.environ.get("STUDIO_EGRESS", "http://egress:8888"), NO_PROXY="proxy,localhost,127.0.0.1")
         try:
-            handle = self.runner.start(j["id"], work, env)
+            handle = self.runner.start(j["id"], work, env, mounts, network)
         except Exception as e:    # noqa: BLE001 - e.g. Docker is down: the studio's fault
             proxy.revoke(j["id"])
             self.failed(j["id"], f"The studio could not start the job ({type(e).__name__}).")
             return
         self.runs[j["id"]] = Run(handle, time.time())
         log.info("job %s started (run %s)", j["id"], j["run_count"])
+
+    def prepare(self, j: dict, work: Path):
+        """The job folder as a small project: the library and lock (links into /studio), the customer's own
+        styles, and for learning their reference set and uploaded videos. Returns (mounts, network)."""
+        for name in ("lib", "library.lock"):
+            link = work / name
+            if not link.is_symlink():
+                link.symlink_to(Path(self.runner.studio) / name)
+        mine, acct = work / "my-styles", store.account_dir(j["owner"])
+        if (acct / "my-styles").is_dir() and not mine.exists():
+            shutil.copytree(acct / "my-styles", mine)
+        inp = j.get("input") or {}
+        if j["kind"] != "learn":
+            return {}, None
+        ref = acct / "references" / inp["set"]
+        ref.mkdir(parents=True, exist_ok=True)
+        os.chmod(ref, 0o777)                          # written by the job user inside the container
+        up = work / "uploads"
+        for u in inp.get("uploads") or []:
+            meta = store.read_json(db.data_dir() / "uploads" / j["owner"] / f"{u}.json")
+            src = db.data_dir() / "uploads" / j["owner"] / meta["file"] if meta else None
+            if src and src.is_file() and not (up / src.name).exists():
+                up.mkdir(exist_ok=True)
+                shutil.copy2(src, up / src.name)
+        net = getattr(self.runner, "network_yt", None) if inp.get("source") == "youtube" else None
+        return {f"references/{inp['set']}": ref}, net
 
     def resume_answered(self) -> None:
         """Jobs whose review got a decision go back in the queue; the agent session is resumed (R5)."""
@@ -328,7 +420,22 @@ class Worker:
             shutil.copytree(work / "films" / film, dest, dirs_exist_ok=True)
             j = jobs.finish(job_id, "done", links={"film": film})
         else:
-            j = jobs.finish(job_id, "done", links={k: v for k, v in rep.items() if k in ("film", "style")})
+            slug = rep.get("style")
+            src = work / "my-styles" / (slug or "")
+            dest = store.account_dir(j["owner"]) / "my-styles" / (slug or "")
+            if not slug or not (src / "style.json").is_file():
+                self.failed(job_id, "The agent said it was done, but no style was saved.")
+                self.purge(jobs.load(job_id))
+                return
+            if dest.exists():
+                self.failed(job_id, f"A style named {slug} already exists.")
+                self.purge(jobs.load(job_id))
+                return
+            shutil.copytree(src, dest)
+            if (work / "my-styles" / "README.md").is_file():
+                shutil.copy2(work / "my-styles" / "README.md", dest.parent / "README.md")
+            j = jobs.finish(job_id, "done", links={"style": slug, "set": (j.get("input") or {}).get("set")})
+            self.purge(j)
         self.notify(j, "job_done")
         shutil.rmtree(work, ignore_errors=True)
         log.info("job %s done", job_id)
@@ -344,6 +451,8 @@ class Worker:
                 self.runner.kill(run.handle)
                 proxy.revoke(job_id)
                 del self.runs[job_id]
+                if j:
+                    self.purge(j)
                 continue
             rc = self.runner.poll(run.handle)
             if rc is None:
@@ -366,6 +475,53 @@ class Worker:
                 log.exception("job %s: finishing failed", job_id)
                 self.failed(job_id, f"The studio could not finish the job ({type(e).__name__}).")
 
+    # ----- cleaning (every 15 minutes, R10) -----
+    def purge(self, j: dict) -> None:
+        """A learn job ended: its reference media, sheets, transcripts and uploads go now."""
+        if j["kind"] != "learn" or j.get("media_removed_at"):
+            return
+        inp = j.get("input") or {}
+        acct = store.account_dir(j["owner"])
+        if inp.get("set"):
+            sweep(acct / "references" / inp["set"])
+        work = self.work_dir(j["id"])
+        if work.exists():
+            for sub in ("uploads", "references"):
+                shutil.rmtree(work / sub, ignore_errors=True)
+            sweep(work)
+        updir = db.data_dir() / "uploads" / j["owner"]
+        for u in inp.get("uploads") or []:
+            meta = store.read_json(updir / f"{u}.json")
+            if meta:
+                (updir / meta["file"]).unlink(missing_ok=True)
+            (updir / f"{u}.json").unlink(missing_ok=True)
+        jobs.update(j["id"], lambda x: (x.__setitem__("media_removed_at", store.now_iso()),
+                                        x["log"].append(jobs._line("Reference videos, contact sheets and transcripts deleted"))))
+        log.info("job %s: reference media deleted", j["id"])
+
+    def clean(self) -> None:
+        s = quotas.settings()
+        for j in jobs.all_jobs():
+            if "charged" not in j or j["id"] in self.runs:
+                continue
+            if j["status"] in jobs.FINAL:
+                self.purge(j)
+                work = self.work_dir(j["id"])
+                if work.exists() and store.age_seconds(j["updated_at"]) > 3600:
+                    shutil.rmtree(work, ignore_errors=True)
+            elif j["status"] == "waiting_review" and j["review_ids"]:
+                r = reviews.load(j["review_ids"][-1])
+                if not r["decision"] and store.age_seconds(r["created_at"]) > s["review_timeout_days"] * 86400:
+                    j = jobs.finish(j["id"], "stopped", error=f"No answer for {s['review_timeout_days']} days")
+                    self.notify(j, "review_timeout", days=s["review_timeout_days"])
+                    self.purge(j)
+        updir = db.data_dir() / "uploads"
+        for meta_path in updir.glob("*/u-*.json") if updir.exists() else []:
+            meta = store.read_json(meta_path) or {}
+            if not meta.get("job") and store.age_seconds(meta.get("created_at")) > 86400:   # uploaded, never used
+                (meta_path.parent / meta.get("file", "-")).unlink(missing_ok=True)
+                meta_path.unlink(missing_ok=True)
+
     # ----- loop -----
     def tick(self) -> None:
         self.check_runs()
@@ -375,6 +531,12 @@ class Worker:
             if not j:
                 break
             self.start(j)
+        if time.time() - getattr(self, "cleaned_at", 0) >= self.clean_every:
+            self.cleaned_at = time.time()
+            try:
+                self.clean()
+            except Exception:   # noqa: BLE001
+                log.exception("clean")
         try:
             mail.flush()
         except Exception:   # noqa: BLE001 - mail problems are retried next time

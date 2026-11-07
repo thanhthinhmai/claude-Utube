@@ -54,7 +54,8 @@ const ERR = {
   quota_exceeded: "You have used all your films for this month.", daily_cap: "The studio is fully booked today. Please try again tomorrow.",
   too_many_queued: "You already have 3 jobs in progress. Wait for one to finish.", too_long: "The film is too long.",
   content_rejected: "The studio cannot make this idea.", style_not_found: "This style does not exist any more.",
-  in_use: "A job is still using this.",
+  in_use: "A job is still using this.", rights_required: "Please confirm your right to use the channel's videos.",
+  too_many_videos: "Too many videos for one style.", too_large: "The file is too large.", bad_video: "This file is not a video the studio can read.",
 };
 const errText = (body, status) => {
   const e = body?.error || {};
@@ -148,7 +149,7 @@ function emptyJobs() {
   if (MODE === "online") {
     $app.innerHTML = `<div class="empty"><span class="spark">${SPARK}</span><h1>What should we make today?</h1>
       <p class="muted">Pick a style, describe your idea, and the studio makes the film for you. You can follow every step here.</p>
-      <p><a class="button primary" href="#/new">Make a film</a></p></div>`;
+      <p><a class="button primary" href="#/new">Make a film</a> <a class="button" href="#/learn">Learn a style</a></p></div>`;
     return;
   }
   $app.innerHTML = `<div class="empty"><span class="spark">${SPARK}</span>
@@ -291,7 +292,7 @@ async function pageSets() {
   const { sets } = await get("/sets");
   $app.innerHTML = `${head("Browse", "Measurements", "Frame-by-frame measurements of the reference video sets you learned from.")}${sets.length ? `<ul class="jobs">${sets.map((s) => `<li><a class="panel job" href="#/sets/${esc(s.set)}">
       <strong>${esc(s.set)}</strong><span class="muted">${s.measured}/${s.videos} videos measured</span>
-      <span class="muted">${s.media_removed ? "Reference videos deleted" : "Reference videos still on this machine"}</span></a></li>`).join("")}</ul>`
+      <span class="muted">${s.media_removed ? "Reference videos deleted" : MODE === "online" ? "Learning in progress" : "Reference videos still on this machine"}</span></a></li>`).join("")}</ul>`
     : `<p class="panel muted">No reference sets yet.</p>`}`;
 }
 
@@ -537,6 +538,76 @@ async function pageNew() {
   });
 }
 
+async function pageLearn() {
+  const L = ME.limits, q = ME.quota.learns, left = Math.max(0, q.limit - q.used);
+  $app.innerHTML = `${head("Learn", "Learn a style", `The studio watches every frame of a few videos, measures the look and sound,
+      and writes a style you can make films with. You review it twice on the way. You have ${left} of ${q.limit} learns left this month.`)}
+    ${left === 0 ? `<p class="notice">You have used all your learns for this month. They come back on ${when(ME.quota.resets_at)}.</p>` : ""}
+    <form class="form panel" id="learn-form">
+      <div class="row" role="radiogroup" aria-label="Source">
+        <label class="check"><input type="radio" name="src" value="youtube" checked> <span>From a YouTube channel</span></label>
+        <label class="check"><input type="radio" name="src" value="upload"> <span>From my own videos</span></label></div>
+      <div id="src-youtube" class="form">
+        <label>Channel address <span class="hint">For example https://www.youtube.com/@channel-name</span>
+          <input id="channel" type="text" inputmode="url" autocomplete="off" placeholder="https://www.youtube.com/@channel-name"></label>
+        <label>Number of recent videos <span class="hint">1 to ${L.learn_max_videos}.</span>
+          <input id="count" type="number" min="1" max="${L.learn_max_videos}" value="${Math.min(5, L.learn_max_videos)}"></label>
+        <label class="check"><input id="rights" type="checkbox"> <span>${esc(L.rights_text)}</span></label>
+      </div>
+      <div id="src-upload" class="form" hidden>
+        <label>Videos <span class="hint">Up to ${L.learn_max_videos} files, ${L.upload_max_mb} MB and ${L.upload_max_minutes} minutes each.
+          They are used only for learning, never shown again, and deleted when the job ends.</span>
+          <input id="files" type="file" accept="video/*" multiple></label>
+        <ul id="up-list" class="uploads"></ul>
+      </div>
+      <div><button class="primary" type="submit" ${left === 0 ? "disabled" : ""}>Learn the style (uses 1 learn)</button></div>
+    </form><p id="msg" class="muted" role="status"></p>`;
+  const show = () => {
+    const src = /** @type {HTMLInputElement} */ ($app.querySelector("input[name=src]:checked")).value;
+    document.getElementById("src-youtube").hidden = src !== "youtube";
+    document.getElementById("src-upload").hidden = src !== "upload";
+  };
+  $app.querySelectorAll("input[name=src]").forEach((r) => r.addEventListener("change", show));
+  onSubmit(async () => {
+    const src = /** @type {HTMLInputElement} */ ($app.querySelector("input[name=src]:checked")).value;
+    let body;
+    if (src === "youtube") {
+      if (!field("rights").checked) throw new Error(ERR.rights_required);
+      body = { kind: "learn", source: "youtube", channel: field("channel").value.trim(), count: Number(field("count").value), rights_confirmed: true };
+    } else {
+      const files = Array.from(field("files").files || []);
+      if (!files.length) throw new Error("Choose at least one video.");
+      if (files.length > L.learn_max_videos) throw new Error(ERR.too_many_videos);
+      const list = document.getElementById("up-list"), ids = [];
+      list.innerHTML = files.map((f, i) => `<li>${esc(f.name)} <progress id="up-${i}" max="100" value="0"></progress></li>`).join("");
+      for (const [i, f] of files.entries()) ids.push(await uploadFile(f, /** @type {HTMLProgressElement} */ (document.getElementById(`up-${i}`))));
+      body = { kind: "learn", source: "upload", uploads: ids };
+    }
+    const j = await post("/jobs", body);
+    await loadMe();
+    location.hash = `#/jobs/${j.id}`;
+    return "";
+  });
+}
+/** Send one video with a progress bar; resolves to its upload id. */
+function uploadFile(file, bar) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest(), form = new FormData();
+    form.append("file", file);
+    x.open("POST", API + "/uploads");
+    x.setRequestHeader("X-Studio", "1");
+    x.upload.onprogress = (e) => { if (e.lengthComputable) bar.value = Math.round((100 * e.loaded) / e.total); };
+    x.onload = () => {
+      let body = {};
+      try { body = JSON.parse(x.responseText); } catch { /* not JSON */ }
+      if (x.status === 201) { bar.value = 100; resolve(/** @type {any} */ (body).upload_id); }
+      else reject(new Error(`${file.name}: ${errText(body, x.status)}`));
+    };
+    x.onerror = () => reject(new Error(`${file.name}: the upload was interrupted.`));
+    x.send(form);
+  });
+}
+
 async function loadMe() {
   try { ME = await get("/me"); } catch { ME = null; }
   drawAccount();
@@ -564,7 +635,7 @@ const routes = [
   [/^#\/sets$/, pageSets, "sets"], [/^#\/sets\/([^/?]+)$/, pageSet, "sets"],
   [/^#\/library(\?.*)?$/, pageLibrary, "library"], [/^#\/library\/([^/?]+)$/, pageLibStyle, "library"],
   [/^#\/styles$/, pageStyles, "styles"], [/^#\/styles\/([^/?]+)$/, pageStyle, "styles"],
-  [/^#\/new(\?.*)?$/, pageNew, "new"],
+  [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"],
 ];
 /** pages open without logging in (online mode) */
 const PUBLIC = [

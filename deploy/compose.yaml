@@ -1,0 +1,41 @@
+# Online studio (specs/007). Phase 3–4 part: the API proxy, the YouTube egress filter and the job networks.
+# The web app, the worker, Caddy and the Docker socket filter are added in Phase 8 (tasks T044–T047).
+#   docker build -f deploy/job.Dockerfile -t studio-job:latest .
+#   docker compose -f deploy/compose.yaml --env-file deploy/.env up -d
+# deploy/.env (never in git): ANTHROPIC_API_KEY=…  STUDIO_DATA_HOST=/srv/studio/data
+name: studio
+
+services:
+  proxy:
+    image: studio-job:latest
+    entrypoint: ["/studio/tools/.venv/bin/python", "/studio/tools/runner/proxy.py"]
+    environment:
+      STUDIO_MODE: online
+      STUDIO_DATA: /data
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set it in deploy/.env}
+    volumes:
+      - ${STUDIO_DATA_HOST:-../data}:/data
+    networks: [jobnet, jobnet-yt, outside]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+  egress:
+    build: ./egress
+    networks: [jobnet-yt, outside]
+    read_only: true
+    tmpfs: [/tmp, /var/run/tinyproxy]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+networks:
+  jobnet:                 # job containers: only the proxy
+    name: jobnet
+    internal: true
+  jobnet-yt:              # learn jobs from YouTube: the proxy and the egress filter
+    name: jobnet-yt
+    internal: true
+  outside: {}
