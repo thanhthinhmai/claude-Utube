@@ -144,12 +144,12 @@
   - Ghi `.result.json` kèm mã phiên.
   - Khi có `.resume.json` thì nối lại phiên với tin nhắn là quyết định của khách.
   - **Trước khi viết, đọc tài liệu Agent SDK cho Python (code.claude.com/docs/en/agent-sdk) để lấy đúng tên tuỳ chọn (cwd, allowed tools, setting sources, resume, max turns), không đoán.**
-- [ ] T024 [P] [US1] (đã viết, chưa dựng/chạy: máy chưa có Docker trong WSL) Tạo `deploy/job.Dockerfile`:
+- [X] T024 [P] [US1] Tạo `deploy/job.Dockerfile`:
   - Ubuntu 24.04, người dùng 1000.
   - ffmpeg 7 bản static, Node và Chromium cho Playwright.
   - Chép `bin/`, `tools/`, `CLAUDE.md`, `.claude/`, `library.lock`; dựng `tools/.venv` (`deps voice music learn --extra`); lấy thư viện theo `library.lock` vào `/studio/lib/lemo-opuscar`; cài `claude-agent-sdk`.
   - Đặt `ENTRYPOINT python /studio/tools/runner/agent.py`.
-- [ ] T025 [US1] (đã viết, test tự bỏ qua: máy chưa có Docker trong WSL) Viết phần `docker` của worker trong `tools/runner/worker.py`, theo `contracts/runner.md`:
+- [X] T025 [US1] Viết phần `docker` của worker trong `tools/runner/worker.py`, theo `contracts/runner.md`:
   - các cờ `--user 1000 --read-only --tmpfs /tmp --cap-drop ALL --pids-limit 512 --cpus --memory`;
   - mạng `jobnet`, gắn `/data/jobs/<id>:/work`;
   - giới hạn 60 phút mỗi lượt.
