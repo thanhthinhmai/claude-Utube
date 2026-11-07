@@ -244,14 +244,14 @@ Ghi chú khi làm (2026-11-07):
 
 **Independent Test**: `sh tests/online/run.sh -k us4` đạt.
 
-- [ ] T038 [P] [US4] Tạo `tests/online/test_us4.py`:
+- [X] T038 [P] [US4] Tạo `tests/online/test_us4.py`:
   - đổi mật khẩu (cần mật khẩu cũ);
   - tắt email thông báo;
   - xoá phim hoặc phong cách;
   - `DELETE /me` thì đăng xuất ngay và đăng nhập lại bị từ chối;
   - sau lượt dọn (giả lập thời gian 30 ngày), mọi hàng và thư mục của khách đã hết, kể cả RightsConfirmation.
-- [ ] T039 [US4] Trong `accounts.py` và `api_online.py`, viết `PUT /me` và `DELETE /me` (đặt `deleted_at`, huỷ phiên, dừng việc). Trong `tools/runner/worker.py`, thêm bước xoá hẳn (hàng trong cơ sở dữ liệu và `/data/accounts/<id>`, `/data/uploads/<id>`) cho tài khoản có `deleted_at` quá 30 ngày, và gửi thư account_deleted ngay khi khách yêu cầu.
-- [ ] T040 [US4] Trong `tools/studio/studio/web/app.js`, thêm trang **Account**: số lượt còn lại và ngày làm mới, đổi mật khẩu, công tắc email, nút xoá tài khoản (phải gõ lại mật khẩu).
+- [X] T039 [US4] Trong `accounts.py` và `api_online.py`, viết `PUT /me` và `DELETE /me` (đặt `deleted_at`, huỷ phiên, dừng việc). Trong `tools/runner/worker.py`, thêm bước xoá hẳn (hàng trong cơ sở dữ liệu và `/data/accounts/<id>`, `/data/uploads/<id>`) cho tài khoản có `deleted_at` quá 30 ngày, và gửi thư account_deleted ngay khi khách yêu cầu.
+- [X] T040 [US4] Trong `tools/studio/studio/web/app.js`, thêm trang **Account**: số lượt còn lại và ngày làm mới, đổi mật khẩu, công tắc email, nút xoá tài khoản (phải gõ lại mật khẩu).
 
 ## Phase 7: Hỏi lại, duyệt kịch bản, sửa phim (FR-014, FR-015)
 

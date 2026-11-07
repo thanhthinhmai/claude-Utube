@@ -677,6 +677,60 @@ async function pageAdmin() {
   });
 }
 
+// ---------- account (US4) ----------
+async function pageAccount() {
+  ME = await get("/me");
+  drawAccount();
+  const f = ME.quota.films, l = ME.quota.learns;
+  $app.innerHTML = `${head("You", "Account", esc(ME.email))}
+    <div class="panel"><p class="section-title">This month</p>
+      <p>Films: <strong>${Math.max(0, f.limit - f.used)}</strong> of ${f.limit} left · Learns: <strong>${Math.max(0, l.limit - l.used)}</strong> of ${l.limit} left</p>
+      <p class="muted">They come back on ${when(ME.quota.resets_at)}.</p></div>
+    <h2>Email</h2>
+    <div class="panel"><label class="check"><input id="notify" type="checkbox" ${ME.email_notify ? "checked" : ""}>
+      <span>Email me when a job is done, fails, or needs my answer</span></label><p id="notify-msg" class="muted" role="status"></p></div>
+    <h2>Password</h2>
+    <form class="form panel" id="pw-form">
+      <label>Current password <input id="old" type="password" autocomplete="current-password" required></label>
+      <label>New password <span class="hint">At least 10 characters.</span>
+        <input id="new" type="password" autocomplete="new-password" minlength="10" required></label>
+      <div><button class="primary" type="submit">Change password</button></div>
+      <p id="pw-msg" class="muted" role="status"></p></form>
+    <h2>Delete account</h2>
+    <form class="form panel" id="del-form">
+      <p class="muted" style="margin:0">You are logged out at once. Your films, styles, uploads and records are deleted for good within 30 days.</p>
+      <label>Type your password to confirm <input id="del-pw" type="password" autocomplete="current-password" required></label>
+      <div><button class="danger" type="submit">Delete my account</button></div>
+      <p id="del-msg" class="muted" role="status"></p></form>`;
+  const notify = field("notify"), nmsg = document.getElementById("notify-msg");
+  notify.onchange = async () => {
+    try { ME = await send("PUT", "/me", { email_notify: notify.checked }); nmsg.className = "muted"; nmsg.textContent = "Saved."; }
+    catch (e) { nmsg.className = "fail"; nmsg.textContent = e.message; notify.checked = !notify.checked; }
+  };
+  /** Wire one form of this page to `fn`; its message goes under the form. */
+  const wire = (id, msgId, fn) => {
+    const form = /** @type {HTMLFormElement} */ (document.getElementById(id)), msg = document.getElementById(msgId);
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = /** @type {HTMLButtonElement} */ (form.querySelector("button[type=submit]"));
+      btn.disabled = true; msg.className = "muted"; msg.textContent = "";
+      try { msg.textContent = await fn(); form.reset(); } catch (err) { msg.className = "fail"; msg.textContent = err.message; }
+      btn.disabled = false;
+    };
+  };
+  wire("pw-form", "pw-msg", async () => {
+    await send("PUT", "/me", { old_password: field("old").value, password: field("new").value });
+    return "Your password is changed.";
+  });
+  wire("del-form", "del-msg", async () => {
+    if (!confirm("Delete your account and everything in it? This cannot be undone.")) return "";
+    await send("DELETE", "/me", { password: field("del-pw").value });
+    ME = null; drawAccount();
+    authPage("Account deleted", "", `<p>Your account is closed and everything in it is deleted within 30 days. We sent you an email about it.</p>`);
+    return "";
+  });
+}
+
 async function loadMe() {
   try { ME = await get("/me"); } catch { ME = null; }
   drawAccount();
@@ -690,7 +744,7 @@ function drawAccount() {
   if (bar.hidden) return;
   const f = ME.quota.films;
   bar.innerHTML = `<span class="credits">${Math.max(0, f.limit - f.used)}/${f.limit} films left this month</span>
-    <strong>${esc(ME.email)}</strong><button id="logout">Log out</button>`;
+    <a href="#/account" title="Your account"><strong>${esc(ME.email)}</strong></a><button id="logout">Log out</button>`;
   document.getElementById("logout").onclick = async () => {
     try { await post("/auth/logout"); } catch { /* already logged out */ }
     ME = null; drawAccount(); location.hash = "#/login";
@@ -706,6 +760,7 @@ const routes = [
   [/^#\/library(\?.*)?$/, pageLibrary, "library"], [/^#\/library\/([^/?]+)$/, pageLibStyle, "library"],
   [/^#\/styles$/, pageStyles, "styles"], [/^#\/styles\/([^/?]+)$/, pageStyle, "styles"],
   [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"], [/^#\/admin(\?.*)?$/, pageAdmin, "admin"],
+  [/^#\/account$/, pageAccount, "account"],
 ];
 /** pages open without logging in (online mode) */
 const PUBLIC = [

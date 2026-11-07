@@ -515,12 +515,42 @@ class Worker:
                     j = jobs.finish(j["id"], "stopped", error=f"No answer for {s['review_timeout_days']} days")
                     self.notify(j, "review_timeout", days=s["review_timeout_days"])
                     self.purge(j)
+        self.erase_deleted_accounts()
         updir = db.data_dir() / "uploads"
         for meta_path in updir.glob("*/u-*.json") if updir.exists() else []:
             meta = store.read_json(meta_path) or {}
             if not meta.get("job") and store.age_seconds(meta.get("created_at")) > 86400:   # uploaded, never used
                 (meta_path.parent / meta.get("file", "-")).unlink(missing_ok=True)
                 meta_path.unlink(missing_ok=True)
+
+    def erase_deleted_accounts(self, days: int = 30) -> None:
+        """Accounts deleted more than `days` ago lose everything: rows, files, rights records (FR-026).
+        Daily cost totals stay for the studio's books, under the account id "deleted"."""
+        with db.read() as con:
+            rows = con.execute("SELECT id, email, deleted_at FROM accounts WHERE deleted_at IS NOT NULL").fetchall()
+        for a in rows:
+            if store.age_seconds(a["deleted_at"]) <= days * 86400:
+                continue
+            aid = a["id"]
+            job_ids = [j["id"] for j in jobs.all_jobs(aid)]
+            for jid in job_ids:
+                if jid in self.runs:
+                    self.runner.kill(self.runs.pop(jid).handle)
+                shutil.rmtree(self.work_dir(jid), ignore_errors=True)
+            for d in (store.account_dir(aid), db.data_dir() / "uploads" / aid):
+                shutil.rmtree(d, ignore_errors=True)
+            with db.tx() as con:
+                con.execute("DELETE FROM docs WHERE owner = ?", (aid,))
+                con.executemany("DELETE FROM job_tokens WHERE job_id = ?", [(j,) for j in job_ids])
+                con.execute("DELETE FROM rights WHERE account_id = ?", (aid,))
+                con.execute('DELETE FROM outbox WHERE "to" = ?', (a["email"],))
+                con.execute("DELETE FROM ratelimit WHERE key LIKE ?", (f"%:{a['email']}",))
+                con.execute("INSERT INTO usage_day (day, account_id, cost_usd, jobs) SELECT day, 'deleted', cost_usd, jobs "
+                            "FROM usage_day WHERE account_id = ? ON CONFLICT (day, account_id) DO UPDATE SET "
+                            "cost_usd = cost_usd + excluded.cost_usd, jobs = jobs + excluded.jobs", (aid,))
+                con.execute("DELETE FROM usage_day WHERE account_id = ?", (aid,))
+                con.execute("DELETE FROM accounts WHERE id = ?", (aid,))      # sessions and tokens go with it
+            log.info("account %s erased", aid)
 
     # ----- loop -----
     def tick(self) -> None:
