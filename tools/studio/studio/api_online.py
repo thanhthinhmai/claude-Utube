@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 from typing import List, Literal, Optional
 
-from fastapi import APIRouter, File, Request, Response, UploadFile
+from fastapi import APIRouter, File, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -376,3 +376,135 @@ def delete_style(slug: str, request: Request):
         lines = [x for x in readme.read_text(encoding="utf-8").splitlines(True) if not x.startswith(f"| {slug} |")]
         readme.write_text("".join(lines), encoding="utf-8")
     return Response(status_code=204)
+
+
+# ---------- admin (US3) ----------
+class AccountIn(BaseModel):
+    quota_films: Optional[int] = Field(default=None, ge=0, le=1000)
+    quota_learns: Optional[int] = Field(default=None, ge=0, le=1000)
+    use_default_films: bool = False          # back to the studio default
+    use_default_learns: bool = False
+    locked: Optional[bool] = None
+
+
+def admin(request: Request):
+    a = me(request)
+    if a["role"] != "admin":
+        raise StudioError("forbidden", "chỉ quản trị viên mới dùng được", 403)
+    return a
+
+
+_sizes: dict = {}          # account id: (time, MB) — walking folders is slow, so cache it 10 minutes
+
+
+def storage_mb(account_id: str) -> float:
+    import time
+    hit = _sizes.get(account_id)
+    if hit and time.time() - hit[0] < 600:
+        return hit[1]
+    total = 0
+    for base in (store.account_dir(account_id), db.data_dir() / "uploads" / account_id):
+        if base.exists():
+            total += sum(f.stat().st_size for f in base.rglob("*") if f.is_file() and not f.is_symlink())
+    mb = round(total / 1e6, 1)
+    _sizes[account_id] = (time.time(), mb)
+    return mb
+
+
+def month_cost(con, account_id: str) -> float:
+    since = quotas.month_start_vn().strftime("%Y-%m-%d")
+    return round(con.execute("SELECT coalesce(sum(cost_usd), 0) FROM usage_day WHERE account_id = ? AND day >= ?",
+                             (account_id, since)).fetchone()[0], 4)
+
+
+def account_row(con, row) -> dict:
+    return {**accounts.public(row), "quota_films": row["quota_films"], "quota_learns": row["quota_learns"],
+            "created_at": row["created_at"], "quota": quotas.summary(row), "cost_month_usd": month_cost(con, row["id"]),
+            "storage_mb": storage_mb(row["id"])}
+
+
+@router.get("/admin/settings")
+def get_settings(request: Request):
+    admin(request)
+    return quotas.settings()
+
+
+@router.put("/admin/settings")
+async def put_settings(request: Request):
+    admin(request)
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict):
+        raise StudioError("invalid", "cần một đối tượng JSON", 422)
+    return quotas.update_settings(body)
+
+
+@router.get("/admin/accounts")
+def list_accounts(request: Request, q: str = ""):
+    admin(request)
+    q = (q or "").strip().lower()[:254]
+    with db.read() as con:
+        rows = con.execute("SELECT * FROM accounts WHERE deleted_at IS NULL AND instr(email, ?) > 0 "
+                           "ORDER BY created_at DESC LIMIT 200", (q,)).fetchall()
+        return {"accounts": [account_row(con, r) for r in rows]}
+
+
+@router.put("/admin/accounts/{account_id}")
+def put_account(account_id: str, body: AccountIn, request: Request):
+    me_ = admin(request)
+    row = accounts.get(account_id)
+    if not row:
+        raise StudioError("not_found", "không có tài khoản này", 404)
+    if body.locked and account_id == me_["id"]:
+        raise StudioError("invalid", "không tự khoá tài khoản quản trị", 422)
+    with db.tx() as con:
+        for field, default in (("quota_films", body.use_default_films), ("quota_learns", body.use_default_learns)):
+            value = getattr(body, field)
+            if default:
+                con.execute(f"UPDATE accounts SET {field} = NULL WHERE id = ?", (account_id,))
+            elif value is not None:
+                con.execute(f"UPDATE accounts SET {field} = ? WHERE id = ?", (value, account_id))
+        if body.locked is not None:
+            con.execute("UPDATE accounts SET locked_at = ? WHERE id = ?",
+                        (store.now_iso() if body.locked else None, account_id))
+    if body.locked:                  # stop what runs now; the worker sees it and removes the containers
+        for j in jobs.all_jobs(account_id):
+            if j["status"] not in jobs.FINAL:
+                try:
+                    jobs.finish(j["id"], "stopped", error="Stopped: the account was locked by the studio")
+                except StudioError:
+                    pass
+    with db.read() as con:
+        return account_row(con, con.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone())
+
+
+DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+@router.get("/admin/usage")
+def usage(request: Request, start: Optional[str] = Query(None, alias="from"), end: Optional[str] = Query(None, alias="to")):
+    """Cost and jobs per day (Vietnam days) and per account; total storage. Default: the last 30 days."""
+    import datetime as dt
+    admin(request)
+    today = dt.date.fromisoformat(quotas.today_vn())
+    end = end or today.isoformat()
+    start = start or (today - dt.timedelta(days=29)).isoformat()
+    try:
+        ok = bool(DAY.match(start) and DAY.match(end)) and dt.date.fromisoformat(start) <= dt.date.fromisoformat(end)
+    except ValueError:
+        ok = False
+    if not ok:
+        raise StudioError("invalid", "ngày phải có dạng YYYY-MM-DD và from ≤ to", 422)
+    with db.read() as con:
+        days = [{"day": r[0], "cost_usd": round(r[1], 4), "jobs": r[2]} for r in con.execute(
+            "SELECT day, sum(cost_usd), sum(jobs) FROM usage_day WHERE day BETWEEN ? AND ? GROUP BY day ORDER BY day",
+            (start, end))]
+        by = [{"id": r[0], "email": r[1], "cost_usd": round(r[2], 4), "jobs": r[3]} for r in con.execute(
+            "SELECT u.account_id, a.email, sum(u.cost_usd), sum(u.jobs) FROM usage_day u LEFT JOIN accounts a "
+            "ON a.id = u.account_id WHERE day BETWEEN ? AND ? GROUP BY u.account_id ORDER BY 3 DESC", (start, end))]
+        ids = [r[0] for r in con.execute("SELECT id FROM accounts WHERE deleted_at IS NULL")]
+    return {"from": start, "to": end, "days": days, "by_account": by,
+            "cost_usd_total": round(sum(d["cost_usd"] for d in days), 4),
+            "storage_mb_total": round(sum(storage_mb(i) for i in ids), 1)}

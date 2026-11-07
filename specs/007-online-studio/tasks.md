@@ -227,15 +227,15 @@ Ghi chú khi làm (2026-11-07):
 
 **Independent Test**: `sh tests/online/run.sh -k us3` đạt.
 
-- [ ] T035 [P] [US3] Tạo `tests/online/test_admin.py`. Kiểm:
+- [X] T035 [P] [US3] Tạo `tests/online/test_admin.py`. Kiểm:
   - Khách gọi `/admin/*` thì `403 forbidden`.
   - Đổi hạn mức mặc định có hiệu lực ngay (US3/AC1), và hạn mức riêng ghi đè mặc định.
   - `signup_open=false` (US3/AC3).
   - Khoá tài khoản thì đăng nhập bị chặn và việc đang chạy chuyển `stopped` (US3/AC4).
   - `/admin/usage` khớp tổng cost_usd của Job.
   - Giá trị cài đặt ngoài khoảng thì `422`.
-- [ ] T036 [US3] Trong `tools/studio/studio/api_online.py`, thêm `/admin/settings` (GET, PUT), `/admin/accounts` (GET kèm `storage_mb` tính bằng `du` các thư mục của khách, có bộ nhớ đệm 10 phút), `/admin/accounts/{id}` (PUT; `locked` thì `jobs.finish(stopped)` cho mọi việc chưa xong và worker dừng container), và `/admin/usage`.
-- [ ] T037 [US3] Trong `tools/studio/studio/web/app.js`, thêm trang **Admin** (chỉ hiện với admin):
+- [X] T036 [US3] Trong `tools/studio/studio/api_online.py`, thêm `/admin/settings` (GET, PUT), `/admin/accounts` (GET kèm `storage_mb` tính bằng `du` các thư mục của khách, có bộ nhớ đệm 10 phút), `/admin/accounts/{id}` (PUT; `locked` thì `jobs.finish(stopped)` cho mọi việc chưa xong và worker dừng container), và `/admin/usage`.
+- [X] T037 [US3] Trong `tools/studio/studio/web/app.js`, thêm trang **Admin** (chỉ hiện với admin):
   - form Settings;
   - bảng khách (tìm theo email, sửa hạn mức, khoá);
   - bảng chi phí theo ngày và tổng dung lượng.

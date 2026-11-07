@@ -608,6 +608,75 @@ function uploadFile(file, bar) {
   });
 }
 
+// ---------- admin (US3) ----------
+const SETTING = [
+  ["signup_open", "Sign-up open", "bool"], ["quota_films_default", "Films per month (default)", "int"],
+  ["quota_learns_default", "Learns per month (default)", "int"], ["film_max_seconds", "Longest film (seconds)", "int"],
+  ["learn_max_videos", "Videos per learn", "int"], ["upload_max_mb", "Upload size (MB)", "int"],
+  ["upload_max_minutes", "Upload length (minutes)", "int"], ["daily_cost_cap_usd", "Studio cost cap per day (USD)", "num"],
+  ["job_cost_cap_usd", "Cost cap per job (USD)", "num"], ["concurrency", "Jobs at the same time", "int"],
+  ["review_timeout_days", "Stop a job after waiting (days)", "int"], ["model", "Claude model", "text"],
+];
+const usd = (v) => `$${Number(v || 0).toFixed(2)}`;
+async function pageAdmin() {
+  if (ME.role !== "admin") { $app.innerHTML = `<p class="error">This page is for the studio admin.</p>`; return; }
+  const params = new URLSearchParams(location.hash.split("?")[1] || "");
+  const q = params.get("q") || "";
+  const [st, acc, use] = await Promise.all([get("/admin/settings"), get("/admin/accounts?q=" + encodeURIComponent(q)), get("/admin/usage")]);
+  const input = ([k, label, t]) => t === "bool"
+    ? `<label class="check"><input id="s-${k}" type="checkbox" ${st[k] ? "checked" : ""}> <span>${label}</span></label>`
+    : `<label>${label}<input id="s-${k}" type="${t === "text" ? "text" : "number"}" ${t === "num" ? 'step="0.01"' : ""} value="${esc(st[k])}"></label>`;
+  const rows = acc.accounts.map((a) => `<tr data-id="${esc(a.id)}"><td>${esc(a.email)}${a.role === "admin" ? " (admin)" : ""}${a.verified ? "" : ' <span class="muted">unverified</span>'}</td>
+      <td>${a.quota.films.used} / <input type="number" min="0" data-f="quota_films" value="${a.quota_films ?? ""}" placeholder="${a.quota.films.limit}" aria-label="Films limit"></td>
+      <td>${a.quota.learns.used} / <input type="number" min="0" data-f="quota_learns" value="${a.quota_learns ?? ""}" placeholder="${a.quota.learns.limit}" aria-label="Learns limit"></td>
+      <td class="num">${usd(a.cost_month_usd)}</td><td class="num">${num(a.storage_mb, 1)} MB</td>
+      <td>${a.role === "admin" ? "" : `<button data-lock="${a.locked ? "0" : "1"}" class="${a.locked ? "" : "danger"}">${a.locked ? "Unlock" : "Lock"}</button>`}</td></tr>`).join("");
+  $app.innerHTML = `${head("Studio", "Admin", `Cost in the last 30 days: ${usd(use.cost_usd_total)} · storage ${num(use.storage_mb_total, 1)} MB`)}
+    <h2>Settings</h2><form class="form panel" id="settings"><div class="admin-grid">${SETTING.map(input).join("")}</div>
+      <div><button class="primary" type="submit">Save settings</button></div></form><p id="msg" class="muted" role="status"></p>
+    <h2>Customers</h2>
+    <div class="row filters"><label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="acc-q" type="search" placeholder="Search by email" value="${esc(q)}" aria-label="Search by email"></label></div>
+    <p class="muted">Films and learns: used / own limit (empty = the default). Locking stops the account's running jobs.</p>
+    <div class="table-wrap"><table><tr><th>Email</th><th>Films</th><th>Learns</th><th>Cost this month</th><th>Storage</th><th></th></tr>${rows}</table></div>
+    <p id="acc-msg" class="muted" role="status"></p>
+    <h2>Cost per day</h2><div class="table-wrap"><table><tr><th>Day</th><th>Jobs</th><th>Cost</th></tr>
+      ${use.days.slice().reverse().map((d) => `<tr><td>${esc(d.day)}</td><td class="num">${d.jobs}</td><td class="num">${usd(d.cost_usd)}</td></tr>`).join("") || '<tr><td colspan="3" class="muted">No jobs yet.</td></tr>'}</table></div>`;
+  onSubmit(async () => {
+    const data = {};
+    for (const [k, , t] of SETTING) {
+      const el = field(`s-${k}`);
+      data[k] = t === "bool" ? el.checked : t === "text" ? el.value.trim() : Number(el.value);
+    }
+    await send("PUT", "/admin/settings", data);
+    return "Saved.";
+  });
+  const msg = document.getElementById("acc-msg");
+  const save = async (id, body) => {
+    try { await send("PUT", `/admin/accounts/${encodeURIComponent(id)}`, body); msg.className = "muted"; msg.textContent = "Saved."; }
+    catch (e) { msg.className = "fail"; msg.textContent = e.message; }
+  };
+  (/** @type {NodeListOf<HTMLInputElement>} */ ($app.querySelectorAll("tr[data-id] input[data-f]"))).forEach((el) => el.addEventListener("change", () => {
+    const id = /** @type {HTMLElement} */ (el.closest("tr")).dataset.id, f = el.dataset.f;
+    save(id, el.value === "" ? { [f === "quota_films" ? "use_default_films" : "use_default_learns"]: true } : { [f]: Number(el.value) });
+  }));
+  (/** @type {NodeListOf<HTMLButtonElement>} */ ($app.querySelectorAll("tr[data-id] button[data-lock]"))).forEach((b) => b.addEventListener("click", async () => {
+    const lock = b.dataset.lock === "1";
+    if (lock && !confirm("Lock this account? Its running jobs stop now.")) return;
+    await save(/** @type {HTMLElement} */ (b.closest("tr")).dataset.id, { locked: lock });
+    route();
+  }));
+  const qi = field("acc-q");
+  let t = 0;
+  qi.addEventListener("input", () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      history.replaceState(null, "", "#/admin?q=" + encodeURIComponent(qi.value));
+      route().then(() => { const n = field("acc-q"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); });
+    }, 400);
+  });
+}
+
 async function loadMe() {
   try { ME = await get("/me"); } catch { ME = null; }
   drawAccount();
@@ -617,6 +686,7 @@ function drawAccount() {
   const bar = document.getElementById("acct");
   document.body.classList.toggle("guest", MODE === "online" && !ME);
   bar.hidden = !(MODE === "online" && ME);
+  (/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(".admin-only"))).forEach((el) => (el.hidden = !(ME && ME.role === "admin")));
   if (bar.hidden) return;
   const f = ME.quota.films;
   bar.innerHTML = `<span class="credits">${Math.max(0, f.limit - f.used)}/${f.limit} films left this month</span>
@@ -635,7 +705,7 @@ const routes = [
   [/^#\/sets$/, pageSets, "sets"], [/^#\/sets\/([^/?]+)$/, pageSet, "sets"],
   [/^#\/library(\?.*)?$/, pageLibrary, "library"], [/^#\/library\/([^/?]+)$/, pageLibStyle, "library"],
   [/^#\/styles$/, pageStyles, "styles"], [/^#\/styles\/([^/?]+)$/, pageStyle, "styles"],
-  [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"],
+  [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"], [/^#\/admin(\?.*)?$/, pageAdmin, "admin"],
 ];
 /** pages open without logging in (online mode) */
 const PUBLIC = [
