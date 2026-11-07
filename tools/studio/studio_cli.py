@@ -118,7 +118,7 @@ def job_run(a) -> int:
         tail.append(text)
     rc = p.wait()
     done.set()
-    jobs.log(a.id, *tail, f"(lệnh kết thúc với mã {rc})")
+    jobs.log(a.id, *tail, f"(command exited with code {rc})")
     return rc
 
 
