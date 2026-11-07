@@ -1,41 +1,135 @@
-# Online studio (specs/007). Phase 3–4 part: the API proxy, the YouTube egress filter and the job networks.
-# The web app, the worker, Caddy and the Docker socket filter are added in Phase 8 (tasks T044–T047).
-#   docker build -f deploy/job.Dockerfile -t studio-job:latest .
-#   docker compose -f deploy/compose.yaml --env-file deploy/.env up -d
-# deploy/.env (never in git): ANTHROPIC_API_KEY=…  STUDIO_DATA_HOST=/srv/studio/data
+# Online studio (specs/007 tasks T044). Start with: sh bin/studio online up   (reads deploy/.env)
+# Images: studio-web (web, proxy, worker; deploy/web.Dockerfile) and studio-job (one per job; deploy/job.Dockerfile).
+#
+#   internet ── caddy ── web                      customers (HTTPS)
+#   worker ── docker-proxy ── /var/run/docker.sock  only container calls; the worker never holds the real socket
+#   job containers ── jobnet ── proxy ── Anthropic   the real key stays in proxy
+#   YouTube learn jobs ── jobnet-yt ── egress ── *.youtube.com, *.googlevideo.com, *.ytimg.com only
 name: studio
 
+x-studio: &studio
+  image: studio-web:latest
+  user: "1000:1000"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  volumes:
+    - ${STUDIO_DATA_HOST:?set STUDIO_DATA_HOST in deploy/.env}:/data
+
 services:
-  proxy:
-    image: studio-job:latest
-    entrypoint: ["/studio/tools/.venv/bin/python", "/studio/tools/runner/proxy.py"]
+  web:
+    <<: *studio
+    build: { context: .., dockerfile: deploy/web.Dockerfile }
     environment:
       STUDIO_MODE: online
       STUDIO_DATA: /data
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set it in deploy/.env}
-    volumes:
-      - ${STUDIO_DATA_HOST:-../data}:/data
-    networks: [jobnet, jobnet-yt, outside]
-    read_only: true
+      STUDIO_URL: https://${DOMAIN:?set DOMAIN in deploy/.env}
+      STUDIO_PROXIED: "1"
+      STUDIO_SECURE_COOKIE: "1"
+      STUDIO_MODERATION: ${STUDIO_MODERATION:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in deploy/.env}
+      TMPDIR: /data/tmp                 # uploads are spooled here, not in memory
     tmpfs: [/tmp]
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
+    networks: [front]
+
+  proxy:
+    <<: *studio
+    command: ["/studio/tools/.venv/bin/python", "/studio/tools/runner/proxy.py"]
+    environment:
+      STUDIO_MODE: online
+      STUDIO_DATA: /data
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_UPSTREAM: ${ANTHROPIC_UPSTREAM:-https://api.anthropic.com}
+    tmpfs: [/tmp]
+    networks:
+      jobnet: { aliases: [proxy] }
+      jobnet-yt: { aliases: [proxy] }
+      outside: {}
+
+  worker:
+    <<: *studio
+    command: ["/studio/tools/.venv/bin/python", "/studio/tools/runner/worker.py"]
+    depends_on: [docker-proxy, proxy]
+    environment:
+      STUDIO_MODE: online
+      STUDIO_DATA: /data
+      STUDIO_HOST_DATA: ${STUDIO_DATA_HOST}       # bind mounts are made by the Docker host, so it needs host paths
+      STUDIO_URL: https://${DOMAIN}
+      RUNNER: docker
+      DOCKER_HOST: tcp://docker-proxy:2375
+      STUDIO_JOB_IMAGE: studio-job:latest
+      STUDIO_JOB_CPUS: ${STUDIO_JOB_CPUS:-4}
+      STUDIO_JOB_MEMORY: ${STUDIO_JOB_MEMORY:-8g}
+      STUDIO_PROXY: http://proxy:8780
+      STUDIO_EGRESS: http://egress:8888
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-Film Studio <noreply@localhost>}
+      MAIL_DIR: ${MAIL_DIR:-}
+    tmpfs: [/tmp]
+    networks: [dockerapi, outside]
+
+  docker-proxy:
+    # Only the container calls the worker needs: create, start, inspect, stop, remove, logs (runner.md).
+    # IMAGES=1 lets `docker run` look the image up; the worker itself only accepts studio-job:* images.
+    image: tecnativa/docker-socket-proxy:0.3.0
+    environment:
+      CONTAINERS: 1
+      POST: 1
+      DELETE: 1
+      IMAGES: 1
+      INFO: 1
+      NETWORKS: 0
+      VOLUMES: 0
+      EXEC: 0
+      BUILD: 0
+      SWARM: 0
+      SERVICES: 0
+      SECRETS: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # not read_only: it writes its haproxy.cfg at start
     restart: unless-stopped
+    networks: [dockerapi]
+
+  caddy:
+    image: caddy:2.8
+    depends_on: [web]
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    networks: [front]
 
   egress:
     build: ./egress
-    networks: [jobnet-yt, outside]
+    image: studio-egress:latest
     read_only: true
     tmpfs: [/tmp, /var/run/tinyproxy]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     restart: unless-stopped
+    networks: [jobnet-yt, outside]
 
 networks:
-  jobnet:                 # job containers: only the proxy
+  front: {}
+  outside: {}
+  dockerapi:
+    internal: true
+  jobnet:                 # job containers: the proxy and nothing else
     name: jobnet
     internal: true
   jobnet-yt:              # learn jobs from YouTube: the proxy and the egress filter
     name: jobnet-yt
     internal: true
-  outside: {}
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}

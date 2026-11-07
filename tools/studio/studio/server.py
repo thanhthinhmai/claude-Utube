@@ -287,8 +287,20 @@ def create_app() -> FastAPI:
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     if online:
-        from . import api_online
+        from . import api_online, db
+        (db.data_dir() / "tmp").mkdir(exist_ok=True)        # TMPDIR of the web container (uploads)
         app.include_router(api_online.router)
+
+        @app.get("/terms")
+        def terms():
+            """Terms of use and content policy (deploy/terms.md, edited by the studio owner)."""
+            from fastapi.responses import HTMLResponse
+            f = Path(os.environ.get("STUDIO_TERMS") or Path(__file__).resolve().parents[3] / "deploy" / "terms.md")
+            text = f.read_text(encoding="utf-8") if f.is_file() else "# Terms of use\n\nNot written yet."
+            return HTMLResponse('<!doctype html><html lang="en"><head><meta charset="utf-8">'
+                                '<meta name="viewport" content="width=device-width, initial-scale=1"><title>Terms · Film Studio</title>'
+                                '<link rel="stylesheet" href="/style.css"></head><body><main class="md" style="max-width:760px">'
+                                + resources.to_html(text) + '<p><a href="/#/signup">Back to sign-up</a></p></main></body></html>')
     app.mount("/", FreshStaticFiles(directory=WEB, html=True), name="web")
     return app
 

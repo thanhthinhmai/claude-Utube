@@ -257,9 +257,9 @@ class Worker:
             mail.queue(a["email"], template, {"name": j["name"], "job": j["id"], **data})
 
     def failed(self, job_id: str, error: str, by: str = "studio") -> None:
+        if job_id not in self.runs:      # media go first, as for done jobs
+            self.purge(jobs.load(job_id))
         j = quotas.fail(job_id, error, by)
-        if job_id not in self.runs:
-            self.purge(j)
         refund = ("Your credit was given back." if by == "studio" and not j.get("charged")
                   else "This job used one credit.")
         self.notify(j, "job_failed", error=error, refund=refund)
@@ -325,6 +325,7 @@ class Worker:
         try:
             handle = self.runner.start(j["id"], work, env, mounts, network)
         except Exception as e:    # noqa: BLE001 - e.g. Docker is down: the studio's fault
+            log.error("job %s: could not start: %s %s", j["id"], e, (getattr(e, "stderr", "") or "")[-500:])
             proxy.revoke(j["id"])
             self.failed(j["id"], f"The studio could not start the job ({type(e).__name__}).")
             return
@@ -443,8 +444,8 @@ class Worker:
             shutil.copytree(src, dest)
             if (work / "my-styles" / "README.md").is_file():
                 shutil.copy2(work / "my-styles" / "README.md", dest.parent / "README.md")
+            self.purge(j)                 # media go first, so a job shown as done never still has them
             j = jobs.finish(job_id, "done", links={"style": slug, "set": (j.get("input") or {}).get("set")})
-            self.purge(j)
         self.notify(j, "job_done")
         shutil.rmtree(work, ignore_errors=True)
         log.info("job %s done", job_id)

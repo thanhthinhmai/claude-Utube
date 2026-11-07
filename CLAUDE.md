@@ -71,8 +71,9 @@ Mẹo chung để tiết kiệm token:
 Lệnh phụ: `/speckit-checklist <lĩnh vực>` tạo checklist kiểm tra chất lượng spec (UX, bảo mật…). `/speckit-constitution` dùng để sửa hiến pháp.
 
 ## Cấu trúc
-- `bin/studio`: `setup` · `status [--json]` · `deps [voice] [music]` · `deps learn [--extra]` · `learn <lệnh>` · `deps ui` · `ui [open|status|stop]` · `job …` · `review …`; test: `sh tests/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`
+- `bin/studio`: `setup` · `status [--json]` · `deps [voice] [music]` · `deps learn [--extra]` · `learn <lệnh>` · `deps ui` · `ui [open|status|stop]` · `job …` · `review …` · `deps online` · `admin create <email>` · `online up|down|logs|admin <email>`; test: `sh tests/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh` (bài chạy thật, tốn tiền: `sh tests/online/live.sh`)
 - `tools/studio/`: giao diện web và API v1 (chỉ `127.0.0.1`), sổ việc và yêu cầu duyệt trong `.studio/` (không vào git)
+- Chế độ online (specs/007, `STUDIO_MODE=online`): tài khoản, hạn mức và việc nằm trong SQLite ở `$STUDIO_DATA`. `tools/runner/` gồm `worker.py` (hàng đợi, chạy mỗi việc trong một container), `proxy.py` (giữ khoá API thật, tính chi phí) và `agent.py` (Claude Agent SDK trong container). `deploy/` chứa Dockerfile, `compose.yaml`, Caddyfile và hướng dẫn `deploy/README.md`
 - `tools/style-learn/`: công cụ đo và lưu phong cách (venv riêng `tools/.venv`, không vào git); skill `.claude/skills/style-learn/`
 - `library.lock`: phiên bản thư viện đã ghim; `lib/lemo-opuscar/`: thư viện (không vào git, không sửa)
 - `my-styles/`: phong cách riêng (vào git) · `films/`: phim (không vào git) · `references/`: video tham chiếu (không vào git) · `tools/`: công cụ tự viết

@@ -499,8 +499,9 @@ async function pageSignup() {
     <label>Email <input id="email" type="email" autocomplete="email" required></label>
     <label>Password <span class="hint">At least 10 characters.</span>
       <input id="password" type="password" autocomplete="new-password" minlength="10" required></label>
-    <label class="check"><input id="terms" type="checkbox" required> <span>I agree to the terms of use: I only ask for films I may publish,
-      and I do not ask for violence, sexual content, hate, or copies of real people, brands or channels.</span></label>
+    <label class="check"><input id="terms" type="checkbox" required> <span>I agree to the <a href="/terms" target="_blank" rel="noopener">terms of use
+      and content policy</a>: I only ask for films I may publish, and I do not ask for violence, sexual content, hate, or copies of
+      real people, brands or channels.</span></label>
     <button class="primary" type="submit">Create account</button></form>`, `<p>Already have an account? <a href="#/login">Log in</a></p>`);
   onSubmit(async () => {
     await post("/auth/signup", { email: field("email").value, password: field("password").value, accept_terms: field("terms").checked });

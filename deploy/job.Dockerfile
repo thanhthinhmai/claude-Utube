@@ -23,15 +23,12 @@ RUN curl -fsSL "$FFMPEG_URL" -o /tmp/ffmpeg.tar.xz \
     && cp /tmp/ffmpeg-*-static/ffmpeg /tmp/ffmpeg-*-static/ffprobe /usr/local/bin/ \
     && rm -rf /tmp/ffmpeg*
 
-# The studio: code, instructions and skills (read-only at run time)
+# The style library, pinned by library.lock, and every package. Only what the install reads is copied
+# first, so changing the studio's code later does not reinstall all of this.
 WORKDIR /studio
 COPY bin/ bin/
-COPY tools/ tools/
-COPY .claude/skills/style-learn/ .claude/skills/style-learn/
-COPY CLAUDE.md library.lock ./
-RUN rm -rf tools/.venv lib && find tools -name __pycache__ -prune -exec rm -rf {} +
-
-# The style library, pinned by library.lock; its packages (npm, Chromium, voice model) and the studio's venv
+COPY library.lock ./
+COPY tools/requirements-*.txt tools/
 RUN sh bin/studio setup || true \
     && test -f lib/lemo-opuscar/AGENTS.md \
     && sh bin/studio deps voice music \
@@ -42,6 +39,13 @@ RUN sh bin/studio setup || true \
 # System libraries Chromium needs; everything readable by the job user
 RUN cd lib/lemo-opuscar && node node_modules/playwright-core/cli.js install-deps chromium-headless-shell \
     && rm -rf /var/lib/apt/lists/* && chmod -R a+rX /opt/playwright /studio
+
+# The studio: code, instructions and skills (read-only at run time)
+COPY tools/ /tmp/tools/
+RUN cp -a /tmp/tools/. tools/ && rm -rf /tmp/tools && find tools -path tools/.venv -prune -o -name __pycache__ -prune -exec rm -rf {} + \
+    && chmod -R a+rX tools
+COPY CLAUDE.md ./
+COPY .claude/skills/style-learn/ .claude/skills/style-learn/
 
 RUN useradd --uid 1000 --create-home --home-dir /home/job job 2>/dev/null || usermod -l job -d /home/job ubuntu
 USER 1000

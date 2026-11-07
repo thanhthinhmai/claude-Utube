@@ -267,9 +267,9 @@ Các yêu cầu này thuộc luồng làm phim, nhưng xếp sau US1 để MVP g
 
 ## Phase 8: Polish & triển khai
 
-- [ ] T044 [P] Tạo `deploy/web.Dockerfile` (web, proxy và worker dùng chung ảnh, khác lệnh chạy), `deploy/compose.yaml` (các dịch vụ `web`, `proxy` (chỉ trên `jobnet`), `worker`, `docker-socket-proxy` (chỉ cho phép containers create/start/inspect/stop/remove/logs; worker gọi Docker qua dịch vụ này, **không** gắn `docker.sock` thật vào worker; xem runner.md), `caddy`, `egress-yt`; volume `/data`; mạng `jobnet` (internal), `jobnet-yt`. Worker từ chối mọi ảnh khác `studio-job:*`) và `deploy/Caddyfile` (tên miền lấy từ `.env`, chuyển `/` tới web, header bảo mật HSTS, CSP như 003). Thêm `deploy/.env.example` gồm `ANTHROPIC_API_KEY`, `SMTP_*`, `MAIL_FROM`, `DOMAIN`, `STUDIO_DATA=/data`.
-- [ ] T045 [P] Thêm lệnh `sh bin/studio online up|down|logs` trong `bin/studio`: chạy `docker compose -f deploy/compose.yaml`; thiếu Docker thì báo rõ, không tự cài (CLAUDE.md).
-- [ ] T046 [P] Viết `deploy/README.md` bằng tiếng Việt, ngắn:
+- [X] T044 [P] Tạo `deploy/web.Dockerfile` (web, proxy và worker dùng chung ảnh, khác lệnh chạy), `deploy/compose.yaml` (các dịch vụ `web`, `proxy` (chỉ trên `jobnet`), `worker`, `docker-socket-proxy` (chỉ cho phép containers create/start/inspect/stop/remove/logs; worker gọi Docker qua dịch vụ này, **không** gắn `docker.sock` thật vào worker; xem runner.md), `caddy`, `egress-yt`; volume `/data`; mạng `jobnet` (internal), `jobnet-yt`. Worker từ chối mọi ảnh khác `studio-job:*`) và `deploy/Caddyfile` (tên miền lấy từ `.env`, chuyển `/` tới web, header bảo mật HSTS, CSP như 003). Thêm `deploy/.env.example` gồm `ANTHROPIC_API_KEY`, `SMTP_*`, `MAIL_FROM`, `DOMAIN`, `STUDIO_DATA=/data`.
+- [X] T045 [P] Thêm lệnh `sh bin/studio online up|down|logs` trong `bin/studio`: chạy `docker compose -f deploy/compose.yaml`; thiếu Docker thì báo rõ, không tự cài (CLAUDE.md).
+- [X] T046 [P] Viết `deploy/README.md` bằng tiếng Việt, ngắn:
   - chọn máy chủ (Ubuntu 24.04, khoảng 8 vCPU, 16 GB RAM);
   - trỏ tên miền về máy chủ;
   - điền `.env`;
@@ -277,10 +277,32 @@ Các yêu cầu này thuộc luồng làm phim, nhưng xếp sau US1 để MVP g
   - `admin create`;
   - sao lưu `/data` (chép `studio.db` bằng `sqlite3 .backup` và thư mục phim);
   - nhắc hỏi luật sư trước khi mở đăng ký (hiến pháp 2.1.0).
-- [ ] T047 [P] Tạo trang Terms và trang Content policy (chữ mẫu, chủ xưởng sửa trong `deploy/terms.md`) phục vụ ở `/terms`; đăng ký bắt buộc đồng ý (Assumptions của spec).
-- [ ] T048 Viết `tests/online/live.sh` (chạy bằng tay, tốn tiền, hỏi xác nhận trước): bật stack `online up` ở localhost, làm 3 phim 30 giây và 1 lần học từ 3 video mẫu tải lên. In thời gian và cost_usd của mỗi việc (SC-006), và chạy kiểm tra âm thanh (−14 ±1 LUFS, đỉnh ≤ −1 dB) và kiểm tra đọc chữ trên từng phim (SC-002).
-- [ ] T049 Cập nhật `CLAUDE.md` (mục Cấu trúc: `tools/runner/`, `deploy/`, `tests/online/run.sh`, lệnh `online`, `admin`) và `specs/003-studio-ui/contracts/cli.md` (hành vi `job`/`review` ở chế độ online).
-- [ ] T050 Chạy đủ 4 bộ test: `sh tests/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`; kiểm tra kiểu `app.js`; đối chiếu SC-001…SC-009. Ghi rõ kết quả cho từng SC: đạt, đạt một phần, hay chưa chạy được (ví dụ SC-006 cần bài chạy thật).
+- [X] T047 [P] Tạo trang Terms và trang Content policy (chữ mẫu, chủ xưởng sửa trong `deploy/terms.md`) phục vụ ở `/terms`; đăng ký bắt buộc đồng ý (Assumptions của spec).
+- [ ] T048 (đã viết `live.sh`/`live.py`, chưa chạy: cần khoá thật, tốn tiền) Viết `tests/online/live.sh` (chạy bằng tay, tốn tiền, hỏi xác nhận trước): bật stack `online up` ở localhost, làm 3 phim 30 giây và 1 lần học từ 3 video mẫu tải lên. In thời gian và cost_usd của mỗi việc (SC-006), và chạy kiểm tra âm thanh (−14 ±1 LUFS, đỉnh ≤ −1 dB) và kiểm tra đọc chữ trên từng phim (SC-002).
+- [X] T049 Cập nhật `CLAUDE.md` (mục Cấu trúc: `tools/runner/`, `deploy/`, `tests/online/run.sh`, lệnh `online`, `admin`) và `specs/003-studio-ui/contracts/cli.md` (hành vi `job`/`review` ở chế độ online).
+- [X] T050 Chạy đủ 4 bộ test: `sh tests/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`; kiểm tra kiểu `app.js`; đối chiếu SC-001…SC-009. Ghi rõ kết quả cho từng SC: đạt, đạt một phần, hay chưa chạy được (ví dụ SC-006 cần bài chạy thật).
+
+### Kết quả T050 (2026-11-07)
+
+4 bộ test: chính 71/71, học phong cách 42/42, UI 37/37, online 59/59; `app.js` kiểm kiểu 0 lỗi.
+
+Chạy thử cả hệ thống (`compose.yaml` với khoá giả, `DOMAIN=localhost`):
+- 6 dịch vụ đều chạy; HTTPS qua Caddy có HSTS và CSP.
+- Một phim giao qua HTTPS đi trọn đường: worker → docker-proxy → container trên `jobnet` → Agent SDK → proxy → Anthropic.
+- Anthropic trả 401 vì khoá giả, việc thành failed/studio và được trả lượt.
+- Không còn container nào sót lại.
+
+| SC | Kết quả | Căn cứ |
+|---|---|---|
+| SC-001 | Đạt (thao tác tự động) | `BrowserUS1`: đặt phim mất 0,8 s thao tác, không tính bước đọc thư. Chưa đo với người thật |
+| SC-002 | Đạt một phần | Worker chặn giao phim khi chưa đạt −14 ±1 LUFS, đỉnh ≤ −1 dB, readcheck (`test_quality_gate`). Chưa có phim thật nào: cần T048 |
+| SC-003 | Đạt | Test hai khách trên việc, phim, phong cách, duyệt, tệp tải lên, bộ tham chiếu, tải phim (`test_accounts`, `test_us1`, `test_us2`) |
+| SC-004 | Đạt | `test_media_gone`: xong, lỗi, dừng, lượt dọn; ≤ 6 khung; mọi đường có tên video trả 4xx |
+| SC-005 | Đạt | `test_daily_cap_lets_running_jobs_finish`, `test_job_cost_cap` |
+| SC-006 | Chưa chạy | Cần T048 với Claude thật |
+| SC-007 | Đạt | `BrowserUS1`: bước mới hiện sau 1,7 s |
+| SC-008 | Đạt | `test_ten_at_once_only_two_pass` |
+| SC-009 | Đạt | `test_never_more_than_n_or_two_per_customer` (20 việc, 5 khách, N=2) |
 
 ## Dependencies
 

@@ -1,0 +1,17 @@
+# HTTPS in front of the web app (specs/007 tasks T044). DOMAIN comes from deploy/.env.
+{$DOMAIN} {
+	encode zstd gzip
+	request_body {
+		max_size 4GB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+	reverse_proxy web:8787 {
+		flush_interval -1
+	}
+}
