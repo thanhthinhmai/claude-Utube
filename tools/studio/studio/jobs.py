@@ -78,10 +78,12 @@ def step(job_id: str, text: str, progress: dict = None) -> dict:
     def f(j):
         if j["status"] in FINAL:
             raise StudioError("finished", "việc đã kết thúc", 409)
+        same = j["step"] == text and j["progress"] == progress     # e.g. `job step X` then `job run --step X`
         j["step"], j["progress"] = text, progress
         if j["status"] == "waiting_resume":
             j["status"] = "running"
-        j["log"].append(_line(text if not progress else f"{text} ({progress['done']}/{progress['total']})"))
+        if not same:
+            j["log"].append(_line(text if not progress else f"{text} ({progress['done']}/{progress['total']})"))
     return update(job_id, f)
 
 

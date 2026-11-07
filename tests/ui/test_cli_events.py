@@ -87,6 +87,16 @@ class CliAndEvents(unittest.TestCase):
         self.assertEqual(job["step"], "Render")
         self.assertTrue(any("dòng 6" in l["line"] for l in job["log"]))
         self.assertTrue(any("mã 7" in l["line"] for l in job["log"]))
+        # same step twice (job step, then job run --step) → one log line; tool notes and repeats stay out of the log
+        self.assertEqual(self.p.cli("job", "step", jid, "Mix").returncode, 0)
+        run = self.p.cli("job", "run", jid, "--step", "Mix", "--", "sh", "-c",
+                         "echo '[note] WebGL runs on software'; echo trộn; echo trộn; echo xong")
+        self.assertIn("[note] WebGL", run.stdout)                              # still printed in the terminal
+        lines = [l["line"] for l in json.loads(self.p.cli("job", "show", jid).stdout)["log"]]
+        self.assertEqual(lines.count("Mix"), 1)
+        self.assertFalse(any(l.startswith("[note]") for l in lines))
+        self.assertEqual(lines.count("trộn"), 1)
+        self.assertIn("xong", lines)
         self.assertEqual(self.p.cli("job", "fail", jid, "hết dung lượng").returncode, 0)
         self.assertEqual(json.loads(self.p.cli("job", "show", jid).stdout)["status"], "failed")
 
