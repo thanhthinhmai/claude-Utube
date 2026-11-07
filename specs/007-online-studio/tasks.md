@@ -78,20 +78,20 @@
 
 ### Tests (viết trước, phải fail)
 
-- [ ] T013 [P] [US1] Tạo `tests/online/test_quota.py` cho FR-005, FR-006 và SC-008:
+- [X] T013 [P] [US1] Tạo `tests/online/test_quota.py` cho FR-005, FR-006 và SC-008:
   - Hạn mức 2: 10 luồng cùng `POST /jobs` thì đúng 2 lần `201`, còn lại `402 quota_exceeded` kèm `resets_at` là 00:00 ngày 1 tháng sau giờ Việt Nam.
   - Việc lỗi `failure_kind=studio` được trả lượt.
   - Khách tự dừng thì không được trả lượt.
   - Bị `content_rejected` thì không trừ lượt.
-- [ ] T014 [P] [US1] Tạo `tests/online/test_queue.py` cho FR-008a và SC-009: N=2, 20 việc của 5 khách chạy bằng tác tử giả. Kiểm qua bảng Job được ghi mỗi 50 ms rằng không lúc nào có hơn 2 việc `running`, và không khách nào có 2 việc `running`. Kiểm thêm `queue_position` đúng thứ tự nhận.
-- [ ] T015 [P] [US1] Tạo `tests/online/test_proxy.py` cho R3 và SC-005:
+- [X] T014 [P] [US1] Tạo `tests/online/test_queue.py` cho FR-008a và SC-009: N=2, 20 việc của 5 khách chạy bằng tác tử giả. Kiểm qua bảng Job được ghi mỗi 50 ms rằng không lúc nào có hơn 2 việc `running`, và không khách nào có 2 việc `running`. Kiểm thêm `queue_position` đúng thứ tự nhận.
+- [X] T015 [P] [US1] Tạo `tests/online/test_proxy.py` cho R3 và SC-005:
   - Dựng API Claude giả trả `usage` cố định.
   - Kiểm chi phí cộng đúng theo `price_table`.
   - Khoá thật không có trong yêu cầu từ container.
   - Mã của việc đã kết thúc bị từ chối.
   - Vượt `job_cost_cap_usd` thì việc thành failed/studio và lượt được trả.
   - Chạm `daily_cost_cap_usd` thì `POST /jobs` trả `503 daily_cap`, còn việc đang chạy vẫn xong.
-- [ ] T016 [P] [US1] Tạo `tests/online/fake_agent.py` để thay `agent.py` trong test. Tác tử giả đọc `/work/.input.json` và:
+- [X] T016 [P] [US1] Tạo `tests/online/fake_agent.py` để thay `agent.py` trong test. Tác tử giả đọc `/work/.input.json` và:
   - ghi 3 bước bằng `sh bin/studio job step`;
   - chép một mp4 mẫu 2 giây (tạo bằng ffmpeg trong `helpers.py`) vào `/work/films/<tên>/`;
   - chạy `job done`.
@@ -100,27 +100,27 @@
 
 ### Implementation
 
-- [ ] T017 [US1] Tạo `tools/studio/studio/quotas.py`:
+- [X] T017 [US1] Tạo `tools/studio/studio/quotas.py`:
   - `settings()` và `update_settings(dict)`, kiểm khoảng cho phép (concurrency 1–16, các trần chi phí > 0, film_max_seconds 5–300).
   - `month_start_vn(now)` theo UTC+7.
   - `used(account, kind)`.
   - `reserve(account, kind)`: cùng giao dịch với việc tạo Job; ném `quota_exceeded` hoặc `daily_cap`.
   - `refund(job)`.
   - `add_cost(job, usd)`: cập nhật Job.cost_usd và UsageDay.
-- [ ] T018 [P] [US1] Tạo `tools/studio/studio/moderation.py`, hàm `check(idea) -> (ok, reason)`:
+- [X] T018 [P] [US1] Tạo `tools/studio/studio/moderation.py`, hàm `check(idea) -> (ok, reason)`:
   - Một lệnh gọi `anthropic` Messages API với model trong Settings, `output_config.effort="low"`, và structured outputs `{allowed: bool, reason: str}`.
   - Chính sách: không bạo lực đồ hoạ, nội dung tình dục, thù ghét, mạo danh người thật hay thương hiệu, hay nêu tên kênh tham chiếu.
   - Khi `stop_reason=="refusal"` thì coi là từ chối.
   - Khi chạy test, dùng biến `STUDIO_MODERATION=fake` để thay bằng luật từ khoá.
   - Tham số SDK phải kiểm lại theo skill claude-api, không đoán.
-- [ ] T019 [US1] Trong `tools/studio/studio/api_online.py`, thêm:
+- [X] T019 [US1] Trong `tools/studio/studio/api_online.py`, thêm:
   - `POST /jobs` loại `film`: kiểm `style` có trong thư viện hoặc trong `my-styles` của khách, `seconds ≤ film_max_seconds`, đã xác minh email, tối đa 3 việc chưa xong; gọi moderation rồi `quotas.reserve` và tạo Job `queued`.
   - `POST /jobs/{id}/stop`.
   - `GET /films/{name}/download` (`Content-Disposition: attachment`).
   - `DELETE /films/{name}`.
 
   Mã lỗi đúng `contracts/api-online.md`.
-- [ ] T020 [US1] Tạo `tools/runner/proxy.py` (FastAPI, nghe `proxy:8780`):
+- [X] T020 [US1] Tạo `tools/runner/proxy.py` (FastAPI, nghe `proxy:8780`):
   - `POST /v1/messages` chuyển tiếp tới `ANTHROPIC_UPSTREAM` (mặc định `https://api.anthropic.com`) bằng `httpx`, kể cả khi phản hồi chạy dòng (SSE), và thay `x-api-key` bằng khoá thật.
   - Đọc `usage` từ phản hồi thường, hoặc từ sự kiện `message_delta` khi chạy dòng, rồi gọi `quotas.add_cost`.
   - Trả nguyên `429`, `529` và `5xx` của Anthropic kèm `retry-after` (R13), và ghi lúc có phản hồi thành công gần nhất của việc.
@@ -128,8 +128,8 @@
   - `/internal/jobs/{id}/{step|log|done|fail}` và `/internal/reviews/{request|status}`, chỉ cho mã của chính việc đó.
   - Mã của việc: ngẫu nhiên 32 byte, lưu bản băm, thu hồi khi việc kết thúc.
   - Nhật ký không ghi nội dung lời nhắc.
-- [ ] T021 [US1] Sửa `tools/studio/studio_cli.py` để khi `STUDIO_MODE=online` và có `STUDIO_JOB`, các lệnh `job step|log|run|done|fail` và `review request|status` gọi `http://proxy:8780/internal/…` (địa chỉ lấy từ `STUDIO_PROXY`) bằng `ANTHROPIC_API_KEY` của việc. `review wait` in "kết thúc lượt: thoát mã 10" rồi thoát mã 10. `job fail` nhận thêm `--by studio|customer` (mặc định `studio`; FR-006a). Chế độ local không đổi.
-- [ ] T022 [US1] Tạo `tools/runner/worker.py` theo `contracts/runner.md`:
+- [X] T021 [US1] Sửa `tools/studio/studio_cli.py` để khi `STUDIO_MODE=online` và có `STUDIO_JOB`, các lệnh `job step|log|run|done|fail` và `review request|status` gọi `http://proxy:8780/internal/…` (địa chỉ lấy từ `STUDIO_PROXY`) bằng `ANTHROPIC_API_KEY` của việc. `review wait` in "kết thúc lượt: thoát mã 10" rồi thoát mã 10. `job fail` nhận thêm `--by studio|customer` (mặc định `studio`; FR-006a). Chế độ local không đổi.
+- [X] T022 [US1] Tạo `tools/runner/worker.py` theo `contracts/runner.md`:
   - Vòng lặp 2 giây: chọn việc `queued` cũ nhất mà chủ của nó không có việc `running`, khi tổng số việc `running` < N, trong `db.tx()`.
   - Tạo `/data/jobs/<id>/`, ghi `.input.json`, cấp mã việc, bật container qua `RUNNER` (`docker`, hoặc `local` để test chạy tiến trình con không có container).
   - Đọc `.result.json`; khi xong thì chép phim về `/data/accounts/<owner>/films/`.
@@ -138,18 +138,18 @@
   - Gửi thư job_done, job_failed hoặc review_needed (khi việc chuyển sang `waiting_review`) nếu khách bật `email_notify` (FR-023).
   - Theo dõi: lượt chạy nào không có phản hồi thành công từ Claude trong 30 phút thì dừng, tính là failed/studio (R13).
   - Kiểm chất lượng (R14): khi tác tử báo xong một phim, chạy `ffmpeg -af ebur128` (−14 ±1 LUFS, đỉnh ≤ −1 dB) và `readcheck.mjs` của thư viện trong container, rồi ghi `qa`. Không đạt thì nối lại phiên một lần, kèm số đo. Vẫn không đạt thì failed/studio và trả lượt.
-- [ ] T023 [US1] Tạo `tools/runner/agent.py` (chạy trong container):
+- [X] T023 [US1] (chưa chạy với Claude thật) Tạo `tools/runner/agent.py` (chạy trong container):
   - Đọc `/work/.input.json` và dựng lời nhắc tiếng Anh. Lời nhắc làm phim gồm: phong cách, ý tưởng, độ dài; luôn làm theo `CLAUDE.md` của `/studio`; mọi chữ trong phim bằng tiếng Anh; không nêu tên kênh; ghi bước bằng `job step`; kết thúc bằng `job done --film <tên>`.
   - Gọi Claude Agent SDK với thư mục làm việc `/work`, nạp `CLAUDE.md` và skill từ `/studio`, công cụ Read/Write/Edit/Bash/Glob/Grep, không có công cụ web, model trong Settings.
   - Ghi `.result.json` kèm mã phiên.
   - Khi có `.resume.json` thì nối lại phiên với tin nhắn là quyết định của khách.
   - **Trước khi viết, đọc tài liệu Agent SDK cho Python (code.claude.com/docs/en/agent-sdk) để lấy đúng tên tuỳ chọn (cwd, allowed tools, setting sources, resume, max turns), không đoán.**
-- [ ] T024 [P] [US1] Tạo `deploy/job.Dockerfile`:
+- [ ] T024 [P] [US1] (đã viết, chưa dựng/chạy: máy chưa có Docker trong WSL) Tạo `deploy/job.Dockerfile`:
   - Ubuntu 24.04, người dùng 1000.
   - ffmpeg 7 bản static, Node và Chromium cho Playwright.
   - Chép `bin/`, `tools/`, `CLAUDE.md`, `.claude/`, `library.lock`; dựng `tools/.venv` (`deps voice music learn --extra`); lấy thư viện theo `library.lock` vào `/studio/lib/lemo-opuscar`; cài `claude-agent-sdk`.
   - Đặt `ENTRYPOINT python /studio/tools/runner/agent.py`.
-- [ ] T025 [US1] Viết phần `docker` của worker trong `tools/runner/worker.py`, theo `contracts/runner.md`:
+- [ ] T025 [US1] (đã viết, test tự bỏ qua: máy chưa có Docker trong WSL) Viết phần `docker` của worker trong `tools/runner/worker.py`, theo `contracts/runner.md`:
   - các cờ `--user 1000 --read-only --tmpfs /tmp --cap-drop ALL --pids-limit 512 --cpus --memory`;
   - mạng `jobnet`, gắn `/data/jobs/<id>:/work`;
   - giới hạn 60 phút mỗi lượt.
@@ -159,14 +159,14 @@
   - `env` không có khoá thật;
   - `curl https://example.com` thất bại;
   - `curl http://proxy:8780` thành công.
-- [ ] T026 [US1] Trong `tools/studio/studio/web/` (`index.html`, `app.js`, `style.css`), thêm các trang ở chế độ online:
+- [X] T026 [US1] Trong `tools/studio/studio/web/` (`index.html`, `app.js`, `style.css`), thêm các trang ở chế độ online:
   - Sign up (ô đồng ý điều khoản), Log in, Verify, Forgot/Reset password.
   - Thanh trên có tên tài khoản, số lượt còn lại và nút Log out.
   - **New film**: chọn phong cách bằng thẻ của trang Library 004, ô ý tưởng, ô độ dài, ô "Review the treatment first".
   - Trang việc hiện `queue_position`, nút Stop, nút Download khi xong.
 
   Viết chữ tiếng Anh, dùng được trên điện thoại (bề rộng 360 px); `app.js` giữ `// @ts-check` với 0 lỗi. Giao diện nhận biết chế độ qua `GET /health` (thêm `mode`).
-- [ ] T027 [US1] Tạo `tests/online/test_us1.py`, chạy với `RUNNER=local` và tác tử giả:
+- [X] T027 [US1] Tạo `tests/online/test_us1.py`, chạy với `RUNNER=local` và tác tử giả:
   - đăng ký → xác minh qua tệp `.eml` → giao phim → `queued` → `running` → `done`;
   - tải phim được (`Content-Disposition: attachment`), còn lượt `used=1`;
   - chưa xác minh thì `403 unverified`;

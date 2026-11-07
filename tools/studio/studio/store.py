@@ -170,6 +170,33 @@ def doc_create(kind: str, ident: str, data: dict) -> bool:
         return False
 
 
+def doc_update(kind: str, ident: str, fn):
+    """Read, change with `fn(doc)`, write back, safe against other processes. `fn` must not open a transaction.
+    Returns the new document, or None when it does not exist."""
+    if mode() == "local":
+        with lock(ident):
+            d = doc_get(kind, ident)
+            if d is None:
+                return None
+            fn(d)
+            doc_put(kind, ident, d)
+            return d
+    from . import db
+    with db.tx() as con:
+        r = con.execute("SELECT data FROM docs WHERE kind = ? AND id = ?", (kind, ident)).fetchone()
+        if not r:
+            return None
+        d = json.loads(r[0])
+        fn(d)
+        con.execute("INSERT OR REPLACE INTO docs VALUES (?, ?, ?, ?, ?, ?, ?)", _row(kind, ident, d))
+        return d
+
+
+def doc_insert(con, kind: str, ident: str, data: dict) -> None:
+    """Online: write a document inside a transaction the caller holds (quotas.reserve, worker claims)."""
+    con.execute("INSERT OR REPLACE INTO docs VALUES (?, ?, ?, ?, ?, ?, ?)", _row(kind, ident, data))
+
+
 def doc_list(kind: str, owner: str = None) -> list:
     """All documents of a kind (online: of one owner when given)."""
     if mode() == "local":

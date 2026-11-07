@@ -68,19 +68,25 @@ def _send(m: EmailMessage) -> None:
 
 
 def flush() -> int:
-    """Send what is waiting (retries failed mails up to MAX_TRIES). Returns how many were sent."""
+    """Send what is waiting (retries failed mails up to MAX_TRIES). Returns how many were sent.
+    Each mail is claimed first, so two processes flushing at once never send it twice."""
+    import secrets
     with db.read() as con:
         rows = con.execute('SELECT id, "to", template, data FROM outbox WHERE sent_at IS NULL AND tries < ?',
                            (MAX_TRIES,)).fetchall()
-    sent = 0
+    sent, mark = 0, f"sending:{secrets.token_hex(6)}"
     for r in rows:
+        with db.tx() as con:
+            if con.execute("UPDATE outbox SET sent_at = ? WHERE id = ? AND sent_at IS NULL", (mark, r["id"])).rowcount == 0:
+                continue                      # someone else took it
         m = render(r["template"], json.loads(r["data"]))
         m["To"] = r["to"]
         try:
             _send(m)
         except Exception as e:     # noqa: BLE001 - any delivery problem is retried later
             with db.tx() as con:
-                con.execute("UPDATE outbox SET tries = tries + 1, last_error = ? WHERE id = ?", (str(e)[:300], r["id"]))
+                con.execute("UPDATE outbox SET sent_at = NULL, tries = tries + 1, last_error = ? WHERE id = ?",
+                            (str(e)[:300], r["id"]))
             continue
         with db.tx() as con:
             con.execute("UPDATE outbox SET sent_at = ?, tries = tries + 1 WHERE id = ?", (store.now_iso(), r["id"]))

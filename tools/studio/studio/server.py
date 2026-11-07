@@ -111,6 +111,11 @@ def create_app() -> FastAPI:
     @app.exception_handler(StudioError)
     async def studio_error(_, e: StudioError):
         r = err(e.code, e.message, e.status)
+        if getattr(e, "extra", None):          # e.g. resets_at of quota_exceeded, reason of content_rejected
+            import json
+            body = json.loads(r.body)
+            body["error"].update(e.extra)
+            r = JSONResponse(body, status_code=e.status)
         if getattr(e, "retry_after", None):
             r.headers["Retry-After"] = str(e.retry_after)
         return r
@@ -130,7 +135,12 @@ def create_app() -> FastAPI:
     # ---------- jobs ----------
     @app.get(api + "/jobs")
     def list_jobs(request: Request, status: Optional[str] = None, kind: Optional[str] = None):
-        out = [reviews.job_view(j) for j in jobs.all_jobs(owner(request))]
+        if online:
+            from .api_online import queue_positions, view
+            pos, a = queue_positions(), request.state.account
+            out = [view(j, a, pos) for j in jobs.all_jobs(None if a["role"] == "admin" else a["id"])]
+        else:
+            out = [reviews.job_view(j) for j in jobs.all_jobs()]
         if status:
             out = [j for j in out if j["status"] == status]
         if kind:
@@ -139,7 +149,12 @@ def create_app() -> FastAPI:
 
     @app.get(api + "/jobs/{job_id}")
     def get_job(job_id: str, request: Request):
-        j = reviews.job_view(jobs.load(job_id, owner(request)))
+        if online:
+            from .api_online import view
+            a = request.state.account
+            j = view(jobs.load(job_id, None if a["role"] == "admin" else a["id"]), a)
+        else:
+            j = reviews.job_view(jobs.load(job_id))
         j["reviews"] = [_review_out(reviews.load(r)) for r in j["review_ids"]]
         return j
 

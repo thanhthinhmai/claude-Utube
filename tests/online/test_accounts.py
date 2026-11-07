@@ -1,5 +1,4 @@
 """Accounts, sessions, one-time links, rate limits and isolation between customers (T012; FR-001–004, FR-025, SC-003)."""
-import json
 import unittest
 
 from helpers import PASSWORD, W, OnlineProject, account_id

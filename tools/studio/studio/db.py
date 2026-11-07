@@ -87,6 +87,10 @@ CREATE TABLE IF NOT EXISTS outbox (
                                              'review_timeout', 'account_deleted')),
   data TEXT NOT NULL, created_at TEXT NOT NULL, sent_at TEXT, tries INTEGER NOT NULL DEFAULT 0, last_error TEXT
 );
+CREATE TABLE IF NOT EXISTS job_tokens (
+  token_hash TEXT PRIMARY KEY, job_id TEXT NOT NULL, created_at TEXT NOT NULL, revoked_at TEXT, last_ok_at REAL
+);
+CREATE INDEX IF NOT EXISTS job_tokens_job ON job_tokens (job_id);
 CREATE TABLE IF NOT EXISTS ratelimit (key TEXT NOT NULL, at REAL NOT NULL);
 CREATE INDEX IF NOT EXISTS ratelimit_key ON ratelimit (key, at);
 """

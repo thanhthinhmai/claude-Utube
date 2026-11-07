@@ -4,11 +4,16 @@
 const API = "/api/v1";
 const $app = document.getElementById("app");
 const STATUS = {
-  running: "Running", waiting_review: "Needs review", waiting_resume: "Waiting to resume", done: "Done",
+  queued: "In queue", running: "Running", waiting_review: "Needs review", waiting_resume: "Waiting to resume", done: "Done",
   failed: "Failed", stopped: "Stopped", inactive: "Inactive",
 };
 const KIND = { learn: "Learn a style", film: "Make a film" };
-const REVIEW = { "style-1": "Review 1: style draft", "style-2": "Review 2: proof frame" };
+const REVIEW = { "style-1": "Review 1: style draft", "style-2": "Review 2: proof frame", question: "Question from the studio",
+  treatment: "Treatment review" };
+// Online mode (specs/007): the same page serves many customers; MODE comes from GET /health
+let MODE = "local";
+/** @type {any} */
+let ME = null;
 const DECISION = { approve: "Approve", revise: "Request changes", accept_anyway: "Accept anyway", stop: "Stop" };
 const SOURCE = { ui: "the studio", chat: "the chat" };
 
@@ -41,11 +46,28 @@ const ERR = {
   already_decided: "This review was already decided elsewhere.", note_required: "Add a note (at least 3 characters) before requesting changes.",
   value_not_allowed: "That choice is not allowed for this review.", csrf: "Request blocked (missing studio header).",
   bad_host: "Request blocked (wrong host).", not_local: "Request blocked (not from this machine).",
+  auth_required: "Please log in.", locked: "This account is locked. Contact the studio.",
+  bad_login: "Wrong email or password.", email_taken: "This email already has an account. Log in instead.",
+  weak_password: "The password needs at least 10 characters.", terms_required: "Please accept the terms of use.",
+  signup_closed: "Sign-up is closed for now. Please try again later.", token_expired: "This link was already used or has expired.",
+  rate_limited: "Too many tries. Please wait a little and try again.", unverified: "Confirm your email first: open the link we sent you.",
+  quota_exceeded: "You have used all your films for this month.", daily_cap: "The studio is fully booked today. Please try again tomorrow.",
+  too_many_queued: "You already have 3 jobs in progress. Wait for one to finish.", too_long: "The film is too long.",
+  content_rejected: "The studio cannot make this idea.", style_not_found: "This style does not exist any more.",
+  in_use: "A job is still using this.",
 };
-const errText = (body, status) => ERR[body?.error?.code] || `Error ${status}`;
+const errText = (body, status) => {
+  const e = body?.error || {};
+  let t = ERR[e.code] || `Error ${status}`;
+  if (e.code === "quota_exceeded" && e.resets_at) t += ` Your films come back on ${when(e.resets_at)}.`;
+  if (e.code === "content_rejected" && e.reason) t += ` ${e.reason}`;
+  return t;
+};
 const fold = (s) => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 const stylePrompt = (name) => `Make a 40-second film in the ${name} style about …`;
-const useBtn = (name) => `<button class="primary use" data-name="${esc(name)}">Use this style</button>`;
+const useBtn = (name, slug = "") => (MODE === "online" && slug
+  ? `<a class="button primary" href="#/new?style=${encodeURIComponent(slug)}">Make a film in this style</a>`
+  : `<button class="primary use" data-name="${esc(name)}">Use this style</button>`);
 async function copyPrompt(btn) {
   const text = stylePrompt(btn.dataset.name);
   const box = btn.parentElement;
@@ -62,18 +84,27 @@ function wireUse(root) {
   root.querySelectorAll("button.use").forEach((b) => b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); copyPrompt(b); }));
 }
 const badge = (s) => `<span class="badge s-${esc(s)}">${esc(STATUS[s] || s)}</span>`;
+function failed(r, body) {
+  if (MODE === "online" && r.status === 401 && body?.error?.code === "auth_required" && !location.hash.startsWith("#/login")) {
+    ME = null; location.hash = "#/login";
+  }
+  const e = /** @type {Error & {code?: string}} */ (new Error(errText(body, r.status))); e.code = body?.error?.code;
+  return e;
+}
 async function get(path) {
   const r = await fetch(API + path);
   const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(errText(body, r.status));
+  if (!r.ok) throw failed(r, body);
   return body;
 }
-async function post(path, data) {
-  const r = await fetch(API + path, { method: "POST", headers: { "Content-Type": "application/json", "X-Studio": "1" }, body: JSON.stringify(data) });
+async function send(method, path, data) {
+  const r = await fetch(API + path, { method, headers: { "Content-Type": "application/json", "X-Studio": "1" },
+    body: data === undefined ? undefined : JSON.stringify(data) });
   const body = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = /** @type {Error & {code?: string}} */ (new Error(errText(body, r.status))); e.code = body?.error?.code; throw e; }
+  if (!r.ok) throw failed(r, body);
   return body;
 }
+const post = (path, data) => send("POST", path, data);
 function zoomable(root) {
   root.querySelectorAll("img[data-zoom]").forEach((img) => img.addEventListener("click", () => {
     const lb = document.getElementById("lightbox"); lb.querySelector("img").src = img.src; lb.hidden = false;
@@ -97,6 +128,7 @@ async function pageJobs() {
   }).join("");
   if (!jobs.length && !st && !kd) return emptyJobs();
   $app.innerHTML = `${head("Track", "Jobs", "Everything Claude is doing for you: learning styles and making films. Jobs that need your review are highlighted in purple.")}
+    ${MODE === "online" ? '<p><a class="button primary" href="#/new">New film</a></p>' : ""}
     <div class="row filters">
       <label>Status <select id="f-status"><option value="">All</option>${opt(STATUS, st)}</select></label>
       <label>Type <select id="f-kind"><option value="">All</option>${opt(KIND, kd)}</select></label>
@@ -113,6 +145,12 @@ async function pageJobs() {
 }
 
 function emptyJobs() {
+  if (MODE === "online") {
+    $app.innerHTML = `<div class="empty"><span class="spark">${SPARK}</span><h1>What should we make today?</h1>
+      <p class="muted">Pick a style, describe your idea, and the studio makes the film for you. You can follow every step here.</p>
+      <p><a class="button primary" href="#/new">Make a film</a></p></div>`;
+    return;
+  }
   $app.innerHTML = `<div class="empty"><span class="spark">${SPARK}</span>
       <h1>What should we make today?</h1>
       <p class="muted">Open Claude Code in the project folder and say what you want. Jobs show up here, with the steps that need your review.</p></div>
@@ -143,6 +181,9 @@ async function pageJob(id) {
     ${head(esc(KIND[j.kind] || j.kind), `${esc(j.name)} ${badge(j.status)}`, "")}
     <div class="split"><div>
     ${j.status === "waiting_review" && j.reviews.some((r) => !r.decision) ? `<p class="notice">This job is waiting for your review: <a href="#/reviews/${esc(j.reviews.find((r) => !r.decision).id)}">open the review</a>.</p>` : ""}
+    ${j.status === "queued" ? `<p class="notice">In the queue${j.queue_position ? `: number ${j.queue_position}` : ""}. It starts by itself when the studio is free.</p>` : ""}
+    ${MODE === "online" && j.status === "done" && j.links.film ? `<p><a class="button primary" href="${API}/films/${encodeURIComponent(j.links.film)}/download">Download the film</a>
+      <a class="button" href="#/films/${esc(j.links.film)}">Watch it</a></p>` : ""}
     ${j.status === "waiting_resume" ? `<p class="notice">You decided, but the Claude session is no longer waiting. Open Claude Code again and say “continue job ${esc(j.name)}”.</p>` : ""}
     ${j.status === "inactive" ? `<p class="notice">No updates for over 10 minutes: the Claude session may have closed or stopped.</p>` : ""}
     ${j.error ? `<p class="error">${esc(j.error)}</p>` : ""}
@@ -156,8 +197,17 @@ async function pageJob(id) {
       <dt>Progress</dt><dd>${pct !== null ? `${j.progress.done}/${j.progress.total}` : "—"}</dd>
       <dt>Started</dt><dd>${when(j.started_at)}</dd>
       <dt>Updated</dt><dd>${when(j.updated_at)}</dd></dl>
+      ${MODE === "online" && !["done", "failed", "stopped"].includes(j.status) ? `<p style="margin-top:14px"><button class="danger" id="stop">Stop this job</button></p>
+        <p class="muted" style="font-size:13px">Stopping keeps the film credit used.</p>` : ""}
       ${links ? `<p class="section-title" style="margin-top:18px">Results</p><p style="display:grid;gap:4px;margin:0">${links.replaceAll(" · ", "")}</p>` : ""}
     </aside></div>`;
+  const stop = /** @type {HTMLButtonElement | null} */ (document.getElementById("stop"));
+  if (stop) stop.onclick = async () => {
+    if (!confirm("Stop this job? The film credit is not given back.")) return;
+    stop.disabled = true;
+    try { await post(`/jobs/${encodeURIComponent(id)}/stop`); } catch (e) { alert(e.message); }
+    route();
+  };
 }
 
 function metricRows(c) {
@@ -184,7 +234,7 @@ async function pageReview(id) {
   const d = r.decision;
   const extra = r.final_round ? `<button data-v="accept_anyway">Accept anyway</button><button class="danger" data-v="stop">Stop</button>` : "";
   $app.innerHTML = `${back(`#/jobs/${esc(r.job_id)}`, "Job")}
-    ${head("Review", esc(REVIEW[r.kind]), `Reference set <a href="#/sets/${esc(r.set)}">${esc(r.set)}</a> · sent ${when(r.created_at)}`)}
+    ${head("Review", esc(REVIEW[r.kind]), `${r.set ? `Reference set <a href="#/sets/${esc(r.set)}">${esc(r.set)}</a> · ` : ""}sent ${when(r.created_at)}`)}
     ${proof}
     <h2>${c ? "Notes from Claude" : "Summary"}</h2><div class="panel md">${r.summary_html}</div>
     <div class="panel decide" id="decide">${d ? decidedHtml(d) : `
@@ -212,7 +262,7 @@ const decidedHtml = (d) => `<p class="done-box">Decided: <strong>${esc(DECISION[
 
 async function pageFilms() {
   const { films } = await get("/films");
-  $app.innerHTML = `${head("Results", "Films", "Rendered films in the films/ folder.")}${films.length ? `<div class="grid">${films.map((f) => `<a class="panel card" href="#/films/${esc(f.name)}">
+  $app.innerHTML = `${head("Results", "Films", MODE === "online" ? "Your finished films." : "Rendered films in the films/ folder.")}${films.length ? `<div class="grid">${films.map((f) => `<a class="panel card" href="#/films/${esc(f.name)}">
       ${f.has_poster ? `<img src="${API}/films/${esc(f.name)}/poster" alt="">` : ""}<p><strong>${esc(f.name)}</strong>
       ${f.rendering ? '<span class="badge s-running">Rendering</span>' : ""}</p></a>`).join("")}</div>`
     : `<p class="panel muted">No films in the films/ folder yet.</p>`}`;
@@ -225,10 +275,16 @@ async function pageFilm(name) {
     ${f.has_video ? `<video controls preload="metadata" ${f.has_poster ? `poster="${base}/poster"` : ""}>
         <source src="${base}/video" type="video/mp4">
         ${f.has_subtitles ? `<track kind="subtitles" srclang="vi" label="Subtitles" src="${base}/subtitles.vtt" default>` : ""}
-      </video><p class="muted">Turn subtitles on or off with the player’s CC button.</p>`
+      </video><p class="muted">Turn subtitles on or off with the player’s CC button.</p>
+      ${MODE === "online" ? `<p><a class="button primary" href="${base}/download">Download</a> <button class="danger" id="del-film">Delete this film</button></p>` : ""}`
     : `<p class="notice">${f.rendering ? "The film is still rendering: see progress on the Jobs page." : "No film file yet."}</p>`}
     ${f.treatment_html ? `<h2>Script (TREATMENT)</h2><div class="panel md">${f.treatment_html}</div>` : ""}
     ${f.credits ? `<h2>Third-party assets (CREDITS)</h2><pre class="log">${esc(f.credits)}</pre>` : ""}`;
+  const del = document.getElementById("del-film");
+  if (del) del.onclick = async () => {
+    if (!confirm("Delete this film for good?")) return;
+    try { await send("DELETE", `/films/${encodeURIComponent(name)}`); location.hash = "#/films"; } catch (e) { alert(e.message); }
+  };
 }
 
 async function pageSets() {
@@ -279,7 +335,7 @@ async function pageStyles() {
       ${s.has_styleframe ? `<img src="${API}/styles/${esc(s.slug)}/styleframe" alt="">` : ""}
       <p><strong>${esc(s.en || s.slug)}</strong><br><span class="muted">based on ${s.based_on_in_library
         ? `<a class="base-link" href="#/library/${esc(s.based_on)}">${esc(s.based_on)}</a>` : esc(s.based_on || "–")}${s.source === "learned" ? " · learned from videos" : ""}</span></p>
-      <div class="use-row">${useBtn(s.en || s.slug)}</div></article>`).join("")}</div>`
+      <div class="use-row">${useBtn(s.en || s.slug, s.slug)}</div></article>`).join("")}</div>`
     : `<p class="panel muted">No styles yet. Learn one by telling Claude: “Learn the style of the channel …”.</p>`}`;
   (/** @type {NodeListOf<HTMLElement>} */ ($app.querySelectorAll(".my-card"))).forEach((c) => {
     const open = () => { location.hash = `#/styles/${c.dataset.slug}`; };
@@ -293,7 +349,7 @@ async function pageStyle(slug) {
   const s = await get(`/styles/${encodeURIComponent(slug)}`);
   const ref = s.reference || {};
   $app.innerHTML = `${back("#/styles", "My styles")}${head(esc(slug), esc(s.en || slug), `Base technique ${s.based_on_in_library ? `<a href="#/library/${esc(s.based_on)}">${esc(s.based_on)}</a>` : esc(s.based_on || "–")} · ${s.source === "learned" ? `learned from ${ref.videos ?? "?"} videos, ${num(ref.measured_seconds, 0)} seconds measured` : "custom style"}${s.created ? ` · saved ${esc(s.created)}` : ""}`)}
-    <div class="use-row">${useBtn(s.en || slug)}</div>
+    <div class="use-row">${useBtn(s.en || slug, slug)}</div>
     ${s.has_styleframe ? `<p><img class="shot" data-zoom src="${API}/styles/${esc(slug)}/styleframe" alt="Proof frame"></p>` : ""}
     <h2>STYLE.md</h2><div class="panel md">${s.style_html}</div>
     ${s.evidence_html ? `<h2>Evidence</h2><div class="panel md">${s.evidence_html}</div>` : ""}`;
@@ -329,7 +385,7 @@ async function pageLibrary() {
         <h3>${esc(s.en)}</h3>
         <p class="lib-film"><em>${esc(s.film)}</em></p><p class="muted lib-line">${esc(s.line)}</p>
         <p class="pills">${s.uses.map((u) => `<span class="pill">${esc(u)}</span>`).join("")}</p>
-        <div class="use-row">${useBtn(s.en)}</div></div></article>`;
+        <div class="use-row">${useBtn(s.en, s.slug)}</div></div></article>`;
   const draw = () => {
     const words = fold(q).split(/\s+/).filter(Boolean);
     const hits = lib.styles.filter((s) => (!group || s.category === group)
@@ -367,9 +423,137 @@ async function pageLibStyle(slug) {
       ${s.github_url ? `<p><a href="${esc(s.github_url)}" target="_blank" rel="noopener">Watch the demo film on GitHub ↗</a></p>` : ""}
       <p class="section-title" style="margin-top:18px">Good for</p>
       <p class="pills">${s.uses.map((u) => `<span class="pill">${esc(u)}</span>`).join("")}</p>
-      <div class="use-row">${useBtn(s.en)}</div>
+      <div class="use-row">${useBtn(s.en, s.slug)}</div>
     </aside></div>`;
   zoomable($app); wireUse($app);
+}
+
+// ---------- online mode: accounts and new films (specs/007) ----------
+const field = (id) => /** @type {HTMLInputElement} */ (document.getElementById(id));
+function authPage(title, lead, body, foot = "") {
+  document.body.classList.add("guest");
+  $app.innerHTML = `<div class="auth panel"><h1>${title}</h1>${lead ? `<p class="muted">${lead}</p>` : ""}${body}
+    <p id="msg" class="muted" role="status"></p>${foot}</div>`;
+}
+/** Wire a form: `fn` sends it; its result is shown, an error is shown in red. */
+function onSubmit(fn) {
+  const form = /** @type {HTMLFormElement} */ ($app.querySelector("form"));
+  const msg = document.getElementById("msg");
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const btn = /** @type {HTMLButtonElement} */ (form.querySelector("button[type=submit]"));
+    btn.disabled = true; msg.className = "muted"; msg.textContent = "";
+    try { const t = await fn(); if (t) msg.textContent = t; } catch (err) { msg.className = "fail"; msg.textContent = err.message; }
+    btn.disabled = false;
+  };
+}
+async function pageLogin() {
+  authPage("Log in", "Film Studio makes short films for you in the style you choose.", `<form class="form">
+    <label>Email <input id="email" type="email" autocomplete="email" required></label>
+    <label>Password <input id="password" type="password" autocomplete="current-password" required></label>
+    <button class="primary" type="submit">Log in</button></form>`,
+  `<p><a href="#/forgot">Forgot your password?</a> · <a href="#/signup">Create an account</a></p>`);
+  onSubmit(async () => {
+    await post("/auth/login", { email: field("email").value, password: field("password").value });
+    await loadMe(); location.hash = "#/";
+    return "";
+  });
+}
+async function pageSignup() {
+  authPage("Create an account", "Each month you get a few free films. No card needed.", `<form class="form">
+    <label>Email <input id="email" type="email" autocomplete="email" required></label>
+    <label>Password <span class="hint">At least 10 characters.</span>
+      <input id="password" type="password" autocomplete="new-password" minlength="10" required></label>
+    <label class="check"><input id="terms" type="checkbox" required> <span>I agree to the terms of use: I only ask for films I may publish,
+      and I do not ask for violence, sexual content, hate, or copies of real people, brands or channels.</span></label>
+    <button class="primary" type="submit">Create account</button></form>`, `<p>Already have an account? <a href="#/login">Log in</a></p>`);
+  onSubmit(async () => {
+    await post("/auth/signup", { email: field("email").value, password: field("password").value, accept_terms: field("terms").checked });
+    $app.querySelector("form").remove();
+    return "Check your email: we sent a link to confirm your address. Then log in.";
+  });
+}
+async function pageVerify(token) {
+  authPage("Confirm your email", "", "");
+  const msg = document.getElementById("msg");
+  try {
+    await post("/auth/verify", { token });
+    msg.innerHTML = 'Your email is confirmed. <a href="#/login">Log in</a> to make your first film.';
+    if (ME) { await loadMe(); msg.innerHTML = 'Your email is confirmed. <a href="#/new">Make your first film</a>.'; }
+  } catch (e) { msg.className = "fail"; msg.textContent = e.message; }
+}
+async function pageForgot() {
+  authPage("Forgot your password", "We send a link to choose a new one.", `<form class="form">
+    <label>Email <input id="email" type="email" autocomplete="email" required></label>
+    <button class="primary" type="submit">Send the link</button></form>`, `<p><a href="#/login">Back to log in</a></p>`);
+  onSubmit(async () => {
+    await post("/auth/forgot", { email: field("email").value });
+    return "If this email has an account, the link is on its way. It works for 1 hour.";
+  });
+}
+async function pageReset(token) {
+  authPage("Choose a new password", "You are logged out everywhere after the change.", `<form class="form">
+    <label>New password <span class="hint">At least 10 characters.</span>
+      <input id="password" type="password" autocomplete="new-password" minlength="10" required></label>
+    <button class="primary" type="submit">Save the password</button></form>`, `<p><a href="#/login">Log in</a></p>`);
+  onSubmit(async () => {
+    await post("/auth/reset", { token, password: field("password").value });
+    $app.querySelector("form").remove();
+    return "Your password is changed. Log in with the new one.";
+  });
+}
+
+async function pageNew() {
+  const params = new URLSearchParams(location.hash.split("?")[1] || "");
+  const [lib, mine] = await Promise.all([get("/library"), get("/styles")]);
+  const q = ME.quota.films, left = Math.max(0, q.limit - q.used), max = ME.limits?.film_max_seconds || 60;
+  const want = params.get("style") || "";
+  const opt = (slug, name, img) => `<label><input type="radio" name="style" value="${esc(slug)}" ${slug === want ? "checked" : ""} required>
+      ${img ? `<img src="${img}" alt="" loading="lazy">` : `<div class="poster-ph"><span>${esc(name)}</span></div>`}<span>${esc(name)}</span></label>`;
+  const cards = [...mine.styles.map((s) => opt(s.slug, `${s.en || s.slug} (yours)`, s.has_styleframe ? `${API}/styles/${esc(s.slug)}/styleframe` : "")),
+    ...(lib.styles || []).map((s) => opt(s.slug, s.en, s.has_poster ? `${API}/library/styles/${esc(s.slug)}/poster` : ""))].join("");
+  $app.innerHTML = `${head("Make", "New film", `You have ${left} of ${q.limit} films left this month.`)}
+    ${!ME.verified ? `<p class="notice">Confirm your email first: open the link we sent to ${esc(ME.email)}.</p>` : ""}
+    ${left === 0 ? `<p class="notice">You have used all your films for this month. They come back on ${when(ME.quota.resets_at)}.</p>` : ""}
+    <form class="form panel">
+      <label>Style <span class="hint">Pick the look of the film. <a href="#/library">See the whole library</a>.</span></label>
+      <div class="pick" role="radiogroup" aria-label="Style">${cards}</div>
+      <label>Your idea <span class="hint">What happens in the film, who is in it, the mood. Up to 2000 characters.</span>
+        <textarea id="idea" minlength="3" maxlength="2000" required placeholder="A late-night bánh mì stall in Saigon, told by the old man who runs it."></textarea></label>
+      <label>Length in seconds <span class="hint">Up to ${max} seconds.</span>
+        <input id="seconds" type="number" min="5" max="${max}" value="${Math.min(30, max)}" required></label>
+      <label class="check"><input id="treat" type="checkbox"> <span>Let me review the treatment (the written plan) before the picture is made</span></label>
+      <div><button class="primary" type="submit" ${left === 0 || !ME.verified ? "disabled" : ""}>Make the film (uses 1 credit)</button></div>
+    </form><p id="msg" class="muted" role="status"></p>`;
+  $app.querySelector("input[name=style]:checked")?.closest("label")?.scrollIntoView({ block: "nearest" });
+  onSubmit(async () => {
+    const style = /** @type {HTMLInputElement | null} */ ($app.querySelector("input[name=style]:checked"));
+    if (!style) throw new Error("Pick a style first.");
+    const j = await post("/jobs", { kind: "film", style: style.value, idea: field("idea").value.trim(),
+      seconds: Number(field("seconds").value), review_treatment: field("treat").checked });
+    await loadMe();
+    location.hash = `#/jobs/${j.id}`;
+    return "";
+  });
+}
+
+async function loadMe() {
+  try { ME = await get("/me"); } catch { ME = null; }
+  drawAccount();
+  return ME;
+}
+function drawAccount() {
+  const bar = document.getElementById("acct");
+  document.body.classList.toggle("guest", MODE === "online" && !ME);
+  bar.hidden = !(MODE === "online" && ME);
+  if (bar.hidden) return;
+  const f = ME.quota.films;
+  bar.innerHTML = `<span class="credits">${Math.max(0, f.limit - f.used)}/${f.limit} films left this month</span>
+    <strong>${esc(ME.email)}</strong><button id="logout">Log out</button>`;
+  document.getElementById("logout").onclick = async () => {
+    try { await post("/auth/logout"); } catch { /* already logged out */ }
+    ME = null; drawAccount(); location.hash = "#/login";
+  };
 }
 
 // ---------- router, live updates, waiting badge, notifications ----------
@@ -380,10 +564,24 @@ const routes = [
   [/^#\/sets$/, pageSets, "sets"], [/^#\/sets\/([^/?]+)$/, pageSet, "sets"],
   [/^#\/library(\?.*)?$/, pageLibrary, "library"], [/^#\/library\/([^/?]+)$/, pageLibStyle, "library"],
   [/^#\/styles$/, pageStyles, "styles"], [/^#\/styles\/([^/?]+)$/, pageStyle, "styles"],
+  [/^#\/new(\?.*)?$/, pageNew, "new"],
+];
+/** pages open without logging in (online mode) */
+const PUBLIC = [
+  [/^#\/login$/, pageLogin], [/^#\/signup$/, pageSignup], [/^#\/forgot$/, pageForgot],
+  [/^#\/verify\/([^/?]+)$/, pageVerify], [/^#\/reset\/([^/?]+)$/, pageReset],
 ];
 let rendering = null;
 async function route() {
   const h = location.hash || "#/";
+  if (MODE === "online") {
+    for (const [re, fn] of PUBLIC) {
+      const m = h.match(/** @type {RegExp} */ (re));
+      if (m) { await /** @type {(id?: string) => Promise<void>} */ (fn)(m[1] && decodeURIComponent(m[1])); return; }
+    }
+    if (!ME) { location.hash = "#/login"; return; }
+    document.body.classList.remove("guest");
+  }
   for (const [re, fn, nav] of routes) {
     const m = h.match(re);
     if (!m) continue;
@@ -409,7 +607,7 @@ async function refreshPending(announce) {
 }
 function notify(r) {
   if (!("Notification" in window) || Notification.permission !== "granted") return;
-  const n = new Notification("Film Studio: a job needs your review", { body: REVIEW[r.kind] + " · " + r.set, tag: r.id });
+  const n = new Notification("Film Studio: a job needs your review", { body: REVIEW[r.kind] + (r.set ? " · " + r.set : ""), tag: r.id });
   n.onclick = () => { window.focus(); location.hash = `#/reviews/${r.id}`; n.close(); };
 }
 function askNotify() {
@@ -440,5 +638,20 @@ function connect() {
 }
 
 window.addEventListener("hashchange", route);
-route().then(() => { refreshPending(false); askNotify(); });
-connect();
+(async () => {
+  try { MODE = (await get("/health")).mode || "local"; } catch { /* old server */ }
+  (/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(".online-only"))).forEach((el) => (el.hidden = MODE !== "online"));
+  (/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(".local-only"))).forEach((el) => (el.hidden = MODE === "online"));
+  if (MODE === "online") {
+    document.querySelector(".owner strong").textContent = "Your account";
+    await loadMe();
+  }
+  await route();
+  if (MODE === "online" && !ME) {     // live updates and the review badge start after logging in
+    const wait = () => { if (ME) { window.removeEventListener("hashchange", wait); refreshPending(false); connect(); } };
+    window.addEventListener("hashchange", wait);
+    return;
+  }
+  refreshPending(false); askNotify();
+  connect();
+})();

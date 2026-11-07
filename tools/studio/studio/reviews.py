@@ -34,7 +34,8 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
         raise StudioError("invalid", "loại duyệt phải là " + ", ".join(sorted(KINDS)), 422)
     if len(summary_md.encode()) > MAX_SUMMARY:
         raise StudioError("invalid", "bản tóm tắt quá dài (tối đa 200 KB)", 422)
-    resources.check_name(set_name)
+    if kind.startswith("style-") or set_name:         # question and treatment reviews have no reference set
+        resources.check_name(set_name)
     compare = None
     if kind == "style-2":
         compare = store.read_json(resources.set_dir(set_name) / "proof" / "compare.json")
@@ -44,7 +45,7 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
                                                 "palette_needed", "pass", "round", "ref", "ours",
                                                 "ref_palette", "our_palette")}
     r = {"id": jobs.new_id("r"), "owner": job.get("owner", "local"), "job_id": job_id, "kind": kind, "created_at": store.now_iso(),
-         "summary_md": summary_md, "set": set_name, "compare": compare,
+         "summary_md": summary_md, "set": set_name or None, "compare": compare,
          "final_round": bool(final_round and kind == "style-2"), "waiting": {"last_poll_at": None}}
     store.doc_put("review", r["id"], r)
 
