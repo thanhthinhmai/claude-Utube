@@ -36,3 +36,4 @@ __pycache__/
 deploy/.env
 /data/
 tests/online/.tmp/
+!deploy/.env.example
