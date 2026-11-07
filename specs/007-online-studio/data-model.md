@@ -53,7 +53,9 @@ Mở rộng Job của 003. Giữ nguyên các trường cũ: `id`, `kind`, `name
 | cost_usd | real | cộng dồn từ bộ chuyển tiếp (R3) |
 | queued_at, run_count | time, int | hàng đợi (FR-008a) |
 | agent_session | text \| null | mã phiên của Agent SDK để nối lại (R5) |
-| failure_kind | `studio` \| `customer` \| null | `studio` thì trả lượt |
+| failure_kind | `studio` \| `customer` \| null | `studio` thì trả lượt; luật phân loại theo spec FR-006a |
+| qa | json \| null | kết quả kiểm chất lượng phim: `lufs`, `true_peak`, `readcheck` (R14) |
+| media_removed_at | time \| null | lúc đã xoá video, ảnh ghép, lời chép (FR-019) |
 
 **Trạng thái** (thêm `queued` vào danh sách của 003):
 

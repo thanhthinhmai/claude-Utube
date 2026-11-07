@@ -84,7 +84,7 @@ Mỗi mục: **Decision** (chọn gì) · **Rationale** (vì sao) · **Alternati
 
 - **Decision**:
   - **Tải**: `yt-dlp` (đã có trong `requirements-learn-extra.txt`), chạy trong container của việc học. Video nằm trong `/work/references/<set>/videos`, không có đường nào ra web.
-  - **Xoá**: khi việc học kết thúc, worker chạy lệnh dọn sẵn có (`learn clean`) và xoá thêm mọi tệp âm thanh hay video còn sót. Một tác vụ định kỳ mỗi 15 phút quét lại để chắc chắn video bị xoá chậm nhất sau 1 giờ (FR-019, SC-004).
+  - **Xoá**: khi việc học kết thúc, worker chạy lệnh dọn sẵn có (`learn clean`), rồi xoá thêm mọi tệp âm thanh hay video còn sót, **ảnh ghép khung hình** (`profile/*/sheets/`) và **lời chép** (`transcripts/`). Chỉ giữ số đo (`profile/*.json`, `summary`), khung gốc dùng để so sánh và khung chứng minh (`proof/`, tối đa 6 khung). Một tác vụ định kỳ mỗi 15 phút quét lại để chắc chắn mọi thứ bị xoá chậm nhất sau 1 giờ (FR-018, FR-019, SC-004; hiến pháp 2.1.0: "chỉ giữ số đo và vài khung hình làm bằng chứng").
   - **Lỗi tải**: YouTube chặn tải từ máy chủ thì việc lỗi, báo lý do và gợi ý tải video lên.
 - **Rationale**: Dùng lại công cụ đã có và đáp ứng các điều kiện của hiến pháp 2.1.0.
 - **Alternatives**: tải trên máy chủ chung rồi chép vào container (video nằm ngoài vùng cách ly, khó chắc là đã xoá).
@@ -93,7 +93,7 @@ Mỗi mục: **Decision** (chọn gì) · **Rationale** (vì sao) · **Alternati
 
 - **Decision**:
   - **Máy chủ**: một máy chủ Linux thuê (Ubuntu 24.04, khoảng 8 vCPU và 16 GB RAM, vì dựng phim cần Chromium), nhà cung cấp do chủ xưởng chọn.
-  - **Dịch vụ**: **Docker Compose** chạy 3 dịch vụ: `web` (FastAPI), `worker`, `caddy` (HTTPS tự động, FR-024). Bộ chuyển tiếp API là một phần của `web`, nghe trên mạng nội bộ của Docker.
+  - **Dịch vụ**: **Docker Compose** chạy các dịch vụ `web` (FastAPI), `proxy` (bộ chuyển tiếp API, cùng ảnh với web nhưng khác lệnh chạy, chỉ nghe trên mạng nội bộ `jobnet`), `worker`, `egress-yt` (bộ lọc ra ngoài cho việc học từ YouTube), và `caddy` (HTTPS tự động, FR-024).
   - **Dữ liệu**: nằm trong `/data`, sao lưu bằng cách chép tệp SQLite và thư mục phim.
 - **Rationale**: Ít thành phần nhất mà vẫn có HTTPS và cách ly (hiến pháp V).
 - **Alternatives**: Kubernetes (quá nặng cho một máy); nền tảng không máy chủ (không chạy được Chromium, ffmpeg và việc dài).
@@ -107,3 +107,22 @@ Mỗi mục: **Decision** (chọn gì) · **Rationale** (vì sao) · **Alternati
   - Hình dạng dữ liệu của API v1 (việc, yêu cầu duyệt, quyết định) không đổi (FR-028); chỉ thêm điểm truy cập mới.
 - **Rationale**: Chủ xưởng vẫn dùng xưởng trên máy như cũ. Cả 3 bộ test hiện có tiếp tục chạy.
 - **Alternatives**: tách thành một dự án riêng (phải sửa hai nơi cho cùng một quy trình).
+
+## R13. Lỗi của dịch vụ Claude
+
+- **Decision**:
+  - Bộ chuyển tiếp trả nguyên mã `429`, `529` và `5xx` của Anthropic kèm `retry-after`, để Agent SDK tự thử lại theo cơ chế sẵn có.
+  - Nếu một lượt chạy không có phản hồi thành công nào từ Claude trong 30 phút, worker dừng container và đánh dấu lỗi do xưởng (FR-006a), khách được trả lượt.
+  - Có lỗi quá tải thì trang quản trị hiện cảnh báo.
+- **Rationale**: Spec có edge case "Claude lỗi hoặc quá tải: chờ, thử lại, quá hạn thì lỗi và trả lượt". Dùng cơ chế thử lại có sẵn của SDK, không tự làm thêm.
+- **Alternatives**: bộ chuyển tiếp tự thử lại (thử lại hai lớp chồng nhau, chờ lâu gấp đôi).
+
+## R14. Kiểm chất lượng phim trước khi giao
+
+- **Decision**: Sau khi tác tử báo xong, worker tự chạy trong container của việc:
+  - `ffmpeg -af ebur128` để đo độ lớn tích hợp và đỉnh thật;
+  - kiểm tra đọc chữ của thư viện (`core/render/readcheck.mjs`) trên `index.html` của phim.
+
+  Đạt (−14 ±1 LUFS, đỉnh ≤ −1 dB, đọc chữ đạt) thì việc mới thành `done`. Không đạt thì gửi tác tử một lượt sửa (nối lại phiên, kèm số đo). Vẫn không đạt thì lỗi do xưởng và trả lượt.
+- **Rationale**: FR-011 và SC-002 không được chỉ trông vào việc tác tử tự giác; worker là chỗ kiểm cuối mà khách tin được.
+- **Alternatives**: chỉ đo trong bài chạy thật (không bảo vệ được từng khách).

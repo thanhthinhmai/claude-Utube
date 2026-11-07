@@ -123,18 +123,21 @@
 - [ ] T020 [US1] Tạo `tools/runner/proxy.py` (FastAPI, nghe `proxy:8780`):
   - `POST /v1/messages` chuyển tiếp tới `ANTHROPIC_UPSTREAM` (mặc định `https://api.anthropic.com`) bằng `httpx`, kể cả khi phản hồi chạy dòng (SSE), và thay `x-api-key` bằng khoá thật.
   - Đọc `usage` từ phản hồi thường, hoặc từ sự kiện `message_delta` khi chạy dòng, rồi gọi `quotas.add_cost`.
+  - Trả nguyên `429`, `529` và `5xx` của Anthropic kèm `retry-after` (R13), và ghi lúc có phản hồi thành công gần nhất của việc.
   - Kiểm trần chi phí của việc như R3.
   - `/internal/jobs/{id}/{step|log|done|fail}` và `/internal/reviews/{request|status}`, chỉ cho mã của chính việc đó.
   - Mã của việc: ngẫu nhiên 32 byte, lưu bản băm, thu hồi khi việc kết thúc.
   - Nhật ký không ghi nội dung lời nhắc.
-- [ ] T021 [US1] Sửa `tools/studio/studio_cli.py` để khi `STUDIO_MODE=online` và có `STUDIO_JOB`, các lệnh `job step|log|run|done|fail` và `review request|status` gọi `http://proxy:8780/internal/…` (địa chỉ lấy từ `STUDIO_PROXY`) bằng `ANTHROPIC_API_KEY` của việc. `review wait` in "kết thúc lượt: thoát mã 10" rồi thoát mã 10. Chế độ local không đổi.
+- [ ] T021 [US1] Sửa `tools/studio/studio_cli.py` để khi `STUDIO_MODE=online` và có `STUDIO_JOB`, các lệnh `job step|log|run|done|fail` và `review request|status` gọi `http://proxy:8780/internal/…` (địa chỉ lấy từ `STUDIO_PROXY`) bằng `ANTHROPIC_API_KEY` của việc. `review wait` in "kết thúc lượt: thoát mã 10" rồi thoát mã 10. `job fail` nhận thêm `--by studio|customer` (mặc định `studio`; FR-006a). Chế độ local không đổi.
 - [ ] T022 [US1] Tạo `tools/runner/worker.py` theo `contracts/runner.md`:
   - Vòng lặp 2 giây: chọn việc `queued` cũ nhất mà chủ của nó không có việc `running`, khi tổng số việc `running` < N, trong `db.tx()`.
   - Tạo `/data/jobs/<id>/`, ghi `.input.json`, cấp mã việc, bật container qua `RUNNER` (`docker`, hoặc `local` để test chạy tiến trình con không có container).
   - Đọc `.result.json`; khi xong thì chép phim về `/data/accounts/<owner>/films/`.
   - Mã thoát 10 thì đặt `waiting_review` và lưu `agent_session`.
   - Khởi động lại: chạy lại một lần, lần thứ hai thì failed/studio và trả lượt.
-  - Gửi thư job_done hoặc job_failed khi `email_notify`.
+  - Gửi thư job_done, job_failed hoặc review_needed (khi việc chuyển sang `waiting_review`) nếu khách bật `email_notify` (FR-023).
+  - Theo dõi: lượt chạy nào không có phản hồi thành công từ Claude trong 30 phút thì dừng, tính là failed/studio (R13).
+  - Kiểm chất lượng (R14): khi tác tử báo xong một phim, chạy `ffmpeg -af ebur128` (−14 ±1 LUFS, đỉnh ≤ −1 dB) và `readcheck.mjs` của thư viện trong container, rồi ghi `qa`. Không đạt thì nối lại phiên một lần, kèm số đo. Vẫn không đạt thì failed/studio và trả lượt.
 - [ ] T023 [US1] Tạo `tools/runner/agent.py` (chạy trong container):
   - Đọc `/work/.input.json` và dựng lời nhắc tiếng Anh. Lời nhắc làm phim gồm: phong cách, ý tưởng, độ dài; luôn làm theo `CLAUDE.md` của `/studio`; mọi chữ trong phim bằng tiếng Anh; không nêu tên kênh; ghi bước bằng `job step`; kết thúc bằng `job done --film <tên>`.
   - Gọi Claude Agent SDK với thư mục làm việc `/work`, nạp `CLAUDE.md` và skill từ `/studio`, công cụ Read/Write/Edit/Bash/Glob/Grep, không có công cụ web, model trong Settings.
@@ -167,9 +170,13 @@
   - đăng ký → xác minh qua tệp `.eml` → giao phim → `queued` → `running` → `done`;
   - tải phim được (`Content-Disposition: attachment`), còn lượt `used=1`;
   - chưa xác minh thì `403 unverified`;
-  - hết lượt thì `402`.
+  - hết lượt thì `402`;
+  - tác tử giả xuất phim quá to (−8 LUFS) thì việc thành failed/studio và được trả lượt (FR-011);
+  - `job fail --by customer` không trả lượt, `--by studio` có trả lượt (FR-006a);
+  - API giả trả `529` liên tục quá thời hạn (thu ngắn trong test) thì việc thành failed/studio (R13);
+  - thư `review_needed` được ghi khi tác tử giả chạy với `--ask`.
 
-  Mở rộng `tests/ui/browser_check.cjs` (hoặc thêm `tests/online/browser_us1.cjs`) để đi trọn luồng trên trình duyệt.
+  Mở rộng `tests/ui/browser_check.cjs` (hoặc thêm `tests/online/browser_us1.cjs`) để đi trọn luồng trên trình duyệt. Đo thời gian từ mở trang tới giao việc, không tính bước đọc thư (SC-001, dưới 3 phút với thao tác tự động; ghi số đo), và kiểm bước mới hiện trên trang trong ≤ 5 giây sau `job step` (SC-007).
 
 **Checkpoint**: MVP: khách lạ làm được phim. Có thể triển khai bản dùng thử chỉ với US1.
 
@@ -184,7 +191,8 @@
   - Hai lần duyệt Approve trên web thì việc nối lại phiên và xong.
   - Phong cách có trong `GET /styles` và dùng được ở `POST /jobs` loại film.
 - [ ] T029 [P] [US2] Tạo `tests/online/test_media_gone.py` cho FR-018, FR-019 và SC-004:
-  - Sau khi việc học xong, dừng hoặc lỗi, và sau một lượt dọn, không còn tệp `.mp4 .mkv .webm .mov .m4a .wav .mp3 .opus` nào trong `/data/jobs/<id>` hay `/data/accounts/*/references`.
+  - Sau khi việc học xong, dừng hoặc lỗi, và sau một lượt dọn, không còn tệp `.mp4 .mkv .webm .mov .m4a .wav .mp3 .opus` nào trong `/data/jobs/<id>` hay `/data/accounts/*/references`. Cũng không còn ảnh ghép (`profile/*/sheets/`) hay lời chép (`transcripts/`), và mỗi bộ tham chiếu còn ≤ 6 ảnh trong `proof/` (FR-018, FR-019, SC-004).
+  - Trong lúc việc học còn chạy, `GET /sets/{set}/sheets` trả danh sách ảnh; sau khi kết thúc thì trả `{removed: true}`.
   - Thử mọi đường `/api/v1/sets/*` và `/uploads/*` với tên tệp video đều trả 404.
   - Tác vụ dọn xoá được tệp sót được tạo giả với thời gian kết thúc cách đây hơn 1 giờ.
 - [ ] T030 [US2] Trong `tools/studio/studio/api_online.py`, thêm:
@@ -194,10 +202,10 @@
 - [ ] T031 [US2] Trong `tools/runner/worker.py`, thêm cho việc học:
   - Chép các tệp tải lên vào `/work/references/<set>/videos/`.
   - Với nguồn YouTube, dùng thêm mạng `jobnet-yt`. Tạo mạng này trong `deploy/compose.yaml` kèm một bộ lọc ra ngoài (ví dụ squid hoặc tinyproxy) chỉ cho `*.youtube.com`, `*.googlevideo.com`, `*.ytimg.com`.
-  - Khi xong, chép `my-styles/<slug>` và `references/<set>` (đã xoá video) về `/data/accounts/<owner>/`.
+  - Khi xong, chép `my-styles/<slug>` về `/data/accounts/<owner>/`. Từ `references/<set>` chỉ chép số đo (`profile/*.json`, summary) và tối đa 6 ảnh `proof/`; **không** chép video, ảnh ghép hay lời chép (hiến pháp 2.1.0).
 - [ ] T032 [US2] Trong `tools/runner/agent.py`, thêm lời nhắc học phong cách: làm theo skill `style-learn` với nguồn đã cho; tải bằng `sh bin/studio learn fetch` (YouTube) hoặc dùng video có sẵn; duyệt bằng `review request` (style-1, style-2) rồi kết thúc lượt; viết mọi tóm tắt bằng tiếng Anh. Khi nối lại phiên, đưa quyết định và góp ý vào tin nhắn.
 - [ ] T033 [US2] Trong `tools/runner/worker.py`, thêm tác vụ dọn mỗi 15 phút (R10):
-  - Với Job `learn` đã kết thúc, chạy `sh bin/studio learn clean <set>` trong thư mục việc, rồi xoá mọi tệp có phần mở rộng âm thanh hay video, kể cả tệp tải lên của việc đó.
+  - Với Job `learn` đã kết thúc, chạy `sh bin/studio learn clean <set>` trong thư mục việc, rồi xoá mọi tệp có phần mở rộng âm thanh hay video (kể cả tệp tải lên của việc đó), ảnh ghép `profile/*/sheets/` và lời chép `transcripts/`.
   - Ghi `media_removed_at`.
   - Dừng các việc `waiting_review` quá `review_timeout_days`, gửi thư review_timeout.
 - [ ] T034 [US2] Trong `tools/studio/studio/web/app.js`, thêm:
@@ -254,7 +262,7 @@ Các yêu cầu này thuộc luồng làm phim, nhưng xếp sau US1 để MVP g
 
 ## Phase 8: Polish & triển khai
 
-- [ ] T044 [P] Tạo `deploy/web.Dockerfile` (web cùng proxy và worker, chung ảnh, khác lệnh chạy), `deploy/compose.yaml` (các dịch vụ `web`, `worker`, `caddy`, `egress-yt`; volume `/data`; mạng `jobnet` (internal), `jobnet-yt`; worker được dùng Docker socket) và `deploy/Caddyfile` (tên miền lấy từ `.env`, chuyển `/` tới web, header bảo mật HSTS, CSP như 003). Thêm `deploy/.env.example` gồm `ANTHROPIC_API_KEY`, `SMTP_*`, `MAIL_FROM`, `DOMAIN`, `STUDIO_DATA=/data`.
+- [ ] T044 [P] Tạo `deploy/web.Dockerfile` (web, proxy và worker dùng chung ảnh, khác lệnh chạy), `deploy/compose.yaml` (các dịch vụ `web`, `proxy` (chỉ trên `jobnet`), `worker`, `docker-socket-proxy` (chỉ cho phép containers create/start/inspect/stop/remove/logs; worker gọi Docker qua dịch vụ này, **không** gắn `docker.sock` thật vào worker; xem runner.md), `caddy`, `egress-yt`; volume `/data`; mạng `jobnet` (internal), `jobnet-yt`. Worker từ chối mọi ảnh khác `studio-job:*`) và `deploy/Caddyfile` (tên miền lấy từ `.env`, chuyển `/` tới web, header bảo mật HSTS, CSP như 003). Thêm `deploy/.env.example` gồm `ANTHROPIC_API_KEY`, `SMTP_*`, `MAIL_FROM`, `DOMAIN`, `STUDIO_DATA=/data`.
 - [ ] T045 [P] Thêm lệnh `sh bin/studio online up|down|logs` trong `bin/studio`: chạy `docker compose -f deploy/compose.yaml`; thiếu Docker thì báo rõ, không tự cài (CLAUDE.md).
 - [ ] T046 [P] Viết `deploy/README.md` bằng tiếng Việt, ngắn:
   - chọn máy chủ (Ubuntu 24.04, khoảng 8 vCPU, 16 GB RAM);

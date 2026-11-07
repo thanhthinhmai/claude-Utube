@@ -38,7 +38,9 @@ Thêm vào [api-v1 của 003](../../003-studio-ui/contracts/api-v1.md). Mọi đ
 
 `POST /reviews/{id}/decision` giữ nguyên. Thêm loại `question` và `treatment` (data-model).
 
-**Không có** điểm truy cập nào trả video hay âm thanh gốc của bộ tham chiếu, kể cả tệp khách tự tải lên (FR-018). Các đường `/sets/*` chỉ trả ảnh ghép và khung chứng minh như 003.
+**Không có** điểm truy cập nào trả video hay âm thanh gốc của bộ tham chiếu, kể cả tệp khách tự tải lên (FR-018).
+
+`/sets/*` như 003, với hai giới hạn: `sheets` và lời chép chỉ trả khi việc học **còn chạy**; sau đó `GET /sets/{set}/sheets` trả `{removed: true}`. `proof` trả tối đa 6 khung.
 
 ## Quản trị (chỉ `admin`)
 | Phương thức · Đường dẫn | Trả về |
@@ -47,6 +49,9 @@ Thêm vào [api-v1 của 003](../../003-studio-ui/contracts/api-v1.md). Mọi đ
 | `GET /admin/accounts?q=` | `{accounts: [{id, email, verified, locked, quota, used, cost_month_usd, storage_mb}]}` |
 | `PUT /admin/accounts/{id}` `{quota_films?, quota_learns?, locked?}` | `200`; khoá tài khoản thì dừng việc đang chạy |
 | `GET /admin/usage?from=&to=` | `{days: [{day, cost_usd, jobs}], by_account: [...], storage_mb_total}` |
+
+## Khác
+`GET /health` trả thêm `mode` (`local` hoặc `online`) để giao diện biết nên hiện trang nào.
 
 ## Sự kiện
 `GET /events` như 003, chỉ gửi sự kiện của khách đang đăng nhập. Thêm `job.queued` với `data: {"id", "position"}`.

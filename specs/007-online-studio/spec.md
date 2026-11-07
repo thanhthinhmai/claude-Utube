@@ -65,7 +65,7 @@ Khách giao việc học phong cách theo một trong hai cách: nêu một kên
 1. **Given** khách nêu một kênh YouTube, **When** giao việc mà chưa đánh dấu xác nhận quyền, **Then** bị từ chối.
 2. **Given** việc học tới lần duyệt 1 hoặc 2, **When** khách mở trang duyệt, **Then** thấy đủ nội dung như giai đoạn 1 (bản tóm tắt; với lần 2 là khung của mình đặt cạnh khung gốc kèm số so sánh) và đưa được một quyết định: Approve · Request changes (bắt buộc ghi góp ý) · ở vòng cuối thêm Accept anyway · Stop.
 3. **Given** khách chọn Request changes kèm góp ý, **When** xưởng sửa xong, **Then** có yêu cầu duyệt mới. Số vòng sửa giới hạn như giai đoạn 1.
-4. **Given** việc học kết thúc (đạt, dừng hoặc lỗi), **When** kiểm tra máy chủ, **Then** không còn video hay âm thanh gốc. Chỉ còn số đo và khung hình bằng chứng (hiến pháp 2.1.0).
+4. **Given** việc học kết thúc (đạt, dừng hoặc lỗi), **When** kiểm tra máy chủ, **Then** không còn video, âm thanh gốc, ảnh ghép khung hình hay lời chép. Chỉ còn số đo và tối đa 6 khung hình bằng chứng (hiến pháp 2.1.0).
 5. **Given** bất kỳ lúc nào, **When** khách hoặc người khác tìm cách xem hay tải video gốc qua trang hoặc API, **Then** không có cách nào làm được.
 6. **Given** phong cách đã lưu, **When** khách giao việc làm phim, **Then** chọn được phong cách đó cạnh các phong cách thư viện.
 
@@ -111,7 +111,7 @@ Khách đổi mật khẩu hoặc lấy lại mật khẩu qua email, xem hạn 
 
 ### Edge Cases
 
-- Kênh YouTube không tồn tại, video riêng tư, hoặc máy chủ bị YouTube chặn tải: việc kết thúc lỗi với lý do rõ ràng, lượt được trả lại, và gợi ý tải video lên thay thế.
+- Kênh YouTube không tồn tại hoặc video riêng tư: việc kết thúc lỗi do khách, kèm lý do. Máy chủ bị YouTube chặn tải: lỗi do xưởng, lượt được trả lại. Cả hai trường hợp đều gợi ý tải video lên thay thế (FR-006a).
 - Video khách tải lên quá lớn, sai định dạng hoặc quá dài: bị từ chối ngay khi tải lên, trước khi trừ lượt.
 - Khách đóng trình duyệt giữa chừng: việc vẫn chạy, và mở lại thì thấy đúng tiến độ.
 - Khách không duyệt trong thời gian dài: việc chờ duyệt không tốn chi phí. Sau một thời hạn thì tự dừng và báo cho khách.
@@ -134,6 +134,7 @@ Khách đổi mật khẩu hoặc lấy lại mật khẩu qua email, xem hạn 
 **Hạn mức và chi phí**
 - **FR-005**: Mỗi khách MUST có hạn mức theo tháng (làm mới ngày 1 mỗi tháng, 00:00 giờ Việt Nam) gồm số phim và số lần học phong cách. Giá trị mặc định lấy từ cài đặt; chủ xưởng đặt được hạn mức riêng cho từng khách.
 - **FR-006**: Xưởng MUST kiểm hạn mức lúc nhận việc, trừ một lượt khi nhận, và trả lại lượt khi việc lỗi do xưởng hoặc bị từ chối trước khi chạy. Việc khách tự dừng không được trả lượt.
+- **FR-006a**: Mỗi lỗi MUST được ghi là do xưởng hoặc do khách. **Do xưởng** (trả lượt): lỗi máy chủ hay container, vượt trần chi phí của việc, dịch vụ Claude lỗi quá thời hạn, YouTube chặn tải, phim không qua kiểm tra chất lượng. **Do khách** (không trả lượt): kênh không tồn tại, video riêng tư hay không tải được vì lý do của nguồn, video tải lên hỏng, khách dừng hoặc không duyệt quá hạn.
 - **FR-007**: Cài đặt MUST có: giới hạn độ dài phim tối đa, số video tối đa mỗi lần học, dung lượng và độ dài tối đa của video tải lên, trần chi phí tổng mỗi ngày, bật hoặc tắt đăng ký.
 - **FR-008a**: Mỗi khách MUST có tối đa 1 việc đang chạy; cả xưởng MUST chạy tối đa N việc cùng lúc (cài đặt, mặc định 2). Việc vượt mức MUST xếp hàng theo thứ tự nhận, khách thấy vị trí trong hàng; việc xếp hàng không tốn chi phí.
 - **FR-008**: Xưởng MUST ước tính và ghi chi phí của từng việc. Khi tổng chi phí trong ngày chạm trần, MUST từ chối mọi việc mới cho tới ngày hôm sau.
@@ -141,7 +142,7 @@ Khách đổi mật khẩu hoặc lấy lại mật khẩu qua email, xem hạn 
 
 **Làm phim**
 - **FR-010**: Khách MUST giao được việc làm phim gồm: phong cách (thư viện hoặc phong cách của mình), mô tả ý tưởng, độ dài trong giới hạn.
-- **FR-011**: Xưởng MUST tự chạy việc làm phim theo đúng quy trình của thư viện và kiểm tra chất lượng như giai đoạn 1 (âm lượng, đỉnh âm, kiểm tra đọc chữ), không cần chủ xưởng can thiệp.
+- **FR-011**: Xưởng MUST tự chạy việc làm phim theo đúng quy trình của thư viện, không cần chủ xưởng can thiệp. Trước khi giao phim, xưởng MUST tự kiểm chất lượng (âm lượng −14 ±1 LUFS, đỉnh ≤ −1 dB, kiểm tra đọc chữ đạt). Không đạt thì việc lỗi do xưởng và khách được trả lượt.
 - **FR-012**: Khách MUST xem được tiến độ (bước, nhật ký) tự cập nhật, xem được phim có tiếng, poster, phụ đề, và tải được tệp phim.
 - **FR-013**: Xưởng MUST từ chối ý tưởng vi phạm chính sách nội dung trước khi trừ lượt, kèm lý do.
 - **FR-014**: Khách điền mẫu một lần. Nếu ý tưởng chưa rõ, Claude MUST hỏi lại tối đa 3 câu, khách trả lời trên web, và việc chờ không tốn chi phí. Khách MUST được chọn duyệt kịch bản (treatment) trước khi dựng: Approve hoặc Request changes kèm góp ý. Không có khung chat tự do.
@@ -150,14 +151,14 @@ Khách đổi mật khẩu hoặc lấy lại mật khẩu qua email, xem hạn 
 **Học phong cách**
 - **FR-016**: Khách MUST giao được việc học phong cách theo một trong hai nguồn: kênh YouTube kèm số video trong giới hạn, hoặc các video tự tải lên.
 - **FR-017**: Với nguồn YouTube, khách MUST đánh dấu xác nhận quyền trước khi giao việc. Xưởng MUST lưu lần xác nhận (ai, lúc nào, kênh nào).
-- **FR-018**: Video và âm thanh gốc MUST NOT được hiện, phát hay tải về qua bất kỳ đường nào, kể cả cho chính khách. Chỉ khung hình bằng chứng và ảnh ghép đo được hiện ra.
-- **FR-019**: Video và âm thanh gốc MUST bị xoá khi việc học kết thúc (đạt, dừng hoặc lỗi), chậm nhất sau 1 giờ.
+- **FR-018**: Video và âm thanh gốc MUST NOT được hiện, phát hay tải về qua bất kỳ đường nào, kể cả cho chính khách. Ảnh ghép khung hình và lời chép từ video chỉ được hiện **trong lúc việc học còn chạy** (để duyệt). Sau khi học xong chỉ còn số đo và vài khung hình bằng chứng (khung gốc dùng để so sánh và khung chứng minh, tối đa 6 khung) (hiến pháp 2.1.0).
+- **FR-019**: Khi việc học kết thúc (đạt, dừng hoặc lỗi), video và âm thanh gốc, ảnh ghép khung hình và lời chép MUST bị xoá chậm nhất sau 1 giờ.
 - **FR-020**: Hai lần duyệt (bản phong cách, khung chứng minh) MUST giữ nội dung, các quyết định và giới hạn vòng sửa như giai đoạn 1. Khách duyệt bằng nút trên web, và việc đi tiếp mà không cần ai khác.
 - **FR-021**: Việc chờ duyệt MUST NOT tốn chi phí khi chờ, và MUST tự dừng sau 7 ngày không có quyết định, kèm email báo cho khách.
 - **FR-022**: Phong cách học xong MUST vào "My styles" của khách theo khung 11 mục, và dùng được ngay khi làm phim.
 
 **Thông báo**
-- **FR-023**: Xưởng MUST gửi email cho khách khi việc xong, lỗi, hoặc cần duyệt. Khách tắt được email này.
+- **FR-023**: Xưởng MUST gửi email cho khách khi việc xong, lỗi, hoặc cần khách trả lời hay duyệt (câu hỏi lại, kịch bản, phong cách lần 1 hoặc 2). Khách tắt được email này.
 
 **An toàn và dữ liệu**
 - **FR-024**: Mọi kết nối MUST được mã hoá. Mật khẩu MUST NOT được lưu ở dạng đọc được.
@@ -187,7 +188,7 @@ Khách đổi mật khẩu hoặc lấy lại mật khẩu qua email, xem hạn 
 - **SC-001**: Một khách mới đi từ mở trang tới giao việc làm phim đầu tiên trong dưới 3 phút (không tính thời gian chờ email).
 - **SC-002**: 100% phim làm xong đạt kiểm tra chất lượng như giai đoạn 1 (âm lượng −14 ±1 LUFS, đỉnh ≤ −1 dB, kiểm tra đọc chữ đạt).
 - **SC-003**: 0 trường hợp một khách thấy hoặc tải được dữ liệu của khách khác (kiểm bằng test tự động trên mọi đường API).
-- **SC-004**: 0 đường nào phát hay tải được video gốc. 100% video gốc bị xoá trong vòng 1 giờ sau khi việc học kết thúc (kiểm tự động).
+- **SC-004**: 0 đường nào phát hay tải được video gốc. 100% video gốc, ảnh ghép và lời chép bị xoá trong vòng 1 giờ sau khi việc học kết thúc; mỗi bộ tham chiếu còn ≤ 6 khung hình (kiểm tự động).
 - **SC-005**: Tổng chi phí mỗi ngày không vượt trần cài đặt quá chi phí của các việc đã đang chạy lúc chạm trần.
 - **SC-006**: Không tính bước chờ khách, 90% việc làm phim 30 giây xong trong 20 phút.
 - **SC-007**: Tiến độ trên trang cập nhật trong vòng 5 giây sau khi bước đổi.

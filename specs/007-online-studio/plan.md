@@ -115,3 +115,4 @@ tests/online/           # mới: test tài khoản, hạn mức, hàng đợi, c
 | Worker riêng | FR-008a hàng đợi và giới hạn N; việc không mất khi web khởi động lại | Chạy việc trong tiến trình web: mất việc khi khởi động lại |
 | SQLite | Giao dịch hạn mức đúng khi nhiều yêu cầu cùng lúc (SC-008), nhiều khách | Tệp JSON và khoá tệp: khó đúng khi nhiều khách; PostgreSQL: thêm một dịch vụ |
 | Caddy | FR-024 HTTPS và tự gia hạn chứng chỉ | Tự cấu hình TLS: dễ sai, phải gia hạn bằng tay |
+| Worker có quyền Docker, qua bộ lọc socket | Cần bật và dừng container cho mỗi việc. Quyền Docker gần như toàn quyền máy chủ, nên chỉ cho phép các lệnh tạo, chạy, xem, dừng, xoá container và chỉ với ảnh `studio-job` ([runner.md](contracts/runner.md)) | Gắn thẳng `docker.sock`: tác tử thoát được container là chiếm cả máy |
