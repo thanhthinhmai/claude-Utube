@@ -125,15 +125,32 @@ def main() -> int:
     key = os.environ.get("ANTHROPIC_API_KEY", "")
     studio("job", "log", JOB, f"key kind: {'job token' if key.startswith('sk-job-') else 'OTHER'}")
     studio("job", "step", JOB, "Treatment")
-    for kind in ("ask", "treatment"):
-        if f"[{kind}]" in idea and not resumed:
-            q = WORK / "question.md"
-            q.write_text("Should the fox be orange or grey?")
-            studio("review", "request", JOB, "--kind", "question" if kind == "ask" else "treatment", "--summary", str(q))
+    msg = json.loads((WORK / ".resume.json").read_text())["message"] if resumed else ""
+    if resumed:
+        studio("job", "log", JOB, "answer: " + msg[:160].replace("\n", " "))
+    # questions: [ask] one, [ask N] up to N; a refused request (over the limit) is logged and the film goes on
+    m = re.search(r"\[ask(?: (\d+))?\]", idea)
+    asks, asked_file = (int(m.group(1) or 1) if m and not inp.get("revise_of") else 0), WORK / ".asked"
+    asked = int(asked_file.read_text()) if asked_file.exists() else 0
+    if asked < asks:
+        asked_file.write_text(str(asked + 1))
+        q = WORK / "question.md"
+        q.write_text(f"Question {asked + 1}: should the fox be orange or grey?")
+        studio("review", "request", JOB, "--kind", "question", "--summary", str(q))
+        if (WORK / ".review_pending").exists():
             result("waiting")
             return 10
-    if resumed:
-        studio("job", "log", JOB, "answer: " + json.loads((WORK / ".resume.json").read_text())["message"][:120])
+        studio("job", "log", JOB, "question refused")
+    treat_ok = WORK / ".treatment_ok"
+    if (inp.get("review_treatment") or "[treatment]" in idea) and not treat_ok.exists():
+        if resumed and "treatment review" in msg and ": Approve." in msg:
+            treat_ok.write_text("1")
+        else:
+            t = WORK / "treatment.md"
+            t.write_text("# Treatment\nA fox finds a lantern." + (" (changed)" if "Their note" in msg else ""))
+            studio("review", "request", JOB, "--kind", "treatment", "--summary", str(t))
+            result("waiting")
+            return 10
     m = re.search(r"\[spend (\d+)\]", idea)
     for _ in range(int(m.group(1)) if m else 0):
         studio("job", "log", JOB, f"api: {call_api()}")
@@ -160,6 +177,14 @@ def main() -> int:
     d.mkdir(parents=True, exist_ok=True)
     loud = "[loud]" in idea and not (resumed and "quality check" in (WORK / ".resume.json").read_text() and "[loud-always]" not in idea)
     sample = SAMPLES / ("loud.mp4" if loud or "[loud-always]" in idea else "good.mp4")
+    if inp.get("revise_of"):                       # a changed version starts from the old film, which stays as it is
+        old = WORK / "films" / inp["revise_of"] / f"{inp['revise_of']}.mp4"
+        if not old.is_file():
+            studio("job", "fail", JOB, "the old film is missing")
+            result("ended")
+            return 0
+        sample = old
+        (d / "NOTE.txt").write_text(inp.get("note", ""))
     (d / f"{film}.mp4").write_bytes(sample.read_bytes())
     if "[noreport]" in idea:
         result("ended")

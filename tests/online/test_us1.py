@@ -110,7 +110,7 @@ class US1(unittest.TestCase):
         rid = j["review_ids"][-1]
         r = c.get(f"/api/v1/reviews/{rid}").json()
         self.assertEqual((r["kind"], r["set"]), ("question", None))
-        self.assertEqual(c.post(f"/api/v1/reviews/{rid}/decision", json={"value": "revise", "note": "Orange, please"},
+        self.assertEqual(c.post(f"/api/v1/reviews/{rid}/decision", json={"value": "approve", "note": "Orange, please"},
                                 headers=W).status_code, 201)
         j = self.s.wait(jid)
         self.assertEqual(j["status"], "done", j["log"])

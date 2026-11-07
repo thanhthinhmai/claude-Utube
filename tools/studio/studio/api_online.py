@@ -149,6 +149,8 @@ class JobIn(BaseModel):
     idea: Optional[str] = Field(default=None, min_length=3, max_length=2000)
     seconds: Optional[int] = Field(default=None, ge=1, le=3600)
     review_treatment: bool = False
+    revise_of: Optional[str] = Field(default=None, max_length=60)
+    note: Optional[str] = Field(default=None, max_length=2000)
     # learn
     source: Optional[Literal["youtube", "upload"]] = None
     channel: Optional[str] = Field(default=None, max_length=300)
@@ -190,6 +192,8 @@ def post_job(body: JobIn, request: Request):
         raise StudioError("unverified", "hãy xác minh email trước khi giao việc", 403)
     if body.kind == "learn":
         return post_learn(body, a)
+    if body.revise_of:
+        return post_revision(body, a)
     if not (body.style and body.idea and body.seconds):
         raise StudioError("invalid", "việc làm phim cần style, idea và seconds", 422)
     s = quotas.settings()
@@ -207,6 +211,39 @@ def post_job(body: JobIn, request: Request):
     j = quotas.reserve(a, "film", body.idea[:80], {"film": name, "style": body.style},
                        {"kind": "film", "style": body.style, "idea": body.idea, "seconds": body.seconds,
                         "review_treatment": body.review_treatment, "film": name})
+    return view(j, a)
+
+
+def post_revision(body: JobIn, a) -> dict:
+    """A new version of a finished film, from the customer's note (FR-015): 1 film credit; the old one stays."""
+    old = body.revise_of
+    if not resources.NAME.match(old) or not (resources.film_dir(old) / f"{old}.mp4").is_file():
+        raise StudioError("not_found", f"không có phim \"{old}\"", 404)
+    note = (body.note or "").strip()
+    if len(note) < 3:
+        raise StudioError("note_required", "hãy ghi điều muốn sửa (ít nhất 3 ký tự)", 422)
+    first = next((j for j in jobs.all_jobs(a["id"]) if j["status"] == "done" and j["kind"] == "film"
+                  and j["links"].get("film") == old), None)
+    if not first or not (first.get("input") or {}).get("style"):
+        raise StudioError("not_found", f"không tìm thấy việc đã làm ra phim \"{old}\"", 404)
+    for j in jobs.all_jobs(a["id"]):
+        if j["status"] not in jobs.FINAL and (j.get("input") or {}).get("revise_of") == old:
+            raise StudioError("in_use", "phim này đang được sửa", 409)
+    ratelimit.hit("job_account", a["id"])
+    ok, reason = moderation.check(note)
+    if not ok:
+        e = StudioError("content_rejected", "góp ý này xưởng không làm được", 422)
+        e.extra = {"reason": reason}
+        raise e
+    base = re.sub(r"-r\d+$", "", old)
+    n = 1
+    while (resources.film_dir(f"{base}-r{n}")).exists() or any(
+            (j.get("input") or {}).get("film") == f"{base}-r{n}" for j in jobs.all_jobs(a["id"])):
+        n += 1
+    name, prev = f"{base}-r{n}", first["input"]
+    j = quotas.reserve(a, "film", f"Changes to {old}"[:80], {"film": name, "style": prev["style"]},
+                       {"kind": "film", "style": prev["style"], "idea": prev.get("idea"), "seconds": prev.get("seconds"),
+                        "review_treatment": False, "film": name, "revise_of": old, "note": note})
     return view(j, a)
 
 

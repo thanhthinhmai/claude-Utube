@@ -55,7 +55,7 @@ const ERR = {
   too_many_queued: "You already have 3 jobs in progress. Wait for one to finish.", too_long: "The film is too long.",
   content_rejected: "The studio cannot make this idea.", style_not_found: "This style does not exist any more.",
   in_use: "A job is still using this.", rights_required: "Please confirm your right to use the channel's videos.",
-  too_many_videos: "Too many videos for one style.", too_large: "The file is too large.", bad_video: "This file is not a video the studio can read.",
+  too_many_questions: "The studio already asked 3 questions.", too_many_videos: "Too many videos for one style.", too_large: "The file is too large.", bad_video: "This file is not a video the studio can read.",
 };
 const errText = (body, status) => {
   const e = body?.error || {};
@@ -178,13 +178,22 @@ async function pageJob(id) {
   ].filter(Boolean).join(" · ");
   const revs = j.reviews.map((r) => `<li class="panel"><a href="#/reviews/${esc(r.id)}">${esc(REVIEW[r.kind])}</a>
       ${r.decision ? `<span class="muted">${esc(DECISION[r.decision.value])} · via ${esc(SOURCE[r.decision.source])}</span>` : `<span class="badge s-waiting_review">Needs your review</span>`}</li>`).join("");
+  const open = j.status === "waiting_review" ? j.reviews.find((r) => !r.decision) : null;
   $app.innerHTML = `${back("#/", "Jobs")}
     ${head(esc(KIND[j.kind] || j.kind), `${esc(j.name)} ${badge(j.status)}`, "")}
     <div class="split"><div>
-    ${j.status === "waiting_review" && j.reviews.some((r) => !r.decision) ? `<p class="notice">This job is waiting for your review: <a href="#/reviews/${esc(j.reviews.find((r) => !r.decision).id)}">open the review</a>.</p>` : ""}
+    ${open && open.kind === "question" ? `<div class="panel decide" id="answer-box"><p class="section-title">The studio has a question</p>
+      <div class="md">${open.summary_html}</div>
+      <textarea id="answer" maxlength="4000" placeholder="Your answer"></textarea>
+      <div class="row" style="margin-top:8px"><button class="primary" id="send-answer">Send</button></div><p id="answer-msg" class="muted" role="status"></p></div>`
+    : open ? `<p class="notice">This job is waiting for your review: <a href="#/reviews/${esc(open.id)}">${open.kind === "treatment" ? "review the treatment" : "open the review"}</a>.</p>` : ""}
     ${j.status === "queued" ? `<p class="notice">In the queue${j.queue_position ? `: number ${j.queue_position}` : ""}. It starts by itself when the studio is free.</p>` : ""}
     ${MODE === "online" && j.status === "done" && j.links.film ? `<p><a class="button primary" href="${API}/films/${encodeURIComponent(j.links.film)}/download">Download the film</a>
-      <a class="button" href="#/films/${esc(j.links.film)}">Watch it</a></p>` : ""}
+      <a class="button" href="#/films/${esc(j.links.film)}">Watch it</a></p>
+      <details class="panel" id="changes"><summary><strong>Request changes</strong> <span class="muted">· makes a new version and keeps this one</span></summary>
+        <textarea id="change-note" maxlength="2000" placeholder="What should be different? For example: a slower ending, warmer colours."></textarea>
+        <div class="row" style="margin-top:8px"><button class="primary" id="send-changes">Request changes (uses 1 film credit)</button></div>
+        <p id="changes-msg" class="muted" role="status"></p></details>` : ""}
     ${j.status === "waiting_resume" ? `<p class="notice">You decided, but the Claude session is no longer waiting. Open Claude Code again and say “continue job ${esc(j.name)}”.</p>` : ""}
     ${j.status === "inactive" ? `<p class="notice">No updates for over 10 minutes: the Claude session may have closed or stopped.</p>` : ""}
     ${j.error ? `<p class="error">${esc(j.error)}</p>` : ""}
@@ -202,6 +211,24 @@ async function pageJob(id) {
         <p class="muted" style="font-size:13px">Stopping keeps the film credit used.</p>` : ""}
       ${links ? `<p class="section-title" style="margin-top:18px">Results</p><p style="display:grid;gap:4px;margin:0">${links.replaceAll(" · ", "")}</p>` : ""}
     </aside></div>`;
+  const sendAnswer = /** @type {HTMLButtonElement | null} */ (document.getElementById("send-answer"));
+  if (sendAnswer) sendAnswer.onclick = async () => {
+    const note = field("answer").value.trim(), msg = document.getElementById("answer-msg");
+    if (!note) { msg.className = "fail"; msg.textContent = "Write your answer first."; return; }
+    sendAnswer.disabled = true;
+    try { await post(`/reviews/${encodeURIComponent(open.id)}/decision`, { value: "approve", note }); route(); }
+    catch (e) { msg.className = "fail"; msg.textContent = e.message; sendAnswer.disabled = false; }
+  };
+  const sendChanges = /** @type {HTMLButtonElement | null} */ (document.getElementById("send-changes"));
+  if (sendChanges) sendChanges.onclick = async () => {
+    const note = field("change-note").value.trim(), msg = document.getElementById("changes-msg");
+    if (note.length < 3) { msg.className = "fail"; msg.textContent = "Say what should change (at least 3 characters)."; return; }
+    sendChanges.disabled = true;
+    try {
+      const nj = await post("/jobs", { kind: "film", revise_of: j.links.film, note });
+      await loadMe(); location.hash = `#/jobs/${nj.id}`;
+    } catch (e) { msg.className = "fail"; msg.textContent = e.message; sendChanges.disabled = false; }
+  };
   const stop = /** @type {HTMLButtonElement | null} */ (document.getElementById("stop"));
   if (stop) stop.onclick = async () => {
     if (!confirm("Stop this job? The film credit is not given back.")) return;
@@ -238,7 +265,11 @@ async function pageReview(id) {
     ${head("Review", esc(REVIEW[r.kind]), `${r.set ? `Reference set <a href="#/sets/${esc(r.set)}">${esc(r.set)}</a> · ` : ""}sent ${when(r.created_at)}`)}
     ${proof}
     <h2>${c ? "Notes from Claude" : "Summary"}</h2><div class="panel md">${r.summary_html}</div>
-    <div class="panel decide" id="decide">${d ? decidedHtml(d) : `
+    <div class="panel decide" id="decide">${d ? decidedHtml(d, r.kind) : r.kind === "question" ? `
+      <p><strong>Your answer</strong> <span class="muted">· the job continues on its own</span></p>
+      <textarea id="note" maxlength="4000" placeholder="Your answer"></textarea>
+      <div class="row" style="margin-top:8px"><button class="primary" data-v="approve">Send</button></div>
+      <p id="msg" class="muted"></p>` : `
       <p><strong>Your decision</strong> <span class="muted">· the job continues on its own, no need to type in the chat</span></p>
       <textarea id="note" placeholder="Note (required when requesting changes)"></textarea>
       <div class="row" style="margin-top:8px"><button class="primary" data-v="approve">Approve</button><button data-v="revise">Request changes</button>${extra}</div>
@@ -247,10 +278,11 @@ async function pageReview(id) {
   (/** @type {NodeListOf<HTMLElement>} */ ($app.querySelectorAll("#decide button[data-v]"))).forEach((b) => b.addEventListener("click", async () => {
     const v = b.dataset.v, note = (/** @type {HTMLInputElement} */ (document.getElementById("note"))).value.trim(), msg = document.getElementById("msg");
     if (v === "revise" && note.length < 3) { msg.textContent = ERR.note_required; msg.className = "fail"; return; }
+    if (r.kind === "question" && !note) { msg.textContent = "Write your answer first."; msg.className = "fail"; return; }
     (/** @type {NodeListOf<HTMLButtonElement>} */ ($app.querySelectorAll("#decide button"))).forEach((x) => (x.disabled = true));
     try {
       const res = await post(`/reviews/${encodeURIComponent(id)}/decision`, { value: v, note });
-      document.getElementById("decide").innerHTML = decidedHtml(res);
+      document.getElementById("decide").innerHTML = decidedHtml(res, r.kind);
       askNotify();
     } catch (e) {
       msg.textContent = e.message; msg.className = "fail";
@@ -258,8 +290,10 @@ async function pageReview(id) {
     }
   }));
 }
-const decidedHtml = (d) => `<p class="done-box">Decided: <strong>${esc(DECISION[d.value])}</strong> (via ${esc(SOURCE[d.source])}, ${when(d.at)})
-  ${d.note ? `<br>Note: ${esc(d.note)}` : ""}</p>`;
+const decidedHtml = (d, kind = "") => (kind === "question"
+  ? `<p class="done-box">You answered (${when(d.at)}): ${esc(d.note)}</p>`
+  : `<p class="done-box">Decided: <strong>${esc(DECISION[d.value])}</strong> (via ${esc(SOURCE[d.source])}, ${when(d.at)})
+  ${d.note ? `<br>Note: ${esc(d.note)}` : ""}</p>`);
 
 async function pageFilms() {
   const { films } = await get("/films");
@@ -821,7 +855,8 @@ function onChange() {           // coalesce bursts of events into one refresh
   timer = setTimeout(() => {
     refreshPending(true);
     const h = location.hash || "#/";
-    const editing = document.activeElement && document.activeElement.id === "note";
+    const editing = document.activeElement && ["note", "answer", "change-note"].includes(document.activeElement.id)
+      || /** @type {HTMLDetailsElement | null} */ (document.getElementById("changes"))?.open;
     if (!editing && !/^#\/(films|sets|styles|library)/.test(h)) route();
   }, 300);
 }

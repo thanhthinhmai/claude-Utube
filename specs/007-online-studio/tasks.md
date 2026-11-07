@@ -257,13 +257,13 @@ Ghi chú khi làm (2026-11-07):
 
 Các yêu cầu này thuộc luồng làm phim, nhưng xếp sau US1 để MVP gọn.
 
-- [ ] T041 [P] [US1] Tạo `tests/online/test_film_dialog.py` với tác tử giả:
+- [X] T041 [P] [US1] Tạo `tests/online/test_film_dialog.py` với tác tử giả:
   - `--ask` tạo `question`; khách trả lời qua `POST /reviews/{id}/decision {value: approve, note: <câu trả lời>}` thì việc nối lại phiên.
   - Tối đa 3 câu hỏi, câu thứ 4 bị `422`.
   - `review_treatment` tạo yêu cầu `treatment`; Request changes có góp ý.
   - `revise_of` tốn 1 lượt và tạo phim `<tên>-r1`, giữ phim cũ.
-- [ ] T042 [US1] Trong `reviews.py`, thêm luật cho `question` (≤ 3 mỗi việc) và `treatment`. Trong `agent.py`, thêm vào lời nhắc làm phim: được hỏi lại tối đa 3 câu bằng `review request --kind question --summary <file>` khi ý tưởng chưa rõ; khi `review_treatment` thì gửi kịch bản để duyệt trước khi dựng. Với `revise_of`, chép phim cũ vào `/work` và làm bản `-r<n>` theo góp ý.
-- [ ] T043 [US1] Trong `app.js`, thêm vào trang việc: khung trả lời câu hỏi (ô chữ và nút Send), duyệt kịch bản (dùng lại trang duyệt), và nút **Request changes** trên phim đã xong (ô góp ý, báo "uses 1 film credit").
+- [X] T042 [US1] Trong `reviews.py`, thêm luật cho `question` (≤ 3 mỗi việc) và `treatment`. Trong `agent.py`, thêm vào lời nhắc làm phim: được hỏi lại tối đa 3 câu bằng `review request --kind question --summary <file>` khi ý tưởng chưa rõ; khi `review_treatment` thì gửi kịch bản để duyệt trước khi dựng. Với `revise_of`, chép phim cũ vào `/work` và làm bản `-r<n>` theo góp ý.
+- [X] T043 [US1] Trong `app.js`, thêm vào trang việc: khung trả lời câu hỏi (ô chữ và nút Send), duyệt kịch bản (dùng lại trang duyệt), và nút **Request changes** trên phim đã xong (ô góp ý, báo "uses 1 film credit").
 
 ## Phase 8: Polish & triển khai
 

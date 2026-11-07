@@ -12,6 +12,7 @@ SOURCES = {"ui", "chat"}
 ID = re.compile(r"^r-\d{8}-\d{6}-[0-9a-f]{4}$")
 RESUME_AFTER = 60       # decided, but nobody waited for this long → the job waits to be resumed
 MAX_SUMMARY = 200_000
+MAX_QUESTIONS = 3       # questions the studio may ask about one film (spec FR-014)
 
 
 def check_id(rid: str) -> str:
@@ -36,6 +37,8 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
         raise StudioError("invalid", "bản tóm tắt quá dài (tối đa 200 KB)", 422)
     if kind.startswith("style-") or set_name:         # question and treatment reviews have no reference set
         resources.check_name(set_name)
+    if kind == "question" and sum(1 for x in job["review_ids"] if (store.doc_get("review", x) or {}).get("kind") == "question") >= MAX_QUESTIONS:
+        raise StudioError("too_many_questions", f"mỗi phim chỉ hỏi lại tối đa {MAX_QUESTIONS} câu", 422)
     compare = None
     if kind == "style-2":
         compare = store.read_json(resources.set_dir(set_name) / "proof" / "compare.json")
@@ -70,6 +73,10 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui") -> dict:
         raise StudioError("invalid", "nguồn phải là ui hoặc chat", 422)
     if value in ("accept_anyway", "stop") and not (r["kind"] == "style-2" and r["final_round"]):
         raise StudioError("value_not_allowed", "chỉ chọn được khi đã hết vòng sửa ở lần duyệt 2", 422)
+    if r["kind"] == "question" and value != "approve":
+        raise StudioError("value_not_allowed", "câu hỏi chỉ cần trả lời", 422)
+    if r["kind"] == "question" and len(note) < 1:
+        raise StudioError("note_required", "hãy ghi câu trả lời", 422)
     if value == "revise" and len(note) < 3:
         raise StudioError("note_required", "hãy ghi góp ý (ít nhất 3 ký tự) khi yêu cầu sửa", 422)
     if len(note) > 4000:
