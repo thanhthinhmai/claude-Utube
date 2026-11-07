@@ -48,8 +48,8 @@ def create(kind: str, name: str, links: dict = None) -> dict:
             raise StudioError("invalid", f"liên kết {k} không hợp lệ", 422)
     t = store.now_iso()
     j = {"id": new_id("j"), "owner": "local", "kind": kind, "name": name, "status": "running",
-         "step": "Bắt đầu", "progress": None, "started_at": t, "updated_at": t,
-         "log": [_line("Bắt đầu việc")], "links": links, "error": None, "review_ids": []}
+         "step": "Starting", "progress": None, "started_at": t, "updated_at": t,
+         "log": [_line("Job started")], "links": links, "error": None, "review_ids": []}
     store.write_json(path(j["id"]), j)
     return j
 
@@ -100,7 +100,7 @@ def finish(job_id: str, status: str, error: str = None, links: dict = None) -> d
 
     def f(j):
         j["status"], j["error"] = status, error
-        j["step"] = {"done": "Xong", "failed": "Lỗi", "stopped": "Đã dừng"}[status]
+        j["step"] = {"done": "Done", "failed": "Failed", "stopped": "Stopped"}[status]
         j["links"].update({k: v for k, v in (links or {}).items() if v})
         j["log"].append(_line(error or j["step"]))
     return update(job_id, f)

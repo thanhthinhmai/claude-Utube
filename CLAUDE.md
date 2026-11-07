@@ -21,8 +21,8 @@ Mỗi yêu cầu đi đúng **một** luồng:
 3. Không sửa file nào trong `lib/` (hiến pháp VI). Muốn dùng phiên bản thư viện mới thì đổi `library.lock` theo quy trình spec-kit.
 4. **Ghi việc lên giao diện** (`specs/003-studio-ui/contracts/skill-integration.md`):
    - Khi đã có tên phim: `sh bin/studio job start --kind film --name <tên> --film <tên>`; lưu dòng đầu (mã việc) vào `films/<tên>/.job`; in dòng `URL: …` cho người dùng ("Theo dõi trên giao diện: <URL>").
-   - Đầu mỗi giai đoạn (treatment, look, giọng, nhạc, hình, mix, render): `sh bin/studio job step <mã> "<giai đoạn>"`.
-   - Lệnh dài (render, mux, tạo giọng): bọc bằng `sh bin/studio job run <mã> --step "<giai đoạn>" -- <lệnh…>`.
+   - Đầu mỗi giai đoạn: `sh bin/studio job step <mã> "<giai đoạn>"`, ghi đúng một trong các tên tiếng Anh: `Treatment`, `Look`, `Storyboard`, `Voice`, `Music`, `Picture`, `Mix`, `Render`, `Self-check`.
+   - Lệnh dài (render, mux, tạo giọng): bọc bằng `sh bin/studio job run <mã> --step "<giai đoạn>" -- <lệnh…>` (cùng danh sách tên trên).
    - Xong: `sh bin/studio job done <mã> --film <tên>`; lỗi không tự sửa được: `sh bin/studio job fail <mã> "<lỗi>"`.
    - Storyboard (nếu người dùng yêu cầu) vẫn duyệt trong khung chat.
    - `job start` báo chưa cài giao diện (mã 1): bỏ qua các lệnh `job`, làm phim như cũ, gợi ý một lần `sh bin/studio deps ui`.

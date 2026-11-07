@@ -4,9 +4,9 @@ import re
 from . import jobs, resources, store
 from .store import StudioError
 
-KINDS = {"style-1": "lần 1", "style-2": "lần 2"}
+KINDS = {"style-1": "review 1", "style-2": "review 2"}        # job log text is English (005)
 VALUES = {"approve", "revise", "accept_anyway", "stop"}
-LABEL = {"approve": "Đồng ý", "revise": "Yêu cầu sửa", "accept_anyway": "Chấp nhận dù chưa đạt", "stop": "Dừng"}
+LABEL = {"approve": "Approve", "revise": "Request changes", "accept_anyway": "Accept anyway", "stop": "Stop"}   # = DECISION in web/app.js
 SOURCES = {"ui", "chat"}
 ID = re.compile(r"^r-\d{8}-\d{6}-[0-9a-f]{4}$")
 RESUME_AFTER = 60       # decided, but nobody waited for this long → the job waits to be resumed
@@ -54,9 +54,9 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
         if j["status"] in jobs.FINAL:
             raise StudioError("finished", "việc đã kết thúc", 409)
         j["status"] = "waiting_review"
-        j["step"] = f"Chờ duyệt {KINDS[kind]}"
+        j["step"] = f"Waiting for {KINDS[kind]}"
         j["review_ids"].append(r["id"])
-        j["log"].append(jobs._line(f"Gửi yêu cầu duyệt {KINDS[kind]}"))
+        j["log"].append(jobs._line(f"{KINDS[kind].capitalize()} requested"))
     jobs.update(job["id"], f)
     r["decision"] = None
     return r
@@ -79,8 +79,8 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui") -> dict:
     _, dp = _paths(rid)
     if not store.create_exclusive(dp, d):
         raise StudioError("already_decided", "yêu cầu này đã được duyệt", 409)
-    where = "giao diện" if source == "ui" else "khung chat"
-    jobs.log(r["job_id"], f"Duyệt {KINDS[r['kind']]}: {LABEL[value]} (qua {where})" + (f": {note[:200]}" if note else ""))
+    where = "UI" if source == "ui" else "chat"
+    jobs.log(r["job_id"], f"{KINDS[r['kind']].capitalize()}: {LABEL[value]} (via {where})" + (f": {note[:200]}" if note else ""))
     return d
 
 
@@ -98,7 +98,7 @@ def poll(rid: str):
 
 def resume(rid: str, d: dict) -> None:
     r = load(rid)
-    jobs.set_status(r["job_id"], "running", f"Tiếp tục sau khi duyệt {KINDS[r['kind']]}: {LABEL[d['value']]}")
+    jobs.set_status(r["job_id"], "running", f"Resumed after {KINDS[r['kind']]}: {LABEL[d['value']]}")
 
 
 def all_reviews(status: str = None) -> list:

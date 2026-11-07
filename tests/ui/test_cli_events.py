@@ -86,7 +86,7 @@ class CliAndEvents(unittest.TestCase):
         job = json.loads(self.p.cli("job", "show", jid).stdout)
         self.assertEqual(job["step"], "Render")
         self.assertTrue(any("dòng 6" in l["line"] for l in job["log"]))
-        self.assertTrue(any("mã 7" in l["line"] for l in job["log"]))
+        self.assertTrue(any("code 7" in l["line"] for l in job["log"]))
         # same step twice (job step, then job run --step) → one log line; tool notes and repeats stay out of the log
         self.assertEqual(self.p.cli("job", "step", jid, "Mix").returncode, 0)
         run = self.p.cli("job", "run", jid, "--step", "Mix", "--", "sh", "-c",
@@ -99,6 +99,54 @@ class CliAndEvents(unittest.TestCase):
         self.assertIn("xong", lines)
         self.assertEqual(self.p.cli("job", "fail", jid, "hết dung lượng").returncode, 0)
         self.assertEqual(json.loads(self.p.cli("job", "show", jid).stdout)["status"], "failed")
+
+    def test_english_lines(self):  # 005 FR-001, SC-001: every line the studio writes is English
+        jid, _ = self.start_job()
+        show = lambda: json.loads(self.p.cli("job", "show", jid).stdout)
+        self.assertEqual(show()["step"], "Starting")
+        self.p.cli("job", "step", jid, "Treatment")
+        self.p.cli("job", "step", jid, "Music", "--progress", "1/2")
+        summ = self.p.dir / "review.md"
+        summ.write_text("# Tóm tắt", encoding="utf-8")            # summaries stay in the user's language
+        rid = self.p.cli("review", "request", jid, "--kind", "style-1", "--set", "demo-set",
+                         "--summary", str(summ)).stdout.splitlines()[0]
+        self.assertEqual(show()["step"], "Waiting for review 1")
+        r = client().post(f"/api/v1/reviews/{rid}/decision", json={"value": "approve"}, headers={"X-Studio": "1"})
+        self.assertEqual(r.status_code, 201)
+        self.assertEqual(self.p.cli("review", "wait", rid, "--timeout", "5").returncode, 0)
+        rid2 = self.p.cli("review", "request", jid, "--kind", "style-2", "--set", "demo-set",
+                          "--summary", str(summ), "--final-round").stdout.splitlines()[0]
+        self.assertEqual(show()["step"], "Waiting for review 2")
+        self.assertEqual(self.p.cli("review", "decide", rid2, "--value", "revise", "--note", "darker",
+                                    "--source", "chat").returncode, 0)
+        self.assertEqual(self.p.cli("review", "wait", rid2, "--timeout", "5").returncode, 0)
+        self.p.cli("job", "run", jid, "--step", "Render", "--", "sh", "-c", "echo hello; exit 3")
+        self.p.cli("job", "done", jid)
+        job = show()
+        lines = [l["line"] for l in job["log"]]
+        self.assertEqual(lines, ["Job started", "Treatment", "Music (1/2)",
+                                 "Review 1 requested", "Review 1: Approve (via UI)", "Resumed after review 1: Approve",
+                                 "Review 2 requested", "Review 2: Request changes (via chat): darker",
+                                 "Resumed after review 2: Request changes",
+                                 "Render", "hello", "(command exited with code 3)", "Done"])
+        self.assertEqual(job["step"], "Done")
+        self.assertTrue(all(l.isascii() for l in lines), lines)
+        jid2, _ = self.start_job()
+        self.p.cli("job", "stop", jid2)
+        self.assertEqual(json.loads(self.p.cli("job", "show", jid2).stdout)["step"], "Stopped")
+        jid3, _ = self.start_job()
+        self.p.cli("job", "fail", jid3, "hết dung lượng")
+        j3 = json.loads(self.p.cli("job", "show", jid3).stdout)
+        self.assertEqual((j3["step"], j3["log"][-1]["line"]), ("Failed", "hết dung lượng"))   # Claude's text kept
+
+    def test_old_jobs_unchanged(self):  # 005 SC-004: no migration
+        jid, _ = self.start_job()
+        p = self.p.dir / ".studio" / "jobs" / f"{jid}.json"
+        j = json.loads(p.read_text())
+        j.update(step="Xong", status="done", log=[{"t": j["started_at"], "line": "Bắt đầu việc"}])
+        p.write_text(json.dumps(j, ensure_ascii=False))
+        got = json.loads(self.p.cli("job", "show", jid).stdout)
+        self.assertEqual((got["step"], got["log"][0]["line"]), ("Xong", "Bắt đầu việc"))
 
     def test_job_run_heartbeat(self):  # research §8
         jid, _ = self.start_job()

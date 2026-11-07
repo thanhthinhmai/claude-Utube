@@ -48,10 +48,10 @@ Báo người dùng dòng `URL: …` mà lệnh in ra: *"Theo dõi và duyệt t
 
 ```sh
 sh bin/studio deps learn            # lần đầu; thêm --extra nếu cần tải video hoặc chép lời
-sh bin/studio job run $JOB --step "Tải video" -- sh bin/studio learn fetch <set> --channel <URL> --count 12   # hoặc --videos / --files
-sh bin/studio job run $JOB --step "Đo video" -- sh bin/studio learn measure <set>
-sh bin/studio job run $JOB --step "Chép lời" -- sh bin/studio learn transcribe <set>   # cần --extra; không cài được thì ghi "chưa có lời"
-sh bin/studio job run $JOB --step "Tổng hợp" -- sh bin/studio learn summary <set>
+sh bin/studio job run $JOB --step "Fetch videos" -- sh bin/studio learn fetch <set> --channel <URL> --count 12   # hoặc --videos / --files
+sh bin/studio job run $JOB --step "Measure videos" -- sh bin/studio learn measure <set>
+sh bin/studio job run $JOB --step "Transcribe" -- sh bin/studio learn transcribe <set>   # cần --extra; không cài được thì ghi "chưa có lời"
+sh bin/studio job run $JOB --step "Summarize" -- sh bin/studio learn summary <set>
 ```
 
 `job run` giữ nguyên đầu ra và mã thoát của lệnh bên trong, và gửi nhịp sống mỗi 30 giây để việc không bị coi là "không còn hoạt động".
@@ -62,7 +62,7 @@ sh bin/studio job run $JOB --step "Tổng hợp" -- sh bin/studio learn summary 
 
 ## 2. Báo nhanh hồ sơ đo (không dừng)
 
-`sh bin/studio job step $JOB "Báo hồ sơ đo"` ở đầu bước.
+`sh bin/studio job step $JOB "Report measurements"` ở đầu bước.
 
 Từ `references/<set>/profile/summary.md`, báo cho người dùng 3–5 dòng: số video, định dạng chính, vài con số nổi bật.
 
@@ -73,7 +73,7 @@ Nêu cảnh báo nếu có, kèm đề nghị:
 
 ## 3. Phân tích bằng 3 agent song song
 
-`sh bin/studio job step $JOB "Phân tích (3 agent)"` ở đầu bước.
+`sh bin/studio job step $JOB "Analysis (3 agents)"` ở đầu bước.
 
 Gọi **3 agent trong cùng một tin nhắn** (công cụ Agent). Mỗi agent:
 - **Chỉ đọc:** `references/<set>/profile/summary.json`, `references/<set>/profile/*/video.json`, ảnh trong `references/<set>/profile/*/sheets/`, và template `.claude/skills/style-learn/templates/aspect-report.md`.
@@ -95,7 +95,7 @@ Prompt cho mỗi agent phải có:
 
 ## 4. Kiểm tra chéo
 
-`sh bin/studio job step $JOB "Kiểm tra chéo"` ở đầu bước.
+`sh bin/studio job step $JOB "Cross-check"` ở đầu bước.
 
 Đọc 3 báo cáo. Với **mỗi** kết luận:
 - So với con số tương ứng trong `summary.json` hoặc `video.json`.
@@ -110,7 +110,7 @@ Các lỗi đã từng gặp (từ claude-animated-shorts), cần kiểm riêng:
 
 ## 5. Viết bản phong cách
 
-`sh bin/studio job step $JOB "Viết bản phong cách"` ở đầu bước.
+`sh bin/studio job step $JOB "Write style"` ở đầu bước.
 
 1. **Chọn `based_on`:** phong cách thư viện có **kỹ thuật** gần nhất (2D Canvas, nét cọ, 3D three.js…). Đọc `lib/lemo-opuscar/styles/README.md` rồi chỉ đọc `STYLE.md` của 2–3 ứng viên. Lấy kỹ thuật dựng (engine), **không lấy luật**.
 2. **Viết `references/<set>/style/STYLE.md`** theo đúng 11 mục của `lib/lemo-opuscar/styles/_template/STYLE.md` (đọc template đó, kể cả phần hướng dẫn trong comment):
@@ -147,7 +147,7 @@ sh bin/studio review wait $RID        # chặn tới 9 phút; mã 3 = chưa có 
 
 ## 7. Khung chứng minh
 
-`sh bin/studio job step $JOB "Khung chứng minh vòng <n>"` ở mỗi vòng.
+`sh bin/studio job step $JOB "Proof frame round <n>"` ở mỗi vòng.
 
 1. **Chọn khung gốc:** khung có độ sáng, bão hoà, độ tối gần trung vị của bộ nhất (xem `frames.csv`), trong một cảnh tiêu biểu. Nếu người dùng muốn chọn thì cho họ chọn. Trích khung đó:
    ```sh
@@ -186,7 +186,7 @@ Giao diện tự hiện ảnh gốc và ảnh tự vẽ cạnh nhau cùng bảng
 
 ## 9. Lưu
 
-`sh bin/studio job step $JOB "Lưu phong cách"`.
+`sh bin/studio job step $JOB "Save style"`.
 
 Chọn `slug` và tên tiếng Anh (cùng tên tiếng Trung nếu người dùng muốn). Không được chứa tên kênh hay tên người.
 
