@@ -189,7 +189,7 @@ LIB_FIELDS = ("num", "en", "cn", "film", "line", "uses", "dur")
 
 
 def lib_dir() -> Path:
-    return store.root() / "lib" / "lemo-opuscar"
+    return store.project_root() / "lib" / "lemo-opuscar"
 
 
 def _lib_commit() -> str:
@@ -204,7 +204,7 @@ def _lib_commit() -> str:
 def _github_base() -> str:
     """https://github.com/<owner>/<repo> from library.lock, or "" when the library is not on GitHub."""
     try:
-        lock = (store.root() / "library.lock").read_text(encoding="utf-8")
+        lock = (store.project_root() / "library.lock").read_text(encoding="utf-8")
     except OSError:
         return ""
     m = re.search(r"^LIB_REPO=https://github\.com/([\w.-]+)/([\w.-]+?)(?:\.git)?/?\s*$", lock, re.M)

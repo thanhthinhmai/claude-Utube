@@ -1,0 +1,198 @@
+"""Accounts, sessions and one-time links (specs/007 FR-001, FR-002, FR-004, research R7)."""
+import datetime as dt
+import hashlib
+import re
+import secrets
+
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError
+
+from . import db, jobs, mail, ratelimit, store
+from .store import StudioError
+
+COOKIE = "studio_session"
+SESSION_DAYS = 30
+TOKEN_HOURS = {"verify": 24, "reset": 1}
+MIN_PASSWORD = 10
+EMAIL = re.compile(r"^[^@\s]{1,64}@[^@\s]+\.[^@\s]{2,}$")
+_ph = PasswordHasher()
+
+
+def _hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _at(seconds: float = 0) -> str:
+    return dt.datetime.fromtimestamp(store.clock() + seconds, dt.timezone.utc).isoformat(timespec="seconds")
+
+
+def _clean_email(email: str) -> str:
+    email = (email or "").strip().lower()
+    if len(email) > 254 or not EMAIL.match(email):
+        raise StudioError("invalid", "email không hợp lệ", 422)
+    return email
+
+
+def _check_password(password: str) -> None:
+    if len(password or "") < MIN_PASSWORD:
+        raise StudioError("weak_password", f"mật khẩu cần ít nhất {MIN_PASSWORD} ký tự", 422)
+
+
+def _new_token(con, account_id: str, purpose: str) -> str:
+    token = secrets.token_urlsafe(32)
+    con.execute("INSERT INTO tokens VALUES (?, ?, ?, ?, NULL)",
+                (_hash(token), account_id, purpose, _at(TOKEN_HOURS[purpose] * 3600)))
+    return token
+
+
+def public(row) -> dict:
+    return {"id": row["id"], "email": row["email"], "verified": bool(row["email_verified_at"]),
+            "role": row["role"], "locked": bool(row["locked_at"]), "email_notify": bool(row["email_notify"])}
+
+
+def get(account_id: str):
+    with db.read() as con:
+        return con.execute("SELECT * FROM accounts WHERE id = ? AND deleted_at IS NULL", (account_id,)).fetchone()
+
+
+# ---------- sign up and verify ----------
+def signup(email: str, password: str, accept_terms: bool, ip: str = "", role: str = "customer",
+           verified: bool = False) -> dict:
+    email = _clean_email(email)
+    if role == "customer":
+        ratelimit.hit("signup_ip", ip)
+        if not db.settings()["signup_open"]:
+            raise StudioError("signup_closed", "xưởng đang tạm đóng đăng ký mới", 403)
+    if not accept_terms:
+        raise StudioError("terms_required", "cần đồng ý điều khoản sử dụng", 422)
+    _check_password(password)
+    aid = jobs.new_id("a")
+    with db.tx() as con:
+        if con.execute("SELECT 1 FROM accounts WHERE email = ?", (email,)).fetchone():
+            raise StudioError("email_taken", "email này đã có tài khoản", 409)
+        if role == "admin" and con.execute("SELECT 1 FROM accounts WHERE role = 'admin'").fetchone():
+            raise StudioError("admin_exists", "đã có tài khoản quản trị", 409)
+        t = store.now_iso()
+        con.execute("INSERT INTO accounts (id, email, password_hash, email_verified_at, role, terms_accepted_at,"
+                    " created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (aid, email, _ph.hash(password), t if verified else None, role, t, t))
+        token = None if verified else _new_token(con, aid, "verify")
+    if token:
+        mail.queue(email, "verify", {"token": token})
+    return {"id": aid, "email": email}
+
+
+def verify(token: str) -> None:
+    with db.tx() as con:
+        row = con.execute("SELECT * FROM tokens WHERE token_hash = ? AND purpose = 'verify'", (_hash(token or ""),)).fetchone()
+        if not row:
+            raise StudioError("not_found", "liên kết không đúng", 404)
+        if row["used_at"] or row["expires_at"] < _at():
+            raise StudioError("token_expired", "liên kết đã dùng hoặc đã hết hạn", 410)
+        con.execute("UPDATE tokens SET used_at = ? WHERE token_hash = ?", (_at(), row["token_hash"]))
+        con.execute("UPDATE accounts SET email_verified_at = COALESCE(email_verified_at, ?) WHERE id = ?",
+                    (_at(), row["account_id"]))
+
+
+# ---------- log in ----------
+def login(email: str, password: str, ip: str = "") -> str:
+    """Returns a new session token (set as a cookie). Wrong email and wrong password give the same answer."""
+    email = (email or "").strip().lower()
+    ratelimit.hit("login_email", email)
+    ratelimit.hit("login_ip", ip)
+    with db.read() as con:
+        row = con.execute("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL", (email,)).fetchone()
+    ok = False
+    if row:
+        try:
+            ok = _ph.verify(row["password_hash"], password or "")
+        except (VerificationError, InvalidHashError):
+            ok = False
+    else:
+        try:
+            _ph.verify(_ph.hash("x" * MIN_PASSWORD), password or "")     # same time whether the email exists or not
+        except VerificationError:
+            pass
+    if not ok:
+        raise StudioError("bad_login", "email hoặc mật khẩu không đúng", 401)
+    if row["locked_at"]:
+        raise StudioError("locked", "tài khoản đã bị khoá", 403)
+    token = secrets.token_urlsafe(32)
+    with db.tx() as con:
+        con.execute("INSERT INTO sessions VALUES (?, ?, ?, ?, ?)",
+                    (_hash(token), row["id"], _at(), _at(SESSION_DAYS * 86400), ip))
+    return token
+
+
+def logout(token: str) -> None:
+    with db.tx() as con:
+        con.execute("DELETE FROM sessions WHERE token_hash = ?", (_hash(token or ""),))
+
+
+def current(token: str):
+    """The account of a session token, or None. Raises 403 locked for a locked account."""
+    if not token:
+        return None
+    with db.read() as con:
+        row = con.execute("SELECT a.* FROM sessions s JOIN accounts a ON a.id = s.account_id "
+                          "WHERE s.token_hash = ? AND s.expires_at > ? AND a.deleted_at IS NULL",
+                          (_hash(token), _at())).fetchone()
+    if row and row["locked_at"]:
+        raise StudioError("locked", "tài khoản đã bị khoá", 403)
+    return row
+
+
+# ---------- passwords ----------
+def forgot(email: str) -> None:
+    """Always quiet (202): never tells whether an email has an account."""
+    email = (email or "").strip().lower()
+    ratelimit.hit("forgot_email", email)
+    with db.tx() as con:
+        row = con.execute("SELECT id FROM accounts WHERE email = ? AND deleted_at IS NULL", (email,)).fetchone()
+        token = _new_token(con, row["id"], "reset") if row else None
+    if token:
+        mail.queue(email, "reset", {"token": token})
+
+
+def reset(token: str, password: str) -> None:
+    _check_password(password)
+    with db.tx() as con:
+        row = con.execute("SELECT * FROM tokens WHERE token_hash = ? AND purpose = 'reset'", (_hash(token or ""),)).fetchone()
+        if not row:
+            raise StudioError("not_found", "liên kết không đúng", 404)
+        if row["used_at"] or row["expires_at"] < _at():
+            raise StudioError("token_expired", "liên kết đã dùng hoặc đã hết hạn", 410)
+        con.execute("UPDATE tokens SET used_at = ? WHERE token_hash = ?", (_at(), row["token_hash"]))
+        con.execute("UPDATE accounts SET password_hash = ? WHERE id = ?", (_ph.hash(password), row["account_id"]))
+        con.execute("DELETE FROM sessions WHERE account_id = ?", (row["account_id"],))   # every old session ends
+
+
+def change(account_id: str, email_notify=None, password=None, old_password=None) -> None:
+    row = get(account_id)
+    if password is not None:
+        try:
+            _ph.verify(row["password_hash"], old_password or "")
+        except (VerificationError, InvalidHashError):
+            raise StudioError("bad_login", "mật khẩu cũ không đúng", 401) from None
+        _check_password(password)
+    with db.tx() as con:
+        if password is not None:
+            con.execute("UPDATE accounts SET password_hash = ? WHERE id = ?", (_ph.hash(password), account_id))
+        if email_notify is not None:
+            con.execute("UPDATE accounts SET email_notify = ? WHERE id = ?", (1 if email_notify else 0, account_id))
+
+
+def delete(account_id: str, password: str) -> None:
+    """Ask for deletion: log out everywhere now; data is removed for good within 30 days (FR-026)."""
+    row = get(account_id)
+    try:
+        _ph.verify(row["password_hash"], password or "")
+    except (VerificationError, InvalidHashError):
+        raise StudioError("bad_login", "mật khẩu không đúng", 401) from None
+    with db.tx() as con:
+        con.execute("UPDATE accounts SET deleted_at = ? WHERE id = ?", (_at(), account_id))
+        con.execute("DELETE FROM sessions WHERE account_id = ?", (account_id,))
+    for j in jobs.all_jobs(account_id):
+        if j["status"] not in jobs.FINAL:
+            jobs.finish(j["id"], "stopped")
+    mail.queue(row["email"], "account_deleted", {})

@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import APP_ID, VERSION, jobs, resources, reviews, store
+from urllib.parse import urlsplit
 from .store import StudioError
 
 WEB = Path(__file__).resolve().parent / "web"
@@ -38,11 +39,58 @@ class FreshStaticFiles(StaticFiles):
         return resp
 
 
+# Online mode (specs/007): paths open without logging in
+PUBLIC_API = ("/api/v1/health", "/api/v1/auth/")
+
+
+def owner(request: Request):
+    """Whose data this request may see: None in local mode (everything), else the logged-in account id."""
+    a = getattr(request.state, "account", None)
+    return a["id"] if a else None
+
+
 def create_app() -> FastAPI:
+    online = store.mode() == "online"
     app = FastAPI(title="claude-Utube studio API", version=VERSION,
                   openapi_url="/api/v1/openapi.json", docs_url="/api/v1/docs", redoc_url=None)
 
     @app.middleware("http")
+    async def guard(request: Request, call_next):
+        if online:
+            return await online_guard(request, call_next)
+        return await local_only(request, call_next)
+
+    async def online_guard(request: Request, call_next):
+        """Online: no loopback rule; CSRF by header and Origin; a session for every API path but the public ones;
+        each customer only sees their own files (store.as_account)."""
+        if request.method not in SAFE_METHODS:
+            ctype = request.headers.get("content-type", "")
+            empty = request.headers.get("content-length", "0") == "0" and "transfer-encoding" not in request.headers
+            if request.headers.get("x-studio") != "1" or not (empty or ctype.startswith("application/json")
+                                                              or ctype.startswith("multipart/form-data")):
+                return err("csrf", "thiếu header X-Studio hoặc nội dung không hợp lệ", 403)
+            origin = request.headers.get("origin")
+            if origin and urlsplit(origin).netloc.lower() != (request.headers.get("host") or "").lower():
+                return err("csrf", "nguồn gửi không khớp tên miền", 403)
+        path = request.url.path
+        request.state.account = None
+        if path.startswith("/api/") and not path.startswith(PUBLIC_API):
+            from . import accounts
+            try:
+                a = accounts.current(request.cookies.get(accounts.COOKIE))
+            except StudioError as e:
+                return err(e.code, e.message, e.status)
+            if not a:
+                return err("auth_required", "cần đăng nhập", 401)
+            request.state.account = a
+            with store.as_account(a["id"]):
+                resp = await call_next(request)
+        else:
+            resp = await call_next(request)
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["Referrer-Policy"] = "no-referrer"
+        return resp
+
     async def local_only(request: Request, call_next):
         host = (request.headers.get("host") or "").lower()
         hostname = host.rsplit(":", 1)[0] if not host.startswith("[") else host.split("]")[0] + "]"
@@ -62,7 +110,10 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(StudioError)
     async def studio_error(_, e: StudioError):
-        return err(e.code, e.message, e.status)
+        r = err(e.code, e.message, e.status)
+        if getattr(e, "retry_after", None):
+            r.headers["Retry-After"] = str(e.retry_after)
+        return r
 
     @app.exception_handler(RequestValidationError)
     async def invalid(_, e: RequestValidationError):
@@ -72,12 +123,14 @@ def create_app() -> FastAPI:
 
     @app.get(api + "/health")
     def health():
-        return {"ok": True, "version": VERSION, "app": APP_ID, "root": str(store.root())}
+        if online:          # never tell the internet where the files are
+            return {"ok": True, "version": VERSION, "app": APP_ID, "mode": "online"}
+        return {"ok": True, "version": VERSION, "app": APP_ID, "root": str(store.root()), "mode": "local"}
 
     # ---------- jobs ----------
     @app.get(api + "/jobs")
-    def list_jobs(status: Optional[str] = None, kind: Optional[str] = None):
-        out = [reviews.job_view(j) for j in jobs.all_jobs()]
+    def list_jobs(request: Request, status: Optional[str] = None, kind: Optional[str] = None):
+        out = [reviews.job_view(j) for j in jobs.all_jobs(owner(request))]
         if status:
             out = [j for j in out if j["status"] == status]
         if kind:
@@ -85,8 +138,8 @@ def create_app() -> FastAPI:
         return {"jobs": out}
 
     @app.get(api + "/jobs/{job_id}")
-    def get_job(job_id: str):
-        j = reviews.job_view(jobs.load(job_id))
+    def get_job(job_id: str, request: Request):
+        j = reviews.job_view(jobs.load(job_id, owner(request)))
         j["reviews"] = [_review_out(reviews.load(r)) for r in j["review_ids"]]
         return j
 
@@ -97,15 +150,16 @@ def create_app() -> FastAPI:
         return r
 
     @app.get(api + "/reviews")
-    def list_reviews(status: Optional[Literal["pending", "decided"]] = None):
-        return {"reviews": [_review_out(r) for r in reviews.all_reviews(status)]}
+    def list_reviews(request: Request, status: Optional[Literal["pending", "decided"]] = None):
+        return {"reviews": [_review_out(r) for r in reviews.all_reviews(status, owner(request))]}
 
     @app.get(api + "/reviews/{rid}")
-    def get_review(rid: str):
-        return _review_out(reviews.load(rid))
+    def get_review(rid: str, request: Request):
+        return _review_out(reviews.load(rid, owner(request)))
 
     @app.post(api + "/reviews/{rid}/decision", status_code=201)
-    def post_decision(rid: str, body: DecisionIn):
+    def post_decision(rid: str, body: DecisionIn, request: Request):
+        reviews.load(rid, owner(request))             # another customer's review is not found
         return reviews.decide(rid, body.value, body.note, "ui")
 
     # ---------- films ----------
@@ -180,15 +234,8 @@ def create_app() -> FastAPI:
                             headers={"Cache-Control": "max-age=86400"})
 
     # ---------- live events ----------
-    def snapshot() -> dict:
-        snap = {}
-        for sub in ("jobs", "reviews"):
-            for p in (store.state_dir() / sub).glob("[jr]-*.json"):
-                try:
-                    snap[p.name] = p.stat().st_mtime_ns
-                except FileNotFoundError:
-                    pass
-        return snap
+    def snapshot(owner: str = None) -> dict:
+        return store.doc_versions(owner)
 
     def changes(old: dict, new: dict):
         for name, t in new.items():
@@ -203,12 +250,14 @@ def create_app() -> FastAPI:
 
     @app.get(api + "/events")
     async def events(request: Request, interval: float = Query(1.0, ge=0.05, le=5)):
+        who = owner(request)
+
         async def gen():
-            old, idle = snapshot(), 0.0
+            old, idle = snapshot(who), 0.0
             yield ": connected\n\n"
             while not await request.is_disconnected():
                 await asyncio.sleep(interval)
-                new = snapshot()
+                new = snapshot(who)
                 for ev, ident in changes(old, new):
                     yield f"event: {ev}\ndata: {{\"id\": \"{ident}\"}}\n\n"
                     idle = 0.0
@@ -222,6 +271,9 @@ def create_app() -> FastAPI:
         return StreamingResponse(gen(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
+    if online:
+        from . import api_online
+        app.include_router(api_online.router)
     app.mount("/", FreshStaticFiles(directory=WEB, html=True), name="web")
     return app
 

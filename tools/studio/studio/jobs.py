@@ -7,7 +7,7 @@ from . import store
 from .store import StudioError
 
 KINDS = {"learn", "film"}
-STORED = {"running", "waiting_review", "waiting_resume", "done", "failed", "stopped"}
+STORED = {"queued", "running", "waiting_review", "waiting_resume", "done", "failed", "stopped"}
 FINAL = {"done", "failed", "stopped"}
 INACTIVE_AFTER = 600          # s without any update while running → shown as inactive
 LOG_KEEP, LOG_LINE = 50, 300
@@ -20,15 +20,16 @@ def new_id(prefix: str) -> str:
     return f"{prefix}-{t:%Y%m%d-%H%M%S}-{secrets.token_hex(2)}"
 
 
-def path(job_id: str):
+def check_id(job_id: str) -> str:
     if not ID.match(job_id or ""):
         raise StudioError("not_found", f"không có việc \"{job_id}\"", 404)
-    return store.state_dir() / "jobs" / f"{job_id}.json"
+    return job_id
 
 
-def load(job_id: str) -> dict:
-    j = store.read_json(path(job_id))
-    if not j:
+def load(job_id: str, owner: str = None) -> dict:
+    """The job; online, `owner` limits it to one customer (another customer's job is simply not found)."""
+    j = store.doc_get("job", check_id(job_id))
+    if not j or (owner and j.get("owner") != owner):
         raise StudioError("not_found", f"không có việc \"{job_id}\"", 404)
     return j
 
@@ -37,7 +38,9 @@ def _line(text: str) -> dict:
     return {"t": store.now_iso(), "line": str(text).replace("\n", " ")[:LOG_LINE]}
 
 
-def create(kind: str, name: str, links: dict = None) -> dict:
+def create(kind: str, name: str, links: dict = None, owner: str = "local", status: str = "running",
+           extra: dict = None) -> dict:
+    """A new job. Online jobs start `queued` with the order fields of data-model.md (Job)."""
     if kind not in KINDS:
         raise StudioError("invalid", "loại việc phải là learn hoặc film", 422)
     if not name or len(name) > 80:
@@ -47,10 +50,15 @@ def create(kind: str, name: str, links: dict = None) -> dict:
         if k not in ("set", "film", "style") or not RES.match(v):
             raise StudioError("invalid", f"liên kết {k} không hợp lệ", 422)
     t = store.now_iso()
-    j = {"id": new_id("j"), "owner": "local", "kind": kind, "name": name, "status": "running",
+    assert status in ("running", "queued")
+    j = {"id": new_id("j"), "owner": owner, "kind": kind, "name": name, "status": status,
          "step": "Starting", "progress": None, "started_at": t, "updated_at": t,
          "log": [_line("Job started")], "links": links, "error": None, "review_ids": []}
-    store.write_json(path(j["id"]), j)
+    if status == "queued":
+        j.update(step="Queued", input=None, charged=False, cost_usd=0.0, queued_at=t, run_count=0,
+                 agent_session=None, failure_kind=None)
+    j.update(extra or {})
+    store.doc_put("job", j["id"], j)
     return j
 
 
@@ -60,7 +68,7 @@ def update(job_id: str, fn) -> dict:
         fn(j)
         j["updated_at"] = store.now_iso()
         j["log"] = j["log"][-LOG_KEEP:]
-        store.write_json(path(job_id), j)
+        store.doc_put("job", job_id, j)
         return j
 
 
@@ -117,12 +125,8 @@ def set_status(job_id: str, status: str, note: str = None) -> dict:
     return update(job_id, f)
 
 
-def all_jobs() -> list:
-    out = []
-    for p in (store.state_dir() / "jobs").glob("j-*.json"):
-        j = store.read_json(p)
-        if j:
-            out.append(j)
+def all_jobs(owner: str = None) -> list:
+    out = store.doc_list("job", owner)
     out.sort(key=lambda j: j["started_at"], reverse=True)
     return out
 

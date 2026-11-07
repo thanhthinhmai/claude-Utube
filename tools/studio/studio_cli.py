@@ -122,6 +122,24 @@ def job_run(a) -> int:
     return rc
 
 
+# ---------- admin (online mode, specs/007) ----------
+def cmd_admin(a):
+    from studio import accounts, store
+    if store.mode() != "online":
+        print("✗ chỉ dùng ở chế độ online: đặt STUDIO_MODE=online và STUDIO_DATA=<thư mục dữ liệu>", file=sys.stderr)
+        return 1
+    password = os.environ.get("STUDIO_ADMIN_PASSWORD")
+    if not password:
+        import getpass
+        password = getpass.getpass("Mật khẩu quản trị (≥ 10 ký tự): ")
+        if getpass.getpass("Nhập lại: ") != password:
+            print("✗ hai lần nhập không khớp", file=sys.stderr)
+            return 2
+    accounts.signup(a.email, password, True, role="admin", verified=True)
+    out(f"✓ đã tạo tài khoản quản trị {a.email.strip().lower()}")
+    return 0
+
+
 # ---------- review ----------
 def cmd_review(a):
     if a.action == "request":
@@ -184,6 +202,11 @@ def main(argv=None) -> int:
     s.add_argument("--note"); s.add_argument("--source", default="chat", choices=sorted(reviews.SOURCES))
     s = rs.add_parser("status"); s.add_argument("id")
     r.set_defaults(fn=cmd_review)
+
+    ad = sub.add_parser("admin", help="tài khoản quản trị (chế độ online)")
+    ads = ad.add_subparsers(dest="action", required=True)
+    s = ads.add_parser("create"); s.add_argument("email")
+    ad.set_defaults(fn=cmd_admin)
 
     argv = list(sys.argv[1:] if argv is None else argv)
     cmd = []

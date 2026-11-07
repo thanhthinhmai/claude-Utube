@@ -11,44 +11,44 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Tạo `tools/requirements-online.txt`: `argon2-cffi`, `python-multipart`, `httpx`, `anthropic`; ghim phiên bản đã phát hành ít nhất 2 tuần. Thêm lệnh `sh bin/studio deps online` cài tệp này vào `tools/.venv`, theo cách của `deps ui` trong `bin/studio`.
-- [ ] T002 [P] Tạo thư mục `tests/online/`: `run.sh` (theo mẫu `tests/ui/run.sh`, discover `tests/online`) và `helpers.py`. `helpers.py` có:
+- [X] T001 Tạo `tools/requirements-online.txt`: `argon2-cffi`, `python-multipart`, `httpx`, `anthropic`; ghim phiên bản đã phát hành ít nhất 2 tuần. Thêm lệnh `sh bin/studio deps online` cài tệp này vào `tools/.venv`, theo cách của `deps ui` trong `bin/studio`.
+- [X] T002 [P] Tạo thư mục `tests/online/`: `run.sh` (theo mẫu `tests/ui/run.sh`, discover `tests/online`) và `helpers.py`. `helpers.py` có:
   - `OnlineProject`: STUDIO_ROOT tạm, `STUDIO_MODE=online`, `STUDIO_DATA` tạm, thư ghi ra tệp;
   - `client(account)` đã đăng nhập;
   - hàm `signup_verified(email)`.
-- [ ] T003 [P] Thêm vào `.gitignore`: `deploy/.env`, `/data/`, `tests/online/.tmp/`.
+- [X] T003 [P] Thêm vào `.gitignore`: `deploy/.env`, `/data/`, `tests/online/.tmp/`.
 
 ## Phase 2: Foundational (chặn mọi user story)
 
-- [ ] T004 Tạo `tools/studio/studio/db.py`:
+- [X] T004 Tạo `tools/studio/studio/db.py`:
   - Kết nối SQLite tại `$STUDIO_DATA/studio.db`, bật WAL và `foreign_keys`.
   - Hàm `tx()` mở `BEGIN IMMEDIATE`.
   - Chuyển lược đồ theo số phiên bản (bảng `meta`).
   - Tạo đủ các bảng của `data-model.md`: Account, Session, Token, Settings (1 hàng, giá trị mặc định đúng bảng Settings), Job, Review, Decision, RightsConfirmation, UsageDay, Outbox, RateLimit.
   - Ràng buộc: `email` duy nhất, chữ thường, ≤ 254 ký tự; `role` ∈ {customer, admin}; `purpose` ∈ {verify, reset}.
-- [ ] T005 Sửa `tools/studio/studio/store.py` để thêm `mode()` (đọc `STUDIO_MODE`, mặc định `local`). Sửa `jobs.py` và `reviews.py` để lưu bằng `db.py` khi `mode()=="online"`, và giữ nguyên tệp JSON khi `local`.
+- [X] T005 Sửa `tools/studio/studio/store.py` để thêm `mode()` (đọc `STUDIO_MODE`, mặc định `local`). Sửa `jobs.py` và `reviews.py` để lưu bằng `db.py` khi `mode()=="online"`, và giữ nguyên tệp JSON khi `local`.
   - Hàm công khai giữ nguyên chữ ký, chỉ thêm tham số `owner`.
   - Job thêm `owner`, `input`, `charged`, `cost_usd`, `queued_at`, `run_count`, `agent_session`, `failure_kind` và trạng thái `queued`.
   - `reviews.KINDS` thêm `question` (log `Question n`) và `treatment` (log `Treatment review`).
   - Test trong `tests/online/test_store_online.py`.
-- [ ] T006 Tạo `tools/studio/studio/accounts.py`:
+- [X] T006 Tạo `tools/studio/studio/accounts.py`:
   - `signup`, `verify`, `login` (băm argon2; sai email hay sai mật khẩu cùng trả `bad_login`), `logout`, `forgot`, `reset` (huỷ mọi phiên), `current(request)`.
   - Phiên dùng cookie `studio_session` với `HttpOnly`, `Secure` (khi HTTPS), `SameSite=Lax`, hết hạn sau 30 ngày; chỉ lưu `sha256` của mã phiên.
   - Token dùng một lần: verify hết hạn sau 24 giờ, reset sau 1 giờ.
   - Mật khẩu tối thiểu 10 ký tự.
-- [ ] T007 [P] Tạo `tools/studio/studio/mail.py`:
+- [X] T007 [P] Tạo `tools/studio/studio/mail.py`:
   - `queue(to, template, data)` ghi vào Outbox.
   - `flush()` gửi qua SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`); khi `MAIL_DIR` có giá trị thì ghi ra tệp `.eml`.
   - Có 7 mẫu thư tiếng Anh: verify, reset, job_done, job_failed, review_needed, review_timeout, account_deleted.
   - Thư lỗi được thử lại tối đa 5 lần.
-- [ ] T008 [P] Tạo `tools/studio/studio/ratelimit.py`: đếm theo cửa sổ trượt trong bảng RateLimit, khoá theo `(kind, ip|email)`:
+- [X] T008 [P] Tạo `tools/studio/studio/ratelimit.py`: đếm theo cửa sổ trượt trong bảng RateLimit, khoá theo `(kind, ip|email)`:
   - signup 5 lần/giờ theo IP;
   - login 10 lần/15 phút theo email và theo IP;
   - forgot 3 lần/giờ theo email;
   - giao việc 20 lần/giờ theo tài khoản.
 
   Vượt mức thì ném `StudioError("rate_limited", …, 429)` kèm `retry_after`.
-- [ ] T009 Sửa `tools/studio/studio/server.py` ở chế độ online:
+- [X] T009 Sửa `tools/studio/studio/server.py` ở chế độ online:
   - bỏ kiểm loopback và Host;
   - thêm middleware đăng nhập: `401 auth_required`, `403 locked`; kiểm `Origin` cho POST/PUT/DELETE, giữ `X-Studio: 1`;
   - lọc mọi điểm truy cập cũ theo `owner`, tài nguyên của khách khác trả `404`;
@@ -56,9 +56,9 @@
   - `/events` chỉ gửi sự kiện của khách đang đăng nhập.
 
   Chế độ local không đổi.
-- [ ] T010 Tạo `tools/studio/studio/api_online.py`, gồm router `/auth/*` và `/me` (GET, PUT, DELETE) đúng `contracts/api-online.md`. Gắn router vào `server.py` khi chế độ online.
-- [ ] T011 [P] Thêm lệnh `sh bin/studio admin create <email>` (hỏi mật khẩu, tạo tài khoản `admin` đã xác minh; chỉ 1 admin) trong `bin/studio` và `tools/studio/studio_cli.py`.
-- [ ] T012 Test `tests/online/test_accounts.py` cho:
+- [X] T010 Tạo `tools/studio/studio/api_online.py`, gồm router `/auth/*` và `/me` (GET, PUT, DELETE) đúng `contracts/api-online.md`. Gắn router vào `server.py` khi chế độ online.
+- [X] T011 [P] Thêm lệnh `sh bin/studio admin create <email>` (hỏi mật khẩu, tạo tài khoản `admin` đã xác minh; chỉ 1 admin) trong `bin/studio` và `tools/studio/studio_cli.py`.
+- [X] T012 Test `tests/online/test_accounts.py` cho:
   - đăng ký, xác minh, đăng nhập, đăng xuất;
   - token hết hạn và token dùng lại;
   - đặt lại mật khẩu huỷ phiên cũ;
