@@ -16,7 +16,7 @@ Cài `tools/requirements-ui.txt` vào `tools/.venv` (tạo venv nếu chưa có)
 | `job start --kind learn\|film --name N [--set S] [--film F]` | tạo việc `running`, bật giao diện nền | dòng 1: mã việc; dòng 2: `URL: …/#/jobs/<id>`; mã 0 |
 | `job step <id> "<bước>" [--progress d/t]` | đổi bước, cập nhật `updated_at`, thêm dòng nhật ký | mã 0 · 2 nếu `progress` sai |
 | `job log <id> "<dòng>"` | thêm nhật ký | mã 0 |
-| `job run <id> [--step "<bước>"] -- <lệnh…>` | chạy lệnh, nhịp sống 30 s, 50 dòng cuối vào nhật ký | mã thoát của lệnh con |
+| `job run <id> [--step "<bước>"] -- <lệnh…>` | chạy lệnh, nhịp sống 30 s, 50 dòng cuối vào nhật ký (bỏ dòng `[note] …` và dòng lặp liền nhau; `--step` trùng bước hiện tại không ghi thêm dòng) | mã thoát của lệnh con |
 | `job done <id> [--style S] [--film F]` · `job fail <id> "<lỗi>"` · `job stop <id>` | trạng thái cuối | mã 0 |
 | `job show <id>` | JSON của việc | mã 0 · 1 nếu không có |
 

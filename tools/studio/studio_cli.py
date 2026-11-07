@@ -111,7 +111,11 @@ def job_run(a) -> int:
     for line in p.stdout:
         sys.stdout.write(line)
         sys.stdout.flush()
-        tail.append(line.rstrip("\n"))
+        text = line.rstrip("\n")
+        # the log keeps the command's output, not tool notes ("[note] WebGL …") or a line repeated right after itself
+        if text.startswith("[note] ") or (tail and tail[-1] == text):
+            continue
+        tail.append(text)
     rc = p.wait()
     done.set()
     jobs.log(a.id, *tail, f"(lệnh kết thúc với mã {rc})")
