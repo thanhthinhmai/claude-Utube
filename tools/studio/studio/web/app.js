@@ -1,3 +1,4 @@
+// @ts-check
 // Film Studio: track jobs and review them (specs/003-studio-ui). Plain JavaScript, no build step.
 "use strict";
 const API = "/api/v1";
@@ -70,7 +71,7 @@ async function get(path) {
 async function post(path, data) {
   const r = await fetch(API + path, { method: "POST", headers: { "Content-Type": "application/json", "X-Studio": "1" }, body: JSON.stringify(data) });
   const body = await r.json().catch(() => ({}));
-  if (!r.ok) { const e = new Error(errText(body, r.status)); e.code = body?.error?.code; throw e; }
+  if (!r.ok) { const e = /** @type {Error & {code?: string}} */ (new Error(errText(body, r.status))); e.code = body?.error?.code; throw e; }
   return body;
 }
 function zoomable(root) {
@@ -78,7 +79,7 @@ function zoomable(root) {
     const lb = document.getElementById("lightbox"); lb.querySelector("img").src = img.src; lb.hidden = false;
   }));
 }
-document.getElementById("lightbox").addEventListener("click", (e) => { e.currentTarget.hidden = true; });
+document.getElementById("lightbox").addEventListener("click", (e) => { /** @type {HTMLElement} */ (e.currentTarget).hidden = true; });
 
 // ---------- pages ----------
 async function pageJobs() {
@@ -103,7 +104,7 @@ async function pageJobs() {
     ${jobs.length ? `<ul class="jobs">${items}</ul>` : `<p class="panel muted">No jobs match these filters.</p>`}`;
   const go = () => {
     const nq = new URLSearchParams();
-    const s = document.getElementById("f-status").value, k = document.getElementById("f-kind").value;
+    const s = (/** @type {HTMLInputElement} */ (document.getElementById("f-status"))).value, k = (/** @type {HTMLInputElement} */ (document.getElementById("f-kind"))).value;
     if (s) nq.set("status", s); if (k) nq.set("kind", k);
     location.hash = "#/" + (nq.toString() ? "?" + nq : "");
   };
@@ -118,7 +119,7 @@ function emptyJobs() {
     <div class="prompts">${PROMPTS.map(([t, x]) => `<div class="panel prompt" tabindex="0" data-text="${esc(x)}">
       <strong>${esc(t)}</strong><p>${esc(x)}</p></div>`).join("")}</div>
     <p class="muted" style="text-align:center;margin-top:16px">Click a card to copy the example prompt.</p>`;
-  $app.querySelectorAll(".prompt").forEach((el) => {
+  (/** @type {NodeListOf<HTMLElement>} */ ($app.querySelectorAll(".prompt"))).forEach((el) => {
     const copy = async () => {
       try { await navigator.clipboard.writeText(el.dataset.text); } catch { return; }
       el.querySelector(".copied")?.remove();
@@ -192,17 +193,17 @@ async function pageReview(id) {
       <div class="row" style="margin-top:8px"><button class="primary" data-v="approve">Approve</button><button data-v="revise">Request changes</button>${extra}</div>
       <p id="msg" class="muted"></p>`}</div>`;
   zoomable($app);
-  $app.querySelectorAll("#decide button[data-v]").forEach((b) => b.addEventListener("click", async () => {
-    const v = b.dataset.v, note = document.getElementById("note").value.trim(), msg = document.getElementById("msg");
+  (/** @type {NodeListOf<HTMLElement>} */ ($app.querySelectorAll("#decide button[data-v]"))).forEach((b) => b.addEventListener("click", async () => {
+    const v = b.dataset.v, note = (/** @type {HTMLInputElement} */ (document.getElementById("note"))).value.trim(), msg = document.getElementById("msg");
     if (v === "revise" && note.length < 3) { msg.textContent = ERR.note_required; msg.className = "fail"; return; }
-    $app.querySelectorAll("#decide button").forEach((x) => (x.disabled = true));
+    (/** @type {NodeListOf<HTMLButtonElement>} */ ($app.querySelectorAll("#decide button"))).forEach((x) => (x.disabled = true));
     try {
       const res = await post(`/reviews/${encodeURIComponent(id)}/decision`, { value: v, note });
       document.getElementById("decide").innerHTML = decidedHtml(res);
       askNotify();
     } catch (e) {
       msg.textContent = e.message; msg.className = "fail";
-      if (e.code === "already_decided") setTimeout(route, 800); else $app.querySelectorAll("#decide button").forEach((x) => (x.disabled = false));
+      if (e.code === "already_decided") setTimeout(route, 800); else (/** @type {NodeListOf<HTMLButtonElement>} */ ($app.querySelectorAll("#decide button"))).forEach((x) => (x.disabled = false));
     }
   }));
 }
@@ -260,8 +261,8 @@ async function pageSet(name) {
   if (!sh.removed) {
     let i = 0;
     const show = () => {
-      const files = sh.sheets[document.getElementById("sv").value]; i = Math.max(0, Math.min(i, files.length - 1));
-      document.getElementById("sheet").src = `${API}/sets/${encodeURIComponent(name)}/sheets/${files[i]}`;
+      const files = sh.sheets[(/** @type {HTMLInputElement} */ (document.getElementById("sv"))).value]; i = Math.max(0, Math.min(i, files.length - 1));
+      (/** @type {HTMLImageElement} */ (document.getElementById("sheet"))).src = `${API}/sets/${encodeURIComponent(name)}/sheets/${files[i]}`;
       document.getElementById("pos").textContent = `${i + 1}/${files.length} · seconds ${i * 2}–${i * 2 + 2}`;
     };
     document.getElementById("sv").onchange = () => { i = 0; show(); };
@@ -280,9 +281,9 @@ async function pageStyles() {
         ? `<a class="base-link" href="#/library/${esc(s.based_on)}">${esc(s.based_on)}</a>` : esc(s.based_on || "–")}${s.source === "learned" ? " · learned from videos" : ""}</span></p>
       <div class="use-row">${useBtn(s.en || s.slug)}</div></article>`).join("")}</div>`
     : `<p class="panel muted">No styles yet. Learn one by telling Claude: “Learn the style of the channel …”.</p>`}`;
-  $app.querySelectorAll(".my-card").forEach((c) => {
+  (/** @type {NodeListOf<HTMLElement>} */ ($app.querySelectorAll(".my-card"))).forEach((c) => {
     const open = () => { location.hash = `#/styles/${c.dataset.slug}`; };
-    c.onclick = (e) => { if (!e.target.closest("a, button")) open(); };   // the base link and the button do their own thing
+    c.onclick = (e) => { if (!(/** @type {Element} */ (e.target)).closest("a, button")) open(); };   // the base link and the button do their own thing
     c.onkeydown = (e) => { if (e.key === "Enter" && e.target === c) open(); };
   });
   wireUse($app);
@@ -341,15 +342,15 @@ async function pageLibrary() {
     const qs = new URLSearchParams(); if (group) qs.set("group", group); if (q) qs.set("q", q);
     libHash = "#/library" + (qs.toString() ? "?" + qs : "");
     if (location.hash !== libHash) history.replaceState(null, "", libHash);
-    chips.querySelectorAll(".chip").forEach((c) => (c.onclick = () => { group = c.dataset.g; draw(); }));
-    document.getElementById("lib-clear")?.addEventListener("click", () => { group = ""; q = ""; document.getElementById("lib-q").value = ""; draw(); });
-    grid.querySelectorAll(".lib-card").forEach((c) => {
+    (/** @type {NodeListOf<HTMLElement>} */ (chips.querySelectorAll(".chip"))).forEach((c) => (c.onclick = () => { group = c.dataset.g; draw(); }));
+    document.getElementById("lib-clear")?.addEventListener("click", () => { group = ""; q = ""; (/** @type {HTMLInputElement} */ (document.getElementById("lib-q"))).value = ""; draw(); });
+    (/** @type {NodeListOf<HTMLElement>} */ (grid.querySelectorAll(".lib-card"))).forEach((c) => {
       const open = () => { location.hash = `#/library/${c.dataset.slug}`; };
       c.onclick = open; c.onkeydown = (e) => { if (e.key === "Enter" && e.target === c) open(); };
     });
     wireUse(grid);
   };
-  document.getElementById("lib-q").addEventListener("input", (e) => { q = e.target.value; draw(); });
+  document.getElementById("lib-q").addEventListener("input", (e) => { q = (/** @type {HTMLInputElement} */ (e.target)).value; draw(); });
   draw();
 }
 
@@ -372,6 +373,7 @@ async function pageLibStyle(slug) {
 }
 
 // ---------- router, live updates, waiting badge, notifications ----------
+/** @type {Array<[RegExp, (id?: string) => Promise<void>, string]>} */
 const routes = [
   [/^#\/?(\?.*)?$/, pageJobs, "jobs"], [/^#\/jobs\/([^/?]+)$/, pageJob, "jobs"], [/^#\/reviews\/([^/?]+)$/, pageReview, "jobs"],
   [/^#\/films$/, pageFilms, "films"], [/^#\/films\/([^/?]+)$/, pageFilm, "films"],
@@ -385,7 +387,7 @@ async function route() {
   for (const [re, fn, nav] of routes) {
     const m = h.match(re);
     if (!m) continue;
-    document.querySelectorAll("nav a").forEach((a) => a.classList.toggle("on", a.dataset.nav === nav));
+    (/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll("nav a"))).forEach((a) => a.classList.toggle("on", a.dataset.nav === nav));
     const p = fn(m[1] && !m[1].startsWith("?") ? decodeURIComponent(m[1]) : undefined);
     rendering = p;
     try { await p; } catch (e) { if (rendering === p) $app.innerHTML = `<p class="error">${esc(e.message)}</p>${back("#/", "Jobs")}`; }
@@ -402,7 +404,7 @@ async function refreshPending(announce) {
     if (announce && seeded) reviews.filter((r) => !pending.has(r.id)).forEach(notify);
     pending = ids; seeded = true;
     document.title = (ids.size ? `(${ids.size}) to review · ` : "") + "Film Studio";
-    const c = document.getElementById("nav-count"); c.textContent = ids.size; c.hidden = !ids.size; c.title = `${ids.size} to review`;
+    const c = document.getElementById("nav-count"); c.textContent = String(ids.size); c.hidden = !ids.size; c.title = `${ids.size} to review`;
   } catch { /* server restarting */ }
 }
 function notify(r) {
