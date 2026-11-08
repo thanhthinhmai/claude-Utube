@@ -61,21 +61,24 @@ Chỉ mục trên `(via, at)` để chọn tài khoản (R4), và trên `(accoun
 | daily_cost_cap_usd | **bỏ** |
 | job_cost_cap_usd | **bỏ**, thay bằng `job_token_cap`, mặc định 40 000 000 (R7) |
 
-## Account · Token (sửa)
-- **Account**: `password_hash` được null khi lời mời chưa dùng. Account chưa có mật khẩu thì không đăng nhập được.
-- **Token**: thêm `purpose = invite`, sống 7 ngày (R8).
+## Account (sửa)
+- Thêm `last_login_at` (time | null): ghi mỗi lần đăng nhập thành công (FR-112).
+- `role`: `admin` hiện là Owner, `customer` hiện là Member. Được có nhiều Owner; luôn còn ít nhất một Owner chưa khoá.
+- `locked_at` dùng cho Turn off (như khoá ở 007).
+- Không dùng lời mời: `password_hash` null và Token `purpose = invite` đã có trong lược đồ 2 nhưng không dùng tới.
 
 ## Usage day
 Không ghi nữa. Báo cáo tính từ Call. Bảng cũ để nguyên, không xoá dữ liệu.
 
 ## Outbox
-Thêm mẫu thư `invite` (gửi thành viên) và `claude_signin` (gửi chủ xưởng: tài khoản slot n cần đăng nhập lại).
+Thêm mẫu thư `claude_signin` (gửi chủ xưởng: tài khoản slot n cần đăng nhập lại).
 
 ## Chuyển phiên bản lược đồ
 Tăng phiên bản trong `db.py`:
 - thêm bảng `claude_account` (tạo sẵn slot 1, có cột `usage`) và bảng `call`;
 - thêm cột `job.tokens`;
-- cho `password_hash` được null;
+- cho `password_hash` được null (không dùng, xem Account);
+- thêm cột `accounts.last_login_at`;
 - bỏ các khoá cài đặt cũ, thêm `job_token_cap`.
 
 Tài khoản khách có từ 007 giữ nguyên (FR-113).

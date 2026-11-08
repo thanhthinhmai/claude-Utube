@@ -64,14 +64,10 @@ Các mục có ghi **Kiểm khi implement** dựa trên hành vi của Claude Co
 - **Rationale**: đếm theo từng lần gọi thì mọi cách chia đều đúng và test được. Nhóm dưới 20 người nên bảng không lớn.
 - **Alternatives**: cộng dồn theo ngày như Usage day: không chia được theo tài khoản Claude.
 
-## R8. Lời mời (FR-111–FR-113)
-- **Decision**: dùng lại bảng Account và Token của 007.
-  - Lời mời là một Account `customer` chưa có mật khẩu (`password_hash` null), cộng một Token loại `invite` sống 7 ngày.
-  - Mở lời mời và đặt mật khẩu thì ghi `email_verified_at`, và Token được tính là đã dùng.
-  - Thu hồi lời mời thì xoá Account chưa có mật khẩu đó và Token của nó.
-  - `/auth/signup` luôn trả `403`. Bỏ `signup_open`.
-- **Rationale**: không cần bảng mới. Luồng giống "đặt lại mật khẩu" đã có và đã test.
-- **Alternatives**: bảng Invite riêng: thêm một bảng mà không thêm khả năng nào.
+## R8. Người dùng (FR-111–FR-113) — đổi ngày 2026-11-08
+- **Decision**: giống neb-creative-tool. Chủ xưởng thêm người dùng trong Settings → Users: email, mật khẩu, vai trò (Owner = `admin`, Member = `customer`). Không có thư mời. Dùng lại bảng Account và Session của 007; thêm `last_login_at`. Tắt người dùng dùng `locked_at` của 007. `/auth/signup` luôn trả `403`; bỏ `signup_open`.
+- **Rationale**: nhóm nội bộ nhỏ, chủ xưởng đưa mật khẩu trực tiếp; không cần cấu hình máy gửi thư. Người dùng đã quen cách này ở neb.
+- **Alternatives**: lời mời qua email (bản đầu của R8): cần SMTP và thêm luồng đặt mật khẩu; người dùng chọn cách của neb.
 
 ## R9. Đặt Claude Code ở đâu
 - **Decision**: ảnh `studio-web` (dùng cho web, proxy, worker) cài `claude-agent-sdk` để có tệp chạy `claude`. Thư mục `/data/claude/` để quyền 700 cho uid 1000. Worker chỉ gắn `/data/jobs/<id>` vào container (như 007). Có test kiểm danh sách gắn không chứa `/data/claude`.

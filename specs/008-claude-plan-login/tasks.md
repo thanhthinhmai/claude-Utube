@@ -159,29 +159,29 @@
 
 ---
 
-## Phase 5: User Story 3 - Chỉ người được mời (P3)
+## Phase 5: User Story 3 - Users trong Settings, giống neb (P3)
 
-**Goal**: bỏ đăng ký công khai; mời bằng email.
+**Goal**: bỏ đăng ký công khai; chủ xưởng thêm và quản lý người dùng trong Settings → Users (đổi ngày 2026-11-08, thay cho lời mời qua email).
 
 **Independent Test**: spec US3.
 
-- [ ] T023 [US3] Sửa `tools/studio/studio/accounts.py` (research R8):
-  - `signup()` luôn báo `403 signup_closed`;
-  - `invite(email, by)` tạo Account `customer` có `password_hash` null cùng Token `purpose = invite` sống 7 ngày, xếp thư `invite`; email đã có thì `409 email_taken`;
-  - `accept_invite(token, password, accept_terms)` đặt mật khẩu, ghi `email_verified_at` và `terms_accepted_at`, đánh dấu Token đã dùng, tạo phiên;
-  - `revoke_invite(id)` xoá Account chưa có mật khẩu đó và Token của nó;
-  - Account có `password_hash` null thì không đăng nhập được.
-- [ ] T024 [US3] Thêm vào `api_online.py`: `POST /auth/invite`, `GET /admin/invites`, `POST /admin/invites`, `DELETE /admin/invites/{id}`, đúng mã lỗi của contract. Áp giới hạn tần suất của 007 cho `/auth/invite`.
-- [ ] T025 [US3] Sửa `web/app.js`:
-  - bỏ trang `#/signup` và liên kết "Create an account";
-  - thêm trang `#/invite/<token>` (mật khẩu, đồng ý điều khoản);
-  - thêm mục Admin → Members: ô mời, danh sách lời mời chưa dùng kèm nút Revoke.
-- [ ] T026 [US3] Đổi `signup_verified()` trong `tests/online/helpers.py` thành tạo tài khoản qua lời mời, để các test của 007 vẫn chạy. Sửa `browser_us1.cjs` và `browser_account.cjs` nếu chúng mở `#/signup`.
-- [ ] T027 [US3] Viết `tests/online/test_invites.py`:
+- [ ] T023 [US3] Sửa `tools/studio/studio/accounts.py` và `db.py`:
+  - `signup()` cho `customer` luôn báo `403 signup_closed`; bỏ khoá `signup_open` khỏi cài đặt;
+  - cột `accounts.last_login_at` (thêm khi mở cơ sở dữ liệu cũ), ghi trong `login()`;
+  - `add_user(email, password, role)`, `update_user(id, role, disabled, password, by)`, `signout_all(id)`, `remove_user(id, by)` theo contract, giữ luật "ít nhất một Owner đang bật" và "không tự tắt, tự hạ, tự xoá".
+- [ ] T024 [US3] Thêm vào `api_online.py`: `GET/POST /admin/users`, `PUT/DELETE /admin/users/{id}`, `POST /admin/users/{id}/signout`, đúng mã lỗi của contract.
+- [ ] T025 [US3] Sửa `web/app.js`, `style.css`:
+  - trang Settings có tab như neb: General (cài đặt), Users, Usage (bảng khách và chi phí cũ, đổi ở US4); tab nhớ theo `#/settings/<tab>`;
+  - tab Users: "People who can sign in", nút Add user (email, mật khẩu, vai trò), bảng User · Role · Last sign-in · Sessions · menu ⋯ (Reset password, Make owner/member, Sign out everywhere, Turn off/on, Remove);
+  - bỏ trang `#/signup` và liên kết "Create an account".
+- [ ] T026 [US3] Đổi `signup_verified()` trong `tests/online/helpers.py` thành tạo tài khoản qua `accounts.add_user`, để các test của 007 vẫn chạy. Sửa `browser_us1.cjs` (không còn đăng ký trên trang).
+- [ ] T027 [US3] Viết `tests/online/test_users.py` và `browser_users.cjs`:
   - SC-106: `POST /auth/signup` luôn `403`;
-  - lời mời đúng; lời mời đã dùng, quá 7 ngày hoặc bị thu hồi thì `410`;
-  - tài khoản chưa đặt mật khẩu không đăng nhập được;
-  - tài khoản 007 cũ vẫn đăng nhập được (US3 #4).
+  - thêm Member → đăng nhập được, không vào được `/admin/*`; Make owner → vào được;
+  - Reset password và Sign out everywhere đăng xuất mọi phiên; Turn off chặn đăng nhập và dừng việc đang chạy;
+  - luật Owner cuối cùng và tự mình;
+  - tài khoản 007 cũ vẫn đăng nhập được (US3 #5);
+  - trình duyệt khổ điện thoại: thêm, đổi vai trò, tắt, xoá.
 
 **Checkpoint**: commit.
 
@@ -220,10 +220,10 @@
 - [ ] T032 [P] Sửa `deploy/README.md`:
   - đăng nhập gói trên trang quản trị;
   - khoá API là tuỳ chọn;
-  - mời thành viên;
+  - thêm người dùng trong Settings → Users;
   - sao lưu `/data/claude`, và việc phải giữ kín thư mục này;
   - đoạn về điều khoản Anthropic: chỉ dùng nội bộ, chủ xưởng chịu trách nhiệm.
-- [ ] T033 [P] Sửa `CLAUDE.md` (mục Cấu trúc, câu về chế độ online: gói Claude, `claude_plan.py`, lời mời) và `bin/studio` nếu lệnh `online admin` cần đổi.
+- [ ] T033 [P] Sửa `CLAUDE.md` (mục Cấu trúc, câu về chế độ online: gói Claude, `claude_plan.py`, Settings → Users) và `bin/studio` nếu lệnh `online admin` cần đổi.
 - [ ] T034 Sửa `tests/online/live.py` và `live.sh`: in token theo việc và `via` thay cho `cost_usd`; không cần `ANTHROPIC_API_KEY` khi có tài khoản gói.
 - [ ] T035 Chạy quickstart bằng tay với tài khoản thật: các bước 1–4 (SC-101, SC-102), rồi `live.sh` (007 T048) để ghi số token thực tế. Chỉnh mặc định `job_token_cap` nếu cần, ghi vào research R7. Ghi kết quả: đạt, đạt một phần hoặc thất bại (hiến pháp IV).
 

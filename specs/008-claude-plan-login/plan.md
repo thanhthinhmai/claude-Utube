@@ -11,7 +11,7 @@ Giữ kiến trúc 007: web, worker, bộ chuyển tiếp, mỗi việc một co
 - **Đăng nhập** như neb-creative-tool. Trang quản trị chạy `claude auth login --claudeai` của Claude Code, mỗi tài khoản một thư mục `/data/claude/slot-<n>` (tối đa 5). Chủ xưởng dán mã vì máy chủ ở xa (R1).
 - **Gọi**: container chạy Claude Code ở chế độ gói với mã riêng của việc. Bộ chuyển tiếp thay mã đó bằng mã thật của tài khoản đang dùng ít nhất (R2–R4). Chạm hạn mức hoặc hỏng đăng nhập thì gửi lại qua tài khoản khác. Hết tài khoản thì dùng khoá API dự phòng nếu có; không có khoá thì chờ tối đa 15 giây, quá thì việc lỗi do xưởng (R5).
 - **Kiểm nội dung** chạy qua `claude -p` trên một tài khoản gói (R6).
-- **Thành viên** vào bằng lời mời, dùng lại bảng Account và Token (R8). Bỏ đăng ký công khai.
+- **Người dùng**: chủ xưởng thêm trong Settings → Users như neb, dùng lại bảng Account (R8). Bỏ đăng ký công khai.
 - **Mức dùng** ghi theo từng lần gọi (bảng Call). Trần token mỗi việc thay cho trần tiền (R7).
 
 Chi tiết: [research.md](research.md) · [data-model.md](data-model.md) · [contracts/](contracts/) · [quickstart.md](quickstart.md).
@@ -45,7 +45,7 @@ Chi tiết: [research.md](research.md) · [data-model.md](data-model.md) · [con
 |---|---|
 | I. Spec là nguồn sự thật | ✓ Spec đã làm rõ 3 câu. Spec sửa 007 qua bảng "Thay đổi so với 007" |
 | II. Không đoán | ✓ có điều kiện. Hành vi của Claude Code mà tài liệu chưa nói rõ (R1, R2, R3, R5) được ghi "Kiểm khi implement". Task T001 kiểm bằng tài khoản thật; kết quả khác thì dừng và hỏi |
-| III. MVP theo story | ✓ US1 (một tài khoản, chạy được phim) tự chạy được. US2 (nhiều tài khoản), US3 (lời mời), US4 (mức dùng) thêm dần |
+| III. MVP theo story | ✓ US1 (một tài khoản, chạy được phim) tự chạy được. US2 (nhiều tài khoản), US3 (người dùng), US4 (mức dùng) thêm dần |
 | IV. Đo được | ✓ SC-103 … SC-107 có test tự động với Claude giả. SC-101, SC-102 kiểm bằng tay với tài khoản thật |
 | V. Đơn giản | ✓ Không thêm dịch vụ hay thư viện. Lời mời dùng lại bảng cũ. Xoay vòng nằm trong bộ chuyển tiếp có sẵn. Một mục ở Complexity Tracking |
 | VI. Thư viện gốc | ✓ Không chạm `lib/` |
@@ -63,7 +63,7 @@ Kiểm lại sau thiết kế: đạt.
 specs/008-claude-plan-login/
 ├── spec.md · plan.md · research.md · data-model.md · quickstart.md
 ├── contracts/
-│   ├── api-admin-claude.md   # tài khoản Claude, lời mời, mức dùng
+│   ├── api-admin-claude.md   # tài khoản Claude, người dùng, mức dùng
 │   └── runner.md             # biến của container, cách chọn tài khoản trong bộ chuyển tiếp
 ├── checklists/requirements.md
 └── tasks.md                  # /speckit-tasks
@@ -76,22 +76,22 @@ tools/studio/studio/
 ├── claude_plan.py      # mới: slot, chạy Claude Code (login, status, logout, -p) có khoá tệp, đọc và làm mới mã,
 │                       #      chọn tài khoản (R4), đánh dấu limited / needs_signin (R5)
 ├── db.py               # sửa: lược đồ mới (data-model "Chuyển phiên bản lược đồ")
-├── accounts.py         # sửa: bỏ signup, thêm lời mời (R8)
+├── accounts.py         # sửa: bỏ signup, thêm quản lý người dùng (R8)
 ├── quotas.py           # sửa: bỏ trần chi phí ngày, thêm trần token, báo cáo từ Call
 ├── moderation.py       # sửa: claude -p trên gói, dự phòng khoá API (R6)
-├── mail.py             # sửa: mẫu invite, claude_signin
-├── api_online.py       # sửa: /admin/claude*, /admin/invites, /auth/invite, mức dùng
-└── web/                # sửa: trang Claude accounts, lời mời, đặt mật khẩu, mức dùng bằng token; bỏ trang đăng ký
+├── mail.py             # sửa: mẫu claude_signin
+├── api_online.py       # sửa: /admin/claude*, /admin/users, /auth/setup, mức dùng
+└── web/                # sửa: trang AI accounts, Settings có tab (General, Users, Usage), mức dùng bằng token; bỏ trang đăng ký
 tools/runner/
 ├── proxy.py            # sửa: chọn tài khoản, gửi lại khi 429/401, khoá dự phòng, ghi Call, trần token
 └── worker.py           # sửa: biến môi trường chế độ gói, chỉ nhận việc khi ready
 deploy/
 ├── web.Dockerfile      # sửa: cài claude-agent-sdk
 ├── compose.yaml        # sửa: ANTHROPIC_API_KEY không bắt buộc
-└── README.md           # sửa: đăng nhập gói, lời mời, điều khoản
+└── README.md           # sửa: đăng nhập gói, người dùng, điều khoản
 tests/online/
 ├── fake_claude         # mới: Claude Code giả
-└── test_claude_plan.py · test_invites.py · sửa test_proxy.py, test_admin.py, test_quota.py, live.py
+└── test_claude_plan.py · test_users.py · sửa test_proxy.py, test_admin.py, test_quota.py, live.py
 ```
 
 **Structure Decision**: Logic gói nằm trong một mô-đun `claude_plan.py` trong gói `studio`, vì cả web (đăng nhập, kiểm nội dung) và proxy (gọi) đều dùng nó. Proxy đã import `studio` như 007.

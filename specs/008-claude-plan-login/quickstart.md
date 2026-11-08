@@ -16,7 +16,7 @@ Các test online mới dùng:
 | Tài khoản 1 trả `429` của gói giữa việc | SC-104: việc vẫn xong; slot 1 thành `limited` kèm `rest_until` |
 | `401` không làm mới được | `needs_signin` + đúng 1 thư `claude_signin` |
 | Hết tài khoản, có hoặc không có khoá API | FR-110: đi qua khoá; không có khoá thì lỗi do xưởng sau ≤ 15 giây, trả lượt, lý do có giờ |
-| `POST /auth/signup` · lời mời đúng, hết hạn, thu hồi, đã dùng | SC-106 |
+| `POST /auth/signup` bị từ chối · Settings → Users: thêm, đổi vai trò, tắt, xoá, luật Owner cuối cùng | SC-106 |
 | Tổng token của `/admin/usage` so với tổng bảng Call | SC-107 = lệch 0 |
 | Tài khoản thường gọi `/admin/claude*` | `403` |
 

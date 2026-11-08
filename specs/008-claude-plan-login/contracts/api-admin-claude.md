@@ -23,16 +23,21 @@ Không điểm truy cập nào trả mã đăng nhập hay nội dung thư mục
 | `GET /auth/setup` | `{needed: bool}`: true khi chưa có tài khoản quản trị | |
 | `POST /auth/setup` `{email, password}` | `201`: tạo tài khoản quản trị đã xác minh, đặt cookie phiên | `409 already_set_up` · `422 weak_password` · `429 rate_limited` (10 lần mỗi 15 phút mỗi IP) |
 
-## Thành viên (FR-111–FR-113)
+## Người dùng (FR-111–FR-113, Settings → Users)
+Chỉ `admin` (Owner). Vai trò hiện trên giao diện: `admin` = Owner, `customer` = Member.
+
 | Phương thức · Đường dẫn | Trả về | Lỗi |
 |---|---|---|
 | `POST /auth/signup` | luôn `403 signup_closed` | |
-| `POST /auth/invite` `{token, password, accept_terms}` | `200`: đặt mật khẩu, xác minh email, đặt cookie phiên | `410 token_expired` (đã dùng, quá 7 ngày hoặc bị thu hồi) · `422 weak_password` · `422 terms_required` |
-| `GET /admin/invites` | `{invites: [{id, email, created_at, expires_at}]}`: lời mời chưa dùng, chưa hết hạn | |
-| `POST /admin/invites` `{email}` | `201`, gửi thư `invite` | `409 email_taken` |
-| `DELETE /admin/invites/{id}` | `204`: thu hồi | `404` |
+| `GET /admin/users` | `{users: [User], me}` | |
+| `POST /admin/users` `{email, password, role}` | `201 User`: tài khoản đã xác minh email | `409 email_taken` · `422 weak_password` · `422 invalid` |
+| `PUT /admin/users/{id}` `{role?, disabled?, password?}` | `200 User`. `disabled: true` hoặc `password` đăng xuất mọi phiên; tắt thì dừng việc đang chạy như khoá ở 007 | `409 last_owner` (đổi, tắt Owner cuối cùng) · `409 self` (tự tắt hoặc tự hạ mình) · `404` |
+| `POST /admin/users/{id}/signout` | `204`: xoá mọi phiên | `404` |
+| `DELETE /admin/users/{id}` | `204`: xoá như `DELETE /me` của 007 | `409 last_owner` · `409 self` · `404` |
 
-Trang web: `/#/invite/<token>` hiện ô đặt mật khẩu. Trang đăng ký bị bỏ.
+**User** = `{id, email, role, disabled, created_at, last_login_at, sessions}`.
+
+`PUT /admin/accounts/{id}` của 007 (hạn mức, khoá) giữ nguyên; `locked` và `disabled` là một trường (`locked_at`).
 
 ## Mức dùng (FR-114–FR-116)
 | Đường dẫn | Thay đổi |

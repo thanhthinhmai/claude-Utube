@@ -22,6 +22,8 @@
 - Q: Trang đăng nhập và trang tài khoản AI trông thế nào? → A: Giống neb-creative-tool, chỉ lấy phần hợp với xưởng: không có proxy, Codex, tài khoản trình duyệt hay sao lưu.
 - Q: Lần đầu mở xưởng, tạo chủ xưởng ở đâu? → A: Trên trang đăng nhập, giống hệt neb, không cần mã cài đặt (FR-118). Ban đầu có mã cài đặt; người dùng bỏ sau khi thử.
 - Q: Có hiện hạn mức 5 giờ và tuần của từng tài khoản không? → A: Có, lấy từ thông tin hạn mức kèm mỗi lần gọi (FR-119).
+- Q: Thêm người dùng thế nào? → A: Giống neb: chủ xưởng đặt email, mật khẩu, vai trò trong Settings → Users; không gửi thư mời (FR-111, FR-112).
+- Q: Settings có những tab nào? → A: General, Users, Usage trong 008. Worker (Latest jobs) và API tokens làm ở spec 009. Licenses chưa làm vì xưởng chưa có app desktop.
 
 ## Bối cảnh
 
@@ -74,20 +76,21 @@ Chủ xưởng thêm tối đa 5 tài khoản Claude. Mỗi lần gọi Claude �
 
 ---
 
-### User Story 3 - Chỉ người được mời mới dùng được xưởng (Priority: P3)
+### User Story 3 - Chỉ người chủ xưởng thêm mới dùng được xưởng (Priority: P3)
 
-Đăng ký công khai không còn. Chủ xưởng mời thành viên bằng email. Thành viên mở liên kết mời, đặt mật khẩu và dùng xưởng như khách ở 007. Chủ xưởng thu hồi được lời mời chưa dùng và khoá được thành viên.
+Đăng ký công khai không còn. Giống neb-creative-tool, chủ xưởng thêm người dùng trong Settings → Users: nhập email, mật khẩu và vai trò (Owner hoặc Member), rồi tự đưa mật khẩu cho người đó. Không cần thư mời. Member dùng xưởng như khách ở 007; Owner thấy thêm AI accounts và Settings.
 
-**Why this priority**: Đây là điều kiện để dùng gói Claude đúng phạm vi nội bộ. Nó xếp sau US1 và US2 vì lúc chưa mời ai, chỉ chủ xưởng dùng xưởng.
+**Why this priority**: Đây là điều kiện để dùng gói Claude đúng phạm vi nội bộ. Nó xếp sau US1 và US2 vì lúc chưa thêm ai, chỉ chủ xưởng dùng xưởng.
 
-**Independent Test**: Mở trang đăng ký khi chưa có lời mời → bị từ chối. Chủ xưởng mời một email → mở liên kết → đặt mật khẩu → giao được việc. Thu hồi một lời mời khác → liên kết đó không dùng được nữa.
+**Independent Test**: Gọi API đăng ký → bị từ chối. Chủ xưởng thêm một Member → người đó đăng nhập bằng mật khẩu được đưa → giao được việc. Chủ xưởng tắt người đó → người đó bị đăng xuất và không đăng nhập lại được.
 
 **Acceptance Scenarios**:
 
-1. **Given** bất kỳ ai không có lời mời, **When** mở trang đăng ký hoặc gọi API đăng ký, **Then** bị từ chối. Không có cài đặt nào bật lại được đăng ký công khai.
-2. **Given** chủ xưởng mời một email, **When** người đó mở liên kết trong 7 ngày và đặt mật khẩu, **Then** tài khoản đã xác minh email, có hạn mức mặc định, và giao được việc.
-3. **Given** liên kết mời đã dùng, đã quá 7 ngày hoặc đã bị thu hồi, **When** mở, **Then** bị từ chối.
-4. **Given** xưởng 007 đã có tài khoản khách từ trước, **When** chuyển sang bản này, **Then** các tài khoản đó vẫn đăng nhập được, và chủ xưởng thấy danh sách để khoá những ai không thuộc nhóm.
+1. **Given** bất kỳ ai, **When** mở trang đăng ký hoặc gọi API đăng ký, **Then** bị từ chối. Không có cài đặt nào bật lại được đăng ký công khai.
+2. **Given** chủ xưởng thêm email, mật khẩu và vai trò Member, **When** người đó đăng nhập, **Then** tài khoản đã xác minh email, có hạn mức mặc định, và giao được việc; không thấy AI accounts hay Settings.
+3. **Given** một người dùng trong danh sách, **When** chủ xưởng chọn Reset password, Make owner / Make member, Sign out everywhere, Turn off / Turn on hoặc Remove, **Then** thay đổi có hiệu lực ngay: Sign out everywhere và Turn off đăng xuất mọi phiên; Turn off chặn đăng nhập và dừng việc đang chạy; Remove xoá tài khoản như 007 (dữ liệu xoá trong 30 ngày).
+4. **Given** chỉ còn một Owner, **When** đổi người đó thành Member, tắt hoặc xoá, **Then** bị từ chối. Chủ xưởng không tự tắt hay tự xoá chính mình.
+5. **Given** xưởng 007 đã có tài khoản khách từ trước, **When** chuyển sang bản này, **Then** các tài khoản đó vẫn đăng nhập được với vai trò Member, và hiện trong Users.
 
 ---
 
@@ -132,8 +135,8 @@ Chủ xưởng xem số token và số lần gọi Claude theo việc, theo ngà
 - **FR-110**: Khi không còn tài khoản nào dùng được, lệnh gọi MUST đi qua khoá API dự phòng nếu có (FR-117). Không có khoá thì lệnh gọi MUST chờ tối đa 15 giây cho tài khoản sớm dùng lại nhất; quá thời gian thì việc lỗi do xưởng (trả lượt, FR-006a của 007), kèm lý do và giờ sớm nhất có tài khoản dùng lại. Khi không có tài khoản nào dùng được và không có khoá API, việc mới MUST bị từ chối với "Studio is not ready", không trừ lượt (vì không kiểm được nội dung ý tưởng, 007 FR-013). Việc đã nằm trong hàng từ trước thì chờ, không bắt đầu chạy; trang quản trị và trang việc MUST hiện lý do "Waiting for a Claude account".
 
 **Thành viên**
-- **FR-111**: Đăng ký công khai MUST bị bỏ. Chỉ người có lời mời còn hiệu lực mới tạo được tài khoản.
-- **FR-112**: Chủ xưởng MUST mời được thành viên bằng email, xem các lời mời đang chờ và thu hồi được. Lời mời dùng được một lần và hết hạn sau 7 ngày. Mở lời mời và đặt mật khẩu thì email được coi là đã xác minh.
+- **FR-111**: Đăng ký công khai MUST bị bỏ. Chỉ chủ xưởng (Owner) tạo được tài khoản mới.
+- **FR-112**: Trang Settings MUST có tab Users giống neb-creative-tool: danh sách người dùng (email, vai trò, lần đăng nhập gần nhất, số phiên đang mở) và nút "Add user" (email, mật khẩu ≥ 10 ký tự, vai trò). Mỗi người có menu: Reset password, Make owner / Make member, Sign out everywhere, Turn off / Turn on, Remove. Xưởng MUST luôn còn ít nhất một Owner đang bật; chủ xưởng không tự tắt hay tự xoá mình.
 - **FR-113**: Tài khoản có từ 007 MUST được giữ nguyên.
 
 **Mức dùng**
@@ -148,7 +151,7 @@ Chủ xưởng xem số token và số lần gọi Claude theo việc, theo ngà
 
 | Mục 007 | Thay bằng |
 |---|---|
-| FR-001 (người lạ tự đăng ký) | FR-111, FR-112 (chỉ người được mời) |
+| FR-001 (người lạ tự đăng ký) | FR-111, FR-112 (chủ xưởng thêm người dùng trong Settings → Users) |
 | FR-007: "bật hoặc tắt đăng ký" | Bỏ. FR-007: "trần chi phí tổng mỗi ngày" đổi thành FR-116 (trần token mỗi việc) |
 | FR-008 (ước tính chi phí, trần chi phí ngày) | FR-114, FR-116 |
 | FR-009: "chi phí theo ngày và theo khách" | FR-115 (token và số lần gọi) |
@@ -159,7 +162,7 @@ Chủ xưởng xem số token và số lần gọi Claude theo việc, theo ngà
 ### Key Entities
 
 - **Tài khoản Claude (Claude account)**: thứ tự (1–5), email, loại gói, trạng thái, giờ dùng lại, tài khoản trùng (nếu có). Thông tin đăng nhập giữ riêng, không bao giờ hiện ra.
-- **Lời mời (Invite)**: email, người mời, lúc tạo, lúc hết hạn, đã dùng hay bị thu hồi.
+- **Người dùng (User)**: tài khoản 007 cộng vai trò Owner (admin) hoặc Member (customer), bật hay tắt, lần đăng nhập gần nhất.
 - **Mức dùng (Usage)**: token vào, token ra, số lần gọi; theo việc, ngày, thành viên, tài khoản Claude hoặc khoá API. Chỉ lần gọi qua khoá API có chi phí ước tính.
 - **Cài đặt (Settings)**: bỏ "bật/tắt đăng ký" và "trần chi phí ngày"; thêm "trần token mỗi việc".
 
@@ -172,7 +175,7 @@ Chủ xưởng xem số token và số lần gọi Claude theo việc, theo ngà
 - **SC-103**: 0 lần thông tin đăng nhập Claude xuất hiện trong môi trường của việc, nhật ký, trang web hoặc API (kiểm tự động bằng cách tìm chuỗi đăng nhập thật).
 - **SC-104**: Khi một trong hai tài khoản chạm hạn mức giữa việc, 100% việc đang chạy vẫn xong mà không lỗi (kiểm tự động bằng dịch vụ Claude giả).
 - **SC-105**: Với 2 tài khoản và 10 việc như nhau, tổng token mỗi tài khoản lệch nhau không quá 20%.
-- **SC-106**: 100% yêu cầu đăng ký không có lời mời hợp lệ bị từ chối (kiểm tự động).
+- **SC-106**: 100% yêu cầu đăng ký công khai bị từ chối, và 0 lần xưởng còn lại không có Owner đang bật sau bất kỳ thao tác nào trong Users (kiểm tự động).
 - **SC-107**: Tổng token trên trang mức dùng bằng đúng tổng token của các lần gọi đã ghi (lệch 0).
 
 ## Assumptions
