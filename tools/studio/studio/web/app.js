@@ -44,6 +44,8 @@ const PROMPTS = [
 const ERR = {
   // specs/008: the owner account and the AI accounts
   already_set_up: "The studio already has an owner. Sign in instead.",
+  last_owner: "The studio needs at least one owner who is switched on.",
+  self: "You cannot do this to your own account here.",
   email_taken_password: "This email already has an account with another password. Use that password to make it the owner.",
   max_accounts: "There are 5 Claude accounts already: remove one to add another.",
   first_account: "The first Claude account cannot be removed. Sign it out instead.",
@@ -57,7 +59,7 @@ const ERR = {
   auth_required: "Please log in.", locked: "This account is locked. Contact the studio.",
   bad_login: "Wrong email or password.", email_taken: "This email already has an account. Log in instead.",
   weak_password: "The password needs at least 10 characters.", terms_required: "Please accept the terms of use.",
-  signup_closed: "Sign-up is closed for now. Please try again later.", token_expired: "This link was already used or has expired.",
+  signup_closed: "There is no public sign-up. Ask the studio owner to add you.", token_expired: "This link was already used or has expired.",
   rate_limited: "Too many tries. Please wait a little and try again.", unverified: "Confirm your email first: open the link we sent you.",
   quota_exceeded: "You have used all your films for this month.", daily_cap: "The studio is fully booked today. Please try again tomorrow.",
   too_many_queued: "You already have 3 jobs in progress. Wait for one to finish.", too_long: "The film is too long.",
@@ -501,7 +503,8 @@ async function pageLogin() {
     <label>Email <input id="email" type="email" autocomplete="email" autofocus required></label>
     <label>Password <input id="password" type="password" autocomplete="current-password" required></label>
     <button class="primary wide" type="submit" data-busy="Signing in…">Sign in</button></form>`,
-  `<a href="#/forgot">Forgot your password?</a> · <a href="#/signup">Create an account</a>`);
+  `<a href="#/forgot">Forgot your password?</a> · No account? Ask the studio owner to add you.
+    <br><a href="/terms" target="_blank" rel="noopener">Terms of use and content policy</a>`);
   onSubmit(async () => {
     await post("/auth/login", { email: field("email").value, password: field("password").value });
     await loadMe(); location.hash = "#/";
@@ -517,27 +520,13 @@ async function pageSetup() {
     <label>Password <span class="hint">At least 10 characters.</span>
       <input id="password" type="password" autocomplete="new-password" minlength="10" required></label>
     <label>Password again <input id="password2" type="password" autocomplete="new-password" required></label>
-    <button class="primary wide" type="submit" data-busy="Creating…">Create the owner account</button></form>`);
+    <button class="primary wide" type="submit" data-busy="Creating…">Create the owner account</button></form>`,
+  `<a href="/terms" target="_blank" rel="noopener">Terms of use and content policy</a>`);
   onSubmit(async () => {
     if (field("password").value !== field("password2").value) throw new Error("The two passwords differ.");
     await post("/auth/setup", { email: field("email").value, password: field("password").value });
     await loadMe(); location.hash = "#/admin/claude";
     return "";
-  });
-}
-async function pageSignup() {
-  authPage("Create an account", "Each month you get a few free films. No card needed.", `<form class="form">
-    <label>Email <input id="email" type="email" autocomplete="email" required></label>
-    <label>Password <span class="hint">At least 10 characters.</span>
-      <input id="password" type="password" autocomplete="new-password" minlength="10" required></label>
-    <label class="check"><input id="terms" type="checkbox" required> <span>I agree to the <a href="/terms" target="_blank" rel="noopener">terms of use
-      and content policy</a>: I only ask for films I may publish, and I do not ask for violence, sexual content, hate, or copies of
-      real people, brands or channels.</span></label>
-    <button class="primary" type="submit">Create account</button></form>`, `<p>Already have an account? <a href="#/login">Log in</a></p>`);
-  onSubmit(async () => {
-    await post("/auth/signup", { email: field("email").value, password: field("password").value, accept_terms: field("terms").checked });
-    $app.querySelector("form").remove();
-    return "Check your email: we sent a link to confirm your address. Then log in.";
   });
 }
 async function pageVerify(token) {
@@ -674,70 +663,145 @@ function uploadFile(file, bar) {
   });
 }
 
-// ---------- admin (US3) ----------
+// ---------- Settings, owner only (specs/007 US3; tabs and Users after neb-creative-tool, specs/008) ----------
 const SETTING = [
-  ["signup_open", "Sign-up open", "bool"], ["quota_films_default", "Films per month (default)", "int"],
+  ["quota_films_default", "Films per month (default)", "int"],
   ["quota_learns_default", "Learns per month (default)", "int"], ["film_max_seconds", "Longest film (seconds)", "int"],
   ["learn_max_videos", "Videos per learn", "int"], ["upload_max_mb", "Upload size (MB)", "int"],
   ["upload_max_minutes", "Upload length (minutes)", "int"], ["daily_cost_cap_usd", "Studio cost cap per day (USD)", "num"],
   ["job_cost_cap_usd", "Cost cap per job (USD)", "num"], ["concurrency", "Jobs at the same time", "int"],
   ["review_timeout_days", "Stop a job after waiting (days)", "int"], ["model", "Claude model", "text"],
 ];
+const SETTINGS_TABS = [["general", "General"], ["users", "Users"], ["usage", "Usage"]];
+const ROLE = { admin: "Owner", customer: "Member" };
 const usd = (v) => `$${Number(v || 0).toFixed(2)}`;
-async function pageAdmin() {
-  if (ME.role !== "admin") { $app.innerHTML = `<p class="error">This page is for the studio admin.</p>`; return; }
-  const params = new URLSearchParams(location.hash.split("?")[1] || "");
-  const q = params.get("q") || "";
-  const [st, acc, use] = await Promise.all([get("/admin/settings"), get("/admin/accounts?q=" + encodeURIComponent(q)), get("/admin/usage")]);
-  const input = ([k, label, t]) => t === "bool"
-    ? `<label class="check"><input id="s-${k}" type="checkbox" ${st[k] ? "checked" : ""}> <span>${label}</span></label>`
-    : `<label>${label}<input id="s-${k}" type="${t === "text" ? "text" : "number"}" ${t === "num" ? 'step="0.01"' : ""} value="${esc(st[k])}"></label>`;
-  const rows = acc.accounts.map((a) => `<tr data-id="${esc(a.id)}"><td>${esc(a.email)}${a.role === "admin" ? " (admin)" : ""}${a.verified ? "" : ' <span class="muted">unverified</span>'}</td>
-      <td>${a.quota.films.used} / <input type="number" min="0" data-f="quota_films" value="${a.quota_films ?? ""}" placeholder="${a.quota.films.limit}" aria-label="Films limit"></td>
-      <td>${a.quota.learns.used} / <input type="number" min="0" data-f="quota_learns" value="${a.quota_learns ?? ""}" placeholder="${a.quota.learns.limit}" aria-label="Learns limit"></td>
-      <td class="num">${usd(a.cost_month_usd)}</td><td class="num">${num(a.storage_mb, 1)} MB</td>
-      <td>${a.role === "admin" ? "" : `<button data-lock="${a.locked ? "0" : "1"}" class="${a.locked ? "" : "danger"}">${a.locked ? "Unlock" : "Lock"}</button>`}</td></tr>`).join("");
-  $app.innerHTML = `${head("Studio", "Settings", `Cost in the last 30 days: ${usd(use.cost_usd_total)} · storage ${num(use.storage_mb_total, 1)} MB`)}
-    <h2>Settings</h2><form class="form panel" id="settings"><div class="admin-grid">${SETTING.map(input).join("")}</div>
-      <div><button class="primary" type="submit">Save settings</button></div></form><p id="msg" class="muted" role="status"></p>
-    <h2>Customers</h2>
-    <div class="row filters"><label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input id="acc-q" type="search" placeholder="Search by email" value="${esc(q)}" aria-label="Search by email"></label></div>
-    <p class="muted">Films and learns: used / own limit (empty = the default). Locking stops the account's running jobs.</p>
-    <div class="table-wrap"><table><tr><th>Email</th><th>Films</th><th>Learns</th><th>Cost this month</th><th>Storage</th><th></th></tr>${rows}</table></div>
-    <p id="acc-msg" class="muted" role="status"></p>
-    <h2>Cost per day</h2><div class="table-wrap"><table><tr><th>Day</th><th>Jobs</th><th>Cost</th></tr>
-      ${use.days.slice().reverse().map((d) => `<tr><td>${esc(d.day)}</td><td class="num">${d.jobs}</td><td class="num">${usd(d.cost_usd)}</td></tr>`).join("") || '<tr><td colspan="3" class="muted">No jobs yet.</td></tr>'}</table></div>`;
+async function pageSettings(tab = "general") {
+  if (ME.role !== "admin") { $app.innerHTML = `<p class="error">This page is for the studio owner.</p>`; return; }
+  if (!SETTINGS_TABS.some(([k]) => k === tab)) tab = "general";
+  const top = `${head("Owner", "Settings", 'How the studio is run. The AI plans themselves are on the <a href="#/admin/claude">AI accounts</a> page.')}
+    <div class="tabs" role="tablist">${SETTINGS_TABS.map(([k, label]) =>
+      `<a role="tab" href="#/settings/${k}" class="${k === tab ? "on" : ""}" aria-selected="${k === tab}">${label}</a>`).join("")}</div>`;
+  if (tab === "users") return settingsUsers(top);
+  if (tab === "usage") return settingsUsage(top);
+  const st = await get("/admin/settings");
+  const input = ([k, label, t]) => `<label>${label}<input id="s-${k}" type="${t === "text" ? "text" : "number"}" ${t === "num" ? 'step="0.01"' : ""} value="${esc(st[k])}"></label>`;
+  $app.innerHTML = `${top}<section class="panel card-pad"><h2>Studio</h2><p class="muted">Limits for every member, and how many films run at once.</p>
+    <form class="form" id="settings"><div class="admin-grid">${SETTING.map(input).join("")}</div>
+      <div><button class="primary" type="submit">Save settings</button></div></form><p id="msg" class="muted" role="status"></p></section>`;
   onSubmit(async () => {
     const data = {};
     for (const [k, , t] of SETTING) {
       const el = field(`s-${k}`);
-      data[k] = t === "bool" ? el.checked : t === "text" ? el.value.trim() : Number(el.value);
+      data[k] = t === "text" ? el.value.trim() : Number(el.value);
     }
     await send("PUT", "/admin/settings", data);
     return "Saved.";
   });
+}
+
+/** Settings → Users: people who can sign in (specs/008 FR-112). */
+async function settingsUsers(top) {
+  const { users, me } = await get("/admin/users");
+  const row = (u) => {
+    const self = u.id === me;
+    const menu = [
+      '<button data-act="password">Reset password</button>',
+      !self && `<button data-act="role">${u.role === "admin" ? "Make member" : "Make owner"}</button>`,
+      `<button data-act="signout">Sign out everywhere</button>`,
+      !self && `<button data-act="toggle">${u.disabled ? "Turn on" : "Turn off"}</button>`,
+      !self && '<button data-act="remove" class="danger">Remove</button>',
+    ].filter(Boolean).join("");
+    return `<li data-id="${esc(u.id)}" data-email="${esc(u.email)}" data-role="${u.role}" data-disabled="${u.disabled}">
+      <div class="u-name"><strong title="${esc(u.email)}">${esc(u.email)}</strong>${self ? ' <span class="muted">(you)</span>' : ""}</div>
+      <div>${pill(ROLE[u.role] || u.role, u.role === "admin" ? "accent" : "")}${u.disabled ? pill("Off", "bad") : ""}</div>
+      <div class="muted"><span class="m-label">Last sign-in: </span>${u.last_login_at ? when(u.last_login_at) : "Never"}</div>
+      <div class="num" title="Browsers signed in now">${u.sessions}<span class="m-label"> browser${u.sessions === 1 ? "" : "s"} signed in</span></div>
+      <div><details class="menu"><summary aria-label="Actions for ${esc(u.email)}">⋯</summary><div class="menu-list">${menu}</div></details></div></li>`;
+  };
+  $app.innerHTML = `${top}<section class="panel card-pad">
+      <h2>People who can sign in</h2>
+      <p class="muted"><strong>Owner</strong>: everything, including AI accounts and Settings. <strong>Member</strong>: makes films and learns styles, but cannot see AI accounts or Settings.</p>
+      <p><button class="primary" id="add-user">Add user</button></p>
+      <form id="user-form" class="user-form" hidden>
+        <input id="u-email" type="email" placeholder="Email" aria-label="Email" autocomplete="off" required>
+        <input id="u-password" type="text" placeholder="Password (at least 10 characters)" aria-label="Password" autocomplete="off" minlength="10" required>
+        <select id="u-role" aria-label="Role"><option value="customer">Member</option><option value="admin">Owner</option></select>
+        <button class="primary" type="submit">Add</button><button type="button" id="u-cancel">Cancel</button>
+      </form>
+      <p id="msg" class="muted" role="status"></p>
+      <ul class="users"><li class="u-head"><div>User</div><div>Role</div><div>Last sign-in</div><div class="num">Browsers</div><div></div></li>${users.map(row).join("")}</ul>
+      <p class="muted small">Give each person their password yourself. They can change it on their account page.</p></section>`;
+  const msg = document.getElementById("msg");
+  const act = async (fn, done = "") => {
+    msg.className = "muted"; msg.textContent = "";
+    try { await fn(); await route(); const m = document.getElementById("msg"); if (m && done) m.textContent = done; }
+    catch (e) { msg.className = "error"; msg.textContent = e.message; }
+  };
+  const form = /** @type {HTMLFormElement} */ (document.getElementById("user-form"));
+  const addBtn = document.getElementById("add-user");
+  addBtn.addEventListener("click", () => { form.hidden = false; addBtn.hidden = true; field("u-email").focus(); });
+  document.getElementById("u-cancel").addEventListener("click", () => { form.hidden = true; addBtn.hidden = false; });
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const email = field("u-email").value.trim();
+    act(() => post("/admin/users", { email, password: field("u-password").value,
+      role: /** @type {HTMLSelectElement} */ (document.getElementById("u-role")).value }), `Added ${email}. Give them the password.`);
+  };
+  (/** @type {NodeListOf<HTMLButtonElement>} */ ($app.querySelectorAll(".users button[data-act]"))).forEach((b) => b.addEventListener("click", () => {
+    const li = /** @type {HTMLElement} */ (b.closest("li")), id = encodeURIComponent(li.dataset.id), email = li.dataset.email;
+    b.closest("details")?.removeAttribute("open");
+    const a = b.dataset.act;
+    if (a === "password") {
+      const pw = prompt(`New password for ${email} (at least 10 characters). They are signed out everywhere.`);
+      if (pw) act(() => send("PUT", `/admin/users/${id}`, { password: pw }), `New password set for ${email}.`);
+    }
+    if (a === "role") {
+      const role = li.dataset.role === "admin" ? "customer" : "admin";
+      if (confirm(`Make ${email} ${role === "admin" ? "an owner? Owners see AI accounts and Settings." : "a member?"}`))
+        act(() => send("PUT", `/admin/users/${id}`, { role }));
+    }
+    if (a === "signout") act(() => post(`/admin/users/${id}/signout`), `${email} is signed out everywhere.`);
+    if (a === "toggle") {
+      const off = li.dataset.disabled !== "true";
+      if (!off || confirm(`Turn off ${email}? They are signed out and their running jobs stop.`))
+        act(() => send("PUT", `/admin/users/${id}`, { disabled: off }));
+    }
+    if (a === "remove" && confirm(`Remove ${email}? They are signed out now; their films and styles are erased within 30 days.`))
+      act(() => send("DELETE", `/admin/users/${id}`));
+  }));
+}
+
+/** Settings → Usage: each member's films, learns, cost and storage, and cost per day (tokens arrive with 008 US4). */
+async function settingsUsage(top) {
+  const params = new URLSearchParams(location.hash.split("?")[1] || "");
+  const q = params.get("q") || "";
+  const [acc, use] = await Promise.all([get("/admin/accounts?q=" + encodeURIComponent(q)), get("/admin/usage")]);
+  const rows = acc.accounts.map((a) => `<tr data-id="${esc(a.id)}"><td>${esc(a.email)}${a.role === "admin" ? " (owner)" : ""}</td>
+      <td>${a.quota.films.used} / <input type="number" min="0" data-f="quota_films" value="${a.quota_films ?? ""}" placeholder="${a.quota.films.limit}" aria-label="Films limit"></td>
+      <td>${a.quota.learns.used} / <input type="number" min="0" data-f="quota_learns" value="${a.quota_learns ?? ""}" placeholder="${a.quota.learns.limit}" aria-label="Learns limit"></td>
+      <td class="num">${usd(a.cost_month_usd)}</td><td class="num">${num(a.storage_mb, 1)} MB</td></tr>`).join("");
+  $app.innerHTML = `${top}<p class="lead">Cost in the last 30 days: ${usd(use.cost_usd_total)} · storage ${num(use.storage_mb_total, 1)} MB</p>
+    <h2>Members</h2>
+    <div class="row filters"><label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="acc-q" type="search" placeholder="Search by email" value="${esc(q)}" aria-label="Search by email"></label></div>
+    <p class="muted">Films and learns: used / own limit (empty = the default on General). To turn someone off, use Users.</p>
+    <div class="table-wrap"><table><tr><th>Email</th><th>Films</th><th>Learns</th><th>Cost this month</th><th>Storage</th></tr>${rows}</table></div>
+    <p id="acc-msg" class="muted" role="status"></p>
+    <h2>Cost per day</h2><div class="table-wrap"><table><tr><th>Day</th><th>Jobs</th><th>Cost</th></tr>
+      ${use.days.slice().reverse().map((d) => `<tr><td>${esc(d.day)}</td><td class="num">${d.jobs}</td><td class="num">${usd(d.cost_usd)}</td></tr>`).join("") || '<tr><td colspan="3" class="muted">No jobs yet.</td></tr>'}</table></div>`;
   const msg = document.getElementById("acc-msg");
-  const save = async (id, body) => {
+  (/** @type {NodeListOf<HTMLInputElement>} */ ($app.querySelectorAll("tr[data-id] input[data-f]"))).forEach((el) => el.addEventListener("change", async () => {
+    const id = /** @type {HTMLElement} */ (el.closest("tr")).dataset.id, f = el.dataset.f;
+    const body = el.value === "" ? { [f === "quota_films" ? "use_default_films" : "use_default_learns"]: true } : { [f]: Number(el.value) };
     try { await send("PUT", `/admin/accounts/${encodeURIComponent(id)}`, body); msg.className = "muted"; msg.textContent = "Saved."; }
     catch (e) { msg.className = "fail"; msg.textContent = e.message; }
-  };
-  (/** @type {NodeListOf<HTMLInputElement>} */ ($app.querySelectorAll("tr[data-id] input[data-f]"))).forEach((el) => el.addEventListener("change", () => {
-    const id = /** @type {HTMLElement} */ (el.closest("tr")).dataset.id, f = el.dataset.f;
-    save(id, el.value === "" ? { [f === "quota_films" ? "use_default_films" : "use_default_learns"]: true } : { [f]: Number(el.value) });
-  }));
-  (/** @type {NodeListOf<HTMLButtonElement>} */ ($app.querySelectorAll("tr[data-id] button[data-lock]"))).forEach((b) => b.addEventListener("click", async () => {
-    const lock = b.dataset.lock === "1";
-    if (lock && !confirm("Lock this account? Its running jobs stop now.")) return;
-    await save(/** @type {HTMLElement} */ (b.closest("tr")).dataset.id, { locked: lock });
-    route();
   }));
   const qi = field("acc-q");
   let t = 0;
   qi.addEventListener("input", () => {
     clearTimeout(t);
     t = setTimeout(() => {
-      history.replaceState(null, "", "#/settings?q=" + encodeURIComponent(qi.value));
+      history.replaceState(null, "", "#/settings/usage?q=" + encodeURIComponent(qi.value));
       route().then(() => { const n = field("acc-q"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); });
     }, 400);
   });
@@ -968,12 +1032,12 @@ const routes = [
   [/^#\/sets$/, pageSets, "sets"], [/^#\/sets\/([^/?]+)$/, pageSet, "sets"],
   [/^#\/library(\?.*)?$/, pageLibrary, "library"], [/^#\/library\/([^/?]+)$/, pageLibStyle, "library"],
   [/^#\/styles$/, pageStyles, "styles"], [/^#\/styles\/([^/?]+)$/, pageStyle, "styles"],
-  [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"], [/^#\/(?:admin|settings)(\?.*)?$/, pageAdmin, "settings"], [/^#\/admin\/claude$/, pageClaude, "ai"],
+  [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"], [/^#\/(?:admin|settings)(?:\/(general|users|usage))?(\?.*)?$/, pageSettings, "settings"], [/^#\/admin\/claude$/, pageClaude, "ai"],
   [/^#\/account$/, pageAccount, "account"],
 ];
 /** pages open without logging in (online mode) */
 const PUBLIC = [
-  [/^#\/login$/, pageLogin], [/^#\/setup$/, pageSetup], [/^#\/signup$/, pageSignup], [/^#\/forgot$/, pageForgot],
+  [/^#\/login$/, pageLogin], [/^#\/setup$/, pageSetup], [/^#\/forgot$/, pageForgot],
   [/^#\/verify\/([^/?]+)$/, pageVerify], [/^#\/reset\/([^/?]+)$/, pageReset],
 ];
 let rendering = null;

@@ -82,9 +82,9 @@ class Quota(unittest.TestCase):
         self.assertEqual(film_job(self.c).json()["error"]["code"], "too_many_queued")
 
     def test_unverified_cannot_order(self):
+        from studio import accounts
         c = self.p.client()
-        c.post("/api/v1/auth/signup", json={"email": "u@example.com", "password": "correct horse battery",
-                                            "accept_terms": True}, headers=W)
+        accounts.signup("u@example.com", "correct horse battery", True)      # an unverified account from 007
         c.post("/api/v1/auth/login", json={"email": "u@example.com", "password": "correct horse battery"}, headers=W)
         r = film_job(c)
         self.assertEqual((r.status_code, r.json()["error"]["code"]), (403, "unverified"))

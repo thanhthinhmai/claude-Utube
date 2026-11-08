@@ -1,4 +1,4 @@
-"""Terms page (specs/007 tasks T047): served at /terms, linked from sign-up."""
+"""Terms page (specs/007 tasks T047): served at /terms, linked from the login page (008: no sign-up page)."""
 import unittest
 
 from helpers import REPO, OnlineProject

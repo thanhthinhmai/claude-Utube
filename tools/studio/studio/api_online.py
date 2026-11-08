@@ -75,8 +75,8 @@ def _set_cookie(request: Request, response: Response, token: str) -> None:
 
 @router.post("/auth/signup", status_code=201)
 def signup(body: SignupIn, request: Request):
-    a = accounts.signup(body.email, body.password, body.accept_terms, ip=client_ip(request))
-    return {"email": a["email"], "verified": False}
+    """No public sign-up (specs/008 FR-111): the owner adds people in Settings → Users."""
+    raise StudioError("signup_closed", "chỉ chủ xưởng thêm được người dùng", 403)
 
 
 class SetupIn(BaseModel):
@@ -617,3 +617,48 @@ def code_claude(slot: int, body: CodeIn, request: Request):
 def logout_claude(slot: int, request: Request):
     admin(request)
     return claude_plan.logout(slot)
+
+
+# ---------- people who can sign in: Settings → Users (specs/008 FR-111, FR-112) ----------
+class UserIn(BaseModel):
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=200)
+    role: Literal["admin", "customer"] = "customer"
+
+
+class UserChange(BaseModel):
+    role: Optional[Literal["admin", "customer"]] = None
+    disabled: Optional[bool] = None
+    password: Optional[str] = Field(default=None, max_length=200)
+
+
+@router.get("/admin/users")
+def list_users(request: Request):
+    a = admin(request)
+    return {"users": accounts.users(), "me": a["id"]}
+
+
+@router.post("/admin/users", status_code=201)
+def add_user(body: UserIn, request: Request):
+    admin(request)
+    return accounts.add_user(body.email, body.password, body.role)
+
+
+@router.put("/admin/users/{account_id}")
+def change_user(account_id: str, body: UserChange, request: Request):
+    a = admin(request)
+    return accounts.update_user(account_id, a["id"], role=body.role, disabled=body.disabled, password=body.password)
+
+
+@router.post("/admin/users/{account_id}/signout", status_code=204)
+def signout_user(account_id: str, request: Request):
+    admin(request)
+    accounts.signout_all(account_id)
+    return Response(status_code=204)
+
+
+@router.delete("/admin/users/{account_id}", status_code=204)
+def remove_user(account_id: str, request: Request):
+    a = admin(request)
+    accounts.remove_user(account_id, a["id"])
+    return Response(status_code=204)

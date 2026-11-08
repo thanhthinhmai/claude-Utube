@@ -13,7 +13,6 @@ from pathlib import Path
 SCHEMA_VERSION = 2           # 2: Claude plan accounts, calls, invites (specs/008 data-model)
 
 SETTINGS_DEFAULT = {
-    "signup_open": True,
     "quota_films_default": 2,
     "quota_learns_default": 1,
     "film_max_seconds": 60,
@@ -47,7 +46,8 @@ CREATE TABLE IF NOT EXISTS accounts (
   email_notify INTEGER NOT NULL DEFAULT 1,
   terms_accepted_at TEXT NOT NULL,
   created_at TEXT NOT NULL,
-  deleted_at TEXT
+  deleted_at TEXT,
+  last_login_at TEXT                      -- specs/008 Settings → Users
 );
 CREATE TABLE IF NOT EXISTS sessions (
   token_hash TEXT PRIMARY KEY,
@@ -178,6 +178,8 @@ def _migrate(con: sqlite3.Connection) -> None:
             _upgrade_to_2(con)
         for stmt in [s for s in SCHEMA.split(";") if s.strip()]:
             con.execute(stmt)
+        if "last_login_at" not in [r[1] for r in con.execute("PRAGMA table_info(accounts)")]:
+            con.execute("ALTER TABLE accounts ADD COLUMN last_login_at TEXT")
         if "usage" not in [r[1] for r in con.execute("PRAGMA table_info(claude_account)")]:
             con.execute("ALTER TABLE claude_account ADD COLUMN usage TEXT")     # early 008 databases
         con.execute("INSERT OR REPLACE INTO meta VALUES ('schema', ?)", (str(SCHEMA_VERSION),))
@@ -214,10 +216,13 @@ def read():
         con.close()
 
 
+REMOVED_SETTINGS = ("signup_open",)            # specs/008: no public sign-up
+
+
 def settings() -> dict:
     with read() as con:
         data = json.loads(con.execute("SELECT data FROM settings WHERE id = 1").fetchone()[0])
-    return {**SETTINGS_DEFAULT, **data}
+    return {k: v for k, v in {**SETTINGS_DEFAULT, **data}.items() if k not in REMOVED_SETTINGS}
 
 
 def save_settings(data: dict) -> None:

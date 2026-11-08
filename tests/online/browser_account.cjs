@@ -15,7 +15,7 @@ const [base, email, password, newPassword] = process.argv.slice(2);
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.click("button[type=submit]");
-  await page.waitForSelector("#acct >> text=films left this month")   // phone width: the account menu is in the top bar;
+  await page.waitForSelector("#acct >> text=films left this month");   // phone width: the account menu is in the top bar
   await page.click("#acct summary.user-btn");                 // the account menu (phone: in the top bar)
   await page.click("#acct >> text=Your account");
   await page.waitForSelector("text=Change password");

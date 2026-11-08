@@ -15,12 +15,19 @@ class Accounts(unittest.TestCase):
         return c.post("/api/v1" + path, json=body, headers=W)
 
     def test_signup_verify_login_logout(self):
+        from studio import accounts
+        from studio.store import StudioError
         c = self.p.client()
         self.assertEqual(c.get("/api/v1/me").status_code, 401)
-        self.assertEqual(self.post(c, "/auth/signup", {"email": "A@Example.com", "password": "short", "accept_terms": True}).json()["error"]["code"], "weak_password")
-        self.assertEqual(self.post(c, "/auth/signup", {"email": "a@example.com", "password": PASSWORD}).json()["error"]["code"], "terms_required")
-        self.assertEqual(self.post(c, "/auth/signup", {"email": "A@Example.com", "password": PASSWORD, "accept_terms": True}).status_code, 201)
-        self.assertEqual(self.post(c, "/auth/signup", {"email": "a@example.com", "password": PASSWORD, "accept_terms": True}).status_code, 409)
+        r = self.post(c, "/auth/signup", {"email": "a@example.com", "password": PASSWORD, "accept_terms": True})
+        self.assertEqual((r.status_code, r.json()["error"]["code"]), (403, "signup_closed"))      # 008 FR-111
+        with self.assertRaises(StudioError) as e:
+            accounts.signup("A@Example.com", "short", True)
+        self.assertEqual(e.exception.code, "weak_password")
+        accounts.signup("A@Example.com", PASSWORD, True)          # an unverified account (from 007) still verifies
+        with self.assertRaises(StudioError) as e:
+            accounts.signup("a@example.com", PASSWORD, True)
+        self.assertEqual(e.exception.code, "email_taken")
         token = self.p.last_link("a@example.com", "verify")
         self.assertEqual(self.post(c, "/auth/login", {"email": "a@example.com", "password": "wrong password!"}).json()["error"]["code"], "bad_login")
         self.assertEqual(self.post(c, "/auth/login", {"email": "nobody@example.com", "password": "wrong password!"}).json()["error"]["code"], "bad_login")
@@ -40,8 +47,9 @@ class Accounts(unittest.TestCase):
 
     def test_expired_link(self):
         from studio import store
+        from studio import accounts
         c = self.p.client()
-        self.post(c, "/auth/signup", {"email": "b@example.com", "password": PASSWORD, "accept_terms": True})
+        accounts.signup("b@example.com", PASSWORD, True)
         token = self.p.last_link("b@example.com", "verify")
         real = store.clock
         try:
@@ -64,9 +72,7 @@ class Accounts(unittest.TestCase):
     def test_signup_closed_and_locked(self):
         from studio import db
         c = self.p.signup_verified("d@example.com")
-        s = db.settings()
-        s["signup_open"] = False
-        db.save_settings(s)
+        self.assertNotIn("signup_open", db.settings())
         r = self.post(self.p.client(), "/auth/signup", {"email": "e@example.com", "password": PASSWORD, "accept_terms": True})
         self.assertEqual((r.status_code, r.json()["error"]["code"]), (403, "signup_closed"))
         with db.tx() as con:
@@ -84,10 +90,10 @@ class Accounts(unittest.TestCase):
 
     def test_csrf(self):
         c = self.p.client()
-        body = {"email": "f@example.com", "password": PASSWORD, "accept_terms": True}
-        self.assertEqual(c.post("/api/v1/auth/signup", json=body).json()["error"]["code"], "csrf")
-        self.assertEqual(c.post("/api/v1/auth/signup", json=body, headers={**W, "Origin": "https://evil.test"}).json()["error"]["code"], "csrf")
-        self.assertEqual(c.post("/api/v1/auth/signup", json=body, headers={**W, "Origin": "https://studio.test"}).status_code, 201)
+        body = {"email": "f@example.com", "password": PASSWORD}
+        self.assertEqual(c.post("/api/v1/auth/login", json=body).json()["error"]["code"], "csrf")
+        self.assertEqual(c.post("/api/v1/auth/login", json=body, headers={**W, "Origin": "https://evil.test"}).json()["error"]["code"], "csrf")
+        self.assertEqual(c.post("/api/v1/auth/login", json=body, headers={**W, "Origin": "https://studio.test"}).json()["error"]["code"], "bad_login")
 
     def test_health_hides_paths(self):
         h = self.p.client().get("/api/v1/health").json()

@@ -65,11 +65,10 @@ class OnlineProject:
         raise AssertionError(f"no {kind} mail for {email}")
 
     def signup_verified(self, email: str, c=None):
-        """A logged-in client of a new, verified customer."""
+        """A logged-in client of a new member, added the way the owner does in Settings → Users (specs/008)."""
+        from studio import accounts
         c = c or self.client()
-        r = c.post("/api/v1/auth/signup", json={"email": email, "password": PASSWORD, "accept_terms": True}, headers=W)
-        assert r.status_code == 201, r.text
-        assert c.post("/api/v1/auth/verify", json={"token": self.last_link(email, "verify")}, headers=W).status_code == 200
+        accounts.add_user(email, PASSWORD, "customer")
         assert c.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD}, headers=W).status_code == 200
         return c
 

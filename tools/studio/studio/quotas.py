@@ -12,7 +12,6 @@ OPEN = ("queued", "running", "waiting_review", "waiting_resume")
 
 # name: (type, low, high); None means no bound
 RANGES = {
-    "signup_open": (bool, None, None),
     "quota_films_default": (int, 0, 1000),
     "quota_learns_default": (int, 0, 1000),
     "film_max_seconds": (int, 5, 300),

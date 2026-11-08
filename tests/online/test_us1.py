@@ -13,10 +13,9 @@ class US1(unittest.TestCase):
         self.s.close()
 
     def test_us1_signup_to_download(self):
+        from studio import accounts
         c = self.s.client()
-        r = c.post("/api/v1/auth/signup", json={"email": "new@example.com", "password": PASSWORD, "accept_terms": True},
-                   headers=W)
-        self.assertEqual(r.status_code, 201)
+        accounts.signup("new@example.com", PASSWORD, True)                 # unverified, as 007 sign-ups were
         c.post("/api/v1/auth/login", json={"email": "new@example.com", "password": PASSWORD}, headers=W)
         self.assertEqual(film_job(c).json()["error"]["code"], "unverified")
         token = self.s.last_link("new@example.com", "verify")          # read from the .eml file
@@ -155,23 +154,18 @@ class BrowserUS1(unittest.TestCase):
             _acc.signup("owner@example.com", PASSWORD, True, role="admin", verified=True)
             web = Server(create_app())
             s.start()
+            _acc.add_user("b@example.com", PASSWORD)          # the owner adds the member in Settings → Users
             p = subprocess.Popen(["node", str(Path(__file__).with_name("browser_us1.cjs")), web.url, "b@example.com", PASSWORD],
-                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                  env={**os.environ, "NODE_PATH": str(NODE_MODULES)})
-            first = p.stdout.readline().strip()
-            if p.poll() == 77 or not first:
-                p.wait()
-                if p.returncode == 77:
-                    self.skipTest("cannot start a browser")
-            self.assertEqual(first, "NEED-TOKEN", p.stderr.read() if p.poll() is not None else first)
-            p.stdin.write(s.last_link("b@example.com", "verify") + "\n")
-            p.stdin.flush()
             out, err = p.communicate(timeout=120)
+            if p.returncode == 77:
+                self.skipTest("cannot start a browser")
             self.assertEqual(p.returncode, 0, err)
             res = json.loads(out.strip().splitlines()[-1])
             self.assertEqual(res["errors"], [])
             self.assertLessEqual(res["wide"], 360)                        # no sideways scrolling on a phone
-            print(f"\n  SC-001: ordering took {res['order_ms'] / 1000:.1f} s of browser time (not counting the mail)")
+            print(f"\n  SC-001: ordering took {res['order_ms'] / 1000:.1f} s of browser time")
             self.assertLess(res["order_ms"], 180_000)
             from studio import jobs
             j = [x for x in jobs.all_jobs() if x["owner"] != "local"][0]

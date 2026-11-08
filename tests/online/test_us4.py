@@ -78,10 +78,9 @@ class US4(unittest.TestCase):
                   self.s.data / "jobs" / learn):
             self.assertFalse(d.exists(), d)
         self.assertEqual(jobs.load(keep)["owner"], account_id(other))            # other customers untouched
-        # the email can sign up again
-        r = self.s.client().post("/api/v1/auth/signup", json={"email": "me@example.com", "password": PASSWORD,
-                                                               "accept_terms": True}, headers=W)
-        self.assertEqual(r.status_code, 201)
+        # the email can be added again
+        from studio import accounts
+        self.assertEqual(accounts.add_user("me@example.com", PASSWORD)["email"], "me@example.com")
 
 
 if __name__ == "__main__":

@@ -38,8 +38,8 @@ class Setup(unittest.TestCase):
         self.assertEqual(sorted(codes), [201, 409, 409])
 
     def test_an_earlier_sign_up_becomes_the_owner_with_its_password(self):
-        r = self.c.post("/api/v1/auth/signup", json={"email": "me@x.test", "password": PASSWORD, "accept_terms": True}, headers=W)
-        self.assertEqual(r.status_code, 201)                          # unverified customer
+        from studio import accounts
+        accounts.signup("me@x.test", PASSWORD, True)                  # an unverified customer from 007
         r = self.setup("ME@x.test", password="another password!")
         self.assertEqual((r.status_code, r.json()["error"]["code"]), (409, "email_taken_password"))
         self.assertEqual(self.c.get("/api/v1/auth/setup").json(), {"needed": True})

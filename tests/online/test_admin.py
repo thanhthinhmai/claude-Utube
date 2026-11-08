@@ -48,7 +48,8 @@ class US3(unittest.TestCase):
         self.assertEqual(self.admin.get("/api/v1/admin/settings").json()["concurrency"], 2)
 
     def test_us3_signup_closed(self):
-        self.admin.put("/api/v1/admin/settings", json={"signup_open": False}, headers=W)
+        r = self.admin.put("/api/v1/admin/settings", json={"signup_open": True}, headers=W)
+        self.assertEqual(r.status_code, 422)                      # 008: no setting turns sign-up back on
         r = self.s.client().post("/api/v1/auth/signup", json={"email": "late@example.com", "password": PASSWORD,
                                                                "accept_terms": True}, headers=W)
         self.assertEqual((r.status_code, r.json()["error"]["code"]), (403, "signup_closed"))
@@ -125,5 +126,6 @@ class AdminBrowser(unittest.TestCase):
             self.assertEqual(quotas.settings()["quota_films_default"], 3)
             a = accounts.get(self.cid)
             self.assertEqual((a["quota_films"], bool(a["locked_at"])), (7, True))
+            self.assertNotIn("new@example.com", [u["email"] for u in accounts.users()])     # added, made owner, removed
         finally:
             web.close()

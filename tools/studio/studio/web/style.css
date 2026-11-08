@@ -324,3 +324,27 @@ details.how div { padding-left: 16px; max-width: 640px; } details.how p { margin
 .acct .user-menu { width: auto; } .acct .user-menu .menu-list { min-width: 230px; }
 @media (min-width: 761px) { .acct { display: none !important; } }
 @media (max-width: 760px) { .acct .user-btn .who strong { max-width: 46vw; } }
+
+/* ---------- Settings: tabs and Users (theo neb-creative-tool) ---------- */
+.tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--line); margin: 4px 0 20px; overflow-x: auto; scrollbar-width: none; }
+.tabs a { padding: 8px 0 10px; color: var(--muted); font-size: 15px; white-space: nowrap; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs a:hover { color: var(--ink); text-decoration: none; }
+.tabs a.on { color: var(--ink); font-weight: 600; border-bottom-color: var(--ink); }
+.card-pad { padding: 20px 24px; } .card-pad h2 { margin: 0 0 4px; font-size: 17px; } .card-pad > p.muted { margin: 0 0 14px; max-width: 640px; }
+.user-form { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.user-form input { flex: 1 1 200px; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; }
+.user-form select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; }
+.users { list-style: none; margin: 8px 0 0; padding: 0; }
+.users > li { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1.3fr) 72px 44px; gap: 10px; align-items: center;
+              padding: 12px 0; border-top: 1px solid var(--line); }
+.users > li.u-head { border-top: 0; color: var(--muted); font-size: 13px; padding-top: 0; }
+.users .u-name strong { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.users .badge + .badge { margin-left: 4px; }
+.m-label { display: none; }
+@media (max-width: 760px) {
+  .users > li { grid-template-columns: minmax(0, 1fr) auto; }
+  .users > li.u-head { display: none; }
+  .users > li > div:nth-child(3), .users > li > div:nth-child(4) { grid-column: 1; font-size: 12.5px; text-align: left; color: var(--muted); }
+  .m-label { display: inline; }
+  .users > li > div:nth-child(2) { justify-self: end; } .users > li > div:last-child { grid-column: 2; grid-row: 3; justify-self: end; }
+}

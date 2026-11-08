@@ -116,7 +116,8 @@ class Upgrade(unittest.TestCase):
         with db.read() as c:
             self.assertEqual(c.execute("SELECT count(*) FROM sessions").fetchone()[0], 0)
         s = db.settings()
-        self.assertEqual((s["signup_open"], s["concurrency"], s["job_token_cap"]), (False, 3, 40_000_000))
+        self.assertEqual((s["concurrency"], s["job_token_cap"]), (3, 40_000_000))
+        self.assertNotIn("signup_open", s)                            # 008: no public sign-up
 
 
 if __name__ == "__main__":

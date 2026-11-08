@@ -1,9 +1,8 @@
 // Online US1 in a real browser (specs/007 T027, SC-001, SC-007). Called by test_us1.py; prints one JSON line.
-// argv: base email password. stdin gets the verify token when the script prints "NEED-TOKEN". Exit 77 = no browser.
+// argv: base email password of a member the owner added (specs/008: no public sign-up). Exit 77 = no browser.
 let pw;
 try { pw = require("playwright-core"); } catch { process.exit(77); }
 const [base, email, password] = process.argv.slice(2);
-const readLine = () => new Promise((res) => process.stdin.once("data", (d) => res(String(d).trim())));
 (async () => {
   let browser;
   try { browser = await pw.chromium.launch(process.env.STUDIO_CHROME ? { executablePath: process.env.STUDIO_CHROME } : {}); }
@@ -14,25 +13,11 @@ const readLine = () => new Promise((res) => process.stdin.once("data", (d) => re
   const t0 = Date.now();
   await page.goto(`${base}/#/`);
   await page.waitForSelector("text=Sign in to continue.");     // guests land on the login page
-  await page.click("text=Create an account");
-  await page.waitForSelector("#terms");
-  await page.fill("#email", email);
-  await page.fill("#password", password);
-  await page.check("#terms");
-  await page.click("button[type=submit]");
-  await page.waitForSelector("text=Check your email").catch(async (e) => { throw new Error("signup: " + (await page.textContent("#msg"))); });
-  const tMail = Date.now();
-  console.log("NEED-TOKEN");
-  const token = await readLine();
-  const tBack = Date.now();
-  await page.goto(`${base}/#/verify/${token}`);
-  await page.waitForSelector("text=Your email is confirmed");
-  await page.click("text=Log in");
-  await page.waitForSelector("text=Forgot your password?");
+  if (await page.locator("text=Create an account").count()) errors.push("public sign-up link still shown");
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.click("button[type=submit]");
-  await page.waitForSelector("#acct >> text=films left this month")   // phone width: the account menu is in the top bar;
+  await page.waitForSelector("#acct >> text=films left this month");   // phone width: the account menu is in the top bar
   await page.click("text=Make a film");
   await page.waitForSelector(".pick label");
   await page.click(".pick label >> nth=0");
@@ -53,5 +38,5 @@ const readLine = () => new Promise((res) => process.stdin.once("data", (d) => re
   await page.waitForSelector("#files", { state: "visible" });
   if (await page.locator("video").count()) throw new Error("a <video> on the learn page");
   await browser.close();
-  console.log(JSON.stringify({ order_ms: (tMail - t0) + (tSubmit - tBack), render_seen: renderSeen / 1000, href, wide, errors }));
+  console.log(JSON.stringify({ order_ms: tSubmit - t0, render_seen: renderSeen / 1000, href, wide, errors }));
 })().catch((e) => { console.error(e); process.exit(1); });

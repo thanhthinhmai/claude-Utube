@@ -165,17 +165,17 @@
 
 **Independent Test**: spec US3.
 
-- [ ] T023 [US3] Sửa `tools/studio/studio/accounts.py` và `db.py`:
+- [X] T023 [US3] Sửa `tools/studio/studio/accounts.py` và `db.py`:
   - `signup()` cho `customer` luôn báo `403 signup_closed`; bỏ khoá `signup_open` khỏi cài đặt;
   - cột `accounts.last_login_at` (thêm khi mở cơ sở dữ liệu cũ), ghi trong `login()`;
   - `add_user(email, password, role)`, `update_user(id, role, disabled, password, by)`, `signout_all(id)`, `remove_user(id, by)` theo contract, giữ luật "ít nhất một Owner đang bật" và "không tự tắt, tự hạ, tự xoá".
-- [ ] T024 [US3] Thêm vào `api_online.py`: `GET/POST /admin/users`, `PUT/DELETE /admin/users/{id}`, `POST /admin/users/{id}/signout`, đúng mã lỗi của contract.
-- [ ] T025 [US3] Sửa `web/app.js`, `style.css`:
+- [X] T024 [US3] Thêm vào `api_online.py`: `GET/POST /admin/users`, `PUT/DELETE /admin/users/{id}`, `POST /admin/users/{id}/signout`, đúng mã lỗi của contract.
+- [X] T025 [US3] Sửa `web/app.js`, `style.css`:
   - trang Settings có tab như neb: General (cài đặt), Users, Usage (bảng khách và chi phí cũ, đổi ở US4); tab nhớ theo `#/settings/<tab>`;
   - tab Users: "People who can sign in", nút Add user (email, mật khẩu, vai trò), bảng User · Role · Last sign-in · Sessions · menu ⋯ (Reset password, Make owner/member, Sign out everywhere, Turn off/on, Remove);
   - bỏ trang `#/signup` và liên kết "Create an account".
-- [ ] T026 [US3] Đổi `signup_verified()` trong `tests/online/helpers.py` thành tạo tài khoản qua `accounts.add_user`, để các test của 007 vẫn chạy. Sửa `browser_us1.cjs` (không còn đăng ký trên trang).
-- [ ] T027 [US3] Viết `tests/online/test_users.py` và `browser_users.cjs`:
+- [X] T026 [US3] Đổi `signup_verified()` trong `tests/online/helpers.py` thành tạo tài khoản qua `accounts.add_user`, để các test của 007 vẫn chạy. Sửa `browser_us1.cjs` (không còn đăng ký trên trang).
+- [X] T027 [US3] Viết `tests/online/test_users.py` và mở rộng `browser_admin.cjs` (thêm, đổi vai trò, tắt, xoá):
   - SC-106: `POST /auth/signup` luôn `403`;
   - thêm Member → đăng nhập được, không vào được `/admin/*`; Make owner → vào được;
   - Reset password và Sign out everywhere đăng xuất mọi phiên; Turn off chặn đăng nhập và dừng việc đang chạy;
