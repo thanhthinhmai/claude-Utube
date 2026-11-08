@@ -1,8 +1,10 @@
-"""Live run of the online studio with real Claude (specs/007 tasks T048, SC-002, SC-006). Costs money.
+"""Live run of the online studio with real Claude (specs/007 T048, specs/008 T035; SC-002, SC-006, SC-102).
+Uses the owner's Claude plan (and money only through the optional API key).
 
-Brings the stack up on this machine (DOMAIN=localhost in deploy/.env), makes 3 films of 30 seconds and, when
---videos is given, learns one style from up to 3 of your own videos. Reviews and questions are answered
-automatically. Prints the time, cost and quality checks of each job. Run it through tests/online/live.sh."""
+Brings the stack up on this machine (DOMAIN=localhost in deploy/.env), waits until a Claude account is signed in
+on AI accounts (or an API key is set), makes 3 films of 30 seconds and, when --videos is given, learns one style
+from up to 3 of your own videos. Reviews and questions are answered automatically. Prints the time, Claude calls,
+tokens, the accounts used and the quality checks of each job. Run it through tests/online/live.sh."""
 import argparse
 import http.cookiejar
 import json
@@ -66,8 +68,10 @@ def compose(*args, check=True):
 
 
 def make_account(email, role):
-    code = (f"from studio import accounts\ntry:\n    accounts.signup({email!r}, {PASSWORD!r}, True, role={role!r}, verified=True)\n"
-            f"except Exception as e:\n    print('exists', e)\n")
+    """The owner (as `online admin` does) and a member (as Settings → Users does)."""
+    make = (f"accounts.signup({email!r}, {PASSWORD!r}, True, role='admin', verified=True)" if role == "admin"
+            else f"accounts.add_user({email!r}, {PASSWORD!r}, {role!r})")
+    code = f"from studio import accounts\ntry:\n    {make}\nexcept Exception as e:\n    print('exists', e)\n"
     compose("exec", "-T", "web", "/studio/tools/.venv/bin/python", "-c",
             f"import sys; sys.path.insert(0, '/studio/tools/studio')\n{code}")
 
@@ -98,6 +102,13 @@ def main():
     admin, cust = Client(a.base), Client(a.base)
     admin.login(ADMIN)
     cust.login(CUSTOMER)
+    shown = False
+    while not admin.ok("GET", "/admin/claude")["ready"]:        # specs/008: the plan is signed in on the web page
+        if not shown:
+            print(f"… no Claude account yet: open {a.base}/#/admin/claude, log in as {ADMIN} / {PASSWORD!r},\n"
+                  "  press Sign in, sign in to Claude Pro or Max and paste the code. Waiting…")
+            shown = True
+        time.sleep(5)
     me = cust.ok("GET", "/me")
     admin.ok("PUT", f"/admin/accounts/{me['id']}", {"quota_films": a.films + 2, "quota_learns": 2})
     styles = [s["slug"] for s in cust.ok("GET", "/library")["styles"]][: a.films]
@@ -128,9 +139,12 @@ def main():
                 print(f"  {jid}: answered {r['kind']}")
             if j["status"] in ("done", "failed", "stopped"):
                 done[jid] = (j, time.time() - started[jid])
-                print(f"  {jid}: {j['status']} in {done[jid][1] / 60:.1f} min, ${j.get('cost_usd', 0):.2f}")
+                u = j.get("usage") or {}
+                print(f"  {jid}: {j['status']} in {done[jid][1] / 60:.1f} min, {u.get('calls', 0)} calls, "
+                      f"{u.get('tokens', 0):,} tokens via {', '.join(u.get('via') or []) or '–'}")
         time.sleep(10)
-    print("\n| Job | Kind | Status | Minutes | Cost (USD) | LUFS | Peak dB | Readcheck |\n|---|---|---|---|---|---|---|---|")
+    print("\n| Job | Kind | Status | Minutes | Calls | Tokens | Via | API key USD | LUFS | Peak dB | Readcheck |\n"
+          "|---|---|---|---|---|---|---|---|---|---|---|")
     out = REPO / "tests/online/.tmp/live"
     out.mkdir(parents=True, exist_ok=True)
     for jid in ids:
@@ -143,11 +157,16 @@ def main():
                 f = out / f"{j['links']['film']}.mp4"
                 f.write_bytes(data)
                 lufs, peak = loudness(f)
-        print(f"| {jid} | {j['kind']} | {j['status']} | {secs / 60:.1f} | {j.get('cost_usd', 0):.2f} | "
+        u = j.get("usage") or {}
+        print(f"| {jid} | {j['kind']} | {j['status']} | {secs / 60:.1f} | {u.get('calls', 0)} | {u.get('tokens', 0):,} | "
+              f"{', '.join(u.get('via') or []) or '–'} | {j.get('cost_usd', 0):.2f} | "
               f"{lufs if lufs is not None else '–'} | {peak if peak is not None else '–'} | {rc} |")
     films = [done[i][0] for i in ids if done[i][0]["kind"] == "film"]
-    print(f"\nFilms done: {sum(f['status'] == 'done' for f in films)}/{len(films)} · total cost "
+    tokens = sum((done[i][0].get("usage") or {}).get("tokens", 0) for i in ids)
+    print(f"\nFilms done: {sum(f['status'] == 'done' for f in films)}/{len(films)} · {tokens:,} tokens · API key cost "
           f"${sum(done[i][0].get('cost_usd', 0) for i in ids):.2f} · films saved in {out}")
+    print("Largest job in tokens (to set the token limit per job, research R7): "
+          f"{max(((done[i][0].get('usage') or {}).get('tokens', 0) for i in ids), default=0):,}")
 
 
 if __name__ == "__main__":

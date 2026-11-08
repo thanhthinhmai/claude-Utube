@@ -294,7 +294,8 @@ def job_usage(job_id: str) -> dict:
     with db.read() as con:
         r = con.execute("SELECT count(*), coalesce(sum(tokens_in), 0), coalesce(sum(tokens_out), 0), "
                         f"{TOKENS_SQL} FROM call WHERE job_id = ?", (job_id,)).fetchone()
-    return {"calls": r[0], "tokens_in": r[1], "tokens_out": r[2], "tokens": r[3]}
+        via = [x[0] for x in con.execute("SELECT DISTINCT via FROM call WHERE job_id = ? ORDER BY via", (job_id,))]
+    return {"calls": r[0], "tokens_in": r[1], "tokens_out": r[2], "tokens": r[3], "via": via}
 
 
 @router.post("/jobs/{job_id}/stop")

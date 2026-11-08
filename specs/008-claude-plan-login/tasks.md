@@ -217,14 +217,14 @@
 
 ## Phase 7: Polish & triển khai
 
-- [ ] T032 [P] Sửa `deploy/README.md`:
+- [X] T032 [P] Sửa `deploy/README.md`:
   - đăng nhập gói trên trang quản trị;
   - khoá API là tuỳ chọn;
   - thêm người dùng trong Settings → Users;
   - sao lưu `/data/claude`, và việc phải giữ kín thư mục này;
   - đoạn về điều khoản Anthropic: chỉ dùng nội bộ, chủ xưởng chịu trách nhiệm.
-- [ ] T033 [P] Sửa `CLAUDE.md` (mục Cấu trúc, câu về chế độ online: gói Claude, `claude_plan.py`, Settings → Users) và `bin/studio` nếu lệnh `online admin` cần đổi.
-- [ ] T034 Sửa `tests/online/live.py` và `live.sh`: in token theo việc và `via` thay cho `cost_usd`; không cần `ANTHROPIC_API_KEY` khi có tài khoản gói.
+- [X] T033 [P] Sửa `CLAUDE.md` (mục Cấu trúc, câu về chế độ online: gói Claude, `claude_plan.py`, Settings → Users) và `bin/studio` nếu lệnh `online admin` cần đổi.
+- [X] T034 Sửa `tests/online/live.py` và `live.sh`: in token theo việc và `via` thay cho `cost_usd`; không cần `ANTHROPIC_API_KEY` khi có tài khoản gói.
 - [ ] T035 Chạy quickstart bằng tay với tài khoản thật: các bước 1–4 (SC-101, SC-102), rồi `live.sh` (007 T048) để ghi số token thực tế. Chỉnh mặc định `job_token_cap` nếu cần, ghi vào research R7. Ghi kết quả: đạt, đạt một phần hoặc thất bại (hiến pháp IV).
 
 
