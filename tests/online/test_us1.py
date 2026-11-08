@@ -85,7 +85,12 @@ class US1(unittest.TestCase):
         self.assertEqual(self.s.wait(stud)["failure_kind"], "studio")
         self.assertEqual(self.s.wait(crash)["failure_kind"], "studio")
         self.assertEqual(c.get("/api/v1/me").json()["quota"]["films"]["used"], 1)    # only the customer's one
-        mails = [p.read_text() for p in self.s.flush_mail()]
+        end = time.time() + 5                      # the worker queues the mail just after marking the job failed
+        while True:
+            mails = [p.read_text() for p in self.s.flush_mail()]
+            if sum("could not finish" in m for m in mails) >= 3 or time.time() > end:
+                break
+            time.sleep(0.1)
         self.assertEqual(sum("could not finish" in m for m in mails), 3)
 
     def test_overloaded_api_hits_the_watchdog(self):
