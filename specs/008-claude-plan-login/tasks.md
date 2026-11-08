@@ -18,7 +18,7 @@
 > - Làm trước: T003, T004 (phần `sign_in`), T005, T006, T008, T010, T011, T015 và test của chúng. `access_token` (T007) và mọi phần của bộ chuyển tiếp làm sau khi kiểm xong.
 > - Bỏ các khoá cài đặt cũ (`signup_open`, `daily_cost_cap_usd`, `job_cost_cap_usd`) ở task dùng tới chúng (T023 cho `signup_open`, T028–T029 cho trần chi phí), không ở T005, để các bộ test vẫn đạt sau mỗi bước.
 
-- [ ] T001 Kiểm các mục "Kiểm khi implement" của research.md bằng một tài khoản Claude thật, trên máy này, với Claude Code đi kèm `claude-agent-sdk` trong `tools/.venv`. Dùng `CLAUDE_CONFIG_DIR` tạm, không có trình duyệt (`BROWSER=/bin/false`). Ghi kết quả vào `specs/008-claude-plan-login/research.md`, mục mới "Kết quả kiểm T001":
+- [X] T001 Kiểm các mục "Kiểm khi implement" của research.md bằng một tài khoản Claude thật, trên máy này, với Claude Code đi kèm `claude-agent-sdk` trong `tools/.venv`. Dùng `CLAUDE_CONFIG_DIR` tạm, không có trình duyệt (`BROWSER=/bin/false`). Ghi kết quả vào `specs/008-claude-plan-login/research.md`, mục mới "Kết quả kiểm T001":
   - R1: `claude auth login --claudeai` in URL dạng `https://…/oauth/authorize?…` và đọc mã từ stdin; các trường JSON của `claude auth status --json`; `claude auth logout`.
   - R2: tên tệp và các trường của thông tin đăng nhập; lệnh nào làm mới mã truy cập mà không tốn hạn mức (thử `auth status` trước, bằng cách sửa `expiresAt` cho sắp hết hạn).
   - R3: Claude Code có `CLAUDE_CODE_OAUTH_TOKEN` cộng `ANTHROPIC_BASE_URL` trỏ tới một máy chủ ghi lại yêu cầu (chạy cục bộ) thì gửi những đường và header nào.
@@ -56,7 +56,7 @@
   - `usable(now)`: tài khoản dùng được theo data-model, xếp theo `tokens_5h` rồi theo slot (R4);
   - `ready()`: `usable()` khác rỗng hoặc có `ANTHROPIC_API_KEY`.
 - [ ] T007 Thêm vào `claude_plan.py`:
-  - `access_token(slot)`: đọc mã theo kết quả T001; còn dưới 10 phút thì chạy lệnh làm mới (T001) rồi đọc lại; không làm mới được thì trả None;
+  - `access_token(slot)`: đọc `claudeAiOauth.accessToken`; còn dưới 5 phút thì chạy `auth status` (T001: Claude Code làm mới ở mốc này) rồi đọc lại; không làm mới được thì trả None;
   - `mark_limited(slot, reset_at)`: không có giờ thì chờ tăng dần 2 → 4 → … → 300 giây theo `rest_step`;
   - `mark_ok(slot)`: `rest_step` về 0, `limited` quá hạn thành `signed_in`;
   - `mark_needs_signin(slot)`: xếp thư `claude_signin` cho admin nếu `signin_mailed_at` đang null;

@@ -16,7 +16,7 @@ Thay đổi trên [runner của 007](../../007-online-studio/contracts/runner.md
 3. Chọn đường gọi (research R4, R5):
    ```
    for slot in tài khoản dùng được, xếp theo token 5 giờ tăng dần:
-       gửi với Bearer <mã của slot> (làm mới trước nếu còn < 10 phút)
+       gửi với Bearer <mã của slot> (làm mới trước nếu còn < 5 phút, mốc của Claude Code, T001)
        429 của gói  → slot thành limited (rest_until), thử slot kế tiếp
        401          → làm mới 1 lần; vẫn 401 → needs_signin + thư, thử slot kế tiếp
        khác         → trả nguyên phản hồi cho container (kể cả 529, 5xx)

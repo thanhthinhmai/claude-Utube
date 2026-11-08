@@ -86,4 +86,16 @@ Kiểm ngày 2026-11-08 trên máy này, với Claude Code 2.1.319 đi kèm `cla
   - `anthropic-beta` có `oauth-2025-04-20` cùng các mục khác.
   - `user-agent: claude-cli/2.1.319 (external, sdk-cli)`.
 - **Tệp ngoài `CLAUDE_CONFIG_DIR`**: không có. Mọi tệp (`.claude.json`, `backups/`, `projects/`, `plugins/`) nằm trong `CLAUDE_CONFIG_DIR`; `$HOME` vẫn trống. T018 không cần tmpfs thêm.
-- **Chưa kiểm (cần tài khoản thật)**: các trường của `auth status` khi đã đăng nhập (R1), tệp đăng nhập và cách làm mới (R2), header giờ dùng lại (R5).
+- **Phần cần tài khoản thật**: kiểm ngày 2026-11-08 trên tài khoản slot 1 (gói `pro`), đăng nhập qua trang AI accounts.
+  - **R1, đã đăng nhập** (đúng research): `auth status --json` thoát 0, có `loggedIn: true`, `authMethod: "claude.ai"`, `email`, `subscriptionType` (`pro`), cùng `orgId`, `orgName`, `planTier`, `loginExpiresAt`.
+  - **R2, tệp đăng nhập** (đúng research): `.credentials.json` (quyền 600) → `claudeAiOauth.{accessToken, refreshToken, expiresAt (ms), refreshTokenExpiresAt, scopes, subscriptionType, rateLimitTier}`. Mã truy cập sống khoảng 8 giờ.
+  - **R2, làm mới** (đúng research, khác một con số): `auth status` tự làm mới khi mã còn **dưới khoảng 5 phút**, thay cả mã truy cập lẫn mã làm mới, không tốn lượt. Còn 6 hay 9 phút thì không làm mới. Vì vậy bộ chuyển tiếp dùng mốc 5 phút của Claude Code, thay cho "dưới 10 phút".
+  - **R3** (đúng research): với thư mục đăng nhập thật và `ANTHROPIC_BASE_URL` trỏ tới một bộ ghi trên máy, `claude -p` chỉ gọi `POST /v1/messages?beta=true` và nhận `200`.
+  - **R5, header hạn mức** (có trên mọi phản hồi qua gói, không chỉ khi `429`):
+    - `anthropic-ratelimit-unified-5h-utilization` và `-7d-utilization`: phần đã dùng, từ 0 tới 1 (ví dụ `0.03` là 3%);
+    - `anthropic-ratelimit-unified-5h-reset` và `-7d-reset`: giờ đặt lại, tính bằng giây Unix;
+    - `anthropic-ratelimit-unified-5h-status`, `-7d-status`, `-status`: `allowed` (trong research ghi neb còn thấy `allowed_warning` và `rejected`);
+    - `anthropic-ratelimit-unified-reset` và `-representative-claim` (`five_hour`…): giờ dùng lại của cửa sổ đang giới hạn.
+
+    Do đó FR-119 lấy % từ `*-utilization × 100` và giờ đặt lại từ `*-reset`. Khi gặp `429`, `rest_until` lấy từ `anthropic-ratelimit-unified-reset`. Chưa gây được `429` thật, nên `429` chỉ kiểm bằng dịch vụ giả.
+  - **Tệp do `claude -p` ghi**: `projects/` và `sessions/` trong `CLAUDE_CONFIG_DIR`, chứa nội dung phiên. Với kiểm nội dung (T014), phải không lưu, hoặc xoá sau mỗi lần, vì đó là ý tưởng của thành viên. Cách làm sẽ kiểm khi làm T014.
