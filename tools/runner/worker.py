@@ -22,7 +22,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "studio"))
 sys.path.insert(0, str(HERE))
 
-from studio import accounts, db, jobs, mail, quotas, reviews, store  # noqa: E402
+from studio import accounts, claude_plan, db, jobs, mail, quotas, reviews, store  # noqa: E402
+
+WAITING = "Waiting for a Claude account"   # specs/008 FR-110
 from studio.store import StudioError  # noqa: E402
 
 import proxy  # noqa: E402
@@ -281,7 +283,11 @@ class Worker:
                 self.failed(j["id"], "The studio restarted twice during this job.")
 
     def claim(self):
-        """The next job to run, already marked running (one transaction: never more than N, one per customer)."""
+        """The next job to run, already marked running (one transaction: never more than N, one per customer).
+        Nothing starts while no Claude account and no API key can take its calls (specs/008 FR-110)."""
+        if not claude_plan.ready():
+            self.mark_waiting()
+            return None
         n = quotas.settings()["concurrency"]
         with db.tx() as con:
             busy = [r[0] for r in con.execute("SELECT owner FROM docs WHERE kind = 'job' AND status = 'running'")]
@@ -302,6 +308,17 @@ class Worker:
             store.doc_insert(con, "job", j["id"], j)
         return j
 
+    def mark_waiting(self) -> None:
+        """Queued jobs say why they do not start."""
+        with db.read() as con:
+            ids = [r[0] for r in con.execute("SELECT id FROM docs WHERE kind = 'job' AND status = 'queued' "
+                                             "AND json_extract(data, '$.step') != ?", (WAITING,))]
+        for job_id in ids:
+            def f(x):
+                if x["status"] == "queued":
+                    x["step"] = WAITING
+            jobs.update(job_id, f)
+
     def start(self, j: dict) -> None:
         work = self.work_dir(j["id"])
         (work / ".home").mkdir(parents=True, exist_ok=True)
@@ -315,7 +332,9 @@ class Worker:
         else:
             (work / ".resume.json").unlink(missing_ok=True)
         token = proxy.issue(j["id"])
-        env = {"ANTHROPIC_BASE_URL": self.proxy_url, "ANTHROPIC_API_KEY": token, "STUDIO_MODE": "online",
+        # Claude Code in plan mode with the job's own token (specs/008 contracts/runner.md); the proxy swaps it
+        env = {"ANTHROPIC_BASE_URL": self.proxy_url, "CLAUDE_CODE_OAUTH_TOKEN": token,
+               "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "STUDIO_MODE": "online",
                "STUDIO_JOB": j["id"], "STUDIO_PROXY": self.proxy_url, "STUDIO_MODEL": s["model"],
                "STUDIO_ROOT": self.runner.root(work)}          # `learn …` and the film tools work in the job folder
         mounts, network = self.prepare(j, work)

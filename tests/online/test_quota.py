@@ -10,7 +10,9 @@ class Quota(unittest.TestCase):
     def setUp(self):
         import os
         self.old_mod = os.environ.get("STUDIO_MODERATION")
+        self.old_key = os.environ.get("ANTHROPIC_API_KEY")
         os.environ["STUDIO_MODERATION"] = "fake"
+        os.environ["ANTHROPIC_API_KEY"] = "sk-ant-test"      # a ready studio (008 FR-110); nothing calls Claude here
         self.p = OnlineProject()
         self.c = self.p.signup_verified("q@example.com")
 
@@ -21,6 +23,10 @@ class Quota(unittest.TestCase):
             os.environ.pop("STUDIO_MODERATION", None)
         else:
             os.environ["STUDIO_MODERATION"] = self.old_mod
+        if self.old_key is None:
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+        else:
+            os.environ["ANTHROPIC_API_KEY"] = self.old_key
 
     def test_ten_at_once_only_two_pass(self):
         from studio import quotas

@@ -8,6 +8,8 @@ import contextlib
 import json
 import os
 import sqlite3
+import threading
+import time
 from pathlib import Path
 
 SCHEMA_VERSION = 2           # 2: Claude plan accounts, calls, invites (specs/008 data-model)
@@ -125,6 +127,20 @@ def path() -> Path:
 
 
 _ready = set()
+_init = threading.Lock()
+
+
+def _wal(con: sqlite3.Connection) -> None:
+    """Switch to WAL. Two first connections at once (threads or processes) get "database is locked"
+    here without waiting for the busy timeout, so try again for a while."""
+    for i in range(100):
+        try:
+            con.execute("PRAGMA journal_mode = WAL")
+            return
+        except sqlite3.OperationalError as e:
+            if "locked" not in str(e) or i == 99:
+                raise
+            time.sleep(0.05)
 
 
 def connect() -> sqlite3.Connection:
@@ -135,9 +151,11 @@ def connect() -> sqlite3.Connection:
     con.execute("PRAGMA foreign_keys = ON")
     con.execute("PRAGMA busy_timeout = 30000")
     if str(p) not in _ready:
-        con.execute("PRAGMA journal_mode = WAL")
-        _migrate(con)
-        _ready.add(str(p))
+        with _init:                            # one thread of this process sets the file up
+            if str(p) not in _ready:
+                _wal(con)
+                _migrate(con)
+                _ready.add(str(p))
     return con
 
 

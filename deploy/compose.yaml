@@ -3,7 +3,8 @@
 #
 #   internet ── caddy ── web                      customers (HTTPS)
 #   worker ── docker-proxy ── /var/run/docker.sock  only container calls; the worker never holds the real socket
-#   job containers ── jobnet ── proxy ── Anthropic   the real key stays in proxy
+#   job containers ── jobnet ── proxy ── Anthropic   Claude sign-ins (/data/claude) and the optional API key stay in
+#                                                    proxy and web; jobs only get their own token (specs/008)
 #   YouTube learn jobs ── jobnet-yt ── egress ── *.youtube.com, *.googlevideo.com, *.ytimg.com only
 name: studio
 
@@ -28,8 +29,10 @@ services:
       STUDIO_PROXIED: "1"
       STUDIO_SECURE_COOKIE: "1"
       STUDIO_MODERATION: ${STUDIO_MODERATION:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?set ANTHROPIC_API_KEY in deploy/.env}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}   # optional fallback (specs/008 FR-117); Claude plans are signed in on AI accounts
+      HOME: /tmp/home                   # Claude Code (sign-in, content check) writes here and in /data/claude
       TMPDIR: /data/tmp                 # uploads are spooled here, not in memory
+    # one process: a Claude sign-in waiting for its code lives in its memory (specs/008 contracts/runner.md)
     tmpfs: [/tmp]
     networks: [front]
 
@@ -39,8 +42,9 @@ services:
     environment:
       STUDIO_MODE: online
       STUDIO_DATA: /data
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_UPSTREAM: ${ANTHROPIC_UPSTREAM:-https://api.anthropic.com}
+      HOME: /tmp/home                   # Claude Code refreshes the plans' sign-ins in /data/claude
     tmpfs: [/tmp]
     networks:
       jobnet: { aliases: [proxy] }
@@ -63,6 +67,7 @@ services:
       STUDIO_JOB_MEMORY: ${STUDIO_JOB_MEMORY:-8g}
       STUDIO_PROXY: http://proxy:8780
       STUDIO_EGRESS: http://egress:8888
+      STUDIO_API_KEY_SET: ${ANTHROPIC_API_KEY:+1}  # jobs may start on the fallback key; the worker never holds the key
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}

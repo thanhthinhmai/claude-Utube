@@ -88,6 +88,7 @@ def account_id(c) -> str:
 # ---------- running jobs (phase 3): sample films, a fake Claude API, the proxy and a worker ----------
 TMP = Path(__file__).resolve().parent / ".tmp"
 FAKE_AGENT = Path(__file__).resolve().parent / "fake_agent.py"
+FAKE_CLAUDE = Path(__file__).resolve().parent / "fake_claude"
 REAL_KEY = "sk-ant-real-key-for-tests"
 FAKE_USAGE = {"input_tokens": 100_000, "output_tokens": 10_000, "cache_creation_input_tokens": 0,
               "cache_read_input_tokens": 0}          # $0.60 at the opus price of SETTINGS_DEFAULT
@@ -146,20 +147,47 @@ class Server:
 
 
 def fake_upstream():
-    """A Messages API that answers with FAKE_USAGE; model `overloaded` gets 529. Records the keys it saw."""
+    """A Messages API that answers with FAKE_USAGE; model `overloaded` gets 529. Records what it saw:
+    path, query, the API key, the plan token (Bearer), anthropic-beta, model.
+    Plan tokens (Bearer) behave as `app.state.plan[token]` says (specs/008): "ok" (default), "limit:<s>" (429 until
+    s seconds from now, with the plan's reset header) or "401". Plan answers carry the plan's rate-limit headers."""
+    import time as _t
     from fastapi import FastAPI, Request
     from fastapi.responses import JSONResponse
     app, seen = FastAPI(), []
+    app.state.plan = {}
 
     @app.post("/v1/messages")
     async def messages(request: Request):
         body = await request.json()
-        seen.append({"key": request.headers.get("x-api-key"), "model": body.get("model")})
+        auth = request.headers.get("authorization") or ""
+        bearer = auth[7:] if auth.lower().startswith("bearer ") else None
+        seen.append({"key": request.headers.get("x-api-key"), "bearer": bearer, "model": body.get("model"),
+                     "beta": request.headers.get("anthropic-beta"), "query": str(request.url.query)})
+        plan_headers = {}
+        if bearer:
+            how = app.state.plan.get(bearer, "ok")
+            if how == "401":
+                return JSONResponse({"type": "error", "error": {"type": "authentication_error", "message": "bad token"}},
+                                    status_code=401)
+            if how.startswith("limit:"):
+                reset = int(_t.time() + float(how[6:]))
+                return JSONResponse({"type": "error", "error": {"type": "rate_limit_error", "message": "limit"}},
+                                    status_code=429, headers={"anthropic-ratelimit-unified-status": "rejected",
+                                                              "anthropic-ratelimit-unified-reset": str(reset),
+                                                              "anthropic-ratelimit-unified-5h-utilization": "1.0",
+                                                              "anthropic-ratelimit-unified-5h-reset": str(reset)})
+            plan_headers = {"anthropic-ratelimit-unified-status": "allowed",
+                            "anthropic-ratelimit-unified-5h-utilization": "0.25",
+                            "anthropic-ratelimit-unified-5h-reset": str(int(_t.time() + 3600)),
+                            "anthropic-ratelimit-unified-7d-utilization": "0.1",
+                            "anthropic-ratelimit-unified-7d-reset": str(int(_t.time() + 86400 * 3))}
         if body.get("model") == "overloaded":
             return JSONResponse({"type": "error", "error": {"type": "overloaded_error", "message": "busy"}},
                                 status_code=529, headers={"retry-after": "1"})
-        return {"id": "msg_1", "type": "message", "role": "assistant", "model": body.get("model"),
-                "content": [{"type": "text", "text": "ok"}], "stop_reason": "end_turn", "usage": FAKE_USAGE}
+        return JSONResponse({"id": "msg_1", "type": "message", "role": "assistant", "model": body.get("model"),
+                             "content": [{"type": "text", "text": "ok"}], "stop_reason": "end_turn", "usage": FAKE_USAGE},
+                            headers=plan_headers)
     app.state.seen = seen
     return app
 
@@ -167,17 +195,20 @@ def fake_upstream():
 class Studio(OnlineProject):
     """OnlineProject plus the fake Claude API, the real proxy and a worker (RUNNER=local, fake agent)."""
 
-    def __init__(self, concurrency: int = 2, interval: float = 0.1):
+    def __init__(self, concurrency: int = 2, interval: float = 0.1, plan: bool = False):
+        """plan=True: no API key; Claude accounts are signed in with the fake Claude Code (specs/008)."""
         super().__init__()
         import threading
         samples()
         self.old.update({k: os.environ.get(k) for k in ("RUNNER", "STUDIO_AGENT_CMD", "STUDIO_MODERATION",
-                                                         "ANTHROPIC_API_KEY", "ANTHROPIC_UPSTREAM")})
+                                                         "ANTHROPIC_API_KEY", "ANTHROPIC_UPSTREAM", "STUDIO_CLAUDE_BIN")})
         self.upstream_app = fake_upstream()
         self.upstream = Server(self.upstream_app)
         os.environ.update(RUNNER="local", STUDIO_MODERATION="fake", ANTHROPIC_API_KEY=REAL_KEY,
-                          ANTHROPIC_UPSTREAM=self.upstream.url,
+                          ANTHROPIC_UPSTREAM=self.upstream.url, STUDIO_CLAUDE_BIN=str(FAKE_CLAUDE),
                           STUDIO_AGENT_CMD=f"{sys.executable} {FAKE_AGENT}")
+        if plan:
+            os.environ.pop("ANTHROPIC_API_KEY")
         sys.path.insert(0, str(REPO / "tools" / "runner"))
         import proxy
         import worker
@@ -225,7 +256,6 @@ def first_library_style() -> str:
 
 
 # ---------- Claude plan accounts (specs/008) ----------
-FAKE_CLAUDE = Path(__file__).resolve().parent / "fake_claude"
 
 
 def sign_in(c, slot: int, email: str) -> dict:

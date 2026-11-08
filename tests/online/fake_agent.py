@@ -32,8 +32,9 @@ def studio(*args) -> str:
 def call_api(model: str = "claude-opus-5-5") -> int:
     body = json.dumps({"model": model, "max_tokens": 16, "messages": [{"role": "user", "content": "hi"}]}).encode()
     req = urllib.request.Request(os.environ["ANTHROPIC_BASE_URL"].rstrip("/") + "/v1/messages", data=body, method="POST",
-                                 headers={"x-api-key": os.environ["ANTHROPIC_API_KEY"], "content-type": "application/json",
-                                          "anthropic-version": "2023-06-01"})
+                                 headers={"authorization": "Bearer " + os.environ["CLAUDE_CODE_OAUTH_TOKEN"],
+                                          "content-type": "application/json", "anthropic-version": "2023-06-01",
+                                          "anthropic-beta": "oauth-2025-04-20,claude-code-20250219"})   # like Claude Code
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             return r.status
@@ -122,8 +123,9 @@ def main() -> int:
         return rc
     idea = inp.get("idea", "")
     resumed = (WORK / ".resume.json").exists()
-    key = os.environ.get("ANTHROPIC_API_KEY", "")
-    studio("job", "log", JOB, f"key kind: {'job token' if key.startswith('sk-job-') else 'OTHER'}")
+    key = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN", "")
+    plain = "ANTHROPIC_API_KEY" not in os.environ
+    studio("job", "log", JOB, f"key kind: {'job token' if key.startswith('sk-job-') and plain else 'OTHER'}")
     studio("job", "step", JOB, "Treatment")
     msg = json.loads((WORK / ".resume.json").read_text())["message"] if resumed else ""
     if resumed:

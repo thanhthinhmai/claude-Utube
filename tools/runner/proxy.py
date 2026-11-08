@@ -1,11 +1,16 @@
-"""API proxy between job containers and Anthropic (specs/007 contracts/runner.md, research R3, R13).
+"""API proxy between job containers and Anthropic (specs/007 contracts/runner.md, research R3, R13;
+specs/008 contracts/runner.md).
 
-- `POST /v1/messages` (and `/v1/messages/count_tokens`): checks the job's own token, swaps it for the real key
-  (ANTHROPIC_API_KEY of this process), forwards to ANTHROPIC_UPSTREAM, streams the answer back, adds the cost.
+- `POST /v1/messages` (and `/v1/messages/count_tokens`): checks the job's own token, then sends the call through
+  the Claude account (plan) used least in the last 5 hours, as `Authorization: Bearer <its token>`. A plan at its
+  limit (429) or with a broken sign-in (401) hands the call to the next account. With none left: the fallback
+  ANTHROPIC_API_KEY if set, else wait up to 15 s for one, else the job fails as the studio's fault.
+  Every call is a row in `call`; tokens count against the job's token cap.
 - `/internal/…`: what `sh bin/studio job …` and `review …` call from inside a container.
 Logs carry token counts and cost only, never prompt text.
 
 Run: STUDIO_MODE=online STUDIO_DATA=/data python tools/runner/proxy.py   (listens on 0.0.0.0:8780)"""
+import asyncio
 import hashlib
 import json
 import logging
@@ -23,13 +28,16 @@ from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "studio"))
 
-from studio import db, jobs, quotas, reviews, store  # noqa: E402
+from studio import claude_plan, db, jobs, quotas, reviews, store  # noqa: E402
 from studio.store import StudioError  # noqa: E402
 
 log = logging.getLogger("studio.proxy")
-PASS_HEADERS = ("anthropic-version", "anthropic-beta", "content-type", "accept")
+# Claude Code's own headers go through as they are (research R3); these never do
+DROP_HEADERS = ("host", "content-length", "connection", "authorization", "x-api-key", "cookie", "accept-encoding",
+                "proxy-authorization", "transfer-encoding", "keep-alive", "upgrade", "te", "trailer")
 BACK_HEADERS = ("content-type", "retry-after", "request-id", "anthropic-ratelimit-requests-remaining",
                 "anthropic-ratelimit-tokens-remaining", "x-should-retry")
+WAIT_FOR_REST_S = 15            # specs/008 FR-110, like neb-creative-tool's WAIT_FOR_REST_MS
 
 
 # ---------- job tokens ----------
@@ -121,19 +129,26 @@ def usage_of_stream(chunks: list) -> tuple:
     return model, usage
 
 
-def charge(job: dict, model: str, usage: dict) -> None:
-    usd = quotas.cost_of(model or "", usage)
-    total = quotas.add_cost(job["id"], usd)
-    log.info("job %s model %s in %s out %s cache_w %s cache_r %s cost $%.4f total $%.4f", job["id"], model,
-             usage.get("input_tokens"), usage.get("output_tokens"), usage.get("cache_creation_input_tokens"),
-             usage.get("cache_read_input_tokens"), usd, total)
-    if total >= quotas.settings()["job_cost_cap_usd"]:
-        over_cap(job["id"])
+def charge(job: dict, via: str, model: str, usage: dict) -> None:
+    """Record the call and stop the job past its token cap (FR-116) or, through the API key, its cost cap."""
+    t = quotas.record_call(job["id"], via, model, usage)
+    s = quotas.settings()
+    log.info("job %s via %s model %s tokens %s (job %s) cost $%.4f", job["id"], via, model, quotas.tokens_of(usage),
+             t["tokens"], t["cost_usd"])
+    if t["tokens"] >= s["job_token_cap"]:
+        over_cap(job["id"], "tokens")
+    elif t["cost_usd"] >= s["job_cost_cap_usd"]:
+        over_cap(job["id"], "cost")
 
 
-def over_cap(job_id: str) -> None:
-    quotas.fail(job_id, "The job used more than its cost limit and was stopped. Your credit was refunded.", "studio")
+def over_cap(job_id: str, what: str = "tokens") -> None:
+    limit = "token limit" if what == "tokens" else "cost limit"
+    quotas.fail(job_id, f"The job used more than its {limit} and was stopped. Your credit was refunded.", "studio")
     revoke(job_id)
+
+
+def strip_oauth_beta(value: str) -> str:
+    return ",".join(b for b in (x.strip() for x in (value or "").split(",")) if b and not b.startswith("oauth-"))
 
 
 # ---------- app ----------
@@ -186,39 +201,37 @@ def create_app() -> FastAPI:
     def health():
         return {"ok": True}
 
-    async def forward(request: Request, path: str, metered: bool):
-        job, h = job_of(request)
-        if metered and (job.get("cost_usd") or 0) >= quotas.settings()["job_cost_cap_usd"]:
-            over_cap(job["id"])
-            return _anthropic_error(429, "rate_limit_error", "job cost limit reached")
-        key = os.environ.get("ANTHROPIC_API_KEY")
-        if not key:
-            return _anthropic_error(500, "api_error", "the studio has no API key")
-        headers = {k: v for k, v in request.headers.items() if k.lower() in PASS_HEADERS}
-        headers["x-api-key"] = key
-        body = await request.body()
-        req = client.build_request("POST", upstream + path, content=body, headers=headers)
-        r = await client.send(req, stream=True)
-        back = {k: v for k, v in r.headers.items() if k.lower() in BACK_HEADERS}
-        if r.status_code >= 400:              # 429, 529, 5xx… passed through so the SDK retries (R13)
+    async def send(request: Request, path: str, body: bytes, auth: dict, api: bool):
+        headers = {k: v for k, v in request.headers.items() if k.lower() not in DROP_HEADERS}
+        if api:
+            beta = strip_oauth_beta(headers.pop("anthropic-beta", ""))
+            if beta:
+                headers["anthropic-beta"] = beta
+        headers.update(auth)
+        url = upstream + path + (f"?{request.url.query}" if request.url.query else "")
+        return await client.send(client.build_request("POST", url, content=body, headers=headers), stream=True)
+
+    async def relay_answer(r, job: dict, h: str, via: str, metered: bool):
+        back = {k: v for k, v in r.headers.items()
+                if k.lower() in BACK_HEADERS or k.lower().startswith("anthropic-ratelimit-unified-")}
+        if r.status_code >= 400:              # 529, 5xx…: the service's trouble, passed through so the SDK retries
             data = await r.aread()
             await r.aclose()
-            log.info("job %s upstream %s", job["id"], r.status_code)
+            log.info("job %s via %s upstream %s", job["id"], via, r.status_code)
             return Response(data, status_code=r.status_code, headers=back)
-        is_stream = r.headers.get("content-type", "").startswith("text/event-stream")
-        if not is_stream:
+        if not r.headers.get("content-type", "").startswith("text/event-stream"):
             data = await r.aread()
             await r.aclose()
             _mark_ok(h)
             if metered:
                 try:
                     msg = json.loads(data)
-                    charge(job, msg.get("model"), msg.get("usage") or {})
+                    charge(job, via, msg.get("model"), msg.get("usage") or {})
                 except (json.JSONDecodeError, AttributeError):
                     pass
             return Response(data, status_code=r.status_code, headers=back)
 
-        async def relay():
+        async def stream():
             chunks = []
             try:
                 async for chunk in r.aiter_raw():
@@ -229,8 +242,60 @@ def create_app() -> FastAPI:
                 _mark_ok(h)
                 if metered:
                     model, usage = usage_of_stream(chunks)
-                    charge(job, model, usage)
-        return StreamingResponse(relay(), status_code=r.status_code, headers=back)
+                    charge(job, via, model, usage)
+        return StreamingResponse(stream(), status_code=r.status_code, headers=back)
+
+    async def forward(request: Request, path: str, metered: bool):
+        job, h = job_of(request)
+        s = quotas.settings()
+        if metered and ((job.get("tokens") or 0) >= s["job_token_cap"] or (job.get("cost_usd") or 0) >= s["job_cost_cap_usd"]):
+            over_cap(job["id"], "tokens" if (job.get("tokens") or 0) >= s["job_token_cap"] else "cost")
+            return _anthropic_error(429, "rate_limit_error", "job limit reached")
+        body = await request.body()
+        waited = False
+        while True:
+            for slot in await asyncio.to_thread(claude_plan.usable):            # least used first (R4)
+                token = await asyncio.to_thread(claude_plan.access_token, slot)
+                if not token:
+                    await asyncio.to_thread(claude_plan.mark_needs_signin, slot)
+                    log.info("job %s plan:%s cannot refresh its sign-in", job["id"], slot)
+                    continue
+                r = await send(request, path, body, {"authorization": f"Bearer {token}"}, api=False)
+                if r.status_code == 401:                                      # refresh once, then give up on it
+                    await r.aclose()
+                    token = await asyncio.to_thread(claude_plan.access_token, slot, True)
+                    r = await send(request, path, body, {"authorization": f"Bearer {token}"}, api=False) if token else None
+                    if r is None or r.status_code == 401:
+                        if r is not None:
+                            await r.aclose()
+                        await asyncio.to_thread(claude_plan.mark_needs_signin, slot)
+                        log.info("job %s plan:%s 401: needs sign-in", job["id"], slot)
+                        continue
+                await asyncio.to_thread(claude_plan.note_usage, slot, r.headers)
+                if r.status_code == 429:                                      # the plan's limit: next account
+                    await r.aclose()
+                    until = await asyncio.to_thread(claude_plan.mark_limited, slot, claude_plan.reset_at(r.headers))
+                    log.info("job %s plan:%s 429: rests until %s", job["id"], slot, until)
+                    continue
+                if r.status_code < 400:
+                    await asyncio.to_thread(claude_plan.mark_ok, slot)
+                return await relay_answer(r, job, h, f"plan:{slot}", metered)
+            key = os.environ.get("ANTHROPIC_API_KEY")
+            if key:                                                           # FR-117: the fallback key
+                r = await send(request, path, body, {"x-api-key": key}, api=True)
+                return await relay_answer(r, job, h, "api", metered)
+            nxt = await asyncio.to_thread(claude_plan.next_free)
+            if nxt and not waited:
+                delay = claude_plan._ts(nxt[1]) - store.clock()
+                if delay <= WAIT_FOR_REST_S:
+                    waited = True
+                    await asyncio.sleep(max(0.0, delay) + 0.05)
+                    continue
+            when = f" until {nxt[1][11:16]} UTC" if nxt else ""
+            quotas.fail(job["id"], f"No Claude account is available{when}. Your credit was refunded.", "studio")
+            revoke(job["id"])
+            log.info("job %s: no Claude account available%s", job["id"], when)
+            return _anthropic_error(429, "rate_limit_error", f"no Claude account is available{when}")
 
     @app.post("/v1/messages")
     async def messages(request: Request):
@@ -239,6 +304,12 @@ def create_app() -> FastAPI:
     @app.post("/v1/messages/count_tokens")
     async def count_tokens(request: Request):
         return await forward(request, "/v1/messages/count_tokens", metered=False)
+
+    @app.api_route("/v1/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+    @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+    async def unknown(rest: str):
+        """Only the Messages API goes through (research R3)."""
+        return _anthropic_error(404, "not_found_error", "not available through the studio")
 
     # ---------- what the CLI in a container calls ----------
     @app.post("/internal/jobs/{job_id}/step")

@@ -20,6 +20,7 @@ RANGES = {
     "upload_max_minutes": (int, 1, 120),
     "daily_cost_cap_usd": (float, 0.01, 100000),
     "job_cost_cap_usd": (float, 0.01, 10000),
+    "job_token_cap": (int, 1_000_000, 500_000_000),
     "concurrency": (int, 1, 16),
     "review_timeout_days": (int, 1, 90),
     "model": (str, None, None),
@@ -106,6 +107,9 @@ def reserve(account, kind: str, name: str, links: dict, job_input: dict) -> dict
     s = settings()
     j = jobs.build(kind, name, links, owner=account["id"], status="queued",
                    extra={"input": job_input, "charged": True})
+    from . import claude_plan
+    if not claude_plan.ready():                       # specs/008 FR-110: no Claude account and no API key
+        raise StudioError("studio_not_ready", "xưởng chưa có tài khoản Claude nào dùng được", 503)
     with db.tx() as con:
         if cost_today(con) >= s["daily_cost_cap_usd"]:
             raise StudioError("daily_cap", "xưởng đã dùng hết ngân sách hôm nay, hãy thử lại ngày mai", 503)
@@ -171,3 +175,36 @@ def add_cost(job_id: str, usd: float) -> float:
                     "ON CONFLICT (day, account_id) DO UPDATE SET cost_usd = cost_usd + excluded.cost_usd",
                     (today_vn(), j["owner"], usd))
     return j["cost_usd"]
+
+
+TOKEN_FIELDS = ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
+
+
+def tokens_of(usage: dict) -> int:
+    return int(sum((usage.get(k) or 0) for k in TOKEN_FIELDS))
+
+
+def record_call(job_id, via: str, model: str, usage: dict) -> dict:
+    """One Claude call (specs/008 data-model: Call): a row in `call`, the job's tokens, and cost only through the
+    API key (`via` = "api"; a plan call costs nothing per call). Returns the job's totals {tokens, cost_usd}."""
+    usd = cost_of(model or "", usage) if via == "api" else 0.0
+    n = tokens_of(usage)
+    with db.tx() as con:
+        owner, totals = None, {"tokens": 0, "cost_usd": 0.0}
+        if job_id:
+            r = con.execute("SELECT data FROM docs WHERE kind = 'job' AND id = ?", (job_id,)).fetchone()
+            if r:
+                j = json.loads(r[0])
+                owner = j["owner"]
+                j["tokens"] = int(j.get("tokens") or 0) + n
+                j["cost_usd"] = round((j.get("cost_usd") or 0.0) + usd, 6)
+                store.doc_insert(con, "job", job_id, j)
+                totals = {"tokens": j["tokens"], "cost_usd": j["cost_usd"]}
+                if usd > 0:
+                    con.execute("INSERT INTO usage_day (day, account_id, cost_usd) VALUES (?, ?, ?) "
+                                "ON CONFLICT (day, account_id) DO UPDATE SET cost_usd = cost_usd + excluded.cost_usd",
+                                (today_vn(), owner, usd))
+        con.execute("INSERT INTO call (job_id, account_id, via, model, tokens_in, tokens_out, cache_write, cache_read, "
+                    "cost_usd, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (job_id, owner, via, model, *(int(usage.get(k) or 0) for k in TOKEN_FIELDS), usd, store.now_iso()))
+    return totals

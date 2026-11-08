@@ -3,7 +3,8 @@
 Reads /work/.input.json (and /work/.resume.json when the customer answered a review), runs one Claude Agent SDK
 session in /work with the studio's CLAUDE.md and skills, writes /work/.result.json {status, session, error?}.
 Exit codes: 0 finished its turn · 10 waits for the customer · other = error.
-ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY point at the studio's API proxy; the real key never enters here."""
+ANTHROPIC_BASE_URL points at the studio's API proxy and CLAUDE_CODE_OAUTH_TOKEN is this job's own token, so Claude
+Code runs in plan mode; the proxy swaps the token for a Claude account's (specs/008). No real sign-in enters here."""
 import asyncio
 import json
 import os

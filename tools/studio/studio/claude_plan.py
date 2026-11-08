@@ -55,11 +55,27 @@ def config_dir(slot: int) -> Path:
     return d
 
 
+class Busy(Exception):
+    """The slot's lock was not free in time (a sign-in may hold it for minutes)."""
+
+
 @contextlib.contextmanager
-def lock(slot: int):
-    """The slot's file lock (contracts/runner.md), shared by web and proxy processes."""
+def lock(slot: int, wait: float = None):
+    """The slot's file lock (contracts/runner.md), shared by web and proxy processes.
+    wait=None blocks; otherwise raise Busy after `wait` seconds."""
     with open(base_dir() / f"slot-{int(slot)}.lock", "a") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
+        if wait is None:
+            fcntl.flock(f, fcntl.LOCK_EX)
+        else:
+            end = time.time() + wait
+            while True:
+                try:
+                    fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    if time.time() >= end:
+                        raise Busy(slot) from None
+                    time.sleep(0.05)
         try:
             yield
         finally:
@@ -73,10 +89,11 @@ def env(slot: int) -> dict:
     return e
 
 
-def run(slot: int, args: list, timeout: float = 60) -> subprocess.CompletedProcess:
-    with lock(slot):
+def run(slot: int, args: list, timeout: float = 60, input: str = None, cwd: str = None,
+        wait: float = None) -> subprocess.CompletedProcess:
+    with lock(slot, wait):
         return subprocess.run([claude_bin(), *args], env=env(slot), capture_output=True, text=True, timeout=timeout,
-                              stdin=subprocess.DEVNULL)
+                              input=input, stdin=None if input is not None else subprocess.DEVNULL, cwd=cwd)
 
 
 def clean(text: str) -> str:
@@ -172,7 +189,8 @@ def usable(now: float = None) -> list:
 
 
 def api_key() -> bool:
-    return bool(os.environ.get("ANTHROPIC_API_KEY"))
+    """A fallback API key is set (the worker only learns that it is, via STUDIO_API_KEY_SET)."""
+    return bool(os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("STUDIO_API_KEY_SET"))
 
 
 def ready() -> bool:
@@ -350,3 +368,145 @@ def refresh_all() -> list:
         if a["state"] != "signed_out":
             status(a["slot"])
     return accounts()
+
+
+# ---------- calls through a plan (research R2, R5; T001 results) ----------
+REFRESH_BEFORE_S = 300          # Claude Code's `auth status` refreshes the access token under about 5 minutes (T001)
+BACKOFF_MAX_S = 300
+
+
+def _credentials(slot: int):
+    """claudeAiOauth of the slot's .credentials.json, or None. Never logged."""
+    f = config_dir(slot) / ".credentials.json"
+    for _ in range(3):                       # Claude Code may be rewriting it right now
+        try:
+            o = json.loads(f.read_text()).get("claudeAiOauth") or {}
+            return o if o.get("accessToken") else None
+        except FileNotFoundError:
+            return None
+        except (ValueError, OSError):
+            time.sleep(0.05)
+    return None
+
+
+def _left(o) -> float:
+    return (o.get("expiresAt") or 0) / 1000 - time.time() if o else -1
+
+
+def access_token(slot: int, force: bool = False, wait: float = 20):
+    """The slot's access token, refreshed through Claude Code when it has under 5 minutes left
+    (or when `force`, after a 401). None when it cannot be had: the account needs signing in again."""
+    o = _credentials(slot)
+    if o and not force and _left(o) > REFRESH_BEFORE_S:
+        return o["accessToken"]
+    try:
+        with lock(slot, wait):
+            o = _credentials(slot)
+            if o and not force and _left(o) > REFRESH_BEFORE_S:
+                return o["accessToken"]          # another process refreshed it while we waited
+            old = o["accessToken"] if o else None
+            if o and force:                      # make Claude Code's own refresh run now
+                f = config_dir(slot) / ".credentials.json"
+                data = json.loads(f.read_text())
+                data["claudeAiOauth"]["expiresAt"] = int((time.time() + 60) * 1000)
+                tmp = f.with_name(".credentials.json.tmp")
+                fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                with os.fdopen(fd, "w") as out:
+                    json.dump(data, out)
+                os.replace(tmp, f)
+            try:
+                subprocess.run([claude_bin(), "auth", "status", "--json"], env=env(slot), capture_output=True,
+                               text=True, timeout=60, stdin=subprocess.DEVNULL)
+            except subprocess.TimeoutExpired:
+                pass
+            o = _credentials(slot)
+    except Busy:
+        o = _credentials(slot)
+        return o["accessToken"] if o and _left(o) > 0 and not force else None
+    if not o or _left(o) <= 0 or (force and o["accessToken"] == old):
+        return None
+    return o["accessToken"]
+
+
+def mark_ok(slot: int) -> None:
+    with db.tx() as con:
+        con.execute("UPDATE claude_account SET state = 'signed_in', rest_until = NULL, rest_step = 0 "
+                    "WHERE slot = ? AND (state = 'limited' OR rest_step != 0)", (slot,))
+
+
+def mark_limited(slot: int, reset_at: float = None) -> str:
+    """The plan said 429: rest until its reset time, or back off 2 s → 4 s → … → 5 minutes. Returns rest_until."""
+    with db.tx() as con:
+        r = _row(con, slot)
+        step = r["rest_step"] if r else 0
+        if reset_at and reset_at > time.time():
+            until, step = reset_at, step
+        else:
+            step += 1
+            until = time.time() + min(BACKOFF_MAX_S, 2 ** step)
+        con.execute("UPDATE claude_account SET state = 'limited', rest_until = ?, rest_step = ? "
+                    "WHERE slot = ? AND state IN ('signed_in', 'limited')", (_iso(until), step, slot))
+    return _iso(until)
+
+
+def mark_needs_signin(slot: int) -> None:
+    """Its sign-in stopped working (FR-109): skip it, and mail the owners once."""
+    from . import mail
+    with db.tx() as con:
+        r = _row(con, slot)
+        if not r:
+            return
+        con.execute("UPDATE claude_account SET state = 'needs_signin' WHERE slot = ? AND state != 'signed_out'", (slot,))
+        send = r["signin_mailed_at"] is None and r["state"] != "signed_out"
+        if send:
+            con.execute("UPDATE claude_account SET signin_mailed_at = ? WHERE slot = ?", (store.now_iso(), slot))
+        owners = [x[0] for x in con.execute("SELECT email FROM accounts WHERE role = 'admin' AND locked_at IS NULL "
+                                            "AND deleted_at IS NULL")] if send else []
+    for to in owners:
+        mail.queue(to, "claude_signin", {"slot": slot, "email": r["email"] or f"slot {slot}"})
+
+
+def _window(headers, name: str):
+    try:
+        u = float(headers.get(f"anthropic-ratelimit-unified-{name}-utilization"))
+    except (TypeError, ValueError):
+        u = None
+    try:
+        reset = _iso(float(headers.get(f"anthropic-ratelimit-unified-{name}-reset")))
+    except (TypeError, ValueError, OverflowError, OSError):
+        reset = None
+    return None if u is None and reset is None else {"percent": None if u is None else round(u * 100, 1), "resets_at": reset}
+
+
+def note_usage(slot: int, headers) -> None:
+    """The plan's 5-hour and weekly windows from a response's rate-limit headers (FR-119, T001 R5)."""
+    five, week = _window(headers, "5h"), _window(headers, "7d")
+    if not five and not week:
+        return
+    with db.tx() as con:
+        con.execute("UPDATE claude_account SET usage = ? WHERE slot = ?",
+                    (json.dumps({"five_hour": five, "seven_day": week, "at": store.now_iso()}), slot))
+
+
+def reset_at(headers):
+    """When a plan that answered 429 can be used again (unix seconds), from its headers."""
+    for k in ("anthropic-ratelimit-unified-reset", "anthropic-ratelimit-unified-5h-reset"):
+        try:
+            return float(headers.get(k))
+        except (TypeError, ValueError):
+            continue
+    try:
+        return time.time() + float(headers.get("retry-after"))
+    except (TypeError, ValueError):
+        return None
+
+
+def next_free(now: float = None):
+    """(slot, time) of the limited account that rests the shortest, or None."""
+    now = now or store.clock()
+    rest = [(_ts(a["rest_until"]), a["slot"], a["rest_until"]) for a in accounts(now)
+            if a["state"] == "limited" and a["rest_until"] and a["same_as"] is None]
+    if not rest:
+        return None
+    _, slot, iso = min(rest)
+    return slot, iso

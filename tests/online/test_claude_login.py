@@ -123,6 +123,20 @@ class ClaudeLogin(Base):
         self.assertEqual(claude_plan.usable(), [1])
         self.assertEqual(claude_plan.usable(time.time() + 120), [2, 1])
 
+    def test_backoff_without_a_reset_time(self):
+        from studio import claude_plan
+        sign_in(self.a, 1, "one@x.test")
+        rests = []
+        for _ in range(10):
+            until = claude_plan.mark_limited(1)
+            rests.append(round(claude_plan._ts(until) - time.time()))
+        for got, want in zip(rests, [2, 4, 8, 16, 32, 64, 128, 256, 300, 300]):   # never more than 5 minutes
+            self.assertAlmostEqual(got, want, delta=1)              # times are stored to the second
+        claude_plan.mark_ok(1)
+        acc = self.a.get(A).json()["accounts"][0]
+        self.assertEqual((acc["state"], acc["rest_until"]), ("signed_in", None))
+        self.assertAlmostEqual(claude_plan._ts(claude_plan.mark_limited(1)) - time.time(), 2, delta=1)   # starts over
+
     def test_status_notices_a_lost_sign_in(self):
         sign_in(self.a, 1, "one@x.test")
         (self.p.data / "claude" / "slot-1" / ".credentials.json").unlink()

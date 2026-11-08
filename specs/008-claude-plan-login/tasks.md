@@ -32,7 +32,7 @@
   - `auth logout`: xoá tệp.
   - `-p … --output-format json`: trả `{"structured_output": {"allowed": true, "reason": ""}}`.
   - Biến `FAKE_CLAUDE_REFRESH=fail` làm cho lệnh làm mới thất bại.
-- [ ] T004 [P] Thêm vào `.gitignore`: `/data/claude/`. Thêm vào `tests/online/helpers.py`:
+- [X] T004 [P] Thêm vào `.gitignore`: `/data/claude/`. Thêm vào `tests/online/helpers.py`:
   - `fake_upstream()` nhận bảng `{mã truy cập: "ok" | "limit:<giây>" | "401"}`. `limit` trả `429` với header giờ dùng lại theo T001. Ghi mỗi yêu cầu nhận được (đường, header đã che giá trị `authorization`, mã nào đã dùng);
   - `sign_in(c, slot, email)` gọi API đăng nhập với `fake_claude`.
 
@@ -55,14 +55,14 @@
   - `accounts()`: danh sách kèm `same_as` (slot nhỏ hơn cùng email), `plan_warning` (gói không phải Pro hay Max), `tokens_5h` (tổng token trong bảng Call của `plan:<n>` trong 5 giờ qua);
   - `usable(now)`: tài khoản dùng được theo data-model, xếp theo `tokens_5h` rồi theo slot (R4);
   - `ready()`: `usable()` khác rỗng hoặc có `ANTHROPIC_API_KEY`.
-- [ ] T007 Thêm vào `claude_plan.py`:
+- [X] T007 Thêm vào `claude_plan.py`:
   - `access_token(slot)`: đọc `claudeAiOauth.accessToken`; còn dưới 5 phút thì chạy `auth status` (T001: Claude Code làm mới ở mốc này) rồi đọc lại; không làm mới được thì trả None;
   - `mark_limited(slot, reset_at)`: không có giờ thì chờ tăng dần 2 → 4 → … → 300 giây theo `rest_step`;
   - `mark_ok(slot)`: `rest_step` về 0, `limited` quá hạn thành `signed_in`;
   - `mark_needs_signin(slot)`: xếp thư `claude_signin` cho admin nếu `signin_mailed_at` đang null;
   - `record_call(job_id, account_id, via, model, usage, cost)`.
 - [X] T008 [P] Thêm mẫu thư `invite` và `claude_signin` (tiếng Anh) vào `tools/studio/studio/mail.py`.
-- [ ] T009 Viết `tests/online/test_claude_plan.py` cho T006–T007, chỉ dùng `fake_claude`:
+- [X] T009 Viết `tests/online/test_claude_plan.py` cho T006–T007, chỉ dùng `fake_claude`:
   - quyền 700 của thư mục;
   - khoá tệp: hai lệnh `run` trên cùng slot không chạy chồng;
   - `same_as`, `plan_warning`;
@@ -88,19 +88,19 @@
   
   Lần đăng nhập đang chờ chỉ giữ trong bộ nhớ của tiến trình web (data-model "Claude login").
 - [X] T011 [US1] Thêm vào `tools/studio/studio/api_online.py` (chỉ admin): `GET /admin/claude`, `POST /admin/claude/accounts/{slot}/login`, `POST …/code`, `POST …/logout`, `POST /admin/claude/refresh`, đúng mã lỗi của contracts/api-admin-claude.md. Lỗi `login_failed` lọc bỏ mọi chuỗi giống mã trước khi trả về.
-- [ ] T012 [US1] Sửa `tools/runner/proxy.py`:
+- [X] T012 [US1] Sửa `tools/runner/proxy.py`:
   - `job_of` nhận mã của việc qua `Authorization: Bearer` (chế độ gói) và qua `x-api-key` như cũ;
   - `forward` gọi một hàm mới `route(job, path, body, headers)`. Ở phase này hàm chỉ thử tài khoản đầu tiên của `usable()`: gửi `Authorization: Bearer <access_token>`, giữ nguyên `anthropic-beta`. Không có tài khoản nào thì đi qua khoá API như 007 (đổi sang `x-api-key`, bỏ `oauth-*` khỏi `anthropic-beta`);
   - ghi một hàng Call với `via`, cộng `job.tokens`; chỉ cộng `cost_usd` khi `via = api`;
   - đường lạ dưới `/v1/` và `/api/` trả `404` dạng lỗi Anthropic;
   - nhật ký chỉ ghi `via`, trạng thái và số token.
-- [ ] T013 [US1] Sửa `tools/runner/worker.py` (contracts/runner.md):
+- [X] T013 [US1] Sửa `tools/runner/worker.py` (contracts/runner.md):
   - container nhận `CLAUDE_CODE_OAUTH_TOKEN=<mã của việc>`, `ANTHROPIC_BASE_URL`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, không còn `ANTHROPIC_API_KEY`;
   - vòng lặp chỉ nhận việc `queued` khi `claude_plan.ready()`;
   - trang việc hiện "Waiting for a Claude account" khi việc đang chờ vì lý do này.
   
   Sửa dòng chú thích đầu `tools/runner/agent.py` cho khớp.
-- [ ] T014 [US1] Sửa `tools/studio/studio/moderation.py` theo research R6:
+- [X] T014 [US1] Sửa `tools/studio/studio/moderation.py` theo research R6:
   - chạy `claude -p` với lời nhắc và lược đồ cũ trên tài khoản đầu tiên của `usable()`, ghi Call (`job_id` null);
   - không có tài khoản thì dùng khoá API như cũ;
   - không có cả hai thì `POST /jobs` trả `503 studio_not_ready`, không trừ lượt.
@@ -113,7 +113,7 @@
   - dòng cảnh báo "No Claude account signed in. Jobs cannot run." khi `ready` là false.
   
   Mọi chữ tiếng Anh. Có `@ts-check` như 006.
-- [ ] T016 [US1] Viết `tests/online/test_claude_login.py`:
+- [X] T016 [US1] Viết `tests/online/test_claude_login.py`:
   - US1 #1–4, #6: đăng nhập với mã đúng và mã sai, đăng xuất, người không phải admin bị `403`;
   - phim giả chạy xong với `via = plan:1` khi không có `ANTHROPIC_API_KEY`;
   - container nhận đúng biến môi trường;
@@ -121,10 +121,10 @@
   - dán mã đúng thì tài khoản thành `signed_in` trong ≤ 10 giây (US1 #2);
   - đăng nhập bỏ dở tự huỷ (rút 10 phút xuống vài giây bằng biến `STUDIO_CLAUDE_LOGIN_TTL`);
   - khởi động lại proxy và web: tài khoản vẫn `signed_in` (FR-105).
-- [ ] T017 [US1] Viết `tests/online/test_secrets.py` cho SC-103 (US1 #5):
+- [X] T017 [US1] Viết `tests/online/test_secrets.py` cho SC-103 (US1 #5):
   - sau một việc giả, tìm chuỗi `tok-` thật của `fake_claude` trong: `/data/jobs/**`, nhật ký của proxy và worker, mọi phản hồi của `/admin/claude` và `/jobs/{id}`, biến môi trường và danh sách gắn (`-v`) của lệnh chạy container. Phải là 0 lần;
   - danh sách gắn không chứa `/data/claude` hay `studio.db`.
-- [ ] T018 [US1] Sửa `deploy/web.Dockerfile` (cài `claude-agent-sdk` qua `deps online`, tạo `/data/claude` quyền 700 khi khởi động nếu chưa có) và `deploy/compose.yaml` (`ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}` và `HOME: /tmp/home` ở `web` và `proxy`, giữ web một tiến trình, sửa chú thích sơ đồ). Theo kết quả T001, nếu Claude Code cần ghi chỗ khác ngoài `/tmp` và `CLAUDE_CONFIG_DIR` thì thêm tmpfs cho chỗ đó.
+- [X] T018 [US1] Sửa `deploy/web.Dockerfile` (cài `claude-agent-sdk` qua `deps online`, tạo `/data/claude` quyền 700 khi khởi động nếu chưa có) và `deploy/compose.yaml` (`ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}` và `HOME: /tmp/home` ở `web` và `proxy`, giữ web một tiến trình, sửa chú thích sơ đồ). Theo kết quả T001, nếu Claude Code cần ghi chỗ khác ngoài `/tmp` và `CLAUDE_CONFIG_DIR` thì thêm tmpfs cho chỗ đó.
 
 **Checkpoint**: MVP. Một tài khoản gói chạy được phim. Commit.
 
@@ -136,10 +136,10 @@
 
 **Independent Test**: spec US2.
 
-- [ ] T019 [US2] Thêm vào `claude_plan.py` và `api_online.py`:
+- [X] T019 [US2] Thêm vào `claude_plan.py` và `api_online.py`:
   - `POST /admin/claude/accounts` tạo slot trống nhỏ nhất ≥ 2; đã đủ 5 thì `409 max_accounts`;
   - `DELETE /admin/claude/accounts/{slot}` đăng xuất, xoá thư mục và hàng; slot 1 thì `409 first_account`.
-- [ ] T020 [US2] Viết đủ vòng thử của `route()` trong `tools/runner/proxy.py`, theo mã giả ở contracts/runner.md:
+- [X] T020 [US2] Viết đủ vòng thử của `route()` trong `tools/runner/proxy.py`, theo mã giả ở contracts/runner.md:
   - thử lần lượt các tài khoản của `usable()`;
   - `429` của gói (nhận biết theo T001): `mark_limited` rồi thử tài khoản kế tiếp;
   - `401`: làm mới một lần; vẫn `401` thì `mark_needs_signin` rồi thử tài khoản kế tiếp;
@@ -147,8 +147,8 @@
   - hết tài khoản: có khoá API thì gửi qua khoá. Không có khoá mà tài khoản sớm dùng lại nhất có `rest_until` trong ≤ 15 giây thì chờ rồi thử một lần. Còn lại thì `quotas.fail(job, "No Claude account is available until <giờ UTC>. Your credit was refunded.", "studio")`, thu hồi mã của việc, trả `429`;
   - chỉ gửi lại khi phản hồi chưa bắt đầu chạy dòng;
   - `529` và `5xx` trả nguyên.
-- [ ] T021 [US2] Thêm vào trang "Claude accounts" (`web/app.js`): nút "Add Claude account" (ẩn khi đủ 5), nút Remove (không có ở slot 1, có hỏi xác nhận). Trạng thái `Limit reached` kèm giờ dùng lại theo giờ máy người xem, và `Needs sign-in`.
-- [ ] T022 [US2] Viết `tests/online/test_rotation.py`:
+- [X] T021 [US2] Thêm vào trang "Claude accounts" (`web/app.js`): nút "Add Claude account" (ẩn khi đủ 5), nút Remove (không có ở slot 1, có hỏi xác nhận). Trạng thái `Limit reached` kèm giờ dùng lại theo giờ máy người xem, và `Needs sign-in`.
+- [ ] T022 [US2] Viết `tests/online/test_rotation.py` (đã có trong `test_plan_run.py`: chuyển tài khoản khi `429` và `401`, đúng 1 thư, chờ ≤ 15 giây, khoá dự phòng, xoay vòng theo mức dùng; còn thiếu SC-104 khi `429` đến giữa việc và SC-105 với 10 việc):
   - US2 #1–7;
   - SC-104: tài khoản 1 trả `429` giữa việc, việc vẫn xong, tài khoản 1 thành `limited` kèm `rest_until`;
   - SC-105: 2 tài khoản, 10 việc giả như nhau, token lệch ≤ 20%;
@@ -237,7 +237,7 @@ Lấy bố cục và cách dùng của neb (`app/login`, `components/accounts/Cl
 - [X] T036 Trang đăng nhập (`web/app.js`, `style.css`): thẻ giữa màn hình, logo và tên xưởng ở trên, "Welcome back" / "Sign in to continue.", nút chính rộng hết thẻ, chữ "Signing in…" khi đang gửi, lỗi trong khung đỏ.
 - [X] T037 Tạo chủ xưởng lần đầu (FR-118), giống hệt neb: `accounts.setup_needed()`, `setup()`; `GET`/`POST /auth/setup` trong `api_online.py`; giới hạn tần suất `setup_ip`; trang đăng nhập hiện form "Create the owner account" (email, mật khẩu hai lần) khi `needed`. Test trong `tests/online/test_setup.py`.
 - [X] T038 Trang "AI accounts" (`#/admin/claude`, mục "AI accounts" ở thanh bên): dòng tóm tắt (số tài khoản, ready, resting, need signing in, khoá API); thẻ "Claude · plan" có huy hiệu, mô tả, mỗi tài khoản một dòng (tên, huy hiệu trạng thái và gói, nút chính, menu ⋯ có Sign out và Remove), khung đăng nhập ngay dưới dòng, cảnh báo trùng tài khoản, chân thẻ có "Add account" và "How it works". Sửa `browser_claude.cjs`.
-- [ ] T039 Thanh hạn mức (FR-119): cột `claude_account.usage`; `claude_plan.note_usage(slot, headers)` đọc thông tin hạn mức theo kết quả T001 (R5); hiện hai thanh 5 giờ và tuần trên trang AI accounts. Phần đọc header làm sau khi T001 kiểm xong với tài khoản thật; bộ chuyển tiếp gọi `note_usage` ở T012.
+- [X] T039 Thanh hạn mức (FR-119): cột `claude_account.usage`; `claude_plan.note_usage(slot, headers)` đọc thông tin hạn mức theo kết quả T001 (R5); hiện hai thanh 5 giờ và tuần trên trang AI accounts. Phần đọc header làm sau khi T001 kiểm xong với tài khoản thật; bộ chuyển tiếp gọi `note_usage` ở T012.
 
 ---
 
