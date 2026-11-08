@@ -190,14 +190,15 @@ async function pageJob(id) {
       ${r.decision ? `<span class="muted">${esc(DECISION[r.decision.value])} · via ${esc(SOURCE[r.decision.source])}</span>` : `<span class="badge s-waiting_review">Needs your review</span>`}</li>`).join("");
   const open = j.status === "waiting_review" ? j.reviews.find((r) => !r.decision) : null;
   $app.innerHTML = `${back("#/", "Jobs")}
-    ${head(esc(KIND[j.kind] || j.kind), `${esc(j.name)} ${badge(j.status)}`, "")}
+    ${head(esc(KIND[j.kind] || j.kind), `${esc(j.name)} ${badge(j.status)}`, j.usage && j.usage.calls
+      ? `Claude: ${num(j.usage.calls, 0)} call${j.usage.calls === 1 ? "" : "s"} · ${num(j.usage.tokens_in, 0)} tokens in · ${num(j.usage.tokens_out, 0)} out · ${num(j.usage.tokens, 0)} in total${j.cost_usd ? ` · ${usd(j.cost_usd)} through the API key` : ""}` : "")}
     <div class="split"><div>
     ${open && open.kind === "question" ? `<div class="panel decide" id="answer-box"><p class="section-title">The studio has a question</p>
       <div class="md">${open.summary_html}</div>
       <textarea id="answer" maxlength="4000" placeholder="Your answer"></textarea>
       <div class="row" style="margin-top:8px"><button class="primary" id="send-answer">Send</button></div><p id="answer-msg" class="muted" role="status"></p></div>`
     : open ? `<p class="notice">This job is waiting for your review: <a href="#/reviews/${esc(open.id)}">${open.kind === "treatment" ? "review the treatment" : "open the review"}</a>.</p>` : ""}
-    ${j.status === "queued" ? `<p class="notice">In the queue${j.queue_position ? `: number ${j.queue_position}` : ""}. It starts by itself when the studio is free.</p>` : ""}
+    ${j.status === "queued" ? `<p class="notice">${j.step === "Waiting for a Claude account" ? "Waiting for a Claude account: the studio owner needs to sign one in on AI accounts." : `In the queue${j.queue_position ? `: number ${j.queue_position}` : ""}. It starts by itself when the studio is free.`}</p>` : ""}
     ${MODE === "online" && j.status === "done" && j.links.film ? `<p><a class="button primary" href="${API}/films/${encodeURIComponent(j.links.film)}/download">Download the film</a>
       <a class="button" href="#/films/${esc(j.links.film)}">Watch it</a></p>
       <details class="panel" id="changes"><summary><strong>Request changes</strong> <span class="muted">· makes a new version and keeps this one</span></summary>
@@ -668,8 +669,8 @@ const SETTING = [
   ["quota_films_default", "Films per month (default)", "int"],
   ["quota_learns_default", "Learns per month (default)", "int"], ["film_max_seconds", "Longest film (seconds)", "int"],
   ["learn_max_videos", "Videos per learn", "int"], ["upload_max_mb", "Upload size (MB)", "int"],
-  ["upload_max_minutes", "Upload length (minutes)", "int"], ["daily_cost_cap_usd", "Studio cost cap per day (USD)", "num"],
-  ["job_cost_cap_usd", "Cost cap per job (USD)", "num"], ["concurrency", "Jobs at the same time", "int"],
+  ["upload_max_minutes", "Upload length (minutes)", "int"], ["job_token_cap", "Token limit per job", "int"],
+  ["concurrency", "Jobs at the same time", "int"],
   ["review_timeout_days", "Stop a job after waiting (days)", "int"], ["model", "Claude model", "text"],
 ];
 const SETTINGS_TABS = [["general", "General"], ["users", "Users"], ["usage", "Usage"]];
@@ -771,24 +772,37 @@ async function settingsUsers(top) {
   }));
 }
 
-/** Settings → Usage: each member's films, learns, cost and storage, and cost per day (tokens arrive with 008 US4). */
+/** Settings → Usage: films, learns, tokens and storage per member; calls and tokens per Claude account, member and
+ *  day, all from the studio's own record of each call (specs/008 US4). USD only for the API-key part. */
 async function settingsUsage(top) {
   const params = new URLSearchParams(location.hash.split("?")[1] || "");
   const q = params.get("q") || "";
   const [acc, use] = await Promise.all([get("/admin/accounts?q=" + encodeURIComponent(q)), get("/admin/usage")]);
+  const [claude] = await Promise.all([get("/admin/claude")]);
+  const money = use.cost_usd_total > 0;                     // USD only when calls went through the API key (FR-117)
+  const cost = (v) => (money ? `<td class="num">${usd(v)}</td>` : "");
+  const via = (v) => {
+    if (v === "api") return "API key";
+    const a = claude.accounts.find((x) => `plan:${x.slot}` === v);
+    return `${claudeLabel(Number(v.split(":")[1]))}${a && a.email ? ` · ${esc(a.email)}` : ""}`;
+  };
   const rows = acc.accounts.map((a) => `<tr data-id="${esc(a.id)}"><td>${esc(a.email)}${a.role === "admin" ? " (owner)" : ""}</td>
       <td>${a.quota.films.used} / <input type="number" min="0" data-f="quota_films" value="${a.quota_films ?? ""}" placeholder="${a.quota.films.limit}" aria-label="Films limit"></td>
       <td>${a.quota.learns.used} / <input type="number" min="0" data-f="quota_learns" value="${a.quota_learns ?? ""}" placeholder="${a.quota.learns.limit}" aria-label="Learns limit"></td>
-      <td class="num">${usd(a.cost_month_usd)}</td><td class="num">${num(a.storage_mb, 1)} MB</td></tr>`).join("");
-  $app.innerHTML = `${top}<p class="lead">Cost in the last 30 days: ${usd(use.cost_usd_total)} · storage ${num(use.storage_mb_total, 1)} MB</p>
+      <td class="num">${num(a.tokens_month, 0)}</td><td class="num">${num(a.storage_mb, 1)} MB</td></tr>`).join("");
+  const table = (head1, list, first) => `<div class="table-wrap"><table><tr><th>${head1}</th><th>Jobs</th><th>Calls</th><th>Tokens</th>${money ? "<th>Cost</th>" : ""}</tr>
+      ${list.map((d) => `<tr><td>${first(d)}</td><td class="num">${d.jobs}</td><td class="num">${num(d.calls, 0)}</td><td class="num">${num(d.tokens, 0)}</td>${cost(d.cost_usd)}</tr>`).join("")
+        || `<tr><td colspan="${money ? 5 : 4}" class="muted">No calls yet.</td></tr>`}</table></div>`;
+  $app.innerHTML = `${top}<p class="lead">Last 30 days: ${num(use.calls_total, 0)} Claude calls · ${num(use.tokens_total, 0)} tokens${money ? ` · ${usd(use.cost_usd_total)} through the API key` : ""} · storage ${num(use.storage_mb_total, 1)} MB</p>
     <h2>Members</h2>
     <div class="row filters"><label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input id="acc-q" type="search" placeholder="Search by email" value="${esc(q)}" aria-label="Search by email"></label></div>
-    <p class="muted">Films and learns: used / own limit (empty = the default on General). To turn someone off, use Users.</p>
-    <div class="table-wrap"><table><tr><th>Email</th><th>Films</th><th>Learns</th><th>Cost this month</th><th>Storage</th></tr>${rows}</table></div>
+    <p class="muted">Films and learns: used / own limit (empty = the default on General). Tokens: this month. To turn someone off, use Users.</p>
+    <div class="table-wrap"><table><tr><th>Email</th><th>Films</th><th>Learns</th><th>Tokens this month</th><th>Storage</th></tr>${rows}</table></div>
     <p id="acc-msg" class="muted" role="status"></p>
-    <h2>Cost per day</h2><div class="table-wrap"><table><tr><th>Day</th><th>Jobs</th><th>Cost</th></tr>
-      ${use.days.slice().reverse().map((d) => `<tr><td>${esc(d.day)}</td><td class="num">${d.jobs}</td><td class="num">${usd(d.cost_usd)}</td></tr>`).join("") || '<tr><td colspan="3" class="muted">No jobs yet.</td></tr>'}</table></div>`;
+    <h2>Per Claude account</h2>${table("Account", use.by_claude, (d) => via(d.via))}
+    <h2>Per member</h2>${table("Member", use.by_account, (d) => esc(d.email || "(deleted)"))}
+    <h2>Per day</h2>${table("Day", use.days.slice().reverse(), (d) => esc(d.day))}`;
   const msg = document.getElementById("acc-msg");
   (/** @type {NodeListOf<HTMLInputElement>} */ ($app.querySelectorAll("tr[data-id] input[data-f]"))).forEach((el) => el.addEventListener("change", async () => {
     const id = /** @type {HTMLElement} */ (el.closest("tr")).dataset.id, f = el.dataset.f;

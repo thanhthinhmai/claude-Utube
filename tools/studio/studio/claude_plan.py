@@ -10,6 +10,7 @@ import contextlib
 import datetime as dt
 import fcntl
 import json
+import math
 import os
 import pty
 import re
@@ -444,6 +445,7 @@ def mark_limited(slot: int, reset_at: float = None) -> str:
         else:
             step += 1
             until = time.time() + min(BACKOFF_MAX_S, 2 ** step)
+        until = math.ceil(until)                 # stored to the second: never call back before the reset
         con.execute("UPDATE claude_account SET state = 'limited', rest_until = ?, rest_step = ? "
                     "WHERE slot = ? AND state IN ('signed_in', 'limited')", (_iso(until), step, slot))
     return _iso(until)

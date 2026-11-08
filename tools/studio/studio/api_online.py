@@ -283,9 +283,18 @@ def view(j: dict, account, positions: dict = None) -> dict:
         v["queue_position"] = (positions if positions is not None else queue_positions()).get(j["id"])
     else:
         v["queue_position"] = None
+    v["tokens"] = int(j.get("tokens") or 0)
     if account["role"] != "admin":
-        v.pop("cost_usd", None)
+        v.pop("cost_usd", None)                   # only the API-key part costs money; the owner sees it
     return v
+
+
+def job_usage(job_id: str) -> dict:
+    """Calls and tokens of one job from the Call table (specs/008 US4 #1)."""
+    with db.read() as con:
+        r = con.execute("SELECT count(*), coalesce(sum(tokens_in), 0), coalesce(sum(tokens_out), 0), "
+                        f"{TOKENS_SQL} FROM call WHERE job_id = ?", (job_id,)).fetchone()
+    return {"calls": r[0], "tokens_in": r[1], "tokens_out": r[2], "tokens": r[3]}
 
 
 @router.post("/jobs/{job_id}/stop")
@@ -466,15 +475,23 @@ def storage_mb(account_id: str) -> float:
     return mb
 
 
-def month_cost(con, account_id: str) -> float:
-    since = quotas.month_start_vn().strftime("%Y-%m-%d")
-    return round(con.execute("SELECT coalesce(sum(cost_usd), 0) FROM usage_day WHERE account_id = ? AND day >= ?",
-                             (account_id, since)).fetchone()[0], 4)
+TOKENS_SQL = "coalesce(sum(tokens_in + tokens_out + cache_write + cache_read), 0)"
+VN_DAY_SQL = "date(at, '+7 hours')"            # Call times are UTC; days are Vietnam days (007)
+
+
+def month_tokens(con, account_id: str) -> int:
+    since = quotas.month_start_vn().astimezone(dt_utc()).isoformat(timespec="seconds")
+    return con.execute(f"SELECT {TOKENS_SQL} FROM call WHERE account_id = ? AND at >= ?", (account_id, since)).fetchone()[0]
+
+
+def dt_utc():
+    import datetime as dt
+    return dt.timezone.utc
 
 
 def account_row(con, row) -> dict:
     return {**accounts.public(row), "quota_films": row["quota_films"], "quota_learns": row["quota_learns"],
-            "created_at": row["created_at"], "quota": quotas.summary(row), "cost_month_usd": month_cost(con, row["id"]),
+            "created_at": row["created_at"], "quota": quotas.summary(row), "tokens_month": month_tokens(con, row["id"]),
             "storage_mb": storage_mb(row["id"])}
 
 
@@ -540,7 +557,8 @@ DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 @router.get("/admin/usage")
 def usage(request: Request, start: Optional[str] = Query(None, alias="from"), end: Optional[str] = Query(None, alias="to")):
-    """Cost and jobs per day (Vietnam days) and per account; total storage. Default: the last 30 days."""
+    """Calls, tokens and jobs per day (Vietnam days), per member and per Claude account, all from the Call table
+    (specs/008 FR-115); USD only for calls through the API key; total storage. Default: the last 30 days."""
     import datetime as dt
     admin(request)
     today = dt.date.fromisoformat(quotas.today_vn())
@@ -552,15 +570,20 @@ def usage(request: Request, start: Optional[str] = Query(None, alias="from"), en
         ok = False
     if not ok:
         raise StudioError("invalid", "ngày phải có dạng YYYY-MM-DD và from ≤ to", 422)
+    cols = f"count(*), {TOKENS_SQL}, coalesce(sum(cost_usd), 0), count(DISTINCT job_id)"
+    where = f"{VN_DAY_SQL} BETWEEN ? AND ?"
+    row = lambda r: {"calls": r[0], "tokens": r[1], "cost_usd": round(r[2], 4), "jobs": r[3]}      # noqa: E731
     with db.read() as con:
-        days = [{"day": r[0], "cost_usd": round(r[1], 4), "jobs": r[2]} for r in con.execute(
-            "SELECT day, sum(cost_usd), sum(jobs) FROM usage_day WHERE day BETWEEN ? AND ? GROUP BY day ORDER BY day",
-            (start, end))]
-        by = [{"id": r[0], "email": r[1], "cost_usd": round(r[2], 4), "jobs": r[3]} for r in con.execute(
-            "SELECT u.account_id, a.email, sum(u.cost_usd), sum(u.jobs) FROM usage_day u LEFT JOIN accounts a "
-            "ON a.id = u.account_id WHERE day BETWEEN ? AND ? GROUP BY u.account_id ORDER BY 3 DESC", (start, end))]
+        days = [{"day": r[4], **row(r)} for r in con.execute(
+            f"SELECT {cols}, {VN_DAY_SQL} AS d FROM call WHERE {where} GROUP BY d ORDER BY d", (start, end))]
+        by = [{"account_id": r[4], "email": r[5], **row(r)} for r in con.execute(
+            f"SELECT {cols}, c.account_id, a.email FROM call c LEFT JOIN accounts a ON a.id = c.account_id "
+            f"WHERE {where} AND c.account_id IS NOT NULL GROUP BY c.account_id ORDER BY 2 DESC", (start, end))]
+        claude = [{"via": r[4], **row(r)} for r in con.execute(
+            f"SELECT {cols}, via FROM call WHERE {where} GROUP BY via ORDER BY via", (start, end))]
         ids = [r[0] for r in con.execute("SELECT id FROM accounts WHERE deleted_at IS NULL")]
-    return {"from": start, "to": end, "days": days, "by_account": by,
+    return {"from": start, "to": end, "days": days, "by_account": by, "by_claude": claude,
+            "calls_total": sum(d["calls"] for d in days), "tokens_total": sum(d["tokens"] for d in days),
             "cost_usd_total": round(sum(d["cost_usd"] for d in days), 4),
             "storage_mb_total": round(sum(storage_mb(i) for i in ids), 1)}
 

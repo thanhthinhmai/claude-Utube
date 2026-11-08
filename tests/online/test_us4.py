@@ -40,7 +40,7 @@ class US4(unittest.TestCase):
     def test_us4_delete_account_then_erase(self):
         from studio import db, store
         # some data of every kind: a done film, a learn job with a rights record, an upload, a review
-        film = film_job(self.c).json()["id"]
+        film = film_job(self.c, idea="A fox [spend 1]").json()["id"]
         self.s.start()
         self.assertEqual(self.s.wait(film)["status"], "done")
         learn = learn_job(self.c, source="youtube", channel="@some-channel", count=1, rights_confirmed=True).json()["id"]
@@ -72,8 +72,9 @@ class US4(unittest.TestCase):
                 self.assertEqual(n, 0, table)
             n = con.execute('SELECT count(*) FROM outbox WHERE "to" = ?', ("me@example.com",)).fetchone()[0]
             self.assertEqual(n, 0)
-            kept = con.execute("SELECT sum(jobs) FROM usage_day WHERE account_id = 'deleted'").fetchone()[0]
-        self.assertEqual(kept, 2)                                   # the studio's daily totals stay, anonymous
+            self.assertEqual(con.execute("SELECT count(*) FROM call WHERE account_id = ?", (self.aid,)).fetchone()[0], 0)
+            kept = con.execute("SELECT count(*) FROM call WHERE account_id = 'deleted' AND job_id IS NULL").fetchone()[0]
+        self.assertGreater(kept, 0)                                 # the studio's call totals stay, anonymous
         for d in (store.account_dir(self.aid), self.s.data / "uploads" / self.aid, self.s.data / "jobs" / film,
                   self.s.data / "jobs" / learn):
             self.assertFalse(d.exists(), d)

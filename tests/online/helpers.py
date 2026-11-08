@@ -150,12 +150,12 @@ def fake_upstream():
     """A Messages API that answers with FAKE_USAGE; model `overloaded` gets 529. Records what it saw:
     path, query, the API key, the plan token (Bearer), anthropic-beta, model.
     Plan tokens (Bearer) behave as `app.state.plan[token]` says (specs/008): "ok" (default), "limit:<s>" (429 until
-    s seconds from now, with the plan's reset header) or "401". Plan answers carry the plan's rate-limit headers."""
+    s seconds from now, with the plan's reset header), "limit-after:<n>:<s>" (the limit after n good answers) or "401". Plan answers carry the plan's rate-limit headers."""
     import time as _t
     from fastapi import FastAPI, Request
     from fastapi.responses import JSONResponse
     app, seen = FastAPI(), []
-    app.state.plan = {}
+    app.state.plan, app.state.count = {}, {}
 
     @app.post("/v1/messages")
     async def messages(request: Request):
@@ -167,6 +167,10 @@ def fake_upstream():
         plan_headers = {}
         if bearer:
             how = app.state.plan.get(bearer, "ok")
+            app.state.count[bearer] = app.state.count.get(bearer, 0) + 1
+            if how.startswith("limit-after:"):              # "limit-after:<n>:<s>": n good answers, then the limit
+                n, secs = how[12:].split(":")
+                how = f"limit:{secs}" if app.state.count[bearer] > int(n) else "ok"
             if how == "401":
                 return JSONResponse({"type": "error", "error": {"type": "authentication_error", "message": "bad token"}},
                                     status_code=401)

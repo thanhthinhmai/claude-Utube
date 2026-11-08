@@ -150,9 +150,10 @@ def create_app() -> FastAPI:
     @app.get(api + "/jobs/{job_id}")
     def get_job(job_id: str, request: Request):
         if online:
-            from .api_online import view
+            from .api_online import job_usage, view
             a = request.state.account
             j = view(jobs.load(job_id, None if a["role"] == "admin" else a["id"]), a)
+            j["usage"] = job_usage(job_id)              # specs/008 US4: calls and tokens of this job
         else:
             j = reviews.job_view(jobs.load(job_id))
         j["reviews"] = [_review_out(reviews.load(r)) for r in j["review_ids"]]

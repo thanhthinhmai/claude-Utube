@@ -42,7 +42,7 @@ class US3(unittest.TestCase):
         self.assertIn("storage_mb", rows[0])
 
     def test_us3_settings_ranges(self):
-        for bad in ({"concurrency": 0}, {"daily_cost_cap_usd": -1}, {"film_max_seconds": 1000}, {"what": 1}, [1, 2]):
+        for bad in ({"concurrency": 0}, {"daily_cost_cap_usd": 5}, {"film_max_seconds": 1000}, {"what": 1}, [1, 2]):
             r = self.admin.put("/api/v1/admin/settings", json=bad, headers=W)
             self.assertEqual(r.status_code, 422, bad)
         self.assertEqual(self.admin.get("/api/v1/admin/settings").json()["concurrency"], 2)
@@ -79,18 +79,23 @@ class US3(unittest.TestCase):
         self.s.start()
         for i in ids:
             self.assertEqual(self.s.wait(i)["status"], "done")
-        u = self.admin.get("/api/v1/admin/usage").json()
-        total = sum(jobs.load(i)["cost_usd"] for i in ids)
-        self.assertAlmostEqual(u["cost_usd_total"], total, places=4)
-        self.assertAlmostEqual(u["cost_usd_total"], 1.8, places=4)
+        u = self.admin.get("/api/v1/admin/usage").json()      # 008 US4: everything from the Call table
+        from studio import db
+        with db.read() as con:
+            in_table = con.execute("SELECT sum(tokens_in + tokens_out + cache_write + cache_read), count(*) FROM call").fetchone()
+        self.assertEqual((u["tokens_total"], u["calls_total"]), tuple(in_table))                       # SC-107
+        self.assertEqual(u["tokens_total"], sum(jobs.load(i)["tokens"] for i in ids))
+        self.assertEqual((u["tokens_total"], u["calls_total"]), (3 * 110_000, 3))
+        self.assertAlmostEqual(u["cost_usd_total"], 1.8, places=4)            # this studio runs on the API key
         self.assertEqual(sum(d["jobs"] for d in u["days"]), 2)
-        self.assertEqual({x["email"]: x["cost_usd"] for x in u["by_account"]},
-                         {"cust@example.com": 1.2, "cust2@example.com": 0.6})
+        self.assertEqual({x["email"]: (x["calls"], x["tokens"]) for x in u["by_account"]},
+                         {"cust@example.com": (2, 220_000), "cust2@example.com": (1, 110_000)})
+        self.assertEqual([(x["via"], x["calls"]) for x in u["by_claude"]], [("api", 3)])
         self.assertGreater(u["storage_mb_total"], 0)
         self.assertIn("cost_usd", self.admin.get(f"/api/v1/jobs/{ids[0]}").json())   # the admin sees cost
         self.assertEqual(self.admin.get("/api/v1/admin/usage?from=2026-13-01").status_code, 422)
         rows = {x["email"]: x for x in self.admin.get("/api/v1/admin/accounts").json()["accounts"]}
-        self.assertAlmostEqual(rows["cust@example.com"]["cost_month_usd"], 1.2, places=4)
+        self.assertEqual(rows["cust@example.com"]["tokens_month"], 220_000)
 
 
 if __name__ == "__main__":

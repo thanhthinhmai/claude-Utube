@@ -577,7 +577,8 @@ class Worker:
                 con.execute("INSERT INTO usage_day (day, account_id, cost_usd, jobs) SELECT day, 'deleted', cost_usd, jobs "
                             "FROM usage_day WHERE account_id = ? ON CONFLICT (day, account_id) DO UPDATE SET "
                             "cost_usd = cost_usd + excluded.cost_usd, jobs = jobs + excluded.jobs", (aid,))
-                con.execute("DELETE FROM usage_day WHERE account_id = ?", (aid,))
+                con.execute("DELETE FROM usage_day WHERE account_id = ?", (aid,))       # 007 rows, no longer written
+                con.execute("UPDATE call SET account_id = 'deleted', job_id = NULL WHERE account_id = ?", (aid,))
                 con.execute("DELETE FROM accounts WHERE id = ?", (aid,))      # sessions and tokens go with it
             log.info("account %s erased", aid)
 

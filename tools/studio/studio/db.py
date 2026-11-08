@@ -21,8 +21,6 @@ SETTINGS_DEFAULT = {
     "learn_max_videos": 5,
     "upload_max_mb": 500,
     "upload_max_minutes": 20,
-    "daily_cost_cap_usd": 20.0,
-    "job_cost_cap_usd": 5.0,
     "job_token_cap": 40_000_000,          # specs/008 FR-116
     "concurrency": 2,
     "review_timeout_days": 7,
@@ -234,7 +232,7 @@ def read():
         con.close()
 
 
-REMOVED_SETTINGS = ("signup_open",)            # specs/008: no public sign-up
+REMOVED_SETTINGS = ("signup_open", "daily_cost_cap_usd", "job_cost_cap_usd")   # specs/008: no sign-up, tokens not money
 
 
 def settings() -> dict:

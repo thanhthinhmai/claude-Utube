@@ -68,6 +68,12 @@ class PlanRun(unittest.TestCase):
         acc = self.a.get(A).json()["accounts"][0]
         self.assertEqual((acc["tokens_5h"], acc["usage"]["five_hour"]["percent"], acc["usage"]["seven_day"]["percent"]),
                          (220_000, 25.0, 10.0))                                         # FR-119 from the headers
+        u = self.a.get("/api/v1/admin/usage").json()                                    # US4 without an API key
+        self.assertEqual((u["tokens_total"], u["calls_total"], u["cost_usd_total"]), (220_000, 2, 0.0))
+        self.assertEqual([(x["via"], x["tokens"], x["cost_usd"]) for x in u["by_claude"]], [("plan:1", 220_000, 0.0)])
+        usage = self.a.get(f"/api/v1/jobs/{jid}").json()["usage"]
+        self.assertEqual((usage["calls"], usage["tokens_in"], usage["tokens_out"]), (2, 200_000, 20_000))
+        self.assertEqual(c.get(f"/api/v1/jobs/{jid}").json()["tokens"], 220_000)          # members see their tokens
 
     def test_not_ready_rejects_new_jobs_and_holds_queued_ones(self):
         c = self.s.signup_verified("m@x.test")

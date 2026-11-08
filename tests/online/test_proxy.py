@@ -34,11 +34,12 @@ class Proxy(unittest.TestCase):
         self.assertIn("key kind: job token", " ".join(x["line"] for x in j["log"]))
         self.assertTrue(self.s.upstream_app.state.seen)
         self.assertTrue(all(x["key"] == REAL_KEY for x in self.s.upstream_app.state.seen))
-        from studio import db, quotas
-        with db.read() as con:
-            day = con.execute("SELECT cost_usd FROM usage_day WHERE day = ? AND account_id = ?",
-                              (quotas.today_vn(), account_id(self.c))).fetchone()[0]
-        self.assertAlmostEqual(day, 1.2, places=6)
+        from studio import db
+        with db.read() as con:                              # 008: every call is a row; this studio has only the key
+            rows = con.execute("SELECT via, account_id, cost_usd FROM call WHERE job_id = ?", (jid,)).fetchall()
+        self.assertEqual([(r[0], r[1]) for r in rows], [("api", account_id(self.c))] * 2)
+        self.assertAlmostEqual(sum(r[2] for r in rows), 1.2, places=6)
+        self.assertEqual(j["tokens"], 2 * 110_000)
         self.assertNotIn("cost_usd", self.c.get(f"/api/v1/jobs/{jid}").json())    # only the admin sees cost
 
     def test_token_rules(self):
@@ -55,25 +56,25 @@ class Proxy(unittest.TestCase):
         quotas.fail(jid, "x")
         self.assertEqual(post(url + "/v1/messages", token, {"model": "claude-opus-5-5"})[0], 401)   # job ended
 
-    def test_job_cost_cap(self):
+    def test_job_token_cap(self):                    # 008 FR-116 replaces the cost cap of 007
         from studio import quotas
-        quotas.update_settings({"job_cost_cap_usd": 1.0})
-        jid = film_job(self.c, idea="A fox [spend 4]").json()["id"]
+        quotas.update_settings({"job_token_cap": 1_000_000})
+        jid = film_job(self.c, idea="A fox [spend 12]").json()["id"]
         self.s.start()
         j = self.s.wait(jid)
         self.assertEqual((j["status"], j["failure_kind"]), ("failed", "studio"))
+        self.assertIn("token limit", j["error"])
         self.assertFalse(j["charged"])
-        self.assertLess(j["cost_usd"], 1.9)          # stopped after the call that crossed the cap
+        self.assertLess(j["tokens"], 1_000_000 + 110_000 + 1)   # stopped after the call that crossed the cap
         self.assertEqual(self.c.get("/api/v1/me").json()["quota"]["films"]["used"], 0)
 
-    def test_daily_cap_lets_running_jobs_finish(self):
+    def test_no_money_caps_any_more(self):
         from studio import quotas
-        quotas.update_settings({"daily_cost_cap_usd": 0.5, "quota_films_default": 5})
-        jid = film_job(self.c, idea="A fox [spend 1] [slow 0.5]").json()["id"]
-        self.s.start()
-        self.assertEqual(self.s.wait(jid)["status"], "done")
-        r = film_job(self.c)
-        self.assertEqual((r.status_code, r.json()["error"]["code"]), (503, "daily_cap"))
+        from studio.store import StudioError
+        for old in ({"daily_cost_cap_usd": 0.5}, {"job_cost_cap_usd": 1.0}):
+            with self.assertRaises(StudioError):
+                quotas.update_settings(old)
+        self.assertNotIn("daily_cost_cap_usd", quotas.settings())
 
     def test_stream_usage(self):
         import proxy

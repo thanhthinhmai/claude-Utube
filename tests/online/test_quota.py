@@ -98,18 +98,17 @@ class Quota(unittest.TestCase):
     def test_settings_ranges(self):
         from studio import quotas
         from studio.store import StudioError
-        for bad in ({"concurrency": 0}, {"concurrency": 17}, {"job_cost_cap_usd": 0}, {"film_max_seconds": 301},
+        for bad in ({"concurrency": 0}, {"concurrency": 17}, {"job_token_cap": 10}, {"film_max_seconds": 301},
                     {"nope": 1}, {"concurrency": "2"}):
             with self.assertRaises(StudioError, msg=bad):
                 quotas.update_settings(bad)
         self.assertEqual(quotas.update_settings({"concurrency": 16})["concurrency"], 16)
 
-    def test_daily_cap(self):
+    def test_no_daily_money_cap(self):              # 008: plans are paid by the month; no cap in USD per day
         from studio import db, quotas
         with db.tx() as con:
             con.execute("INSERT INTO usage_day VALUES (?, ?, ?, 0)", (quotas.today_vn(), account_id(self.c), 25.0))
-        r = film_job(self.c)
-        self.assertEqual((r.status_code, r.json()["error"]["code"]), (503, "daily_cap"))
+        self.assertEqual(film_job(self.c).status_code, 201)
 
 
 if __name__ == "__main__":

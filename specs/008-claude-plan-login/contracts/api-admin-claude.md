@@ -42,8 +42,8 @@ Chỉ `admin` (Owner). Vai trò hiện trên giao diện: `admin` = Owner, `cust
 ## Mức dùng (FR-114–FR-116)
 | Đường dẫn | Thay đổi |
 |---|---|
-| `GET /jobs/{id}` | thêm `tokens` (thành viên thấy việc của mình); `cost_usd` chỉ admin thấy, chỉ là phần qua khoá API |
-| `GET /admin/usage?from=&to=` | `{days: [{day, calls, tokens, cost_usd}], by_account: [{account_id, email, calls, tokens, cost_usd}], by_claude: [{via, calls, tokens, cost_usd}], storage_mb_total}`. Số nào cũng tính từ Call |
+| `GET /jobs/{id}` | thêm `tokens` và `usage: {calls, tokens_in, tokens_out, tokens}` (thành viên thấy việc của mình); `cost_usd` chỉ admin thấy, chỉ là phần qua khoá API |
+| `GET /admin/usage?from=&to=` | `{days: [{day, jobs, calls, tokens, cost_usd}], by_account: [{account_id, email, jobs, calls, tokens, cost_usd}], by_claude: [{via, jobs, calls, tokens, cost_usd}], calls_total, tokens_total, cost_usd_total, storage_mb_total}`. Số nào cũng tính từ Call (ngày theo giờ Việt Nam); `jobs` là số việc có lần gọi trong nhóm đó (FR-115) |
 | `GET /admin/accounts` | `cost_month_usd` đổi thành `tokens_month` |
 | `PUT /admin/settings` | bỏ `signup_open`, `daily_cost_cap_usd`, `job_cost_cap_usd`; thêm `job_token_cap` (1 triệu … 500 triệu) |
 | `POST /jobs` | bỏ lỗi `503 daily_cap`; thêm `503 studio_not_ready` khi `ready` là false và không kiểm được nội dung (research R6) |

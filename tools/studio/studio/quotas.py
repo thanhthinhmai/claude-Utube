@@ -18,8 +18,6 @@ RANGES = {
     "learn_max_videos": (int, 1, 20),
     "upload_max_mb": (int, 1, 4000),
     "upload_max_minutes": (int, 1, 120),
-    "daily_cost_cap_usd": (float, 0.01, 100000),
-    "job_cost_cap_usd": (float, 0.01, 10000),
     "job_token_cap": (int, 1_000_000, 500_000_000),
     "concurrency": (int, 1, 16),
     "review_timeout_days": (int, 1, 90),
@@ -96,10 +94,6 @@ def summary(account) -> dict:
             "resets_at": next_reset_vn().isoformat(timespec="seconds")}
 
 
-def cost_today(con) -> float:
-    return con.execute("SELECT coalesce(sum(cost_usd), 0) FROM usage_day WHERE day = ?", (today_vn(),)).fetchone()[0]
-
-
 # ---------- reserve, refund, cost ----------
 def reserve(account, kind: str, name: str, links: dict, job_input: dict) -> dict:
     """Charge one credit and create the queued job in the same transaction, so 10 requests at once
@@ -111,8 +105,6 @@ def reserve(account, kind: str, name: str, links: dict, job_input: dict) -> dict
     if not claude_plan.ready():                       # specs/008 FR-110: no Claude account and no API key
         raise StudioError("studio_not_ready", "xưởng chưa có tài khoản Claude nào dùng được", 503)
     with db.tx() as con:
-        if cost_today(con) >= s["daily_cost_cap_usd"]:
-            raise StudioError("daily_cap", "xưởng đã dùng hết ngân sách hôm nay, hãy thử lại ngày mai", 503)
         open_jobs = con.execute(
             "SELECT count(*) FROM docs WHERE kind = 'job' AND owner = ? AND status IN (?, ?, ?, ?)",
             (account["id"], *OPEN)).fetchone()[0]
@@ -123,8 +115,6 @@ def reserve(account, kind: str, name: str, links: dict, job_input: dict) -> dict
             e.extra = {"resets_at": next_reset_vn().isoformat(timespec="seconds")}
             raise e
         store.doc_insert(con, "job", j["id"], j)
-        con.execute("INSERT INTO usage_day (day, account_id, jobs) VALUES (?, ?, 1) "
-                    "ON CONFLICT (day, account_id) DO UPDATE SET jobs = jobs + 1", (today_vn(), account["id"]))
     return j
 
 
@@ -162,21 +152,6 @@ def cost_of(model: str, usage: dict) -> float:
             + (usage.get("cache_read_input_tokens") or 0) * p["cache_read"]) / 1_000_000
 
 
-def add_cost(job_id: str, usd: float) -> float:
-    """Add to the job and to today's usage. Returns the job's total cost."""
-    if usd <= 0:
-        return jobs.load(job_id).get("cost_usd") or 0.0
-    with db.tx() as con:
-        r = con.execute("SELECT data FROM docs WHERE kind = 'job' AND id = ?", (job_id,)).fetchone()
-        j = json.loads(r[0])
-        j["cost_usd"] = round((j.get("cost_usd") or 0.0) + usd, 6)
-        store.doc_insert(con, "job", job_id, j)
-        con.execute("INSERT INTO usage_day (day, account_id, cost_usd) VALUES (?, ?, ?) "
-                    "ON CONFLICT (day, account_id) DO UPDATE SET cost_usd = cost_usd + excluded.cost_usd",
-                    (today_vn(), j["owner"], usd))
-    return j["cost_usd"]
-
-
 TOKEN_FIELDS = ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
 
 
@@ -200,10 +175,6 @@ def record_call(job_id, via: str, model: str, usage: dict) -> dict:
                 j["cost_usd"] = round((j.get("cost_usd") or 0.0) + usd, 6)
                 store.doc_insert(con, "job", job_id, j)
                 totals = {"tokens": j["tokens"], "cost_usd": j["cost_usd"]}
-                if usd > 0:
-                    con.execute("INSERT INTO usage_day (day, account_id, cost_usd) VALUES (?, ?, ?) "
-                                "ON CONFLICT (day, account_id) DO UPDATE SET cost_usd = cost_usd + excluded.cost_usd",
-                                (today_vn(), owner, usd))
         con.execute("INSERT INTO call (job_id, account_id, via, model, tokens_in, tokens_out, cache_write, cache_read, "
                     "cost_usd, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (job_id, owner, via, model, *(int(usage.get(k) or 0) for k in TOKEN_FIELDS), usd, store.now_iso()))

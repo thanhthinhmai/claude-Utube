@@ -130,20 +130,17 @@ def usage_of_stream(chunks: list) -> tuple:
 
 
 def charge(job: dict, via: str, model: str, usage: dict) -> None:
-    """Record the call and stop the job past its token cap (FR-116) or, through the API key, its cost cap."""
+    """Record the call and stop the job past its token cap (FR-116)."""
     t = quotas.record_call(job["id"], via, model, usage)
     s = quotas.settings()
     log.info("job %s via %s model %s tokens %s (job %s) cost $%.4f", job["id"], via, model, quotas.tokens_of(usage),
              t["tokens"], t["cost_usd"])
     if t["tokens"] >= s["job_token_cap"]:
-        over_cap(job["id"], "tokens")
-    elif t["cost_usd"] >= s["job_cost_cap_usd"]:
-        over_cap(job["id"], "cost")
+        over_cap(job["id"])
 
 
-def over_cap(job_id: str, what: str = "tokens") -> None:
-    limit = "token limit" if what == "tokens" else "cost limit"
-    quotas.fail(job_id, f"The job used more than its {limit} and was stopped. Your credit was refunded.", "studio")
+def over_cap(job_id: str) -> None:
+    quotas.fail(job_id, "The job used more than its token limit and was stopped. Your credit was refunded.", "studio")
     revoke(job_id)
 
 
@@ -248,9 +245,9 @@ def create_app() -> FastAPI:
     async def forward(request: Request, path: str, metered: bool):
         job, h = job_of(request)
         s = quotas.settings()
-        if metered and ((job.get("tokens") or 0) >= s["job_token_cap"] or (job.get("cost_usd") or 0) >= s["job_cost_cap_usd"]):
-            over_cap(job["id"], "tokens" if (job.get("tokens") or 0) >= s["job_token_cap"] else "cost")
-            return _anthropic_error(429, "rate_limit_error", "job limit reached")
+        if metered and (job.get("tokens") or 0) >= s["job_token_cap"]:
+            over_cap(job["id"])
+            return _anthropic_error(429, "rate_limit_error", "job token limit reached")
         body = await request.body()
         waited = False
         while True:

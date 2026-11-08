@@ -148,7 +148,7 @@
   - chỉ gửi lại khi phản hồi chưa bắt đầu chạy dòng;
   - `529` và `5xx` trả nguyên.
 - [X] T021 [US2] Thêm vào trang "Claude accounts" (`web/app.js`): nút "Add Claude account" (ẩn khi đủ 5), nút Remove (không có ở slot 1, có hỏi xác nhận). Trạng thái `Limit reached` kèm giờ dùng lại theo giờ máy người xem, và `Needs sign-in`.
-- [ ] T022 [US2] Viết `tests/online/test_rotation.py` (đã có trong `test_plan_run.py`: chuyển tài khoản khi `429` và `401`, đúng 1 thư, chờ ≤ 15 giây, khoá dự phòng, xoay vòng theo mức dùng; còn thiếu SC-104 khi `429` đến giữa việc và SC-105 với 10 việc):
+- [X] T022 [US2] Viết `tests/online/test_rotation.py` (SC-104, SC-105; phần còn lại nằm trong `test_plan_run.py`):
   - US2 #1–7;
   - SC-104: tài khoản 1 trả `429` giữa việc, việc vẫn xong, tài khoản 1 thành `limited` kèm `rest_until`;
   - SC-105: 2 tài khoản, 10 việc giả như nhau, token lệch ≤ 20%;
@@ -193,19 +193,19 @@
 
 **Independent Test**: spec US4.
 
-- [ ] T028 [US4] Sửa `tools/studio/studio/quotas.py`:
+- [X] T028 [US4] Sửa `tools/studio/studio/quotas.py`:
   - bỏ trần chi phí ngày và việc ghi Usage day;
   - `usage(from, to)` tính từ Call: `days`, `by_account`, `by_claude` (contract);
   - `tokens_month` cho mỗi thành viên.
   
   Bỏ lỗi `503 daily_cap` ở `POST /jobs`.
-- [ ] T029 [US4] Trong `tools/runner/proxy.py`, đổi kiểm trần chi phí thành `job.tokens >= job_token_cap`. Vượt trần thì việc lỗi do xưởng ("The job used more than its token limit and was stopped. Your credit was refunded.") và trả `429`.
-- [ ] T030 [US4] Sửa `api_online.py` và `web/app.js`:
+- [X] T029 [US4] Trong `tools/runner/proxy.py`, đổi kiểm trần chi phí thành `job.tokens >= job_token_cap`. Vượt trần thì việc lỗi do xưởng ("The job used more than its token limit and was stopped. Your credit was refunded.") và trả `429`.
+- [X] T030 [US4] Sửa `api_online.py` và `web/app.js`:
   - `GET /jobs/{id}` thêm `tokens`; `cost_usd` chỉ admin thấy;
   - trang Usage hiện calls và tokens theo ngày, theo thành viên, theo tài khoản Claude; chỉ phần `api` có USD;
   - danh sách thành viên hiện `tokens_month`;
   - Settings: bỏ 3 khoá cũ, thêm `job_token_cap`.
-- [ ] T031 [US4] Sửa `tests/online/test_proxy.py`, `test_admin.py`, `test_quota.py`, `test_us4.py`, `browser_admin.cjs`:
+- [X] T031 [US4] Sửa `tests/online/test_proxy.py`, `test_admin.py`, `test_quota.py`, `test_us4.py`, `browser_admin.cjs`:
   - bỏ các test trần chi phí ngày và trần chi phí của việc;
   - thêm test trần token;
   - SC-107: tổng token của `/admin/usage` bằng tổng bảng Call;
