@@ -33,8 +33,7 @@ RUN sh bin/studio setup || true \
     && test -f lib/lemo-opuscar/AGENTS.md \
     && sh bin/studio deps voice music \
     && sh bin/studio deps learn --extra \
-    && sh bin/studio deps online \
-    && tools/.venv/bin/python -m pip install --quiet claude-agent-sdk
+    && sh bin/studio deps online
 
 # System libraries Chromium needs; everything readable by the job user
 RUN cd lib/lemo-opuscar && node node_modules/playwright-core/cli.js install-deps chromium-headless-shell \

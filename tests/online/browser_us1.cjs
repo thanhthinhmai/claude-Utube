@@ -13,7 +13,7 @@ const readLine = () => new Promise((res) => process.stdin.once("data", (d) => re
   page.on("pageerror", (e) => errors.push(String(e)));
   const t0 = Date.now();
   await page.goto(`${base}/#/`);
-  await page.waitForSelector("text=Log in");                  // guests land on the login page
+  await page.waitForSelector("text=Sign in to continue.");     // guests land on the login page
   await page.click("text=Create an account");
   await page.waitForSelector("#terms");
   await page.fill("#email", email);
@@ -32,7 +32,7 @@ const readLine = () => new Promise((res) => process.stdin.once("data", (d) => re
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.click("button[type=submit]");
-  await page.waitForSelector("text=films left this month");
+  await page.waitForSelector("#acct >> text=films left this month")   // phone width: the account menu is in the top bar;
   await page.click("text=Make a film");
   await page.waitForSelector(".pick label");
   await page.click(".pick label >> nth=0");

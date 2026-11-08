@@ -12,6 +12,12 @@
 
 ## Phase 1: Setup
 
+> **Đổi thứ tự (2026-11-08, người dùng duyệt)**: chủ xưởng muốn đăng nhập tài khoản thật từ giao diện của xưởng, không qua chat. Vì vậy:
+> - Phần T001 không cần tài khoản đã kiểm xong (research "Kết quả kiểm T001").
+> - Phần T001 cần tài khoản thật (trạng thái khi đã đăng nhập, tệp đăng nhập, cách làm mới mã, header hạn mức) làm sau T015, bằng tài khoản đăng nhập qua trang Admin → Claude accounts.
+> - Làm trước: T003, T004 (phần `sign_in`), T005, T006, T008, T010, T011, T015 và test của chúng. `access_token` (T007) và mọi phần của bộ chuyển tiếp làm sau khi kiểm xong.
+> - Bỏ các khoá cài đặt cũ (`signup_open`, `daily_cost_cap_usd`, `job_cost_cap_usd`) ở task dùng tới chúng (T023 cho `signup_open`, T028–T029 cho trần chi phí), không ở T005, để các bộ test vẫn đạt sau mỗi bước.
+
 - [ ] T001 Kiểm các mục "Kiểm khi implement" của research.md bằng một tài khoản Claude thật, trên máy này, với Claude Code đi kèm `claude-agent-sdk` trong `tools/.venv`. Dùng `CLAUDE_CONFIG_DIR` tạm, không có trình duyệt (`BROWSER=/bin/false`). Ghi kết quả vào `specs/008-claude-plan-login/research.md`, mục mới "Kết quả kiểm T001":
   - R1: `claude auth login --claudeai` in URL dạng `https://…/oauth/authorize?…` và đọc mã từ stdin; các trường JSON của `claude auth status --json`; `claude auth logout`.
   - R2: tên tệp và các trường của thông tin đăng nhập; lệnh nào làm mới mã truy cập mà không tốn hạn mức (thử `auth status` trước, bằng cách sửa `expiresAt` cho sắp hết hạn).
@@ -19,8 +25,8 @@
   - Claude Code ghi những tệp nào ngoài `CLAUDE_CONFIG_DIR` (ví dụ trong `$HOME`) khi đăng nhập, xem trạng thái và làm mới (cho T018).
   - R5: gửi một yêu cầu thật qua gói bằng Bearer, ghi các header `anthropic-ratelimit-*` của phản hồi. Nếu không gây được `429` thì ghi rõ là chưa kiểm được.
   - **Nếu một mục khác research thì dừng ở đây và hỏi người dùng** (hiến pháp II).
-- [ ] T002 [P] Thêm `claude-agent-sdk` (ghim phiên bản giống `deploy/job.Dockerfile`) vào `tools/requirements-online.txt`. Thêm hàm `claude_bin()` vào `tools/studio/studio/claude_plan.py` (tệp mới): trả về `STUDIO_CLAUDE_BIN` nếu đặt, nếu không thì trả về tệp `claude` đi kèm gói `claude_agent_sdk` (tìm theo đường cài).
-- [ ] T003 [P] Tạo `tests/online/fake_claude` (Python, có quyền chạy), giả các lệnh theo kết quả T001:
+- [X] T002 [P] Thêm `claude-agent-sdk` (ghim phiên bản giống `deploy/job.Dockerfile`) vào `tools/requirements-online.txt`. Thêm hàm `claude_bin()` vào `tools/studio/studio/claude_plan.py` (tệp mới): trả về `STUDIO_CLAUDE_BIN` nếu đặt, nếu không thì trả về tệp `claude` đi kèm gói `claude_agent_sdk` (tìm theo đường cài).
+- [X] T003 [P] Tạo `tests/online/fake_claude` (Python, có quyền chạy), giả các lệnh theo kết quả T001:
   - `auth login --claudeai`: in URL, đợi một dòng trên stdin. Mã `good-<email>` thì ghi `.credentials.json` giả (`accessToken = tok-<email>-<n>`, `expiresAt`) vào `$CLAUDE_CONFIG_DIR` và thoát 0. Mã khác thì in lỗi và thoát 1.
   - `auth status --json`: đọc tệp đó; mã truy cập sắp hết hạn thì tăng `<n>` (làm mới).
   - `auth logout`: xoá tệp.
@@ -34,7 +40,7 @@
 
 ## Phase 2: Foundational (chặn mọi user story)
 
-- [ ] T005 Sửa `tools/studio/studio/db.py`, tăng phiên bản lược đồ (data-model "Chuyển phiên bản lược đồ"):
+- [X] T005 Sửa `tools/studio/studio/db.py`, tăng phiên bản lược đồ (data-model "Chuyển phiên bản lược đồ"):
   - bảng `claude_account(slot INTEGER PRIMARY KEY CHECK (slot BETWEEN 1 AND 5), email, plan, state CHECK IN ('signed_out','signed_in','limited','needs_signin'), rest_until, rest_step INTEGER DEFAULT 0, signin_mailed_at, checked_at)`, tạo sẵn slot 1 `signed_out`;
   - bảng `call(id INTEGER PRIMARY KEY, job_id, account_id, via, model, tokens_in, tokens_out, cache_write, cache_read, cost_usd REAL DEFAULT 0, at)`, chỉ mục `(via, at)` và `(account_id, at)`;
   - cột `job.tokens INTEGER DEFAULT 0`;
@@ -42,7 +48,7 @@
   - Settings: bỏ `signup_open`, `daily_cost_cap_usd`, `job_cost_cap_usd`; thêm `job_token_cap` mặc định `40000000`, khoảng hợp lệ 1 000 000 … 500 000 000.
   
   Thêm test chuyển từ cơ sở dữ liệu 007 có sẵn trong `tests/online/test_store_online.py`: tài khoản cũ còn nguyên (FR-113).
-- [ ] T006 Viết phần lõi của `tools/studio/studio/claude_plan.py`:
+- [X] T006 Viết phần lõi của `tools/studio/studio/claude_plan.py`:
   - `config_dir(slot)` = `$STUDIO_DATA/claude/slot-<n>`, tạo với quyền 700;
   - `run(slot, args, timeout, stdin=None)` chạy `claude_bin()` với `CLAUDE_CONFIG_DIR`, xoá `ANTHROPIC_API_KEY` và `ANTHROPIC_AUTH_TOKEN` khỏi môi trường, bọc trong `flock` của `$STUDIO_DATA/claude/slot-<n>.lock` (contracts/runner.md);
   - `status(slot, fresh)`: đọc `auth status --json`, ghi `email`, `plan`, `checked_at`; `signed_in` khi `loggedIn`;
@@ -55,7 +61,7 @@
   - `mark_ok(slot)`: `rest_step` về 0, `limited` quá hạn thành `signed_in`;
   - `mark_needs_signin(slot)`: xếp thư `claude_signin` cho admin nếu `signin_mailed_at` đang null;
   - `record_call(job_id, account_id, via, model, usage, cost)`.
-- [ ] T008 [P] Thêm mẫu thư `invite` và `claude_signin` (tiếng Anh) vào `tools/studio/studio/mail.py`.
+- [X] T008 [P] Thêm mẫu thư `invite` và `claude_signin` (tiếng Anh) vào `tools/studio/studio/mail.py`.
 - [ ] T009 Viết `tests/online/test_claude_plan.py` cho T006–T007, chỉ dùng `fake_claude`:
   - quyền 700 của thư mục;
   - khoá tệp: hai lệnh `run` trên cùng slot không chạy chồng;
@@ -75,13 +81,13 @@
 
 **Independent Test**: spec US1. Tự động thì dùng `fake_claude` và dịch vụ giả; bằng tay thì làm theo quickstart, bước 1–4.
 
-- [ ] T010 [US1] Viết đăng nhập trong `tools/studio/studio/claude_plan.py` (research R1):
+- [X] T010 [US1] Viết đăng nhập trong `tools/studio/studio/claude_plan.py` (research R1):
   - `start_login(slot)` huỷ lần đang chờ, chạy `auth login --claudeai` với `BROWSER=/bin/false`, đợi URL tối đa 30 giây, hẹn huỷ sau 10 phút (`STUDIO_CLAUDE_LOGIN_TTL`, mặc định 600 giây);
   - `submit_code(slot, code)` ghi mã vào stdin, đợi tiến trình thoát tối đa 30 giây. Thoát 0 thì gọi `status(fresh=True)`, đặt `signed_in`, xoá `signin_mailed_at`. Thoát khác 0 thì báo `bad_code`;
   - `logout(slot)`.
   
   Lần đăng nhập đang chờ chỉ giữ trong bộ nhớ của tiến trình web (data-model "Claude login").
-- [ ] T011 [US1] Thêm vào `tools/studio/studio/api_online.py` (chỉ admin): `GET /admin/claude`, `POST /admin/claude/accounts/{slot}/login`, `POST …/code`, `POST …/logout`, `POST /admin/claude/refresh`, đúng mã lỗi của contracts/api-admin-claude.md. Lỗi `login_failed` lọc bỏ mọi chuỗi giống mã trước khi trả về.
+- [X] T011 [US1] Thêm vào `tools/studio/studio/api_online.py` (chỉ admin): `GET /admin/claude`, `POST /admin/claude/accounts/{slot}/login`, `POST …/code`, `POST …/logout`, `POST /admin/claude/refresh`, đúng mã lỗi của contracts/api-admin-claude.md. Lỗi `login_failed` lọc bỏ mọi chuỗi giống mã trước khi trả về.
 - [ ] T012 [US1] Sửa `tools/runner/proxy.py`:
   - `job_of` nhận mã của việc qua `Authorization: Bearer` (chế độ gói) và qua `x-api-key` như cũ;
   - `forward` gọi một hàm mới `route(job, path, body, headers)`. Ở phase này hàm chỉ thử tài khoản đầu tiên của `usable()`: gửi `Authorization: Bearer <access_token>`, giữ nguyên `anthropic-beta`. Không có tài khoản nào thì đi qua khoá API như 007 (đổi sang `x-api-key`, bỏ `oauth-*` khỏi `anthropic-beta`);
@@ -100,7 +106,7 @@
   - không có cả hai thì `POST /jobs` trả `503 studio_not_ready`, không trừ lượt.
   
   `STUDIO_MODERATION=fake` giữ nguyên.
-- [ ] T015 [US1] Thêm trang Admin → "Claude accounts" vào `tools/studio/studio/web/app.js`, `index.html`, `style.css`:
+- [X] T015 [US1] Thêm trang Admin → "Claude accounts" vào `tools/studio/studio/web/app.js`, `index.html`, `style.css`:
   - bảng tài khoản: slot, email, gói, trạng thái, giờ dùng lại, cảnh báo gói, đánh dấu trùng;
   - nút Sign in mở URL ở thẻ mới, kèm ô dán mã và nút Submit;
   - nút Sign out;
@@ -220,6 +226,18 @@
 - [ ] T033 [P] Sửa `CLAUDE.md` (mục Cấu trúc, câu về chế độ online: gói Claude, `claude_plan.py`, lời mời) và `bin/studio` nếu lệnh `online admin` cần đổi.
 - [ ] T034 Sửa `tests/online/live.py` và `live.sh`: in token theo việc và `via` thay cho `cost_usd`; không cần `ANTHROPIC_API_KEY` khi có tài khoản gói.
 - [ ] T035 Chạy quickstart bằng tay với tài khoản thật: các bước 1–4 (SC-101, SC-102), rồi `live.sh` (007 T048) để ghi số token thực tế. Chỉnh mặc định `job_token_cap` nếu cần, ghi vào research R7. Ghi kết quả: đạt, đạt một phần hoặc thất bại (hiến pháp IV).
+
+
+---
+
+## Phase 8: Giao diện giống neb-creative-tool (2026-11-08, FR-118, FR-119)
+
+Lấy bố cục và cách dùng của neb (`app/login`, `components/accounts/ClaudePlanAccount.tsx`, `parts.tsx`, `QuotaBar.tsx`, `Summary.tsx`), giữ màu và kiểu chữ của xưởng. Không lấy proxy, Codex, tài khoản trình duyệt, sắp thứ tự bằng tay hay sao lưu.
+
+- [X] T036 Trang đăng nhập (`web/app.js`, `style.css`): thẻ giữa màn hình, logo và tên xưởng ở trên, "Welcome back" / "Sign in to continue.", nút chính rộng hết thẻ, chữ "Signing in…" khi đang gửi, lỗi trong khung đỏ.
+- [X] T037 Tạo chủ xưởng lần đầu (FR-118), giống hệt neb: `accounts.setup_needed()`, `setup()`; `GET`/`POST /auth/setup` trong `api_online.py`; giới hạn tần suất `setup_ip`; trang đăng nhập hiện form "Create the owner account" (email, mật khẩu hai lần) khi `needed`. Test trong `tests/online/test_setup.py`.
+- [X] T038 Trang "AI accounts" (`#/admin/claude`, mục "AI accounts" ở thanh bên): dòng tóm tắt (số tài khoản, ready, resting, need signing in, khoá API); thẻ "Claude · plan" có huy hiệu, mô tả, mỗi tài khoản một dòng (tên, huy hiệu trạng thái và gói, nút chính, menu ⋯ có Sign out và Remove), khung đăng nhập ngay dưới dòng, cảnh báo trùng tài khoản, chân thẻ có "Add account" và "How it works". Sửa `browser_claude.cjs`.
+- [ ] T039 Thanh hạn mức (FR-119): cột `claude_account.usage`; `claude_plan.note_usage(slot, headers)` đọc thông tin hạn mức theo kết quả T001 (R5); hiện hai thanh 5 giờ và tuần trên trang AI accounts. Phần đọc header làm sau khi T001 kiểm xong với tài khoản thật; bộ chuyển tiếp gọi `note_usage` ở T012.
 
 ---
 

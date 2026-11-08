@@ -15,7 +15,13 @@ Không điểm truy cập nào trả mã đăng nhập hay nội dung thư mục
 | `POST /admin/claude/accounts/{slot}/logout` | `200 ClaudeAccount` (`signed_out`) | |
 | `POST /admin/claude/refresh` | `200` như `GET`, đọc lại `auth status` của mọi tài khoản | |
 
-**ClaudeAccount** = `{slot, email, plan, state, rest_until, same_as, plan_warning: bool, tokens_5h}`. `ready` là true khi có ít nhất một tài khoản dùng được hoặc có khoá API (FR-110).
+**ClaudeAccount** = `{slot, email, plan, state, rest_until, same_as, plan_warning: bool, tokens_5h, usage}`. `usage` = `{five_hour: {percent, resets_at}, seven_day: {percent, resets_at}, at}` hoặc null khi chưa có lần gọi nào (FR-119). `percent` là 0–100 hoặc null; giờ dạng ISO. `ready` là true khi có ít nhất một tài khoản dùng được hoặc có khoá API (FR-110).
+
+## Tạo chủ xưởng lần đầu (FR-118)
+| Phương thức · Đường dẫn | Trả về | Lỗi |
+|---|---|---|
+| `GET /auth/setup` | `{needed: bool}`: true khi chưa có tài khoản quản trị | |
+| `POST /auth/setup` `{email, password}` | `201`: tạo tài khoản quản trị đã xác minh, đặt cookie phiên | `409 already_set_up` · `422 weak_password` · `429 rate_limited` (10 lần mỗi 15 phút mỗi IP) |
 
 ## Thành viên (FR-111–FR-113)
 | Phương thức · Đường dẫn | Trả về | Lỗi |

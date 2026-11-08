@@ -104,6 +104,8 @@ class AccountBrowser(unittest.TestCase):
         from helpers import Server
         from studio import db
         from studio.server import create_app
+        from studio import accounts as _acc          # a studio always has an owner (008 FR-118: else the login page asks for one)
+        _acc.signup("owner@example.com", PASSWORD, True, role="admin", verified=True)
         web = Server(create_app())
         try:
             r = subprocess.run(["node", str(Path(__file__).with_name("browser_account.cjs")), web.url, "me@example.com",

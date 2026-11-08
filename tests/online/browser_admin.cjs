@@ -15,7 +15,7 @@ const [base, email, password] = process.argv.slice(2);
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.click("button[type=submit]");
-  await page.waitForSelector("text=films left this month");
+  await page.waitForSelector("#acct >> text=films left this month")   // phone width: the account menu is in the top bar;
   await page.goto(`${base}/#/admin`);
   await page.waitForSelector("text=Save settings");
   await page.fill("#s-quota_films_default", "3");

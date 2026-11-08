@@ -2,7 +2,7 @@
 import time
 import unittest
 
-from helpers import W, Studio, film_job
+from helpers import PASSWORD, W, Studio, film_job
 
 
 class FilmDialog(unittest.TestCase):
@@ -105,6 +105,8 @@ class DialogBrowser(unittest.TestCase):
         from helpers import PASSWORD, Server
         from studio import jobs
         from studio.server import create_app
+        from studio import accounts as _acc          # a studio always has an owner (008 FR-118: else the login page asks for one)
+        _acc.signup("owner@example.com", PASSWORD, True, role="admin", verified=True)
         web = Server(create_app())
         try:
             jid = film_job(self.c, idea="A fox [ask]").json()["id"]

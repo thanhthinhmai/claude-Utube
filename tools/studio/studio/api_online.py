@@ -12,7 +12,7 @@ from fastapi import APIRouter, File, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
-from . import accounts, db, jobs, moderation, quotas, ratelimit, resources, reviews, store
+from . import accounts, claude_plan, db, jobs, moderation, quotas, ratelimit, resources, reviews, store
 from .store import StudioError
 
 router = APIRouter(prefix="/api/v1")
@@ -77,6 +77,24 @@ def _set_cookie(request: Request, response: Response, token: str) -> None:
 def signup(body: SignupIn, request: Request):
     a = accounts.signup(body.email, body.password, body.accept_terms, ip=client_ip(request))
     return {"email": a["email"], "verified": False}
+
+
+class SetupIn(BaseModel):
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=200)
+
+
+@router.get("/auth/setup")
+def get_setup():
+    """First visit (FR-118): is there an owner yet?"""
+    return {"needed": accounts.setup_needed()}
+
+
+@router.post("/auth/setup", status_code=201)
+def post_setup(body: SetupIn, request: Request, response: Response):
+    a = accounts.setup(body.email, body.password, ip=client_ip(request))
+    _set_cookie(request, response, accounts.login(body.email, body.password, ip=client_ip(request)))
+    return {"email": a["email"], "role": "admin"}
 
 
 @router.post("/auth/verify")
@@ -545,3 +563,57 @@ def usage(request: Request, start: Optional[str] = Query(None, alias="from"), en
     return {"from": start, "to": end, "days": days, "by_account": by,
             "cost_usd_total": round(sum(d["cost_usd"] for d in days), 4),
             "storage_mb_total": round(sum(storage_mb(i) for i in ids), 1)}
+
+
+# ---------- Claude accounts (specs/008 contracts/api-admin-claude.md) ----------
+class CodeIn(BaseModel):
+    code: str = Field(min_length=1, max_length=500)
+
+
+def claude_overview() -> dict:
+    return {"accounts": claude_plan.accounts(), "login": claude_plan.pending(), "api_key": claude_plan.api_key(),
+            "ready": claude_plan.ready()}
+
+
+@router.get("/admin/claude")
+def get_claude(request: Request):
+    admin(request)
+    return claude_overview()
+
+
+@router.post("/admin/claude/refresh")
+def refresh_claude(request: Request):
+    admin(request)
+    claude_plan.refresh_all()
+    return claude_overview()
+
+
+@router.post("/admin/claude/accounts", status_code=201)
+def add_claude(request: Request):
+    admin(request)
+    return claude_plan.add_account()
+
+
+@router.delete("/admin/claude/accounts/{slot}", status_code=204)
+def remove_claude(slot: int, request: Request):
+    admin(request)
+    claude_plan.remove_account(slot)
+    return Response(status_code=204)
+
+
+@router.post("/admin/claude/accounts/{slot}/login")
+def login_claude(slot: int, request: Request):
+    admin(request)
+    return claude_plan.start_login(slot)
+
+
+@router.post("/admin/claude/accounts/{slot}/code")
+def code_claude(slot: int, body: CodeIn, request: Request):
+    admin(request)
+    return claude_plan.submit_code(slot, body.code)
+
+
+@router.post("/admin/claude/accounts/{slot}/logout")
+def logout_claude(slot: int, request: Request):
+    admin(request)
+    return claude_plan.logout(slot)

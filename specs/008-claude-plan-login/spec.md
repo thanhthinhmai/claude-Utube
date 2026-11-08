@@ -17,6 +17,12 @@
 - Q: Chọn tài khoản Claude một lần cho cả việc, hay ở mỗi lần gọi? → A: Mỗi lần gọi lấy tài khoản dùng ít nhất còn dùng được, như neb-creative-tool (FR-107).
 - Q: Khi xưởng chưa sẵn sàng (không tài khoản, không khoá), việc mới được nhận hay bị từ chối? → A: Bị từ chối "Studio is not ready", không trừ lượt (FR-110).
 
+### Session 2026-11-08
+
+- Q: Trang đăng nhập và trang tài khoản AI trông thế nào? → A: Giống neb-creative-tool, chỉ lấy phần hợp với xưởng: không có proxy, Codex, tài khoản trình duyệt hay sao lưu.
+- Q: Lần đầu mở xưởng, tạo chủ xưởng ở đâu? → A: Trên trang đăng nhập, giống hệt neb, không cần mã cài đặt (FR-118). Ban đầu có mã cài đặt; người dùng bỏ sau khi thử.
+- Q: Có hiện hạn mức 5 giờ và tuần của từng tài khoản không? → A: Có, lấy từ thông tin hạn mức kèm mỗi lần gọi (FR-119).
+
 ## Bối cảnh
 
 Spec 007 đưa xưởng lên internet cho khách tự đăng ký, chạy Claude bằng khoá API của chủ xưởng. Người dùng đã chốt (2026-11-07) đổi hướng: **xưởng online chỉ dùng nội bộ** và chạy bằng **gói Claude (Pro/Max) của chủ xưởng**, không cần khoá API. Cách đăng nhập theo dự án trước của chủ xưởng (neb-creative-tool): nhiều tài khoản Claude, đăng nhập ngay trên trang, việc xoay vòng qua các tài khoản.
@@ -135,6 +141,8 @@ Chủ xưởng xem số token và số lần gọi Claude theo việc, theo ngà
 - **FR-115**: Chủ xưởng MUST xem được mức dùng (token, số lần gọi, số việc) theo ngày, theo thành viên và theo tài khoản Claude.
 - **FR-116**: Mỗi việc MUST có trần token (cài đặt). Vượt trần thì việc lỗi do xưởng (thay cho "vượt trần chi phí của việc" ở 007 FR-006a).
 - **FR-117**: Xưởng MUST chạy được khi không có khoá API. Khoá API là tuỳ chọn, chỉ dùng làm dự phòng khi không còn tài khoản Claude nào dùng được; luôn ưu tiên gói Claude. Lần gọi qua khoá API MUST được ghi riêng và có chi phí ước tính như 007; trang mức dùng MUST tách "gói Claude" và "khoá API".
+- **FR-118**: Khi xưởng chưa có tài khoản quản trị nào, trang đăng nhập MUST cho tạo tài khoản chủ xưởng ("Create the owner account"), giống hệt neb-creative-tool: người mở trang đầu tiên tạo được, không cần mã. Đã có tài khoản quản trị thì form này không hiện, và lệnh tạo trả lỗi. Lệnh `admin create` trong terminal vẫn dùng được. Rủi ro đã chấp nhận: trên máy chủ công khai, chủ xưởng cần tạo tài khoản ngay sau khi triển khai.
+- **FR-119**: Trang tài khoản AI MUST hiện cho mỗi tài khoản Claude đã đăng nhập hai thanh: phần trăm đã dùng của hạn mức 5 giờ và của hạn mức tuần, kèm giờ đặt lại, giống neb-creative-tool. Số liệu lấy từ thông tin hạn mức Claude gửi kèm mỗi lần gọi, không tốn thêm lượt gọi. Chưa có lần gọi nào thì hiện "Usage not read yet". Thanh màu vàng từ 75%, đỏ từ 90%.
 
 ### Thay đổi so với 007
 

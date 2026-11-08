@@ -16,6 +16,7 @@ Một hàng cho mỗi tài khoản đang có (slot 1 luôn có). Thông tin đă
 | same_as | int \| null | **tính ra, không lưu**: slot nhỏ hơn có cùng email |
 | signin_mailed_at | time \| null | đã gửi thư "Needs sign-in" cho lần hỏng này (FR-109) |
 | checked_at | time | lần đọc `auth status` gần nhất |
+| usage | json \| null | hạn mức 5 giờ và tuần đọc từ lần gọi gần nhất: `{five_hour: {percent, resets_at}, seven_day: {percent, resets_at}, at}` (FR-119) |
 
 **Trạng thái**:
 ```
@@ -72,7 +73,7 @@ Thêm mẫu thư `invite` (gửi thành viên) và `claude_signin` (gửi chủ 
 
 ## Chuyển phiên bản lược đồ
 Tăng phiên bản trong `db.py`:
-- thêm bảng `claude_account` (tạo sẵn slot 1) và bảng `call`;
+- thêm bảng `claude_account` (tạo sẵn slot 1, có cột `usage`) và bảng `call`;
 - thêm cột `job.tokens`;
 - cho `password_hash` được null;
 - bỏ các khoá cài đặt cũ, thêm `job_token_cap`.

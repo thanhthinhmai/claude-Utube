@@ -1,4 +1,5 @@
 """Accounts, sessions and one-time links (specs/007 FR-001, FR-002, FR-004, research R7)."""
+import os
 import datetime as dt
 import hashlib
 import re
@@ -53,6 +54,42 @@ def public(row) -> dict:
 def get(account_id: str):
     with db.read() as con:
         return con.execute("SELECT * FROM accounts WHERE id = ? AND deleted_at IS NULL", (account_id,)).fetchone()
+
+
+# ---------- the owner account on first visit (specs/008 FR-118) ----------
+def setup_needed() -> bool:
+    with db.read() as con:
+        return not con.execute("SELECT 1 FROM accounts WHERE role = 'admin'").fetchone()
+
+
+def setup(email: str, password: str, ip: str = "") -> dict:
+    """Create the first admin, like neb-creative-tool: whoever opens the studio first while it has no admin.
+    An email that already has an account (signed up earlier) becomes the owner when its password matches."""
+    if not setup_needed():
+        raise StudioError("already_set_up", "xưởng đã có tài khoản quản trị", 409)
+    ratelimit.hit("setup_ip", ip)
+    clean = _clean_email(email)
+    with db.read() as con:
+        row = con.execute("SELECT * FROM accounts WHERE email = ? AND deleted_at IS NULL", (clean,)).fetchone()
+    if row:
+        try:
+            ok = bool(row["password_hash"]) and _ph.verify(row["password_hash"], password or "")
+        except (VerificationError, InvalidHashError):
+            ok = False
+        if not ok:
+            raise StudioError("email_taken_password", "email này đã có tài khoản với mật khẩu khác", 409)
+        with db.tx() as con:
+            if con.execute("SELECT 1 FROM accounts WHERE role = 'admin'").fetchone():
+                raise StudioError("already_set_up", "xưởng đã có tài khoản quản trị", 409)
+            con.execute("UPDATE accounts SET role = 'admin', email_verified_at = COALESCE(email_verified_at, ?), "
+                        "locked_at = NULL WHERE id = ?", (store.now_iso(), row["id"]))
+        return {"id": row["id"], "email": clean}
+    try:
+        return signup(clean, password, True, role="admin", verified=True)
+    except StudioError as e:
+        if e.code == "admin_exists":          # someone else finished a moment earlier
+            raise StudioError("already_set_up", "xưởng đã có tài khoản quản trị", 409)
+        raise
 
 
 # ---------- sign up and verify ----------

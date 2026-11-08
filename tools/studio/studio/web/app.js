@@ -42,6 +42,14 @@ const PROMPTS = [
   ["A film in a library style", "Make a 40-second watercolor film about my family's coffee shop."],
 ];
 const ERR = {
+  // specs/008: the owner account and the AI accounts
+  already_set_up: "The studio already has an owner. Sign in instead.",
+  email_taken_password: "This email already has an account with another password. Use that password to make it the owner.",
+  max_accounts: "There are 5 Claude accounts already: remove one to add another.",
+  first_account: "The first Claude account cannot be removed. Sign it out instead.",
+  no_login: "This sign-in is no longer waiting (it ends after 10 minutes). Press Sign in again.",
+  bad_code: "Claude did not accept that code. Press Sign in again to get a new link.",
+  login_failed: "Claude Code did not start the sign-in. Try again in a minute.",
   not_found: "Not found.", bad_name: "Invalid file name.", invalid: "Invalid request.", finished: "This job has already finished.",
   already_decided: "This review was already decided elsewhere.", note_required: "Add a note (at least 3 characters) before requesting changes.",
   value_not_allowed: "That choice is not allowed for this review.", csrf: "Request blocked (missing studio header).",
@@ -467,30 +475,53 @@ async function pageLibStyle(slug) {
 const field = (id) => /** @type {HTMLInputElement} */ (document.getElementById(id));
 function authPage(title, lead, body, foot = "") {
   document.body.classList.add("guest");
-  $app.innerHTML = `<div class="auth panel"><h1>${title}</h1>${lead ? `<p class="muted">${lead}</p>` : ""}${body}
-    <p id="msg" class="muted" role="status"></p>${foot}</div>`;
+  $app.innerHTML = `<div class="auth-wrap"><div class="auth-brand"><span class="logo">F</span><span>Film Studio</span></div>
+    <div class="auth panel"><h1>${title}</h1>${lead ? `<p class="muted">${lead}</p>` : ""}${body}
+    <p id="msg" class="muted" role="status"></p></div>${foot ? `<div class="auth-foot">${foot}</div>` : ""}</div>`;
 }
-/** Wire a form: `fn` sends it; its result is shown, an error is shown in red. */
+/** Wire a form: `fn` sends it; its result is shown, an error is shown in red. The button may say what it is
+ *  doing while it waits (data-busy="Signing in…"). */
 function onSubmit(fn) {
   const form = /** @type {HTMLFormElement} */ ($app.querySelector("form"));
   const msg = document.getElementById("msg");
   form.onsubmit = async (e) => {
     e.preventDefault();
     const btn = /** @type {HTMLButtonElement} */ (form.querySelector("button[type=submit]"));
+    const label = btn.textContent;
     btn.disabled = true; msg.className = "muted"; msg.textContent = "";
+    if (btn.dataset.busy) btn.textContent = btn.dataset.busy;
     try { const t = await fn(); if (t) msg.textContent = t; } catch (err) { msg.className = "fail"; msg.textContent = err.message; }
-    btn.disabled = false;
+    btn.disabled = false; btn.textContent = label;
   };
 }
 async function pageLogin() {
-  authPage("Log in", "Film Studio makes short films for you in the style you choose.", `<form class="form">
-    <label>Email <input id="email" type="email" autocomplete="email" required></label>
+  const setup = await get("/auth/setup").catch(() => ({ needed: false }));
+  if (setup.needed) { location.hash = "#/setup"; return; }
+  authPage("Welcome back", "Sign in to continue.", `<form class="form">
+    <label>Email <input id="email" type="email" autocomplete="email" autofocus required></label>
     <label>Password <input id="password" type="password" autocomplete="current-password" required></label>
-    <button class="primary" type="submit">Log in</button></form>`,
-  `<p><a href="#/forgot">Forgot your password?</a> · <a href="#/signup">Create an account</a></p>`);
+    <button class="primary wide" type="submit" data-busy="Signing in…">Sign in</button></form>`,
+  `<a href="#/forgot">Forgot your password?</a> · <a href="#/signup">Create an account</a>`);
   onSubmit(async () => {
     await post("/auth/login", { email: field("email").value, password: field("password").value });
     await loadMe(); location.hash = "#/";
+    return "";
+  });
+}
+/** First visit, no owner yet (specs/008 FR-118): the owner account is made here, with the setup code. */
+async function pageSetup() {
+  const setup = await get("/auth/setup").catch(() => ({ needed: false }));
+  if (!setup.needed) { location.hash = "#/login"; return; }
+  authPage("Create the owner account", "The studio has no owner yet. This account owns it: it alone sees Admin and AI accounts and can invite other people. Already signed up with this email? Use the same password: that account becomes the owner.", `<form class="form">
+    <label>Email <input id="email" type="email" autocomplete="email" autofocus required></label>
+    <label>Password <span class="hint">At least 10 characters.</span>
+      <input id="password" type="password" autocomplete="new-password" minlength="10" required></label>
+    <label>Password again <input id="password2" type="password" autocomplete="new-password" required></label>
+    <button class="primary wide" type="submit" data-busy="Creating…">Create the owner account</button></form>`);
+  onSubmit(async () => {
+    if (field("password").value !== field("password2").value) throw new Error("The two passwords differ.");
+    await post("/auth/setup", { email: field("email").value, password: field("password").value });
+    await loadMe(); location.hash = "#/admin/claude";
     return "";
   });
 }
@@ -666,7 +697,7 @@ async function pageAdmin() {
       <td>${a.quota.learns.used} / <input type="number" min="0" data-f="quota_learns" value="${a.quota_learns ?? ""}" placeholder="${a.quota.learns.limit}" aria-label="Learns limit"></td>
       <td class="num">${usd(a.cost_month_usd)}</td><td class="num">${num(a.storage_mb, 1)} MB</td>
       <td>${a.role === "admin" ? "" : `<button data-lock="${a.locked ? "0" : "1"}" class="${a.locked ? "" : "danger"}">${a.locked ? "Unlock" : "Lock"}</button>`}</td></tr>`).join("");
-  $app.innerHTML = `${head("Studio", "Admin", `Cost in the last 30 days: ${usd(use.cost_usd_total)} · storage ${num(use.storage_mb_total, 1)} MB`)}
+  $app.innerHTML = `${head("Studio", "Settings", `Cost in the last 30 days: ${usd(use.cost_usd_total)} · storage ${num(use.storage_mb_total, 1)} MB`)}
     <h2>Settings</h2><form class="form panel" id="settings"><div class="admin-grid">${SETTING.map(input).join("")}</div>
       <div><button class="primary" type="submit">Save settings</button></div></form><p id="msg" class="muted" role="status"></p>
     <h2>Customers</h2>
@@ -706,11 +737,136 @@ async function pageAdmin() {
   qi.addEventListener("input", () => {
     clearTimeout(t);
     t = setTimeout(() => {
-      history.replaceState(null, "", "#/admin?q=" + encodeURIComponent(qi.value));
+      history.replaceState(null, "", "#/settings?q=" + encodeURIComponent(qi.value));
       route().then(() => { const n = field("acc-q"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); });
     }, 400);
   });
 }
+
+// ---------- AI accounts (specs/008; layout from neb-creative-tool's Accounts page) ----------
+const MAX_CLAUDE = 5;
+const claudeLabel = (slot) => (slot > 1 ? `Claude #${slot}` : "Claude");
+const pill = (text, tone = "", extra = "") => `<span class="badge ${tone ? `t-${tone}` : ""} ${extra}">${esc(text)}</span>`;
+/** "in 3 h 20 min (Tue 17:50)", or a date when it is days away. */
+function resetLabel(iso) {
+  const at = new Date(iso).getTime(), ms = at - Date.now();
+  const clock = new Date(at).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  if (ms <= 0) return clock;
+  const total = Math.round(ms / 60_000), h = Math.floor(total / 60), m = total % 60;
+  if (h >= 48) return new Date(at).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return `in ${h ? `${h} h ` : ""}${m} min (${clock})`;
+}
+/** One window of a plan: how full it is and when it resets. Amber from 75 %, red from 90 % (FR-119). */
+function quotaBar(label, w) {
+  const past = w && w.resets_at && new Date(w.resets_at).getTime() < Date.now();
+  const pct = !w || w.percent == null ? null : past ? 0 : Math.max(0, Math.min(100, w.percent));
+  const tone = pct == null || past ? "none" : pct >= 90 ? "bad" : pct >= 75 ? "warn" : "ok";
+  const reset = w && w.resets_at ? (past ? "reset since" : `resets ${resetLabel(w.resets_at)}`) : "";
+  return `<div class="quota"><span class="q-label">${label}</span>
+    <span class="q-track"><span class="q-fill q-${tone}" style="width:${pct ?? 0}%"></span></span>
+    <span class="q-pct">${pct == null ? "?" : `${Math.round(pct)}%`}</span>${reset ? `<span class="muted">${esc(reset)}</span>` : ""}</div>`;
+}
+function readAgo(iso) {
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+  return min < 1 ? "read just now" : min < 90 ? `read ${min} min ago` : `read ${when(iso)}`;
+}
+async function pageClaude() {
+  if (ME.role !== "admin") { $app.innerHTML = `<p class="error">This page is for the studio admin.</p>`; return; }
+  const c = await get("/admin/claude");
+  const list = c.accounts, login = c.login;
+  const live = list.filter((a) => a.state !== "signed_out" && a.state !== "needs_signin" && !a.same_as);
+  const rested = (a) => a.state === "limited" && a.rest_until && new Date(a.rest_until).getTime() > Date.now();
+  const ready = live.filter((a) => !rested(a)).length, resting = live.filter(rested).length;
+  const needs = list.filter((a) => a.state === "needs_signin").length;
+  const several = list.length > 1;
+  const canAdd = list[0].state !== "signed_out" && list.length < MAX_CLAUDE && !login;
+  const row = (a) => {
+    const name = a.email || claudeLabel(a.slot);
+    const title = several && a.email ? `${claudeLabel(a.slot)} · ${a.email}` : name;
+    const waiting = login && login.slot === a.slot;
+    const signedIn = a.state === "signed_in" || a.state === "limited";
+    const badges = signedIn
+      ? `${pill("Signed in", "ok")}${a.plan ? pill(a.plan) : ""}${rested(a) ? pill("At its limit", "bad") : ""}`
+      : waiting ? pill("Signing in", "accent", "pulse") : a.state === "needs_signin" ? pill("Needs sign-in", "bad") : pill("Not signed in");
+    const meta = rested(a) ? `Back ${resetLabel(a.rest_until)}. Calls use the other accounts until then.`
+      : a.state === "needs_signin" ? "Its sign-in stopped working: sign in again." : !signedIn && !waiting && a.slot === 1 && !several
+        ? (c.api_key ? "The API key is used until you sign in." : "Jobs cannot run until you sign in.") : "";
+    const menu = [signedIn && '<button data-act="login">Sign in again</button>', a.state !== "signed_out" && '<button data-act="logout" class="danger">Sign out</button>',
+      a.slot > 1 && '<button data-act="remove" class="danger">Remove</button>'].filter(Boolean).join("");
+    return `<li data-slot="${a.slot}"><div class="acc-head">
+        <div class="acc-name"><h3 title="${esc(name)}">${esc(title)}</h3>${badges}</div>
+        <div class="acc-actions">${signedIn ? "" : `<button class="primary" data-act="login" ${waiting ? "disabled" : ""}>${waiting ? "Signing in…" : "Sign in"}</button>`}
+          ${menu ? `<details class="menu"><summary aria-label="More for ${esc(name)}">⋯</summary><div class="menu-list">${menu}</div></details>` : ""}</div></div>
+      ${meta ? `<p class="acc-meta">${esc(meta)}</p>` : ""}
+      ${a.same_as ? `<p class="notice warn">Same Claude account as ${claudeLabel(a.same_as)}: it shares those limits and adds nothing. Sign out here and sign in to another account.</p>` : ""}
+      ${a.plan_warning ? `<p class="notice warn">This is a ${esc(a.plan)} plan, not Pro or Max: its limits are small for making films.</p>` : ""}
+      ${waiting ? `<div class="signin-box"><p>Sign in with a Claude Pro or Max account in the tab that opened. No tab opened?
+          <a href="${esc(login.url)}" target="_blank" rel="noopener noreferrer">Open the sign-in</a>. At the end Claude shows a code: paste it here.</p>
+          <form id="code-form" class="code-row"><input id="code" type="text" autocomplete="off" spellcheck="false" placeholder="Code" aria-label="Code" required>
+          <button type="submit">Send</button></form><p class="muted small">The link works for 10 minutes.</p></div>` : ""}
+      ${signedIn && !a.same_as ? `<div class="usage">${a.usage ? `${quotaBar("5-hour", a.usage.five_hour)}${quotaBar("Weekly", a.usage.seven_day)}
+          <p class="muted small">${readAgo(a.usage.at)} · shared with Claude Code and claude.ai</p>`
+        : '<p class="muted small">Usage not read yet: it is noted with the next call.</p>'}
+        <p class="muted small">The studio used ${num(a.tokens_5h, 0)} tokens on it in the last 5 hours.</p></div>` : ""}
+    </li>`;
+  };
+  $app.innerHTML = `${head("Studio", "AI accounts", "The AI plans and keys the studio makes films with.")}
+    <div class="summary panel"><strong>${list.length} account${list.length === 1 ? "" : "s"}</strong>${pill(`${ready} ready`, "ok")}
+      ${resting ? pill(`${resting} resting`, "warn") : ""}${needs ? pill(`${needs} need${needs === 1 ? "s" : ""} signing in`, "bad") : ""}
+      <span class="summary-end">API key: ${c.api_key ? "set, used only as a fallback" : "not set"}</span></div>
+    ${c.ready ? "" : '<p class="error">No Claude account signed in. Jobs cannot run.</p>'}
+    <section class="provider panel" id="claude-plan">
+      <div class="provider-head"><div><div class="acc-name"><h2>Claude · plan</h2>${live.length ? pill(live.length > 1 ? `${live.length} signed in` : "Signed in", "ok") : pill("Not signed in")}</div>
+        <p class="muted">Films, styles and the content check run on your Claude Pro or Max plan. When an account reaches its limit, calls move to the next signed-in account.</p></div>
+        <button id="refresh">Check again</button></div>
+      <p id="msg" class="muted" role="status"></p>
+      <ul class="acc-rows">${list.map(row).join("")}</ul>
+      <div class="provider-foot">
+        ${canAdd ? '<div class="foot-row"><button id="add">Add account</button><span class="muted">Sign in with a different Claude account: calls then rotate over them.</span></div>' : ""}
+        <details class="how"><summary>How it works</summary><div>
+          <p>The sign-in is Claude Code's own, kept on this server in the data folder (claude/). It never goes into a job's sandbox: jobs reach Claude only through the studio.</p>
+          <p>Calls count against the plan's limits, shared with Claude Code and claude.ai on the same account.</p>
+          <p>Several accounts: each call goes to the one the studio used least in the last 5 hours, and moves on when one is at its limit.</p>
+          <p>An API key (ANTHROPIC_API_KEY on the server) is used only when no Claude account can take a call.</p></div></details>
+      </div></section>`;
+  const msg = document.getElementById("msg");
+  const act = async (fn, busy = "") => {
+    msg.className = "muted"; msg.textContent = busy;
+    try { await fn(); await route(); } catch (e) { msg.className = "error"; msg.textContent = e.message; }
+  };
+  (/** @type {NodeListOf<HTMLButtonElement>} */ ($app.querySelectorAll("li[data-slot] button[data-act]"))).forEach((b) => b.addEventListener("click", () => {
+    const slot = /** @type {HTMLElement} */ (b.closest("li")).dataset.slot, label = claudeLabel(Number(slot));
+    b.closest("details")?.removeAttribute("open");
+    if (b.dataset.act === "login") act(async () => {
+      const r = await post(`/admin/claude/accounts/${slot}/login`);
+      window.open(r.url, "_blank", "noopener");
+    }, "Starting the sign-in…");
+    if (b.dataset.act === "logout" && confirm(`Sign out of ${label}? The studio stops using it. Your Claude account itself is not touched.`))
+      act(() => post(`/admin/claude/accounts/${slot}/logout`));
+    if (b.dataset.act === "remove" && confirm(`Remove ${label}? It is signed out and taken off the list. Your Claude account itself is not touched.`))
+      act(() => send("DELETE", `/admin/claude/accounts/${slot}`));
+  }));
+  document.getElementById("add")?.addEventListener("click", () => act(async () => {
+    const a = await post("/admin/claude/accounts");
+    const r = await post(`/admin/claude/accounts/${a.slot}/login`);
+    window.open(r.url, "_blank", "noopener");
+  }, "Starting the sign-in…"));
+  document.getElementById("refresh").addEventListener("click", () => act(() => post("/admin/claude/refresh"), "Checking…"));
+  const form = /** @type {HTMLFormElement} */ (document.getElementById("code-form"));
+  if (form && login) {
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      const btn = /** @type {HTMLButtonElement} */ (form.querySelector("button"));
+      btn.disabled = true; btn.textContent = "Sending…";
+      act(() => post(`/admin/claude/accounts/${login.slot}/code`, { code: field("code").value.trim() }), "Signing in…")
+        .finally(() => { btn.disabled = false; btn.textContent = "Send"; });
+    };
+    field("code").focus();
+  }
+}
+document.addEventListener("click", (e) => {      // close an open ⋯ menu when clicking elsewhere
+  document.querySelectorAll("details.menu[open]").forEach((d) => { if (!d.contains(/** @type {Node} */ (e.target))) d.removeAttribute("open"); });
+});
 
 // ---------- account (US4) ----------
 async function pageAccount() {
@@ -771,19 +927,37 @@ async function loadMe() {
   drawAccount();
   return ME;
 }
+const ICON_UPDOWN = '<svg viewBox="0 0 24 24"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"/></svg>';
+/** The signed-in person (layout from neb-creative-tool's sidebar): a card that opens a small menu —
+ *  their account, and Log out. In the sidebar on a computer, in the top bar on a phone. */
+function userMenu(where) {
+  const f = ME.quota.films, owner = ME.role === "admin";
+  const films = `${Math.max(0, f.limit - f.used)}/${f.limit} films left this month`;
+  const live = document.getElementById("live");
+  return `<details class="menu user-menu ${where === "side" ? "up" : ""}"><summary class="user-btn" aria-label="Account menu">
+      <span class="avatar">${esc(ME.email[0].toUpperCase())}</span>
+      <span class="who"><strong>${esc(ME.email)}</strong><small class="credits">${films}</small></span>${ICON_UPDOWN}</summary>
+    <div class="menu-list">
+      <div class="menu-head"><strong>${esc(ME.email)}</strong><small>${owner ? "Owner" : "Member"}${where === "side"
+        ? ` · <span id="live" class="${live?.className || "live"}">${esc(live?.textContent || "Connecting…")}</span>` : ""}</small></div>
+      <a href="#/account">Your account</a>
+      ${owner && where === "top" ? '<a href="#/admin/claude">AI accounts</a><a href="#/settings">Settings</a>' : ""}
+      <button class="danger" data-logout>Log out</button></div></details>`;
+}
 function drawAccount() {
-  const bar = document.getElementById("acct");
+  const bar = document.getElementById("acct"), side = document.getElementById("owner");
   document.body.classList.toggle("guest", MODE === "online" && !ME);
   bar.hidden = !(MODE === "online" && ME);
   (/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(".admin-only"))).forEach((el) => (el.hidden = !(ME && ME.role === "admin")));
   if (bar.hidden) return;
-  const f = ME.quota.films;
-  bar.innerHTML = `<span class="credits">${Math.max(0, f.limit - f.used)}/${f.limit} films left this month</span>
-    <a href="#/account" title="Your account"><strong>${esc(ME.email)}</strong></a><button id="logout">Log out</button>`;
-  document.getElementById("logout").onclick = async () => {
+  side.classList.add("signed");
+  side.innerHTML = userMenu("side");
+  bar.innerHTML = userMenu("top");
+  document.querySelectorAll("[data-logout]").forEach((b) => b.addEventListener("click", async () => {
     try { await post("/auth/logout"); } catch { /* already logged out */ }
-    ME = null; drawAccount(); location.hash = "#/login";
-  };
+    location.reload();                 // the sidebar, the menus and live updates start over
+  }));
+  document.querySelectorAll(".user-menu a").forEach((a) => a.addEventListener("click", () => a.closest("details").removeAttribute("open")));
 }
 
 // ---------- router, live updates, waiting badge, notifications ----------
@@ -794,12 +968,12 @@ const routes = [
   [/^#\/sets$/, pageSets, "sets"], [/^#\/sets\/([^/?]+)$/, pageSet, "sets"],
   [/^#\/library(\?.*)?$/, pageLibrary, "library"], [/^#\/library\/([^/?]+)$/, pageLibStyle, "library"],
   [/^#\/styles$/, pageStyles, "styles"], [/^#\/styles\/([^/?]+)$/, pageStyle, "styles"],
-  [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"], [/^#\/admin(\?.*)?$/, pageAdmin, "admin"],
+  [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"], [/^#\/(?:admin|settings)(\?.*)?$/, pageAdmin, "settings"], [/^#\/admin\/claude$/, pageClaude, "ai"],
   [/^#\/account$/, pageAccount, "account"],
 ];
 /** pages open without logging in (online mode) */
 const PUBLIC = [
-  [/^#\/login$/, pageLogin], [/^#\/signup$/, pageSignup], [/^#\/forgot$/, pageForgot],
+  [/^#\/login$/, pageLogin], [/^#\/setup$/, pageSetup], [/^#\/signup$/, pageSignup], [/^#\/forgot$/, pageForgot],
   [/^#\/verify\/([^/?]+)$/, pageVerify], [/^#\/reset\/([^/?]+)$/, pageReset],
 ];
 let rendering = null;
@@ -816,7 +990,7 @@ async function route() {
   for (const [re, fn, nav] of routes) {
     const m = h.match(re);
     if (!m) continue;
-    (/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll("nav a"))).forEach((a) => a.classList.toggle("on", a.dataset.nav === nav));
+    (/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll("nav a, .side-foot a[data-nav]"))).forEach((a) => a.classList.toggle("on", a.dataset.nav === nav));
     const p = fn(m[1] && !m[1].startsWith("?") ? decodeURIComponent(m[1]) : undefined);
     rendering = p;
     try { await p; } catch (e) { if (rendering === p) $app.innerHTML = `<p class="error">${esc(e.message)}</p>${back("#/", "Jobs")}`; }
@@ -863,9 +1037,9 @@ function onChange() {           // coalesce bursts of events into one refresh
 }
 function connect() {
   const es = new EventSource(API + "/events");
-  const live = document.getElementById("live");
-  es.onopen = () => { live.classList.add("on"); live.textContent = "● Live updates on"; };
-  es.onerror = () => { live.classList.remove("on"); live.textContent = "Disconnected, reconnecting…"; };      // EventSource reconnects by itself
+  const live = () => document.getElementById("live") || document.createElement("small");      // redrawn with the account menu
+  es.onopen = () => { live().classList.add("on"); live().textContent = "● Live updates on"; };
+  es.onerror = () => { live().classList.remove("on"); live().textContent = "Disconnected, reconnecting…"; };      // EventSource reconnects by itself
   ["job.updated", "review.created", "review.decided"].forEach((t) => es.addEventListener(t, onChange));
 }
 
@@ -875,7 +1049,6 @@ window.addEventListener("hashchange", route);
   (/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(".online-only"))).forEach((el) => (el.hidden = MODE !== "online"));
   (/** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(".local-only"))).forEach((el) => (el.hidden = MODE === "online"));
   if (MODE === "online") {
-    document.querySelector(".owner strong").textContent = "Your account";
     await loadMe();
   }
   await route();

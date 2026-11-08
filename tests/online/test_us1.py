@@ -151,6 +151,8 @@ class BrowserUS1(unittest.TestCase):
         s = Studio()
         try:
             from studio.server import create_app
+            from studio import accounts as _acc          # a studio always has an owner (008 FR-118: else the login page asks for one)
+            _acc.signup("owner@example.com", PASSWORD, True, role="admin", verified=True)
             web = Server(create_app())
             s.start()
             p = subprocess.Popen(["node", str(Path(__file__).with_name("browser_us1.cjs")), web.url, "b@example.com", PASSWORD],

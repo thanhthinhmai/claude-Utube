@@ -223,3 +223,16 @@ def film_job(c, idea: str = "A small fox finds a lantern", style: str = None, se
 def first_library_style() -> str:
     from studio import resources
     return resources.library()["styles"][0]["slug"]
+
+
+# ---------- Claude plan accounts (specs/008) ----------
+FAKE_CLAUDE = Path(__file__).resolve().parent / "fake_claude"
+
+
+def sign_in(c, slot: int, email: str) -> dict:
+    """Sign a Claude account in through the admin API, with the fake Claude Code (STUDIO_CLAUDE_BIN=FAKE_CLAUDE)."""
+    r = c.post(f"/api/v1/admin/claude/accounts/{slot}/login", headers=W)
+    assert r.status_code == 200, r.text
+    r = c.post(f"/api/v1/admin/claude/accounts/{slot}/code", json={"code": f"good-{email}"}, headers=W)
+    assert r.status_code == 200, r.text
+    return r.json()

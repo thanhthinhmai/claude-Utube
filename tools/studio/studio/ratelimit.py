@@ -5,6 +5,7 @@ from .store import StudioError
 # kind: (max hits, window seconds)
 LIMITS = {
     "signup_ip": (5, 3600),
+    "setup_ip": (10, 900),
     "login_email": (10, 900),
     "login_ip": (10, 900),
     "forgot_email": (3, 3600),

@@ -76,3 +76,18 @@ Các mục có ghi **Kiểm khi implement** dựa trên hành vi của Claude Co
 ## R9. Đặt Claude Code ở đâu
 - **Decision**: ảnh `studio-web` (dùng cho web, proxy, worker) cài `claude-agent-sdk` để có tệp chạy `claude`. Thư mục `/data/claude/` để quyền 700 cho uid 1000. Worker chỉ gắn `/data/jobs/<id>` vào container (như 007). Có test kiểm danh sách gắn không chứa `/data/claude`.
 - **Rationale**: cùng một bản Claude Code với container việc, không thêm dịch vụ.
+
+## Kết quả kiểm T001
+
+Kiểm ngày 2026-11-08 trên máy này, với Claude Code 2.1.319 đi kèm `claude-agent-sdk` 0.2.179 (cùng bản trong ảnh `studio-job`).
+
+- **R1, khi chưa đăng nhập** (đúng research, có một chi tiết):
+  - `auth status --json` thoát 1 và in `loggedIn: false`, `authMethod: "none"`, `apiProvider`, `configDirectory`, `loginExpiresAt: null`.
+  - `auth login --claudeai` với `BROWSER=/bin/false` in `If the browser didn't open, visit: https://claude.com/cai/oauth/authorize?code=true&…` rồi `Paste code here if prompted >` và chờ.
+  - **Chi tiết**: mã phải gửi qua một pty. Ghi vào stdin dạng ống thì Claude Code không đọc, và tiến trình treo tới khi hết giờ. Qua pty, mã sai in `Login failed: That code wasn't accepted…` và thoát 1.
+- **R3** (đúng research): với `CLAUDE_CODE_OAUTH_TOKEN=<mã giả>`, `ANTHROPIC_BASE_URL=http://127.0.0.1:<cổng>` và `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, `claude -p` chỉ gọi đúng một đường: `POST /v1/messages?beta=true` (có chuỗi truy vấn; bộ chuyển tiếp phải giữ chuỗi này).
+  - Header: `authorization: Bearer <mã>`, không có `x-api-key`.
+  - `anthropic-beta` có `oauth-2025-04-20` cùng các mục khác.
+  - `user-agent: claude-cli/2.1.319 (external, sdk-cli)`.
+- **Tệp ngoài `CLAUDE_CONFIG_DIR`**: không có. Mọi tệp (`.claude.json`, `backups/`, `projects/`, `plugins/`) nằm trong `CLAUDE_CONFIG_DIR`; `$HOME` vẫn trống. T018 không cần tmpfs thêm.
+- **Chưa kiểm (cần tài khoản thật)**: các trường của `auth status` khi đã đăng nhập (R1), tệp đăng nhập và cách làm mới (R2), header giờ dùng lại (R5).

@@ -30,6 +30,12 @@ TEMPLATES = {
     "account_deleted": ("Your Film Studio account is being deleted",
                         "Your account and all its films and styles will be deleted within 30 days.\n"
                         "If you did not ask for this, reply to this mail right away."),
+    "invite": ("You are invited to Film Studio",
+               "You are invited to make films with Film Studio.\n\nChoose a password to start:\n{url}/#/invite/{token}\n\n"
+               "The link works once and expires in 7 days."),
+    "claude_signin": ("Claude account {slot} needs to sign in again",
+                      "Film Studio cannot use Claude account {slot} ({email}): its sign-in stopped working.\n\n"
+                      "Sign in again: {url}/#/admin/claude"),
 }
 
 

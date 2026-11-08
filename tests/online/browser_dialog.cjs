@@ -15,7 +15,7 @@ const [base, email, password, jobId] = process.argv.slice(2);
   await page.fill("#email", email);
   await page.fill("#password", password);
   await page.click("button[type=submit]");
-  await page.waitForSelector("text=films left this month");
+  await page.waitForSelector("#acct >> text=films left this month")   // phone width: the account menu is in the top bar;
   await page.goto(`${base}/#/jobs/${jobId}`);
   await page.waitForSelector("text=The studio has a question", { timeout: 30000 });
   await page.fill("#answer", "Orange, with a red scarf");
