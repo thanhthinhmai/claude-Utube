@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, File, Query, Request, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from . import accounts, claude_plan, db, jobs, moderation, quotas, ratelimit, resources, reviews, store
+from . import accounts, claude_plan, db, jobs, tokens, moderation, quotas, ratelimit, resources, reviews, store
 from .store import StudioError
 
 router = APIRouter(prefix="/api/v1")
@@ -205,7 +205,37 @@ def style_exists(slug: str) -> bool:
 
 @router.post("/jobs", status_code=201)
 def post_job(body: JobIn, request: Request):
+    """Make a film, a revision or a learn job. With an API token, only when it may use credits (FR-212);
+    an Idempotency-Key makes a repeat return the first job instead of a second one (FR-221)."""
+    import sqlite3
     a = me(request)
+    token = getattr(request.state, "token", None)
+    if token is not None and not token["can_spend"]:
+        request.state.token_outcome = "no_spend"
+        raise StudioError("spend_not_allowed", "mã API này không được dùng lượt phim", 403)
+    key = request.headers.get("idempotency-key")
+    if not key:
+        return make_job(body, a)
+    body_hash = tokens.request_hash(body.model_dump())
+
+    def replay(job_id):
+        if token is not None:
+            request.state.token_outcome = "replay"
+        return JSONResponse(view(jobs.load(job_id, a["id"]), a), status_code=200,
+                            headers={"Idempotent-Replayed": "true"})
+    done = tokens.replayed(a["id"], key, body_hash)
+    if done:
+        return replay(done)
+    mark = tokens.current_idem.set((a["id"], key, body_hash))
+    try:
+        return make_job(body, a)
+    except sqlite3.IntegrityError:                 # another request with this key made the job a moment ago
+        return replay(tokens.replayed(a["id"], key, body_hash))
+    finally:
+        tokens.current_idem.reset(mark)
+
+
+def make_job(body: JobIn, a) -> dict:
     if not a["email_verified_at"]:
         raise StudioError("unverified", "hãy xác minh email trước khi giao việc", 403)
     if body.kind == "learn":
@@ -742,3 +772,35 @@ def worker_status(request: Request):
     return {"workers": workers, "latest": latest,
             "counts": {"queued": max(0, n.get("queued", 0) - waiting_claude), "running": n.get("running", 0),
                        "waiting_review": n.get("waiting_review", 0), "waiting_claude": waiting_claude}}
+
+
+# ---------- API tokens of one's own (specs/009 FR-208-FR-218, contracts/api-tokens-worker.md) ----------
+class TokenIn(BaseModel):
+    name: str = Field(max_length=60)
+    role: Literal["customer", "admin"] = "customer"
+    can_spend: bool = False
+    rate_per_min: Literal[10, 30, 60, 120, 300] = 60
+    expires: Literal["7d", "30d", "90d", "1y", "never"] = "90d"
+
+
+@router.get("/me/tokens")
+def my_tokens(request: Request):
+    return {"tokens": tokens.list_tokens(me(request)["id"])}
+
+
+@router.post("/me/tokens", status_code=201)
+def make_token(body: TokenIn, request: Request):
+    """The secret is in this answer only (FR-210)."""
+    t, secret = tokens.create(me(request), body.name, body.role, body.can_spend, body.rate_per_min, body.expires)
+    return {"token": t, "secret": secret}
+
+
+@router.delete("/me/tokens/{token_id}", status_code=204)
+def revoke_my_token(token_id: str, request: Request):
+    tokens.revoke(token_id, me(request)["id"])
+    return Response(status_code=204)
+
+
+@router.get("/me/tokens/{token_id}/log")
+def my_token_log(token_id: str, request: Request, limit: int = Query(200, ge=1, le=500)):
+    return {"requests": tokens.log(token_id, me(request)["id"], limit)}

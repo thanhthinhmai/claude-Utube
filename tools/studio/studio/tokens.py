@@ -4,6 +4,7 @@ A token is "fs_" + 32 random bytes. Only its sha256 and its first 8 characters a
 once, when it is made. A token acts as its owner, never with more than the owner's current role. Every request made
 with a token is one row of its log (kept 30 days; never the request's content). One-time tickets for uploads and
 downloads, and the Idempotency-Key records of job creation, live here too."""
+import contextvars
 import datetime as dt
 import hashlib
 import json
@@ -180,6 +181,10 @@ def use_ticket(kind: str, secret: str) -> dict:
 
 
 # ---------- Idempotency-Key for job creation (FR-221, research R10) ----------
+# (account id, key, request hash) of the request being handled; quotas.reserve records it with the job
+current_idem = contextvars.ContextVar("current_idem", default=None)
+
+
 def request_hash(body: dict) -> str:
     return sha(json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
 

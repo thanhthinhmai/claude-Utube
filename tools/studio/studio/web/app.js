@@ -1032,6 +1032,7 @@ async function pageAccount() {
     <div class="panel"><p class="section-title">This month</p>
       <p>Films: <strong>${Math.max(0, f.limit - f.used)}</strong> of ${f.limit} left · Learns: <strong>${Math.max(0, l.limit - l.used)}</strong> of ${l.limit} left</p>
       <p class="muted">They come back on ${when(ME.quota.resets_at)}.</p></div>
+    <h2>API tokens</h2><div id="tokens"></div>
     <h2>Email</h2>
     <div class="panel"><label class="check"><input id="notify" type="checkbox" ${ME.email_notify ? "checked" : ""}>
       <span>Email me when a job is done, fails, or needs my answer</span></label><p id="notify-msg" class="muted" role="status"></p></div>
@@ -1048,6 +1049,7 @@ async function pageAccount() {
       <label>Type your password to confirm <input id="del-pw" type="password" autocomplete="current-password" required></label>
       <div><button class="danger" type="submit">Delete my account</button></div>
       <p id="del-msg" class="muted" role="status"></p></form>`;
+  tokensSection(document.getElementById("tokens"), "me");
   const notify = field("notify"), nmsg = document.getElementById("notify-msg");
   notify.onchange = async () => {
     try { ME = await send("PUT", "/me", { email_notify: notify.checked }); nmsg.className = "muted"; nmsg.textContent = "Saved."; }
@@ -1075,6 +1077,111 @@ async function pageAccount() {
     authPage("Account deleted", "", `<p>Your account is closed and everything in it is deleted within 30 days. We sent you an email about it.</p>`);
     return "";
   });
+}
+
+// ---------- API tokens (specs/009 FR-208-FR-218; layout from neb-creative-tool's Settings → API tokens) ----------
+const TOKEN_STATUS = { active: ["Active", "ok"], ended: ["Ended", "bad"], revoked: ["Revoked", ""] };
+const EXPIRY = [["7d", "7 days"], ["30d", "30 days"], ["90d", "90 days"], ["1y", "1 year"], ["never", "Never"]];
+/** What an agent needs; `secret` fills the token in when it is known (right after it is made). */
+function agentInfo(secret) {
+  const origin = location.origin, tok = secret || "<token>", mcp = `${origin}/api/mcp`;
+  const cmd = `claude mcp add --transport http film-studio ${mcp} --header "Authorization: Bearer ${tok}"`;
+  const json = JSON.stringify({ mcpServers: { "film-studio": { type: "http", url: mcp, headers: { Authorization: `Bearer ${tok}` } } } }, null, 2);
+  const brief = [`You can use Film Studio through its API.`, `Base URL: ${origin}`,
+    `Send on every request: Authorization: Bearer ${tok}`,
+    `API reference (OpenAPI): ${origin}/api/v1/openapi.json · readable docs: ${origin}/api/v1/docs`,
+    `MCP server: ${mcp} (Claude Code: ${cmd})`,
+    `Ask the user before anything that uses a film or learn credit.`,
+    `When you make a job, send an Idempotency-Key header (any unique text) and send the same one if you retry.`,
+    `Films take minutes: check the job again (GET /api/v1/jobs/<id>) instead of waiting on one request.`,
+    `To upload a video, ask for a link with POST /api/v1/uploads/tickets, then PUT the file to it.`].join("\n");
+  return { origin, mcp, cmd, json, brief };
+}
+async function copyText(btn, text) {
+  try { await navigator.clipboard.writeText(text); } catch { prompt("Copy this:", text); return; }
+  const was = btn.textContent; btn.textContent = "Copied"; setTimeout(() => { btn.textContent = was; }, 1500);
+}
+function forAgentsBox() {
+  const i = agentInfo("");
+  const row = (label, value, copy) => `<div class="kv"><span class="muted">${label}</span><code>${esc(value)}</code>${copy ? `<button type="button" data-copy="${esc(value)}">Copy</button>` : ""}</div>`;
+  return `<details class="panel card-pad for-agents"><summary><strong>For agents</strong> <span class="muted">· what a script or an AI agent needs</span></summary>
+    ${row("Base URL", i.origin, true)}${row("Header", "Authorization: Bearer <token>", false)}
+    ${row("API reference", `${i.origin}/api/v1/openapi.json`, true)}${row("Readable docs", `${i.origin}/api/v1/docs`, true)}${row("MCP server", i.mcp, true)}
+    <p class="small muted">Claude Code</p><pre class="code">${esc(i.cmd)}</pre><button type="button" data-copy="${esc(i.cmd)}">Copy</button>
+    <p class="small muted">Other MCP clients (JSON)</p><pre class="code">${esc(i.json)}</pre><button type="button" data-copy="${esc(i.json)}">Copy</button>
+    <p class="small muted">A token acts as you, never with more than your role. It cannot make or see tokens, manage users, touch Claude accounts, or change your password or account. An agent on another computer needs the studio's real address over HTTPS.</p></details>`;
+}
+/** The token list of one person ("me") or of everyone ("admin", Settings → API tokens). */
+async function tokensSection(el, scope) {
+  const base = scope === "me" ? "/me/tokens" : "/admin/tokens";
+  const { tokens } = await get(base);
+  const row = (t) => {
+    const [label, tone] = TOKEN_STATUS[t.status] || [t.status, ""];
+    return `<li data-id="${esc(t.id)}"><div class="tok-head">
+        <div class="tok-name"><strong>${esc(t.name)}</strong> <code class="muted">${esc(t.prefix)}…</code>
+          ${scope === "admin" ? `<span class="muted small">${esc(t.owner.email || "(deleted)")}</span>` : ""}</div>
+        <div class="tok-badges">${pill(t.role === "admin" ? "Owner" : "Member", t.role === "admin" ? "accent" : "")}${t.can_spend ? pill("Can use credits", "warn") : ""}${pill(label, tone)}</div>
+        <details class="menu"><summary aria-label="Actions for ${esc(t.name)}">⋯</summary><div class="menu-list">
+          <button data-act="log">Log</button>${t.status === "active" ? '<button data-act="revoke" class="danger">Revoke</button>' : ""}</div></details></div>
+      <p class="muted small">${t.requests_today} request${t.requests_today === 1 ? "" : "s"} today${t.blocked_today ? ` · <span class="fail">${t.blocked_today} blocked</span>` : ""} · ${t.rate_per_min}/min ·
+        ${t.last_used_at ? `used ${ago(t.last_used_at)} ago` : "never used"} · ${t.revoked_at ? "revoked" : t.expires_at ? `ends ${when(t.expires_at)}` : '<span class="fail">never ends</span>'}</p>
+      <div class="tok-log"></div></li>`;
+  };
+  const owner = ME && ME.role === "admin";
+  el.innerHTML = `${scope === "me" ? `<p class="muted">For your own scripts and AI agents (Claude Code and others). A token acts as you.</p>
+      <p><button class="primary" id="tok-new">New token</button></p>
+      <form id="tok-form" class="form panel" hidden>
+        <label>Name <input id="tok-name" maxlength="60" placeholder="Claude Code on my laptop" required></label>
+        <div class="admin-grid">
+          ${owner ? '<label>Role <select id="tok-role"><option value="customer">Member</option><option value="admin">Owner</option></select></label>' : ""}
+          <label>Requests per minute <select id="tok-rate">${[10, 30, 60, 120, 300].map((n) => `<option ${n === 60 ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+          <label>Ends <select id="tok-exp">${EXPIRY.map(([v, l]) => `<option value="${v}" ${v === "90d" ? "selected" : ""}>${l}</option>`).join("")}</select></label></div>
+        <label class="check"><input id="tok-spend" type="checkbox"> <span>Can use my film and learn credits (make films, learn styles)</span></label>
+        <p id="tok-never" class="notice warn small" hidden>A token that never ends stays valid until you revoke it.</p>
+        <div><button class="primary" type="submit">Create</button> <button type="button" id="tok-cancel">Cancel</button></div></form>
+      <div id="tok-secret"></div>` : `<p class="muted">Every person's tokens. People make their own on their account page; you can revoke any.</p>`}
+    <p id="tok-msg" class="muted" role="status"></p>
+    ${tokens.length ? `<ul class="tokens panel">${tokens.map(row).join("")}</ul>` : '<p class="panel muted card-pad">No tokens yet.</p>'}
+    ${forAgentsBox()}`;
+  const msg = /** @type {HTMLElement} */ (el.querySelector("#tok-msg"));
+  el.querySelectorAll("button[data-copy]").forEach((b) => b.addEventListener("click", () => copyText(/** @type {HTMLButtonElement} */ (b), /** @type {HTMLElement} */ (b).dataset.copy)));
+  el.querySelectorAll(".tokens button[data-act]").forEach((b) => b.addEventListener("click", async () => {
+    const li = /** @type {HTMLElement} */ (b.closest("li")), id = encodeURIComponent(li.dataset.id);
+    b.closest("details")?.removeAttribute("open");
+    if (/** @type {HTMLElement} */ (b).dataset.act === "revoke") {
+      if (!confirm("Revoke this token? Anything using it stops working at once.")) return;
+      try { await send("DELETE", `${base}/${id}`); await tokensSection(el, scope); } catch (e) { msg.className = "fail"; msg.textContent = e.message; }
+      return;
+    }
+    const box = /** @type {HTMLElement} */ (li.querySelector(".tok-log"));
+    if (box.innerHTML) { box.innerHTML = ""; return; }
+    const { requests } = await get(`${base}/${id}/log?limit=200`);
+    box.innerHTML = requests.length ? `<div class="table-wrap"><table><tr><th>When</th><th>Request</th><th>Result</th><th>IP</th></tr>${requests.map((r) =>
+      `<tr><td>${when(r.at)}</td><td><code>${esc(r.method)} ${esc(r.path)}</code></td><td class="${r.outcome === "allowed" || r.outcome === "replay" ? "" : "fail"}">${esc(r.outcome)}</td><td class="muted">${esc(r.ip || "")}</td></tr>`).join("")}</table></div>`
+      : '<p class="muted small">No requests yet.</p>';
+  }));
+  if (scope !== "me") return;
+  const form = /** @type {HTMLFormElement} */ (el.querySelector("#tok-form")), newBtn = /** @type {HTMLButtonElement} */ (el.querySelector("#tok-new"));
+  newBtn.addEventListener("click", () => { form.hidden = false; newBtn.hidden = true; field("tok-name").focus(); });
+  el.querySelector("#tok-cancel").addEventListener("click", () => { form.hidden = true; newBtn.hidden = false; });
+  const exp = /** @type {HTMLSelectElement} */ (el.querySelector("#tok-exp"));
+  exp.addEventListener("change", () => { /** @type {HTMLElement} */ (el.querySelector("#tok-never")).hidden = exp.value !== "never"; });
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const role = /** @type {HTMLSelectElement | null} */ (el.querySelector("#tok-role"));
+    try {
+      const r = await post("/me/tokens", { name: field("tok-name").value.trim(), role: role ? role.value : "customer",
+        can_spend: field("tok-spend").checked, rate_per_min: Number(/** @type {HTMLSelectElement} */ (el.querySelector("#tok-rate")).value), expires: exp.value });
+      await tokensSection(el, scope);
+      const i = agentInfo(r.secret);
+      el.querySelector("#tok-secret").innerHTML = `<div class="notice secret-box"><p><strong>Copy it now: it is shown only this once.</strong></p>
+        <pre class="code" id="tok-value">${esc(r.secret)}</pre>
+        <p><button type="button" class="primary" data-copy="${esc(r.secret)}">Copy token</button>
+          <button type="button" data-copy="${esc(i.cmd)}">Copy MCP command</button>
+          <button type="button" data-copy="${esc(i.brief)}">Copy for an agent</button></p></div>`;
+      el.querySelectorAll("#tok-secret button[data-copy]").forEach((b) => b.addEventListener("click", () => copyText(/** @type {HTMLButtonElement} */ (b), /** @type {HTMLElement} */ (b).dataset.copy)));
+    } catch (err) { msg.className = "fail"; msg.textContent = err.message; }
+  };
 }
 
 async function loadMe() {

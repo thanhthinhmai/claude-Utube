@@ -384,3 +384,20 @@ details.how div { padding-left: 16px; max-width: 640px; } details.how p { margin
 .latest-time { margin-left: auto; }
 .clamp { margin: 4px 0 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; }
 .card-pad + .card-pad { margin-top: 16px; }
+
+/* ---------- API tokens (specs/009) ---------- */
+.tokens { list-style: none; margin: 8px 0 16px; padding: 0 16px; }
+.tokens > li { padding: 12px 0; border-top: 1px solid var(--line); } .tokens > li:first-child { border-top: 0; }
+.tok-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.tok-name { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.tok-badges .badge + .badge { margin-left: 4px; }
+.tokens p { margin: 4px 0 0; }
+.tok-log { margin-top: 8px; } .tok-log table { font-size: 12.5px; }
+.code { background: var(--hover); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; overflow-x: auto;
+        white-space: pre-wrap; word-break: break-all; font-size: 12.5px; margin: 4px 0 6px; }
+.kv { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 8px 0; }
+.kv > span { width: 110px; font-size: 13px; } .kv code { overflow-wrap: anywhere; font-size: 12.5px; }
+.kv button, .for-agents button, .secret-box button { padding: 3px 10px; font-size: 12.5px; }
+.for-agents summary { cursor: pointer; } .for-agents { margin-top: 12px; }
+.secret-box { margin: 10px 0; } .secret-box p { margin: 6px 0; }
+select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; }
