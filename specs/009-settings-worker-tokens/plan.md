@@ -88,7 +88,7 @@ tools/runner/
 tools/requirements-online.txt   # sửa: ghim mcp==2.3.0
 deploy/Caddyfile                # sửa nếu cần (R8: không ghi Authorization)
 tests/online/
-├── test_tokens.py · test_worker_status.py · test_mcp.py · test_tickets.py · test_idempotency.py
+├── test_tokens.py · test_worker_status.py · test_mcp.py · test_tickets.py · test_idempotency.py · test_token_secrets.py
 └── browser_tokens.cjs · browser_worker.cjs
 ```
 

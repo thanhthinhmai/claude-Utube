@@ -8,7 +8,7 @@ Thay đổi trên [API của 008](../../008-claude-plan-login/contracts/api-admi
 - Mã sai, đã thu hồi, hết hạn, hoặc người sở hữu bị tắt hay xoá → `401 bad_token` (cùng một câu trả lời cho mọi trường hợp).
 - Vượt `rate_per_min` → `429 rate_limited`, header `Retry-After`.
 - Vai trò thực Member gọi API quản trị → `403 forbidden`.
-- Mọi mã gọi các đường sau → `403 token_forbidden` (FR-213): `/me/tokens*`, `/admin/tokens*`, `/admin/users*`, `/admin/claude*`, `PUT /me`, `DELETE /me`.
+- Mọi mã gọi các đường sau, với mọi phương thức kể cả `GET` → `403 token_forbidden` (FR-213): `/me/tokens*`, `/admin/tokens*`, `/admin/users*`, `/admin/claude*`, `PUT /me`, `DELETE /me`.
 - Mã có `can_spend = false` gọi `POST /jobs` → `403 spend_not_allowed`, không trừ lượt, không kiểm nội dung (FR-212).
 - Mỗi yêu cầu có mã ghi một hàng nhật ký (FR-218, data-model: Token request).
 

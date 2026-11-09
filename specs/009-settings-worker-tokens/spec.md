@@ -59,7 +59,7 @@ Một người dùng (Member hoặc Owner) mở trang **Your account** → API t
 1. **Given** chủ xưởng tạo mã, **When** bấm Create, **Then** mã hiện đúng một lần kèm nút Copy; tải lại trang thì chỉ còn vài ký tự đầu của mã.
 2. **Given** một mã Member còn hạn, **When** script gọi API với header `Authorization: Bearer <mã>`, **Then** nó làm được những gì người đó làm được trên giao diện thành viên (xem việc, phim, phong cách; trả lời duyệt; tải phim), và không gọi được API quản trị.
 3. **Given** mã không có quyền dùng lượt, **When** script giao phim hoặc học phong cách, **Then** bị từ chối với lý do rõ ràng, không trừ lượt.
-4. **Given** mã Owner, **When** script gọi API quản trị (xem Users, Usage, Worker, đổi cài đặt), **Then** được; nhưng **không** tạo hay thu hồi mã API, không đăng nhập hay đăng xuất tài khoản Claude, và không thêm, sửa hay xoá người dùng.
+4. **Given** mã Owner, **When** script gọi API quản trị (Usage, Worker, đổi cài đặt xưởng), **Then** được; nhưng **không** đụng tới mã API, Users (kể cả xem danh sách), tài khoản Claude, hay mật khẩu và tài khoản của chính mình (FR-213).
 5. **Given** mã đã thu hồi, đã hết hạn, hoặc người nó thay mặt đã bị tắt hay xoá, **When** dùng, **Then** bị từ chối ngay.
 6. **Given** một mã vượt giới hạn số yêu cầu mỗi phút, **When** gọi tiếp, **Then** bị từ chối tạm thời kèm thời gian chờ.
 7. **Given** một Member tạo mã, **When** chọn vai trò, **Then** chỉ có Member; không ai tạo được mã thay mặt người khác.
@@ -89,7 +89,7 @@ Trang Your account liệt kê các mã của chính người dùng; tab Settings
 
 - Worker chạy nhiều tiến trình (nhiều máy hoặc chạy lại): mỗi tiến trình là một dòng trạng thái riêng; dòng không báo sống quá 10 phút thì không hiện nữa.
 - Không có việc nào: Latest jobs hiện "No jobs yet"; các ô đếm là 0.
-- Mã bị lộ: chủ xưởng thu hồi; mọi yêu cầu sau đó bị từ chối, kể cả yêu cầu đang trên đường.
+- Mã bị lộ: chủ xưởng thu hồi; mọi yêu cầu đến sau khi thu hồi bị từ chối.
 - Mã có hạn "Never": cho phép, nhưng trang cảnh báo rằng mã không bao giờ tự hết hạn.
 - Người mà mã thay mặt bị hạ từ Owner xuống Member: mã Owner của người đó chỉ còn quyền Member cho tới khi được nâng lại.
 - Gửi cả cookie phiên và mã: xưởng dùng mã, bỏ qua cookie.
@@ -116,7 +116,7 @@ Trang Your account liệt kê các mã của chính người dùng; tab Settings
 - **FR-210**: Mã MUST hiện đúng một lần lúc tạo. Xưởng MUST chỉ giữ bản băm của mã và vài ký tự đầu để nhận ra; không trang nào, API nào hay nhật ký nào hiện lại mã đầy đủ.
 - **FR-211**: Mọi API của xưởng MUST nhận mã trong header `Authorization: Bearer <mã>` như một phiên đăng nhập của người được thay mặt, giới hạn theo vai trò và quyền của mã. Yêu cầu có mã không cần thêm gì để chống giả mạo yêu cầu của trình duyệt.
 - **FR-212**: Mã không có quyền dùng lượt MUST bị từ chối khi giao phim, học phong cách hay yêu cầu sửa phim, và không trừ lượt.
-- **FR-213**: Mã Owner MUST dùng được các API quản trị, **trừ**: tạo hoặc thu hồi mã API (kể cả mã của chính mình), quản lý người dùng (Users), và đăng nhập, đăng xuất, thêm hay xoá tài khoản Claude. Những việc đó chỉ làm được từ trình duyệt đã đăng nhập.
+- **FR-213**: Mã Owner MUST dùng được các API quản trị, **trừ**: tạo, xem hoặc thu hồi mã API (kể cả mã của chính mình); mọi API của Users (kể cả xem danh sách); mọi API tài khoản Claude (kể cả xem trang AI accounts và đổi thứ tự); đổi mật khẩu, đổi cài đặt tài khoản và xoá tài khoản của chính mình. Mọi mã (Member và Owner) đều không làm được những việc này. Những việc đó chỉ làm được từ trình duyệt đã đăng nhập.
 - **FR-214**: Mã MUST bị từ chối ngay khi đã thu hồi, đã hết hạn, hoặc người được thay mặt đã tắt hay đã xoá. Vai trò thực của mã MUST là vai trò thấp hơn giữa vai trò của mã và vai trò hiện tại của người được thay mặt.
 - **FR-215**: Mã vượt giới hạn số yêu cầu mỗi phút MUST bị từ chối tạm thời, kèm thời gian chờ.
 - **FR-216**: Danh sách mã (của mình ở Your account; của mọi người ở tab API tokens của Owner) MUST hiện: tên, vài ký tự đầu, người sở hữu, vai trò, có quyền dùng lượt không, số yêu cầu và số yêu cầu bị chặn hôm nay (theo giờ Việt Nam), lần dùng gần nhất, hạn dùng, trạng thái (Active · Ended · Revoked). Mỗi mã có menu ⋯ với **Log** (200 yêu cầu gần nhất của mã: lúc, phương thức, đường dẫn, kết quả) và Revoke (có hỏi xác nhận); người sở hữu và Owner xem và thu hồi được.
@@ -124,7 +124,7 @@ Trang Your account liệt kê các mã của chính người dùng; tab Settings
 - **FR-219**: Xưởng MUST có một **máy chủ MCP** như neb-creative-tool, để tác tử AI (như Claude Code) nối thẳng vào xưởng bằng một mã API. Máy chủ MCP MUST đưa ra các công cụ tương ứng với việc thành viên làm trên giao diện: xem danh sách phong cách (thư viện và của mình), giao phim, yêu cầu sửa một phim đã xong, **học phong cách** (từ kênh YouTube hoặc từ video đã tải lên, FR-220), xem danh sách việc và trạng thái một việc, xem và trả lời các yêu cầu duyệt (câu hỏi, kịch bản, hai lần duyệt bản nháp phong cách), lấy link tải phim đã xong. Với mã Owner, MUST có thêm các công cụ chỉ đọc: tình trạng worker, Latest jobs, mức dùng. Như neb, máy chủ MCP MUST có thêm ba công cụ chung: liệt kê các API, mô tả một API, và gọi một API bất kỳ của xưởng (chỉ dưới `/api/v1`), kèm tài liệu OpenAPI như một tài nguyên MCP; các lệnh gọi này chịu đúng mọi chốt chặn của mã. Mỗi công cụ MUST tuân đúng vai trò, quyền dùng lượt và giới hạn số yêu cầu của mã (FR-211 đến FR-215), và MUST NOT làm được những việc ở FR-213.
 - **FR-220**: Qua máy chủ MCP, tác tử MUST học được phong cách như trên web:
   - từ **kênh YouTube**: tác tử MUST gửi kèm xác nhận quyền dùng video (cùng văn bản và cùng điều kiện như trên web, 007); thiếu xác nhận thì bị từ chối;
-  - từ **video tải lên**: tác tử MUST tải video lên được qua MCP với đúng giới hạn của web (dung lượng, độ dài, số video mỗi lần học), rồi dùng các video đó để giao việc học;
+  - từ **video tải lên**: một công cụ MCP MUST cấp link tải lên dùng một lần để tác tử tải video lên, với đúng giới hạn của web (dung lượng, độ dài, số video mỗi lần học), rồi dùng các video đó để giao việc học;
   - hai lần duyệt bản nháp phong cách MUST trả lời được qua công cụ trả lời duyệt; video tham chiếu vẫn bị xoá khi việc học kết thúc như 007.
 - **FR-218**: Mỗi yêu cầu dùng mã (kể cả qua MCP) MUST được ghi vào nhật ký của mã: lúc, phương thức, đường dẫn, kết quả (cho qua, hoặc lý do bị chặn: sai quyền, không được dùng lượt, vượt giới hạn mỗi phút, đường cấm, gửi lại theo Idempotency-Key), địa chỉ IP. Nhật ký giữ 30 ngày. Xưởng MUST NOT lưu nội dung yêu cầu hay phản hồi.
 - **FR-221**: Giao việc (giao phim, sửa phim, học phong cách) MUST nhận header `Idempotency-Key`: gửi lại cùng khoá trong 24 giờ thì xưởng trả lại đúng việc đã tạo lần đầu, không tạo việc mới, không trừ thêm lượt, không kiểm nội dung lần nữa. Cùng khoá nhưng nội dung khác MUST bị từ chối. Công cụ MCP giao việc MUST nhận và chuyển khoá này.
@@ -134,6 +134,7 @@ Trang Your account liệt kê các mã của chính người dùng; tab Settings
 - **Worker heartbeat**: một tiến trình worker; tên máy hoặc mã tiến trình, lần báo sống gần nhất, việc đang chạy (nếu có), lúc bắt đầu.
 - **API token**: tên, vài ký tự đầu, bản băm, người sở hữu (cũng là người tạo và người được thay mặt), vai trò, quyền dùng lượt, giới hạn mỗi phút, lúc tạo, hạn dùng, lúc thu hồi, lần dùng gần nhất.
 - **Token request**: một yêu cầu dùng mã: lúc, phương thức, đường dẫn, kết quả, IP; giữ 30 ngày. Số yêu cầu và số bị chặn hôm nay tính từ đây.
+- **Ticket**: vé dùng một lần để tải video lên hoặc tải phim về (loại, người sở hữu, mã đã xin, hạn 30 phút, đã dùng hay chưa); chỉ lưu bản băm.
 - **Idempotency record**: khoá do tác tử gửi, người gửi, dấu của nội dung yêu cầu, việc đã tạo; giữ 24 giờ.
 
 ## Success Criteria *(mandatory)*

@@ -39,4 +39,4 @@ Tài nguyên MCP: `film-studio://openapi` (OpenAPI của các API dùng được
 | `worker_status` | `GET /admin/worker` | như contract worker |
 | `usage` | `GET /admin/usage` | như 008 |
 
-Không có công cụ nào cho: mã API, Users, tài khoản Claude, đổi cài đặt (FR-213).
+Không có công cụ riêng nào cho: mã API, Users, tài khoản Claude (FR-213), hay đổi cài đặt xưởng. Công cụ chung `api_request` tuân đúng quyền của REST: mã Owner đổi được cài đặt xưởng như qua REST; các đường ở FR-213 vẫn bị `403 token_forbidden`.

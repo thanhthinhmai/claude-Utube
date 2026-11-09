@@ -11,7 +11,7 @@ Nền là 007 và 008: FastAPI một tiến trình web, SQLite ở `$STUDIO_DATA
 ## R2. Giới hạn quyền của mã
 - **Decision**: vai trò thực = vai trò thấp hơn giữa vai trò của mã và vai trò hiện tại của người sở hữu (FR-214), tính lại ở mỗi yêu cầu. Ba chốt chặn:
   - `admin(request)` dùng vai trò thực, nên mã Member gọi API quản trị bị `403`.
-  - Danh sách cấm cho mọi mã (FR-213): `/api/v1/me/tokens*`, `/api/v1/admin/tokens*`, `/api/v1/admin/users*`, `/api/v1/admin/claude*`, `DELETE /api/v1/me`, `PUT /api/v1/me` (đổi mật khẩu). Có mã thì trả `403 token_forbidden`.
+  - Danh sách cấm cho mọi mã (FR-213): `/api/v1/me/tokens*`, `/api/v1/admin/tokens*`, `/api/v1/admin/users*` (kể cả `GET`), `/api/v1/admin/claude*` (kể cả `GET` và đổi thứ tự), `PUT /api/v1/me` (đổi mật khẩu, cài đặt tài khoản), `DELETE /api/v1/me`. Có mã thì trả `403 token_forbidden`.
   - Không có quyền dùng lượt (FR-212): `POST /api/v1/jobs` (giao phim, sửa phim, học phong cách) trả `403 spend_not_allowed`, trước khi kiểm nội dung hay trừ lượt.
 - **Rationale**: ít chỗ chạm, dễ test, không quên route nào: danh sách cấm theo tiền tố đường dẫn.
 

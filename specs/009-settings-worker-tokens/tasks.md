@@ -27,7 +27,7 @@
   - `record(token, method, path, outcome, ip)`: một hàng `token_request`; xoá hàng > 30 ngày tối đa mỗi giờ; `last_used_at` tối đa mỗi 5 phút.
 - [ ] T005 `tools/studio/studio/server.py` (`online_guard`) và `api_online.py` (`admin()`), theo contract "Xác thực bằng mã":
   - có `Authorization: Bearer fs_…` → `tokens.resolve`; bỏ qua cookie và không kiểm `X-Studio`/Origin; `request.state.account` là người sở hữu với vai trò thực, `request.state.token` là mã;
-  - mã hỏng → `401 bad_token`; đường cấm (`/me/tokens*`, `/admin/tokens*`, `/admin/users*`, `/admin/claude*`, `PUT /me`, `DELETE /me`) → `403 token_forbidden`; vượt giới hạn mỗi phút → `429 rate_limited` + `Retry-After`;
+  - mã hỏng → `401 bad_token`; đường cấm, với mọi phương thức kể cả `GET` (`/me/tokens*`, `/admin/tokens*`, `/admin/users*`, `/admin/claude*`, `PUT /me`, `DELETE /me`) → `403 token_forbidden`; vượt giới hạn mỗi phút → `429 rate_limited` + `Retry-After`;
   - ghi nhật ký mỗi yêu cầu có mã với `outcome` đúng (data-model: Token request), kể cả khi route trả `403 forbidden`;
   - `admin()` dùng vai trò thực.
 - [ ] T006 `tests/online/test_tokens.py` (phần nền): dạng mã và chỉ lưu băm; vai trò thực (Owner bị hạ xuống Member thì mã Owner chỉ còn quyền Member); mã thu hồi, hết hạn, người sở hữu bị tắt hay xoá → `401`; có mã thì bỏ qua cookie và không cần `X-Studio`; từng đường cấm → `403 token_forbidden`; vượt giới hạn → `429` + `Retry-After`; nhật ký ghi đúng `outcome`; hàng > 30 ngày bị xoá.
