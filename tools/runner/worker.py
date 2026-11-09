@@ -97,7 +97,8 @@ class LocalRunner:
             if not link.is_symlink():
                 link.symlink_to(target, target_is_directory=True)
         base = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "TZ") if k in os.environ}
-        env = {**base, **env, "STUDIO_WORK": str(work), "HOME": str(work / ".home")}
+        env = {**base, **env, "STUDIO_WORK": str(work), "HOME": str(work / ".home"),
+               "STUDIO_HOME_DIR": str(self.studio)}            # what /studio is in a container: this checkout
         with open(work / ".agent.log", "ab") as out:       # the child keeps its own copy of the file
             return subprocess.Popen(self.cmd, cwd=work, env=env, stdout=out, stderr=subprocess.STDOUT,
                                     start_new_session=True)
