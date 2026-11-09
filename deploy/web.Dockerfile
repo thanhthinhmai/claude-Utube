@@ -31,4 +31,6 @@ USER 1000
 ENV STUDIO_MODE=online STUDIO_DATA=/data
 EXPOSE 8787
 CMD ["/studio/tools/.venv/bin/python", "-m", "uvicorn", "studio.server:app", "--app-dir", "/studio/tools/studio", \
-     "--host", "0.0.0.0", "--port", "8787", "--proxy-headers", "--forwarded-allow-ips", "*"]
+     "--host", "0.0.0.0", "--port", "8787", "--proxy-headers", "--forwarded-allow-ips", "*", \
+     "--timeout-graceful-shutdown", "10"]
+# 10 s: open live-update connections (/events) would otherwise hold a restart forever (008 live run)

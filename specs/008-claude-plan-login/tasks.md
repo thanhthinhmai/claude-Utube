@@ -254,6 +254,17 @@ Lấy bố cục và cách dùng của neb (`app/login`, `components/accounts/Cl
 - [X] T041 `api_online.py`: `PUT /admin/claude/order`, `POST /admin/claude/accounts/{slot}/top`, trường `order` trong `GET /admin/claude`. `web/app.js`: công tắc "Auto: least used first / Manual: top to bottom" ở chân thẻ Claude · plan, mục ⋯ **Move to top** (không có ở tài khoản đầu khi đang Manual), nhãn "Used first" trên tài khoản đầu khi Manual.
 - [X] T042 Test (`test_claude_login.py`, `test_rotation.py`, `browser_claude.cjs`): Manual dùng tài khoản trên cùng dù đã dùng nhiều hơn; trên cùng chạm hạn mức thì xuống tài khoản kế; Move to top chuyển sang Manual và đổi thứ tự; Auto không đổi hành vi cũ; mã lỗi.
 
+
+---
+
+## Phase 10: Sửa sau chạy thật, mức Trực tiếp (2026-11-09)
+
+Các thay đổi nhỏ làm thẳng theo CLAUDE.md (≤ 2 tệp, không đổi dữ liệu hay API dùng chung), ghi lại để converge đối chiếu.
+
+- [X] T043 Trang Films có mục **In progress**: phim đang làm, dải các bước (đã xong, đang làm, sắp tới; bước đã báo tính là xong dù khác thứ tự), thanh tiến độ, thời gian; danh sách tự làm mới (`817a342`, `test_films_progress.py`).
+- [X] T044 Tiết kiệm token: hướng dẫn gọn `tools/runner/JOB.md` thay cho CLAUDE.md của repo; `job run` online chỉ in 20 dòng cuối; thống kê mỗi lượt chạy `agent_runs` cho chủ xưởng (`2cf5d43`, `test_agent_thrift.py`). Đo hiệu quả: bài A/B Opus và Sonnet trên cùng kịch bản (kết quả ghi vào research R7).
+- [X] T045 Web trong Docker tắt trong tối đa 10 giây (`--timeout-graceful-shutdown`), như bộ chuyển tiếp: kết nối cập nhật trực tiếp làm một tiến trình web kẹt cả ngày khi chạy thật.
+
 ---
 
 ## Dependencies & Execution Order
