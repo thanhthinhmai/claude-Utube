@@ -87,6 +87,8 @@ def env(slot: int) -> dict:
     """Claude Code's environment for a slot: its own config folder, never an API key, no browser."""
     e = {k: v for k, v in os.environ.items() if k not in DROP_ENV}
     e.update(CLAUDE_CONFIG_DIR=str(config_dir(slot)), BROWSER="/bin/false")
+    if e.get("HOME"):
+        os.makedirs(e["HOME"], exist_ok=True)        # compose points HOME at /tmp/home, a fresh tmpfs
     return e
 
 
