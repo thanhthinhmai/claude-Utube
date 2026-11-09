@@ -90,6 +90,7 @@ class PlanRun(unittest.TestCase):
         from studio import jobs
         j = jobs.load(jid)
         self.assertEqual((j["status"], j["step"]), ("queued", "Waiting for a Claude account"))
+        self.assertEqual(self.a.get(A).json()["waiting"], 1)          # the AI accounts page says so (FR-110)
         sign_in(self.a, 1, "owner@x.test")
         self.s.start()
         self.assertEqual(self.s.wait(jid)["status"], "done")

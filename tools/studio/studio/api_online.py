@@ -597,7 +597,7 @@ class CodeIn(BaseModel):
 
 def claude_overview() -> dict:
     return {"accounts": claude_plan.accounts(), "login": claude_plan.pending(), "api_key": claude_plan.api_key(),
-            "ready": claude_plan.ready(), "order": claude_plan.order()}
+            "ready": claude_plan.ready(), "order": claude_plan.order(), "waiting": claude_plan.waiting_jobs()}
 
 
 class OrderIn(BaseModel):

@@ -150,8 +150,9 @@ def status(slot: int) -> dict:
                         (email, plan.lower() if isinstance(plan, str) else None, state, slot))
         else:
             state = "signed_out" if state == "signed_out" else "needs_signin"
-            con.execute("UPDATE claude_account SET state = ? WHERE slot = ?", (state, slot))
         con.execute("UPDATE claude_account SET checked_at = ? WHERE slot = ?", (store.now_iso(), slot))
+    if state == "needs_signin":
+        mark_needs_signin(slot)          # one mail to the owners, as when a call finds it (FR-109)
     return public(slot)
 
 
@@ -159,6 +160,13 @@ def tokens_5h(con, slot: int, now: float = None) -> int:
     since = _iso((now or store.clock()) - WINDOW_S)
     return con.execute("SELECT coalesce(sum(tokens_in + tokens_out + cache_write + cache_read), 0) FROM call "
                        "WHERE via = ? AND at >= ?", (f"plan:{slot}", since)).fetchone()[0]
+
+
+def waiting_jobs() -> int:
+    """Queued jobs held back because no Claude account (and no key) can take their calls (FR-110)."""
+    with db.read() as con:
+        return con.execute("SELECT count(*) FROM docs WHERE kind = 'job' AND status = 'queued' "
+                           "AND json_extract(data, '$.step') = 'Waiting for a Claude account'").fetchone()[0]
 
 
 def accounts(now: float = None) -> list:

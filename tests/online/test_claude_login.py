@@ -173,6 +173,9 @@ class ClaudeLogin(Base):
         r = self.a.post(f"{A}/refresh", headers=W).json()
         self.assertEqual(r["accounts"][0]["state"], "needs_signin")
         self.assertFalse(r["ready"])
+        self.a.post(f"{A}/refresh", headers=W)                         # checked again: still one mail (FR-109)
+        mails = [p.read_text() for p in self.p.flush_mail() if "needs to sign in again" in p.read_text()]
+        self.assertEqual(len(mails), 1)
         os.environ["ANTHROPIC_API_KEY"] = "sk-ant-x"
         self.assertTrue(self.a.get(A).json()["ready"])                # the fallback key alone is enough (FR-110)
 

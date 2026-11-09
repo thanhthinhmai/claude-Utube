@@ -45,6 +45,7 @@ const ERR = {
   // specs/008: the owner account and the AI accounts
   already_set_up: "The studio already has an owner. Sign in instead.",
   last_owner: "The studio needs at least one owner who is switched on.",
+  studio_not_ready: "The studio has no Claude account ready right now. Please try again later.",
   self: "You cannot do this to your own account here.",
   email_taken_password: "This email already has an account with another password. Use that password to make it the owner.",
   max_accounts: "There are 5 Claude accounts already: remove one to add another.",
@@ -61,7 +62,7 @@ const ERR = {
   weak_password: "The password needs at least 10 characters.", terms_required: "Please accept the terms of use.",
   signup_closed: "There is no public sign-up. Ask the studio owner to add you.", token_expired: "This link was already used or has expired.",
   rate_limited: "Too many tries. Please wait a little and try again.", unverified: "Confirm your email first: open the link we sent you.",
-  quota_exceeded: "You have used all your films for this month.", daily_cap: "The studio is fully booked today. Please try again tomorrow.",
+  quota_exceeded: "You have used all your films for this month.",
   too_many_queued: "You already have 3 jobs in progress. Wait for one to finish.", too_long: "The film is too long.",
   content_rejected: "The studio cannot make this idea.", style_not_found: "This style does not exist any more.",
   in_use: "A job is still using this.", rights_required: "Please confirm your right to use the channel's videos.",
@@ -898,7 +899,7 @@ async function pageClaude() {
     const signedIn = a.state === "signed_in" || a.state === "limited";
     const first = manual && several && a === list[0];
     const badges = (first ? pill("Used first", "accent") : "") + (signedIn
-      ? `${pill("Signed in", "ok")}${a.plan ? pill(a.plan) : ""}${rested(a) ? pill("At its limit", "bad") : ""}`
+      ? `${pill("Signed in", "ok")}${a.plan ? pill(a.plan) : ""}${rested(a) ? pill("Limit reached", "bad") : ""}`
       : waiting ? pill("Signing in", "accent", "pulse") : a.state === "needs_signin" ? pill("Needs sign-in", "bad") : pill("Not signed in"));
     const meta = rested(a) ? `Back ${resetLabel(a.rest_until)}. Calls use the other accounts until then.`
       : a.state === "needs_signin" ? "Its sign-in stopped working: sign in again." : !signedIn && !waiting && a.slot === 1 && !several
@@ -928,6 +929,7 @@ async function pageClaude() {
       ${resting ? pill(`${resting} resting`, "warn") : ""}${needs ? pill(`${needs} need${needs === 1 ? "s" : ""} signing in`, "bad") : ""}
       <span class="summary-end">API key: ${c.api_key ? "set, used only as a fallback" : "not set"}</span></div>
     ${c.ready ? "" : '<p class="error">No Claude account signed in. Jobs cannot run.</p>'}
+    ${c.waiting ? `<p class="notice warn">${c.waiting} job${c.waiting === 1 ? " is" : "s are"} waiting for a Claude account. They start as soon as one is signed in.</p>` : ""}
     <section class="provider panel" id="claude-plan">
       <div class="provider-head"><div><div class="acc-name"><h2>Claude · plan</h2>${live.length ? pill(live.length > 1 ? `${live.length} signed in` : "Signed in", "ok") : pill("Not signed in")}</div>
         <p class="muted">Films, styles and the content check run on your Claude Pro or Max plan. When an account reaches its limit, calls move to the next signed-in account.</p></div>

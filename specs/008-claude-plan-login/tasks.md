@@ -287,3 +287,12 @@ Các thay đổi nhỏ làm thẳng theo CLAUDE.md (≤ 2 tệp, không đổi d
 2. Phase 2 → US1 → dừng, kiểm MVP bằng quickstart bước 1–4.
 3. US2 → US3 → US4, mỗi story xong thì chạy 4 bộ test và commit.
 4. Phase 7, rồi `/speckit-converge`.
+
+## Phase 11: Convergence
+
+- [ ] T046 Chạy một phim thật qua bộ xưởng Docker (`sh bin/studio online up`, container `studio-job`, mạng `jobnet`, bộ chuyển tiếp trong compose) và ghi kết quả vào T035 per SC-102, plan: một việc một container (partial)
+- [X] T047 Trang AI accounts hiện số việc đang chờ tài khoản Claude ("N jobs are waiting for a Claude account") per FR-110 (partial)
+- [X] T048 Khi `status()` phát hiện đăng nhập không còn hiệu lực, dùng `mark_needs_signin` để gửi đúng 1 thư cho chủ xưởng per FR-109 (partial)
+- [X] T049 Đổi nhãn "At its limit" trên trang AI accounts thành "Limit reached" per FR-102, FR-108 (contradicts)
+- [ ] T050 Bấm giờ một lần đăng nhập tài khoản Claude thật từ lúc bấm Sign in, ghi vào T035 per SC-101 (partial)
+- [X] T051 Bỏ mẫu thư `invite` và câu lỗi `daily_cap` không còn dùng per US3, FR-116 (unrequested)
