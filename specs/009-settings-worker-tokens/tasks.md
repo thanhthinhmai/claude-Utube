@@ -91,6 +91,7 @@
 - [X] T024 [P] `deploy/Caddyfile` (theo kết quả T001: không ghi `Authorization`; `/api/mcp` đi tới web) và `deploy/README.md`: mục mã API, khung For agents, nối Claude Code bằng MCP, thu hồi mã khi lộ.
 - [X] T025 [P] `CLAUDE.md` (mục Cấu trúc: `tokens.py`, `mcp_server.py`, `/api/mcp`, tab Worker và API tokens).
 - [ ] T026 Chạy quickstart bằng tay (bước 1–5) với Claude Code thật nối qua MCP (SC-206, SC-207); ghi kết quả vào tasks: đạt, đạt một phần hoặc thất bại (hiến pháp IV).
+  - **Kết quả 2026-11-09: đạt một phần.** Claude Code 2.1.319 nối `http://localhost:8790/api/mcp` bằng `claude mcp add` → "Connected". Với mã Member không dùng lượt, Claude Code (`claude -p`) gọi `list_jobs`, `list_styles` đúng; `api_request /api/v1/admin/usage` → `403 forbidden`; `make_film` → `403 spend_not_allowed`. Nhật ký mã có đúng 5 hàng, mỗi lệnh gọi công cụ một hàng (SC-207); mã thu hồi xong. **Còn lại** (tốn lượt và token thật, người dùng tự chạy): quickstart bước 4.2 (làm phim 20 s qua MCP rồi tải về), 4.3 (học phong cách từ 3 video), bước 1–3 trên giao diện.
 
 ---
 
