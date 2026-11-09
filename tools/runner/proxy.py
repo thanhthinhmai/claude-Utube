@@ -40,6 +40,26 @@ BACK_HEADERS = ("content-type", "retry-after", "request-id", "anthropic-ratelimi
 WAIT_FOR_REST_S = 15            # specs/008 FR-110, like neb-creative-tool's WAIT_FOR_REST_MS
 
 
+def stall_seconds() -> float:
+    """A stream with no content for this long is cut so Claude Code sends the call again. Anthropic's keep-alive
+    pings do not count: in the second live run they ran for 20 minutes with nothing else (2026-11-09)."""
+    return float(os.environ.get("STUDIO_STREAM_STALL_S", "300"))
+
+
+def only_pings(chunk: bytes) -> bool:
+    """True when an SSE chunk carries nothing but keep-alive pings (or blank lines)."""
+    for line in chunk.decode("utf-8", "replace").splitlines():
+        line = line.strip()
+        if not line or line == "event: ping" or (line.startswith("data:") and '"ping"' in line and "content" not in line):
+            continue
+        return False
+    return True
+
+
+class Stalled(Exception):
+    pass
+
+
 # ---------- job tokens ----------
 def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
@@ -230,11 +250,25 @@ def create_app() -> FastAPI:
             return Response(data, status_code=r.status_code, headers=back)
 
         async def stream():
-            chunks = []
+            chunks, limit = [], stall_seconds()
+            it, last = r.aiter_raw().__aiter__(), time.monotonic()
             try:
-                async for chunk in r.aiter_raw():
-                    chunks.append(chunk)
-                    yield chunk
+                while True:
+                    try:
+                        chunk = await asyncio.wait_for(it.__anext__(), timeout=limit)
+                    except StopAsyncIteration:
+                        break
+                    except asyncio.TimeoutError:
+                        chunk = b""
+                    now = time.monotonic()
+                    if not only_pings(chunk):
+                        last = now
+                    elif now - last > limit:     # broken off, not ended: the client sees an error and retries
+                        log.info("job %s via %s: stream stalled %.0f s with no content, cut", job["id"], via, now - last)
+                        raise Stalled()
+                    if chunk:
+                        chunks.append(chunk)
+                        yield chunk
             finally:
                 await r.aclose()
                 _mark_ok(h)
@@ -362,7 +396,7 @@ def main():
     os.environ.setdefault("STUDIO_MODE", "online")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
     uvicorn.run(create_app(), host=os.environ.get("PROXY_HOST", "0.0.0.0"), port=int(os.environ.get("PROXY_PORT", "8780")),
-                log_level="warning")
+                log_level="warning", timeout_graceful_shutdown=10)   # a stalled stream must not hold a restart
 
 
 if __name__ == "__main__":

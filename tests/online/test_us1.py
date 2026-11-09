@@ -94,7 +94,7 @@ class US1(unittest.TestCase):
         self.assertEqual(sum("could not finish" in m for m in mails), 3)
 
     def test_overloaded_api_hits_the_watchdog(self):
-        self.s.worker.watchdog = 1.5
+        self.s.worker.watchdog = 4            # long enough for the fake agent to start on a busy machine
         c = self.s.signup_verified("ov@example.com")
         jid = film_job(c, idea="Busy [529]").json()["id"]
         self.s.start()

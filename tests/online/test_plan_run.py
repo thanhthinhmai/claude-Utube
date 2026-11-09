@@ -115,6 +115,33 @@ class PlanRun(unittest.TestCase):
                          [("plan:1", "claude-opus-5-5", 100_000, 10_000)])
         self.assertEqual(self.s.upstream_app.state.seen[-1]["query"], "beta=true")      # the query string is kept
 
+    def test_a_stream_of_only_pings_is_cut_so_claude_code_retries(self):
+        """Live run 2: Anthropic sent only keep-alive pings for 20 minutes; Claude Code never gave up. The proxy cuts
+        such a stream after STUDIO_STREAM_STALL_S without content, so the client sees an error and retries."""
+        import http.client
+        import proxy
+        from studio import jobs
+        sign_in(self.a, 1, "owner@x.test")
+        c = self.s.signup_verified("m@x.test")
+        jid = film_job(c).json()["id"]
+        jobs.set_status(jid, "running")
+        token = proxy.issue(jid)
+        os.environ["STUDIO_STREAM_STALL_S"] = "1"
+        try:
+            host, port = self.s.proxy.url.split("//")[1].split(":")
+            conn = http.client.HTTPConnection(host, int(port), timeout=20)
+            t = time.time()
+            conn.request("POST", "/v1/messages?beta=true", body=json.dumps({"model": "stall", "stream": True, "messages": []}),
+                         headers={"authorization": f"Bearer {token}", "content-type": "application/json"})
+            r = conn.getresponse()
+            with self.assertRaises((http.client.IncompleteRead, ConnectionError)):
+                r.read()                                     # the stream is broken off, not ended cleanly
+            self.assertLess(time.time() - t, 8)
+        finally:
+            os.environ.pop("STUDIO_STREAM_STALL_S")
+        self.assertEqual(jobs.load(jid)["status"], "running")       # the job goes on; Claude Code sends it again
+        self.assertTrue(any("stalled" in m for m in self.logs))
+
     def test_unknown_paths_are_closed(self):
         import urllib.error
         import urllib.request

@@ -190,6 +190,17 @@ def fake_upstream():
         if body.get("model") == "overloaded":
             return JSONResponse({"type": "error", "error": {"type": "overloaded_error", "message": "busy"}},
                                 status_code=529, headers={"retry-after": "1"})
+        if body.get("stream") and body.get("model") == "stall":     # starts, then only keep-alive pings (live run 2)
+            import asyncio
+            from fastapi.responses import StreamingResponse
+
+            async def pings():
+                yield ('event: message_start\ndata: ' + json.dumps({"type": "message_start", "message": {
+                    "model": "stall", "usage": {"input_tokens": 5, "output_tokens": 1}}}) + '\n\n').encode()
+                while True:
+                    await asyncio.sleep(0.2)
+                    yield b'event: ping\ndata: {"type": "ping"}\n\n'
+            return StreamingResponse(pings(), media_type="text/event-stream", headers=plan_headers)
         if body.get("stream"):                       # SSE like the real API; gzip when the caller accepts it
             import gzip
             from fastapi.responses import Response
