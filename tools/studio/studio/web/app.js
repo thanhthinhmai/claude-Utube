@@ -306,12 +306,45 @@ const decidedHtml = (d, kind = "") => (kind === "question"
   : `<p class="done-box">Decided: <strong>${esc(DECISION[d.value])}</strong> (via ${esc(SOURCE[d.source])}, ${when(d.at)})
   ${d.note ? `<br>Note: ${esc(d.note)}` : ""}</p>`);
 
+// The stages a film job reports (CLAUDE.md: job step); Storyboard only when the job asked for one
+const STAGES = ["Treatment", "Look", "Storyboard", "Voice", "Music", "Picture", "Mix", "Render", "Self-check"];
+const OPEN_STATUS = ["queued", "running", "waiting_review", "waiting_resume"];
+const ago = (iso) => {
+  const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
+};
+/** A film being made: its stages so far, the current one, progress and time (Films page). */
+function filmInProgress(j) {
+  const seen = new Set(j.log.map((x) => x.line));
+  const now = STAGES.indexOf(j.step);
+  const stages = STAGES.filter((st) => st !== "Storyboard" || seen.has(st));
+  const track = stages.map((st) => {
+    const i = STAGES.indexOf(st);
+    const cls = i === now ? "now" : seen.has(st) || (now >= 0 && i < now) ? "done" : "next";   // agents may change the order
+    return `<li class="${cls}">${esc(st)}</li>`;
+  }).join("");
+  const started = j.log.find((x) => x.line === "Started");
+  const pct = j.progress && j.progress.total ? Math.round((100 * j.progress.done) / j.progress.total) : null;
+  const note = j.status === "queued"
+    ? (j.step === "Waiting for a Claude account" ? "Waiting for a Claude account" : `In the queue${j.queue_position ? `: number ${j.queue_position}` : ""}`)
+    : j.status === "waiting_review" ? "Waiting for your answer" : `${esc(j.step)}${started ? ` · ${ago(started.t)} so far` : ""}`;
+  const idea = (j.input && j.input.idea) || j.name;
+  return `<a class="panel making" href="#/jobs/${esc(j.id)}">
+    <div class="making-head"><strong>${esc(idea.length > 90 ? idea.slice(0, 88) + "…" : idea)}</strong>${badge(j.status)}</div>
+    <p class="muted small">${j.links && j.links.style ? `Style ${esc(j.links.style)} · ` : ""}${note}</p>
+    <ol class="stages">${track}</ol>
+    ${pct !== null ? `<div class="bar" title="${pct}%"><span style="width:${pct}%"></span></div><p class="muted small">${esc(j.step)}: ${j.progress.done} / ${j.progress.total}</p>` : ""}
+  </a>`;
+}
 async function pageFilms() {
-  const { films } = await get("/films");
-  $app.innerHTML = `${head("Results", "Films", MODE === "online" ? "Your finished films." : "Rendered films in the films/ folder.")}${films.length ? `<div class="grid">${films.map((f) => `<a class="panel card" href="#/films/${esc(f.name)}">
+  const [{ films }, { jobs }] = await Promise.all([get("/films"), get("/jobs").catch(() => ({ jobs: [] }))]);
+  const making = jobs.filter((j) => j.kind === "film" && OPEN_STATUS.includes(j.status));
+  $app.innerHTML = `${head("Results", "Films", MODE === "online" ? "Your films: the ones being made, then the finished ones." : "Rendered films in the films/ folder.")}
+    ${making.length ? `<h2>In progress</h2><div class="making-list">${making.map(filmInProgress).join("")}</div><h2>Finished</h2>` : ""}
+    ${films.length ? `<div class="grid">${films.map((f) => `<a class="panel card" href="#/films/${esc(f.name)}">
       ${f.has_poster ? `<img src="${API}/films/${esc(f.name)}/poster" alt="">` : ""}<p><strong>${esc(f.name)}</strong>
       ${f.rendering ? '<span class="badge s-running">Rendering</span>' : ""}</p></a>`).join("")}</div>`
-    : `<p class="panel muted">No films in the films/ folder yet.</p>`}`;
+    : `<p class="panel muted">${MODE === "online" ? "No finished films yet." : "No films in the films/ folder yet."}</p>`}`;
 }
 
 async function pageFilm(name) {
@@ -1110,7 +1143,7 @@ function onChange() {           // coalesce bursts of events into one refresh
     const h = location.hash || "#/";
     const editing = document.activeElement && ["note", "answer", "change-note"].includes(document.activeElement.id)
       || /** @type {HTMLDetailsElement | null} */ (document.getElementById("changes"))?.open;
-    if (!editing && !/^#\/(films|sets|styles|library)/.test(h)) route();
+    if (!editing && !/^#\/(films\/|sets|styles|library)/.test(h)) route();   // the Films list follows jobs live
   }, 300);
 }
 function connect() {
