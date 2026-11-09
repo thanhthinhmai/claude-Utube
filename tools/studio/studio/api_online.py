@@ -454,8 +454,11 @@ class AccountIn(BaseModel):
 
 
 def admin(request: Request):
+    """The Owner making this request; with an API token, its role is already capped (specs/009 FR-214)."""
     a = me(request)
     if a["role"] != "admin":
+        if getattr(request.state, "token", None):
+            request.state.token_outcome = "forbidden"
         raise StudioError("forbidden", "chỉ quản trị viên mới dùng được", 403)
     return a
 

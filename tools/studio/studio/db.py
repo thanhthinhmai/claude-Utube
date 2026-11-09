@@ -12,7 +12,7 @@ import threading
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 2           # 2: Claude plan accounts, calls, invites (specs/008 data-model)
+SCHEMA_VERSION = 3           # 2: Claude plan accounts, calls (specs/008); 3: API tokens, worker beats, tickets (specs/009)
 
 SETTINGS_DEFAULT = {
     "quota_films_default": 2,
@@ -113,6 +113,39 @@ CREATE TABLE IF NOT EXISTS call (
 );
 CREATE INDEX IF NOT EXISTS call_via ON call (via, at);
 CREATE INDEX IF NOT EXISTS call_account ON call (account_id, at);
+CREATE TABLE IF NOT EXISTS api_token (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  name TEXT NOT NULL CHECK (length(name) BETWEEN 1 AND 60),
+  prefix TEXT NOT NULL,
+  hash TEXT NOT NULL UNIQUE,
+  role TEXT NOT NULL CHECK (role IN ('customer', 'admin')),
+  can_spend INTEGER NOT NULL DEFAULT 0,
+  rate_per_min INTEGER NOT NULL DEFAULT 60 CHECK (rate_per_min IN (10, 30, 60, 120, 300)),
+  created_at TEXT NOT NULL, expires_at TEXT, revoked_at TEXT, last_used_at TEXT
+);
+CREATE INDEX IF NOT EXISTS api_token_owner ON api_token (owner_id);
+CREATE TABLE IF NOT EXISTS token_request (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  token_id TEXT NOT NULL, at TEXT NOT NULL, method TEXT NOT NULL, path TEXT NOT NULL,
+  outcome TEXT NOT NULL CHECK (outcome IN ('allowed', 'replay', 'forbidden', 'token_forbidden', 'no_spend', 'rate_limit')),
+  ip TEXT
+);
+CREATE INDEX IF NOT EXISTS token_request_token ON token_request (token_id, at);
+CREATE TABLE IF NOT EXISTS idempotency (
+  account_id TEXT NOT NULL, key_hash TEXT NOT NULL, request_hash TEXT NOT NULL, job_id TEXT NOT NULL,
+  created_at TEXT NOT NULL, PRIMARY KEY (account_id, key_hash)
+);
+CREATE TABLE IF NOT EXISTS worker_beat (
+  id TEXT PRIMARY KEY, started_at TEXT NOT NULL, beat_at TEXT NOT NULL, busy TEXT NOT NULL DEFAULT '[]'
+);
+CREATE TABLE IF NOT EXISTS ticket (
+  hash TEXT PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('upload', 'download')),
+  account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+  token_id TEXT, filename TEXT NOT NULL, size INTEGER,
+  expires_at TEXT NOT NULL, used_at TEXT
+);
 """
 
 

@@ -51,6 +51,7 @@ Nền là 007 và 008: FastAPI một tiến trình web, SQLite ở `$STUDIO_DATA
 ## R8. Không lộ mã
 - **Decision**: mã đầy đủ chỉ có trong phản hồi của `POST /me/tokens`. Không ghi vào nhật ký (web chạy ở mức `warning`, không có nhật ký truy cập). Có test tìm chuỗi mã trong cơ sở dữ liệu, nhật ký và mọi phản hồi (SC-204).
 - **Kiểm khi implement**: Caddy có ghi header `Authorization` vào nhật ký truy cập không (`deploy/Caddyfile`); nếu có thì tắt hoặc che.
+  - **Kết quả T001 (2026-11-09)**: `deploy/Caddyfile` không có chỉ thị `log`, nên Caddy không ghi nhật ký truy cập; không lộ `Authorization`. Mọi đường (kể cả `/api/mcp`) đi tới `web:8787`. T024 chỉ cần thêm chú thích để ai bật `log` về sau nhớ che header này.
 
 ## R10. Idempotency-Key cho giao việc (FR-221, như neb)
 - **Decision**: `POST /jobs` nhận header `Idempotency-Key` (≤ 100 ký tự). Bảng `idempotency(account_id, key_hash, request_hash, job_id, created_at)`, khoá chính `(account_id, key_hash)`, giữ 24 giờ.

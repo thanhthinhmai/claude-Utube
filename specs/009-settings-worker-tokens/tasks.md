@@ -12,25 +12,25 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Ghim `mcp==2.3.0` vào `tools/requirements-online.txt` (đã có sẵn vì `claude-agent-sdk` cần; research R5). Kiểm `deploy/Caddyfile`: Caddy có ghi header `Authorization` vào nhật ký truy cập không (research R8); ghi kết quả vào research R8. Nếu có thì sửa ở T024.
-- [ ] T002 [P] `tools/studio/studio/ratelimit.py`: `hit(kind, key, limit=None, window=None)` nhận giới hạn và cửa sổ riêng (dùng cho mã API, research R3); hành vi cũ giữ nguyên khi không truyền.
+- [X] T001 Ghim `mcp==2.3.0` vào `tools/requirements-online.txt` (đã có sẵn vì `claude-agent-sdk` cần; research R5). Kiểm `deploy/Caddyfile`: Caddy có ghi header `Authorization` vào nhật ký truy cập không (research R8); ghi kết quả vào research R8. Nếu có thì sửa ở T024.
+- [X] T002 [P] `tools/studio/studio/ratelimit.py`: `hit(kind, key, limit=None, window=None)` nhận giới hạn và cửa sổ riêng (dùng cho mã API, research R3); hành vi cũ giữ nguyên khi không truyền.
 
 ---
 
 ## Phase 2: Foundational (chặn mọi user story)
 
-- [ ] T003 `tools/studio/studio/db.py`: lược đồ phiên bản **3** (data-model): bảng `api_token` (hash duy nhất), `token_request` (chỉ mục `(token_id, at)`), `idempotency` (khoá chính `(account_id, key_hash)`), `worker_beat`, `ticket`. Cơ sở dữ liệu 008 (phiên bản 2) tự nâng cấp, không mất dữ liệu. Thêm test nâng cấp vào `tests/online/test_store_online.py`.
-- [ ] T004 `tools/studio/studio/tokens.py` (mới), theo data-model và research R1–R3, R9:
+- [X] T003 `tools/studio/studio/db.py`: lược đồ phiên bản **3** (data-model): bảng `api_token` (hash duy nhất), `token_request` (chỉ mục `(token_id, at)`), `idempotency` (khoá chính `(account_id, key_hash)`), `worker_beat`, `ticket`. Cơ sở dữ liệu 008 (phiên bản 2) tự nâng cấp, không mất dữ liệu. Thêm test nâng cấp vào `tests/online/test_store_online.py`.
+- [X] T004 `tools/studio/studio/tokens.py` (mới), theo data-model và research R1–R3, R9:
   - `create(owner, name, role, can_spend, rate_per_min, expires)` → `(token, secret)`: `secret = "fs_" + token_urlsafe(32)`, lưu `sha256` và 8 ký tự đầu; tên 1–60 ký tự; `role = "admin"` chỉ khi người tạo là Owner; `rate_per_min` ∈ {10, 30, 60, 120, 300}; `expires` ∈ {7d, 30d, 90d, 1y, never}; tối đa 20 mã Active mỗi người (`409 too_many_tokens`);
   - `resolve(secret)` → `(account, token, effective_role)` hoặc None: sai, thu hồi, hết hạn, người sở hữu bị tắt hay xoá → None; vai trò thực = mức thấp hơn giữa mã và người sở hữu;
   - `revoke(id, by)`, `list(owner=None)` (kèm `requests_today`, `blocked_today`, `status`), `log(id, limit)`;
   - `record(token, method, path, outcome, ip)`: một hàng `token_request`; xoá hàng > 30 ngày tối đa mỗi giờ; `last_used_at` tối đa mỗi 5 phút.
-- [ ] T005 `tools/studio/studio/server.py` (`online_guard`) và `api_online.py` (`admin()`), theo contract "Xác thực bằng mã":
+- [X] T005 `tools/studio/studio/server.py` (`online_guard`) và `api_online.py` (`admin()`), theo contract "Xác thực bằng mã":
   - có `Authorization: Bearer fs_…` → `tokens.resolve`; bỏ qua cookie và không kiểm `X-Studio`/Origin; `request.state.account` là người sở hữu với vai trò thực, `request.state.token` là mã;
   - mã hỏng → `401 bad_token`; đường cấm, với mọi phương thức kể cả `GET` (`/me/tokens*`, `/admin/tokens*`, `/admin/users*`, `/admin/claude*`, `PUT /me`, `DELETE /me`) → `403 token_forbidden`; vượt giới hạn mỗi phút → `429 rate_limited` + `Retry-After`;
   - ghi nhật ký mỗi yêu cầu có mã với `outcome` đúng (data-model: Token request), kể cả khi route trả `403 forbidden`;
   - `admin()` dùng vai trò thực.
-- [ ] T006 `tests/online/test_tokens.py` (phần nền): dạng mã và chỉ lưu băm; vai trò thực (Owner bị hạ xuống Member thì mã Owner chỉ còn quyền Member); mã thu hồi, hết hạn, người sở hữu bị tắt hay xoá → `401`; có mã thì bỏ qua cookie và không cần `X-Studio`; từng đường cấm → `403 token_forbidden`; vượt giới hạn → `429` + `Retry-After`; nhật ký ghi đúng `outcome`; hàng > 30 ngày bị xoá.
+- [X] T006 `tests/online/test_tokens.py` (phần nền): dạng mã và chỉ lưu băm; vai trò thực (Owner bị hạ xuống Member thì mã Owner chỉ còn quyền Member); mã thu hồi, hết hạn, người sở hữu bị tắt hay xoá → `401`; có mã thì bỏ qua cookie và không cần `X-Studio`; từng đường cấm → `403 token_forbidden`; vượt giới hạn → `429` + `Retry-After`; nhật ký ghi đúng `outcome`; hàng > 30 ngày bị xoá.
 
 **Checkpoint**: mã API gọi được mọi API sẵn có trong giới hạn của nó; 4 bộ test đạt. Commit.
 

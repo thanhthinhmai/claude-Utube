@@ -4,3 +4,4 @@ python-multipart>=0.0.9
 httpx>=0.27
 anthropic>=1.0
 claude-agent-sdk==0.2.179   # Claude Code for plan sign-in, moderation and job containers (specs/008)
+mcp==2.3.0                  # the studio's MCP server (specs/009); already a dependency of claude-agent-sdk

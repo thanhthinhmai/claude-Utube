@@ -84,7 +84,7 @@ INSERT INTO outbox ("to", template, data, created_at) VALUES ('old@x.test', 'ver
 
 
 class Upgrade(unittest.TestCase):
-    """A 007 database (schema 1) opens under 008: rows stay, the new tables and constraints are there (FR-113)."""
+    """A 007 database (schema 1) opens under 008/009: rows stay, the new tables and constraints are there (FR-113)."""
 
     def setUp(self):
         self.p = OnlineProject()
@@ -99,7 +99,9 @@ class Upgrade(unittest.TestCase):
         con.close()
         from studio import db
         with db.read() as c:
-            self.assertEqual(c.execute("SELECT value FROM meta WHERE key = 'schema'").fetchone()[0], "2")
+            self.assertEqual(c.execute("SELECT value FROM meta WHERE key = 'schema'").fetchone()[0], "3")
+            tables = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+            self.assertLessEqual({"api_token", "token_request", "idempotency", "worker_beat", "ticket"}, tables)   # 009
             a = c.execute("SELECT * FROM accounts WHERE id = 'a-1'").fetchone()
             self.assertEqual((a["email"], a["password_hash"], a["quota_films"]), ("old@x.test", "hash", 5))
             self.assertEqual(c.execute("SELECT count(*) FROM sessions").fetchone()[0], 1)

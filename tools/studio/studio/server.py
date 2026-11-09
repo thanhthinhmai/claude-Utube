@@ -40,7 +40,7 @@ class FreshStaticFiles(StaticFiles):
 
 
 # Online mode (specs/007): paths open without logging in
-PUBLIC_API = ("/api/v1/health", "/api/v1/auth/")
+PUBLIC_API = ("/api/v1/health", "/api/v1/auth/", "/api/v1/uploads/t/", "/api/v1/films/t/")   # tickets: the link is the key
 
 
 def owner(request: Request):
@@ -62,7 +62,17 @@ def create_app() -> FastAPI:
 
     async def online_guard(request: Request, call_next):
         """Online: no loopback rule; CSRF by header and Origin; a session for every API path but the public ones;
-        each customer only sees their own files (store.as_account)."""
+        each customer only sees their own files (store.as_account).
+        An API token (Authorization: Bearer fs_…, specs/009 research R1-R3) acts as its owner instead of a cookie:
+        no CSRF check (a browser never sends it by itself), the role capped, some paths closed, a rate per minute,
+        and one log row per request."""
+        auth = request.headers.get("authorization") or ""
+        bearer = auth[7:].strip() if auth[:7].lower() == "bearer " else None
+        path = request.url.path
+        if bearer is not None and path.startswith("/api/") and not path.startswith(PUBLIC_API):
+            return await token_request(request, call_next, bearer)
+        if path == "/api/mcp" or path.startswith("/api/mcp/"):
+            return err("bad_token", "máy chủ MCP cần mã API (Authorization: Bearer)", 401)
         if request.method not in SAFE_METHODS:
             ctype = request.headers.get("content-type", "")
             empty = request.headers.get("content-length", "0") == "0" and "transfer-encoding" not in request.headers
@@ -72,8 +82,8 @@ def create_app() -> FastAPI:
             origin = request.headers.get("origin")
             if origin and urlsplit(origin).netloc.lower() != (request.headers.get("host") or "").lower():
                 return err("csrf", "nguồn gửi không khớp tên miền", 403)
-        path = request.url.path
         request.state.account = None
+        request.state.token = None
         if path.startswith("/api/") and not path.startswith(PUBLIC_API):
             from . import accounts
             try:
@@ -87,6 +97,33 @@ def create_app() -> FastAPI:
                 resp = await call_next(request)
         else:
             resp = await call_next(request)
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["Referrer-Policy"] = "no-referrer"
+        return resp
+
+    async def token_request(request: Request, call_next, secret: str):
+        from . import ratelimit, tokens
+        found = tokens.resolve(secret)
+        if not found:
+            return err("bad_token", "mã API không đúng, đã thu hồi hoặc đã hết hạn", 401)
+        owner, token, role = found
+        method, path = request.method, request.url.path
+        ip = request.client.host if request.client else ""
+        if tokens.is_forbidden(method, path):
+            tokens.record(token, method, path, "token_forbidden", ip)
+            return err("token_forbidden", "mã API không làm được việc này; hãy dùng trình duyệt", 403)
+        try:
+            ratelimit.hit("token", token["id"], limit=token["rate_per_min"], window=60)
+        except StudioError as e:
+            tokens.record(token, method, path, "rate_limit", ip)
+            r = err(e.code, e.message, e.status)
+            r.headers["Retry-After"] = str(getattr(e, "retry_after", 60))
+            return r
+        account = {**dict(owner), "role": role}            # never more than the owner's role now (FR-214)
+        request.state.account, request.state.token, request.state.token_outcome = account, token, "allowed"
+        with store.as_account(account["id"]):
+            resp = await call_next(request)
+        tokens.record(token, method, path, request.state.token_outcome, ip)
         resp.headers["X-Content-Type-Options"] = "nosniff"
         resp.headers["Referrer-Policy"] = "no-referrer"
         return resp
