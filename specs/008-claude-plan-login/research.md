@@ -64,6 +64,10 @@ Các mục có ghi **Kiểm khi implement** dựa trên hành vi của Claude Co
 - **Rationale**: đếm theo từng lần gọi thì mọi cách chia đều đúng và test được. Nhóm dưới 20 người nên bảng không lớn.
 - **Alternatives**: cộng dồn theo ngày như Usage day: không chia được theo tài khoản Claude.
 - **Số thật (T035, 2026-11-09)**: phim 30 giây Sci-Fi Sitcom Toon trên gói Pro, model `claude-opus-5-5`: 52 lần gọi, **5,75 triệu token** (5,50 triệu đọc đệm, 158 nghìn ghi đệm, 91 nghìn ra), khoảng **22% hạn mức 5 giờ** và 1% hạn mức tuần của gói Pro. Phiên càng dài thì mỗi lượt đọc lại càng nhiều (cuối phim khoảng 180 nghìn token mỗi lượt). Trần 40 triệu cho mỗi việc vẫn hợp lý (khoảng 7 lần một phim 30 giây), giữ nguyên. Với gói Pro, khoảng 4 phim 30 giây là chạm hạn mức 5 giờ.
+- **Đo A/B (2026-11-09, gói Max, cùng kịch bản phim 30 giây ở trên)**: so với bản gốc (Opus, hướng dẫn cũ: 5,75 triệu token):
+  - **A, Opus + hướng dẫn gọn** (`tools/runner/JOB.md`, `job run` chỉ in 20 dòng cuối): **4,36 triệu token (−24%)**, 18,5 phút, tự kiểm đạt.
+  - **B, Sonnet + hướng dẫn gọn**: **3,83 triệu token (−33%)**, 16,4 phút, khoảng 6% hạn mức 5 giờ của gói Max. Nhưng B đi lệch kịch bản và hình gần với một bộ phim có sẵn hơn.
+  - **Quyết định**: giữ hướng dẫn gọn; model mặc định vẫn là Opus (chất lượng và bám kịch bản quan trọng hơn 9% token chênh); đặt tài khoản Max lên đầu ở thứ tự Manual. Trần 40 triệu token mỗi việc giữ nguyên.
 
 ## R8. Người dùng (FR-111–FR-113) — đổi ngày 2026-11-08
 - **Decision**: giống neb-creative-tool. Chủ xưởng thêm người dùng trong Settings → Users: email, mật khẩu, vai trò (Owner = `admin`, Member = `customer`). Không có thư mời. Dùng lại bảng Account và Session của 007; thêm `last_login_at`. Tắt người dùng dùng `locked_at` của 007. `/auth/signup` luôn trả `403`; bỏ `signup_open`.
