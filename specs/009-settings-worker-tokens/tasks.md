@@ -88,8 +88,8 @@
 
 ## Phase 6: Polish & triển khai
 
-- [ ] T024 [P] `deploy/Caddyfile` (theo kết quả T001: không ghi `Authorization`; `/api/mcp` đi tới web) và `deploy/README.md`: mục mã API, khung For agents, nối Claude Code bằng MCP, thu hồi mã khi lộ.
-- [ ] T025 [P] `CLAUDE.md` (mục Cấu trúc: `tokens.py`, `mcp_server.py`, `/api/mcp`, tab Worker và API tokens).
+- [X] T024 [P] `deploy/Caddyfile` (theo kết quả T001: không ghi `Authorization`; `/api/mcp` đi tới web) và `deploy/README.md`: mục mã API, khung For agents, nối Claude Code bằng MCP, thu hồi mã khi lộ.
+- [X] T025 [P] `CLAUDE.md` (mục Cấu trúc: `tokens.py`, `mcp_server.py`, `/api/mcp`, tab Worker và API tokens).
 - [ ] T026 Chạy quickstart bằng tay (bước 1–5) với Claude Code thật nối qua MCP (SC-206, SC-207); ghi kết quả vào tasks: đạt, đạt một phần hoặc thất bại (hiến pháp IV).
 
 ---

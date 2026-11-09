@@ -1,4 +1,7 @@
 # HTTPS in front of the web app (specs/007 tasks T044). DOMAIN comes from deploy/.env.
+# No `log` directive on purpose: Caddy then writes no access log, so the Authorization header of API tokens
+# (specs/009) is never written anywhere. If you add one, keep headers out of it.
+# Every path goes to web, the MCP server at /api/mcp too.
 {$DOMAIN} {
 	encode zstd gzip
 	request_body {
