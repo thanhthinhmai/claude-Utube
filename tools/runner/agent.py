@@ -15,6 +15,8 @@ WORK = Path(os.environ.get("STUDIO_WORK", "/work"))
 STUDIO = Path(os.environ.get("STUDIO_HOME_DIR", "/studio"))
 EXIT_REVIEW = 10
 MAX_TURNS = int(os.environ.get("STUDIO_MAX_TURNS", "400"))
+# Reading a large contact sheet returns an image over the SDK's 1 MB default (first live run, 2026-11-09)
+MAX_BUFFER = int(os.environ.get("STUDIO_AGENT_BUFFER", str(32 * 1024 * 1024)))
 
 
 def rules() -> str:
@@ -130,6 +132,7 @@ async def run() -> int:
         permission_mode="acceptEdits",
         model=inp.get("model") or os.environ.get("STUDIO_MODEL"),
         max_turns=MAX_TURNS,
+        max_buffer_size=MAX_BUFFER,
         resume=(resume or {}).get("session") or None,
     )
     session, error = (resume or {}).get("session"), None

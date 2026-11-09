@@ -23,7 +23,9 @@ JOB = os.environ["STUDIO_JOB"]
 
 
 def studio(*args) -> str:
-    p = subprocess.run(["sh", str(REPO / "bin" / "studio"), *args], capture_output=True, text=True)
+    """Like the agent's Bash tool: Claude Code does not pass CLAUDE_CODE_OAUTH_TOKEN on (first live run)."""
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDE_CODE_OAUTH_TOKEN"}
+    p = subprocess.run(["sh", str(REPO / "bin" / "studio"), *args], capture_output=True, text=True, env=env)
     if p.returncode not in (0, 10):
         print(f"studio {args[:2]} → {p.returncode}: {p.stderr}", file=sys.stderr)
     return p.stdout

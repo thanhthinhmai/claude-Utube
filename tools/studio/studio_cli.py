@@ -146,8 +146,9 @@ def proxy_call(method: str, path: str, body: dict = None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(base + path, data=data, method=method,
                                  headers={"content-type": "application/json",
-                                          "x-api-key": os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
-                                          or os.environ.get("ANTHROPIC_API_KEY", "")})     # the job's token (008: plan mode)
+                                          "x-api-key": os.environ.get("STUDIO_JOB_TOKEN")
+                                          or os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
+                                          or os.environ.get("ANTHROPIC_API_KEY", "")})     # the job's own token
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
             return json.loads(r.read() or b"{}")

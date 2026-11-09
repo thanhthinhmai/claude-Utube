@@ -57,6 +57,7 @@ class PlanRun(unittest.TestCase):
         j = self.s.wait(jid)
         self.assertEqual(j["status"], "done", j["log"])
         self.assertIn("key kind: job token", " ".join(x["line"] for x in j["log"]))   # plan mode, no API key inside
+        self.assertIn("Treatment", [x["line"] for x in j["log"]])      # steps reach the studio without the OAuth var
         seen = self.s.upstream_app.state.seen
         self.assertEqual(len(seen), 2)
         self.assertTrue(all(x["bearer"] == self.token(1) and x["key"] is None for x in seen))
@@ -275,6 +276,7 @@ class PlanRun(unittest.TestCase):
         for env, mounts in started:
             self.assertNotIn("ANTHROPIC_API_KEY", env)
             self.assertTrue(env["CLAUDE_CODE_OAUTH_TOKEN"].startswith("sk-job-"))
+            self.assertEqual(env["STUDIO_JOB_TOKEN"], env["CLAUDE_CODE_OAUTH_TOKEN"])     # for `bin/studio job …`
             self.assertEqual(env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"], "1")
             for target in mounts.values():
                 self.assertNotIn("claude", str(target))

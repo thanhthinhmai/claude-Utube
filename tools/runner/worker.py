@@ -334,7 +334,8 @@ class Worker:
             (work / ".resume.json").unlink(missing_ok=True)
         token = proxy.issue(j["id"])
         # Claude Code in plan mode with the job's own token (specs/008 contracts/runner.md); the proxy swaps it
-        env = {"ANTHROPIC_BASE_URL": self.proxy_url, "CLAUDE_CODE_OAUTH_TOKEN": token,
+        # STUDIO_JOB_TOKEN: the same token for `bin/studio job …` (Claude Code hides CLAUDE_CODE_OAUTH_TOKEN from Bash)
+        env = {"ANTHROPIC_BASE_URL": self.proxy_url, "CLAUDE_CODE_OAUTH_TOKEN": token, "STUDIO_JOB_TOKEN": token,
                "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "STUDIO_MODE": "online",
                "STUDIO_JOB": j["id"], "STUDIO_PROXY": self.proxy_url, "STUDIO_MODEL": s["model"],
                "STUDIO_ROOT": self.runner.root(work)}          # `learn …` and the film tools work in the job folder
