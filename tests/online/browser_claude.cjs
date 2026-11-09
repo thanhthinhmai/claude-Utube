@@ -36,6 +36,13 @@ const [base, email, password, shot] = process.argv.slice(2);
   await page.fill("#code", "good-owner@x.test");               // the same Claude account again
   await page.click("#code-form button[type=submit]");
   await page.waitForSelector('li[data-slot="2"] >> text=Same Claude account as Claude');
+  await page.click('li[data-slot="2"] details.menu summary');            // FR-120: Move to top → Manual
+  await page.click('li[data-slot="2"] .menu-list button[data-act=top]');
+  await page.waitForSelector('.seg button.on >> text=Manual: top to bottom');
+  await page.waitForSelector('.acc-rows > li:first-child[data-slot="2"] >> text=Used first');
+  await page.click('.seg button[data-order=auto]');
+  await page.waitForSelector('.seg button.on >> text=Auto: least used first');
+  if (await page.locator(".badge", { hasText: "Used first" }).count()) errors.push("Used first shown in Auto");
   await page.click('li[data-slot="2"] details.menu summary');
   await page.click('li[data-slot="2"] .menu-list button[data-act=remove]');
   await page.waitForSelector('li[data-slot="2"]', { state: "detached" });

@@ -7,15 +7,17 @@ Không điểm truy cập nào trả mã đăng nhập hay nội dung thư mục
 
 | Phương thức · Đường dẫn | Trả về | Lỗi |
 |---|---|---|
-| `GET /admin/claude` | `{accounts: [ClaudeAccount], login: {slot, url, started_at} \| null, api_key: bool, ready: bool}` | |
+| `GET /admin/claude` | `{accounts: [ClaudeAccount], login: {slot, url, started_at} \| null, api_key: bool, ready: bool, order: "auto" \| "manual"}`; `accounts` theo thứ tự Manual | |
 | `POST /admin/claude/accounts` | `201 ClaudeAccount` (slot trống nhỏ nhất ≥ 2, `signed_out`) | `409 max_accounts` (đã có 5) |
 | `DELETE /admin/claude/accounts/{slot}` | `204`: đăng xuất, xoá thư mục và hàng | `409 first_account` (slot 1) · `404` |
 | `POST /admin/claude/accounts/{slot}/login` | `200 {slot, url}`. Huỷ lần đăng nhập đang chờ nếu có | `502 login_failed` (Claude Code không in ra URL trong 30 giây, kèm 200 ký tự cuối của đầu ra đã lọc mã) |
 | `POST /admin/claude/accounts/{slot}/code` `{code}` | `200 ClaudeAccount` khi đăng nhập xong trong 30 giây | `409 no_login` (không có lần đăng nhập nào đang chờ cho slot này) · `422 bad_code` (Claude Code từ chối; đăng nhập lại được) |
 | `POST /admin/claude/accounts/{slot}/logout` | `200 ClaudeAccount` (`signed_out`) | |
 | `POST /admin/claude/refresh` | `200` như `GET`, đọc lại `auth status` của mọi tài khoản | |
+| `PUT /admin/claude/order` `{mode}` | `200` như `GET`; `mode` là `auto` hoặc `manual` (FR-120) | `422 invalid` |
+| `POST /admin/claude/accounts/{slot}/top` | `200` như `GET`: tài khoản lên đầu danh sách, chế độ thành `manual` | `404` |
 
-**ClaudeAccount** = `{slot, email, plan, state, rest_until, same_as, plan_warning: bool, tokens_5h, usage}`. `usage` = `{five_hour: {percent, resets_at}, seven_day: {percent, resets_at}, at}` hoặc null khi chưa có lần gọi nào (FR-119). `percent` là 0–100 hoặc null; giờ dạng ISO. `ready` là true khi có ít nhất một tài khoản dùng được hoặc có khoá API (FR-110).
+**ClaudeAccount** = `{slot, email, plan, state, rest_until, same_as, plan_warning: bool, tokens_5h, usage, position}`. `usage` = `{five_hour: {percent, resets_at}, seven_day: {percent, resets_at}, at}` hoặc null khi chưa có lần gọi nào (FR-119). `percent` là 0–100 hoặc null; giờ dạng ISO. `ready` là true khi có ít nhất một tài khoản dùng được hoặc có khoá API (FR-110).
 
 ## Tạo chủ xưởng lần đầu (FR-118)
 | Phương thức · Đường dẫn | Trả về | Lỗi |

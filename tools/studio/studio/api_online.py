@@ -597,7 +597,26 @@ class CodeIn(BaseModel):
 
 def claude_overview() -> dict:
     return {"accounts": claude_plan.accounts(), "login": claude_plan.pending(), "api_key": claude_plan.api_key(),
-            "ready": claude_plan.ready()}
+            "ready": claude_plan.ready(), "order": claude_plan.order()}
+
+
+class OrderIn(BaseModel):
+    mode: Literal["auto", "manual"]
+
+
+@router.put("/admin/claude/order")
+def put_claude_order(body: OrderIn, request: Request):
+    """auto: least used first; manual: top of the list first (FR-120)."""
+    admin(request)
+    claude_plan.set_order(body.mode)
+    return claude_overview()
+
+
+@router.post("/admin/claude/accounts/{slot}/top")
+def top_claude(slot: int, request: Request):
+    admin(request)
+    claude_plan.move_to_top(slot)
+    return claude_overview()
 
 
 @router.get("/admin/claude")

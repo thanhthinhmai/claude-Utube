@@ -889,20 +889,22 @@ async function pageClaude() {
   const rested = (a) => a.state === "limited" && a.rest_until && new Date(a.rest_until).getTime() > Date.now();
   const ready = live.filter((a) => !rested(a)).length, resting = live.filter(rested).length;
   const needs = list.filter((a) => a.state === "needs_signin").length;
-  const several = list.length > 1;
+  const several = list.length > 1, manual = c.order === "manual";
   const canAdd = list[0].state !== "signed_out" && list.length < MAX_CLAUDE && !login;
   const row = (a) => {
     const name = a.email || claudeLabel(a.slot);
     const title = several && a.email ? `${claudeLabel(a.slot)} · ${a.email}` : name;
     const waiting = login && login.slot === a.slot;
     const signedIn = a.state === "signed_in" || a.state === "limited";
-    const badges = signedIn
+    const first = manual && several && a === list[0];
+    const badges = (first ? pill("Used first", "accent") : "") + (signedIn
       ? `${pill("Signed in", "ok")}${a.plan ? pill(a.plan) : ""}${rested(a) ? pill("At its limit", "bad") : ""}`
-      : waiting ? pill("Signing in", "accent", "pulse") : a.state === "needs_signin" ? pill("Needs sign-in", "bad") : pill("Not signed in");
+      : waiting ? pill("Signing in", "accent", "pulse") : a.state === "needs_signin" ? pill("Needs sign-in", "bad") : pill("Not signed in"));
     const meta = rested(a) ? `Back ${resetLabel(a.rest_until)}. Calls use the other accounts until then.`
       : a.state === "needs_signin" ? "Its sign-in stopped working: sign in again." : !signedIn && !waiting && a.slot === 1 && !several
         ? (c.api_key ? "The API key is used until you sign in." : "Jobs cannot run until you sign in.") : "";
-    const menu = [signedIn && '<button data-act="login">Sign in again</button>', a.state !== "signed_out" && '<button data-act="logout" class="danger">Sign out</button>',
+    const menu = [several && !(manual && a === list[0]) && '<button data-act="top">Move to top</button>',
+      signedIn && '<button data-act="login">Sign in again</button>', a.state !== "signed_out" && '<button data-act="logout" class="danger">Sign out</button>',
       a.slot > 1 && '<button data-act="remove" class="danger">Remove</button>'].filter(Boolean).join("");
     return `<li data-slot="${a.slot}"><div class="acc-head">
         <div class="acc-name"><h3 title="${esc(name)}">${esc(title)}</h3>${badges}</div>
@@ -934,10 +936,13 @@ async function pageClaude() {
       <ul class="acc-rows">${list.map(row).join("")}</ul>
       <div class="provider-foot">
         ${canAdd ? '<div class="foot-row"><button id="add">Add account</button><span class="muted">Sign in with a different Claude account: calls then rotate over them.</span></div>' : ""}
+        ${several ? `<div class="foot-row"><span class="muted">Order</span><div class="seg" role="radiogroup" aria-label="Order">
+          <button data-order="auto" role="radio" aria-checked="${!manual}" class="${manual ? "" : "on"}">Auto: least used first</button>
+          <button data-order="manual" role="radio" aria-checked="${manual}" class="${manual ? "on" : ""}">Manual: top to bottom</button></div></div>` : ""}
         <details class="how"><summary>How it works</summary><div>
           <p>The sign-in is Claude Code's own, kept on this server in the data folder (claude/). It never goes into a job's sandbox: jobs reach Claude only through the studio.</p>
           <p>Calls count against the plan's limits, shared with Claude Code and claude.ai on the same account.</p>
-          <p>Several accounts: each call goes to the one the studio used least in the last 5 hours, and moves on when one is at its limit.</p>
+          <p>Several accounts, Auto: each call goes to the one the studio used least in the last 5 hours. Manual: each call goes to the account at the top, and to the next one only while it is at its limit or needs signing in. Move to top in an account's ⋯ menu.</p>
           <p>An API key (ANTHROPIC_API_KEY on the server) is used only when no Claude account can take a call.</p></div></details>
       </div></section>`;
   const msg = document.getElementById("msg");
@@ -952,6 +957,7 @@ async function pageClaude() {
       const r = await post(`/admin/claude/accounts/${slot}/login`);
       window.open(r.url, "_blank", "noopener");
     }, "Starting the sign-in…");
+    if (b.dataset.act === "top") act(() => post(`/admin/claude/accounts/${slot}/top`));
     if (b.dataset.act === "logout" && confirm(`Sign out of ${label}? The studio stops using it. Your Claude account itself is not touched.`))
       act(() => post(`/admin/claude/accounts/${slot}/logout`));
     if (b.dataset.act === "remove" && confirm(`Remove ${label}? It is signed out and taken off the list. Your Claude account itself is not touched.`))
@@ -963,6 +969,9 @@ async function pageClaude() {
     window.open(r.url, "_blank", "noopener");
   }, "Starting the sign-in…"));
   document.getElementById("refresh").addEventListener("click", () => act(() => post("/admin/claude/refresh"), "Checking…"));
+  (/** @type {NodeListOf<HTMLButtonElement>} */ ($app.querySelectorAll(".seg button[data-order]"))).forEach((b) => b.addEventListener("click", () => {
+    if (!b.classList.contains("on")) act(() => send("PUT", "/admin/claude/order", { mode: b.dataset.order }));
+  }));
   const form = /** @type {HTMLFormElement} */ (document.getElementById("code-form"));
   if (form && login) {
     form.onsubmit = (e) => {

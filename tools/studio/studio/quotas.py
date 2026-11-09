@@ -19,6 +19,7 @@ RANGES = {
     "upload_max_mb": (int, 1, 4000),
     "upload_max_minutes": (int, 1, 120),
     "job_token_cap": (int, 1_000_000, 500_000_000),
+    "claude_order": (str, None, None),
     "concurrency": (int, 1, 16),
     "review_timeout_days": (int, 1, 90),
     "model": (str, None, None),
@@ -50,6 +51,8 @@ def update_settings(changes: dict) -> dict:
         if not ok or (lo is not None and not lo <= v <= hi):
             raise StudioError("invalid", f"giá trị của {k} ngoài khoảng cho phép", 422)
         s[k] = typ(v)
+    if s.get("claude_order", "auto") not in ("auto", "manual"):
+        raise StudioError("invalid", "claude_order phải là auto hoặc manual", 422)
     if s["model"] not in s["price_table"]:
         raise StudioError("invalid", "model chưa có trong bảng giá", 422)
     db.save_settings(s)

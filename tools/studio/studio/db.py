@@ -22,6 +22,7 @@ SETTINGS_DEFAULT = {
     "upload_max_mb": 500,
     "upload_max_minutes": 20,
     "job_token_cap": 40_000_000,          # specs/008 FR-116
+    "claude_order": "auto",               # specs/008 FR-120: auto (least used first) or manual (top to bottom)
     "concurrency": 2,
     "review_timeout_days": 7,
     "model": "claude-opus-5-5",
@@ -99,7 +100,8 @@ CREATE TABLE IF NOT EXISTS claude_account (
   email TEXT, plan TEXT,
   state TEXT NOT NULL DEFAULT 'signed_out' CHECK (state IN ('signed_out', 'signed_in', 'limited', 'needs_signin')),
   rest_until TEXT, rest_step INTEGER NOT NULL DEFAULT 0, signin_mailed_at TEXT, checked_at TEXT,
-  usage TEXT                             -- JSON: the plan's 5-hour and weekly windows (FR-119)
+  usage TEXT,                            -- JSON: the plan's 5-hour and weekly windows (FR-119)
+  position INTEGER                       -- the manual order, smaller first (FR-120)
 );
 INSERT OR IGNORE INTO claude_account (slot) VALUES (1);
 CREATE TABLE IF NOT EXISTS call (
@@ -196,6 +198,9 @@ def _migrate(con: sqlite3.Connection) -> None:
             con.execute(stmt)
         if "last_login_at" not in [r[1] for r in con.execute("PRAGMA table_info(accounts)")]:
             con.execute("ALTER TABLE accounts ADD COLUMN last_login_at TEXT")
+        if "position" not in [r[1] for r in con.execute("PRAGMA table_info(claude_account)")]:
+            con.execute("ALTER TABLE claude_account ADD COLUMN position INTEGER")
+        con.execute("UPDATE claude_account SET position = slot WHERE position IS NULL")
         if "usage" not in [r[1] for r in con.execute("PRAGMA table_info(claude_account)")]:
             con.execute("ALTER TABLE claude_account ADD COLUMN usage TEXT")     # early 008 databases
         con.execute("INSERT OR REPLACE INTO meta VALUES ('schema', ?)", (str(SCHEMA_VERSION),))

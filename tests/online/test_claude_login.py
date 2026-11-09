@@ -123,6 +123,36 @@ class ClaudeLogin(Base):
         self.assertEqual(claude_plan.usable(), [1])
         self.assertEqual(claude_plan.usable(time.time() + 120), [2, 1])
 
+    def test_manual_order_and_move_to_top(self):                   # FR-120, like neb-creative-tool
+        from studio import claude_plan, db, store
+        sign_in(self.a, 1, "pro@x.test")
+        self.a.post(f"{A}/accounts", headers=W)
+        sign_in(self.a, 2, "max@x.test")
+        self.a.post(f"{A}/accounts", headers=W)
+        sign_in(self.a, 3, "three@x.test")
+        with db.tx() as con:                                         # slot 2 used most, slot 3 least
+            con.execute("INSERT INTO call (via, tokens_in, at) VALUES ('plan:2', 900, ?)", (store.now_iso(),))
+            con.execute("INSERT INTO call (via, tokens_in, at) VALUES ('plan:1', 500, ?)", (store.now_iso(),))
+        r = self.a.get(A).json()
+        self.assertEqual((r["order"], [x["slot"] for x in r["accounts"]]), ("auto", [1, 2, 3]))
+        self.assertEqual(claude_plan.usable(), [3, 1, 2])            # auto: least used first, as before
+        r = self.a.post(f"{A}/accounts/2/top", headers=W).json()       # the Max account to the top
+        self.assertEqual((r["order"], [x["slot"] for x in r["accounts"]]), ("manual", [2, 1, 3]))
+        self.assertEqual(claude_plan.usable(), [2, 1, 3])            # manual: top first, though used most
+        claude_plan.mark_limited(2, time.time() + 600)
+        self.assertEqual(claude_plan.usable(), [1, 3])               # at its limit: the next one
+        r = self.a.put(f"{A}/order", json={"mode": "auto"}, headers=W).json()
+        self.assertEqual((r["order"], [x["slot"] for x in r["accounts"]]), ("auto", [2, 1, 3]))   # the list keeps its order
+        self.assertEqual(claude_plan.usable(), [3, 1])
+        self.assertEqual(self.a.put(f"{A}/order", json={"mode": "random"}, headers=W).status_code, 422)
+        self.assertEqual(self.a.post(f"{A}/accounts/5/top", headers=W).status_code, 404)
+        self.assertEqual(self.a.put("/api/v1/admin/settings", json={"claude_order": "x"}, headers=W).status_code, 422)
+        self.a.post(f"{A}/accounts", headers=W)
+        self.assertEqual([x["slot"] for x in self.a.get(A).json()["accounts"]][-1], 4)          # a new account goes last
+        c = self.p.signup_verified("m@x.test")
+        self.assertEqual(c.post(f"{A}/accounts/1/top", headers=W).status_code, 403)
+        self.assertEqual(c.put(f"{A}/order", json={"mode": "auto"}, headers=W).status_code, 403)
+
     def test_backoff_without_a_reset_time(self):
         from studio import claude_plan
         sign_in(self.a, 1, "one@x.test")

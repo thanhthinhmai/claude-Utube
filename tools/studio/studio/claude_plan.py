@@ -164,7 +164,7 @@ def tokens_5h(con, slot: int, now: float = None) -> int:
 def accounts(now: float = None) -> list:
     """Every slot as the admin page shows it (contracts: ClaudeAccount)."""
     with db.read() as con:
-        rows = con.execute("SELECT * FROM claude_account ORDER BY slot").fetchall()
+        rows = con.execute("SELECT * FROM claude_account ORDER BY coalesce(position, slot), slot").fetchall()   # FR-120
         out, seen = [], {}
         for r in rows:
             email = r["email"] if r["state"] != "signed_out" else None
@@ -174,7 +174,7 @@ def accounts(now: float = None) -> list:
             out.append({"slot": r["slot"], "email": email, "plan": r["plan"] if email else None, "state": r["state"],
                         "rest_until": r["rest_until"] if r["state"] == "limited" else None, "same_as": same,
                         "plan_warning": bool(email and r["plan"] and r["plan"] not in PLANS_OK),
-                        "tokens_5h": tokens_5h(con, r["slot"], now),
+                        "tokens_5h": tokens_5h(con, r["slot"], now), "position": r["position"],
                         "usage": json.loads(r["usage"]) if email and r["usage"] else None})
     return out
 
@@ -183,12 +183,35 @@ def public(slot: int) -> dict:
     return next(a for a in accounts() if a["slot"] == slot)
 
 
+def order() -> str:
+    """auto: least tokens in 5 hours first (research R4); manual: top of the list first (FR-120)."""
+    return "manual" if db.settings().get("claude_order") == "manual" else "auto"
+
+
 def usable(now: float = None) -> list:
-    """Slots a call may use: signed in (or rested), not a duplicate; least tokens in 5 hours first (research R4)."""
+    """Slots a call may use, in the order to try them: signed in (or rested) and not a duplicate."""
     now = now or store.clock()
     ok = [a for a in accounts(now) if a["same_as"] is None and (
         a["state"] == "signed_in" or (a["state"] == "limited" and (_ts(a["rest_until"]) or 0) <= now))]
+    if order() == "manual":
+        return [a["slot"] for a in ok]                 # accounts() is already in the manual order
     return [a["slot"] for a in sorted(ok, key=lambda a: (a["tokens_5h"], a["slot"]))]
+
+
+def set_order(mode: str) -> None:
+    from . import quotas
+    if mode not in ("auto", "manual"):
+        raise StudioError("invalid", "thứ tự phải là auto hoặc manual", 422)
+    quotas.update_settings({"claude_order": mode})
+
+
+def move_to_top(slot: int) -> None:
+    """Put an account first in the manual order and switch to manual (FR-120, like neb-creative-tool)."""
+    _need(slot)
+    with db.tx() as con:
+        top = con.execute("SELECT min(coalesce(position, slot)) FROM claude_account").fetchone()[0] or 1
+        con.execute("UPDATE claude_account SET position = ? WHERE slot = ?", (top - 1, slot))
+    set_order("manual")
 
 
 def api_key() -> bool:
@@ -208,7 +231,8 @@ def add_account() -> dict:
         free = [s for s in SLOTS if s >= 2 and s not in taken]
         if not free:
             raise StudioError("max_accounts", "đã đủ 5 tài khoản Claude", 409)
-        con.execute("INSERT INTO claude_account (slot) VALUES (?)", (free[0],))
+        last = con.execute("SELECT max(coalesce(position, slot)) FROM claude_account").fetchone()[0] or 0
+        con.execute("INSERT INTO claude_account (slot, position) VALUES (?, ?)", (free[0], last + 1))   # new: last
     return public(free[0])
 
 

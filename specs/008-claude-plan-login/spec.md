@@ -23,6 +23,7 @@
 - Q: Lần đầu mở xưởng, tạo chủ xưởng ở đâu? → A: Trên trang đăng nhập, giống hệt neb, không cần mã cài đặt (FR-118). Ban đầu có mã cài đặt; người dùng bỏ sau khi thử.
 - Q: Có hiện hạn mức 5 giờ và tuần của từng tài khoản không? → A: Có, lấy từ thông tin hạn mức kèm mỗi lần gọi (FR-119).
 - Q: Thêm người dùng thế nào? → A: Giống neb: chủ xưởng đặt email, mật khẩu, vai trò trong Settings → Users; không gửi thư mời (FR-111, FR-112).
+- Q: Có cho chọn tài khoản Claude dùng trước không? → A: Có, như neb: công tắc Auto / Manual và Move to top (FR-120, thêm 2026-11-09).
 - Q: Settings có những tab nào? → A: General, Users, Usage trong 008. Worker (Latest jobs) và API tokens làm ở spec 009. Licenses chưa làm vì xưởng chưa có app desktop.
 
 ## Bối cảnh
@@ -146,6 +147,7 @@ Chủ xưởng xem số token và số lần gọi Claude theo việc, theo ngà
 - **FR-117**: Xưởng MUST chạy được khi không có khoá API. Khoá API là tuỳ chọn, chỉ dùng làm dự phòng khi không còn tài khoản Claude nào dùng được; luôn ưu tiên gói Claude. Lần gọi qua khoá API MUST được ghi riêng và có chi phí ước tính như 007; trang mức dùng MUST tách "gói Claude" và "khoá API".
 - **FR-118**: Khi xưởng chưa có tài khoản quản trị nào, trang đăng nhập MUST cho tạo tài khoản chủ xưởng ("Create the owner account"), giống hệt neb-creative-tool: người mở trang đầu tiên tạo được, không cần mã. Đã có tài khoản quản trị thì form này không hiện, và lệnh tạo trả lỗi. Lệnh `admin create` trong terminal vẫn dùng được. Rủi ro đã chấp nhận: trên máy chủ công khai, chủ xưởng cần tạo tài khoản ngay sau khi triển khai.
 - **FR-119**: Trang tài khoản AI MUST hiện cho mỗi tài khoản Claude đã đăng nhập hai thanh: phần trăm đã dùng của hạn mức 5 giờ và của hạn mức tuần, kèm giờ đặt lại, giống neb-creative-tool. Số liệu lấy từ thông tin hạn mức Claude gửi kèm mỗi lần gọi, không tốn thêm lượt gọi. Chưa có lần gọi nào thì hiện "Usage not read yet". Thanh màu vàng từ 75%, đỏ từ 90%.
+- **FR-120**: Trang AI accounts MUST có công tắc thứ tự như neb-creative-tool: **Auto** (mặc định, lệnh gọi đi qua tài khoản dùng ít token nhất trong 5 giờ, FR-107) và **Manual** (lệnh gọi luôn đi qua tài khoản trên cùng còn dùng được; chỉ xuống tài khoản kế tiếp khi nó chạm hạn mức hoặc cần đăng nhập lại). Mỗi tài khoản có lệnh **Move to top**; bấm khi đang Auto thì xưởng chuyển sang Manual. Danh sách hiện theo thứ tự Manual ở cả hai chế độ. Kiểm nội dung ý tưởng đi theo cùng thứ tự.
 
 ### Thay đổi so với 007
 

@@ -16,6 +16,7 @@ Một hàng cho mỗi tài khoản đang có (slot 1 luôn có). Thông tin đă
 | same_as | int \| null | **tính ra, không lưu**: slot nhỏ hơn có cùng email |
 | signin_mailed_at | time \| null | đã gửi thư "Needs sign-in" cho lần hỏng này (FR-109) |
 | checked_at | time | lần đọc `auth status` gần nhất |
+| position | int | thứ tự Manual (nhỏ là trên cùng); tài khoản mới đứng cuối (FR-120) |
 | usage | json \| null | hạn mức 5 giờ và tuần đọc từ lần gọi gần nhất: `{five_hour: {percent, resets_at}, seven_day: {percent, resets_at}, at}` (FR-119) |
 
 **Trạng thái**:
@@ -60,6 +61,7 @@ Chỉ mục trên `(via, at)` để chọn tài khoản (R4), và trên `(accoun
 | signup_open | **bỏ** (FR-111) |
 | daily_cost_cap_usd | **bỏ** |
 | job_cost_cap_usd | **bỏ**, thay bằng `job_token_cap`, mặc định 40 000 000 (R7) |
+| claude_order | **mới**: `auto` (mặc định) hoặc `manual` (FR-120) |
 
 ## Account (sửa)
 - Thêm `last_login_at` (time | null): ghi mỗi lần đăng nhập thành công (FR-112).

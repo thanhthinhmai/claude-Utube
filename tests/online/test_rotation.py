@@ -47,6 +47,15 @@ class Rotation(unittest.TestCase):
         self.assertTrue(acc[1]["rest_until"])
         self.assertEqual(acc[1]["usage"]["five_hour"]["percent"], 100.0)          # the bar shows it full
 
+    def test_manual_order_uses_the_top_account_until_its_limit(self):     # FR-120
+        self.a.post("/api/v1/admin/claude/accounts/2/top", headers=W)           # e.g. the Max account first
+        self.s.upstream_app.state.plan[self.token(2)] = "limit-after:2:900"
+        c = self.s.signup_verified("m@x.test")
+        jid = film_job(c, idea="A fox [spend 4]").json()["id"]
+        self.s.start()
+        self.assertEqual(self.s.wait(jid)["status"], "done")
+        self.assertEqual([x["via"] for x in self.calls()], ["plan:2", "plan:2", "plan:1", "plan:1"])
+
     def test_sc105_ten_jobs_spread_evenly(self):
         from studio import quotas
         quotas.update_settings({"quota_films_default": 20, "concurrency": 2})

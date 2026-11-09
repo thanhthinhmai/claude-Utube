@@ -245,6 +245,15 @@ Lấy bố cục và cách dùng của neb (`app/login`, `components/accounts/Cl
 - [X] T038 Trang "AI accounts" (`#/admin/claude`, mục "AI accounts" ở thanh bên): dòng tóm tắt (số tài khoản, ready, resting, need signing in, khoá API); thẻ "Claude · plan" có huy hiệu, mô tả, mỗi tài khoản một dòng (tên, huy hiệu trạng thái và gói, nút chính, menu ⋯ có Sign out và Remove), khung đăng nhập ngay dưới dòng, cảnh báo trùng tài khoản, chân thẻ có "Add account" và "How it works". Sửa `browser_claude.cjs`.
 - [X] T039 Thanh hạn mức (FR-119): cột `claude_account.usage`; `claude_plan.note_usage(slot, headers)` đọc thông tin hạn mức theo kết quả T001 (R5); hiện hai thanh 5 giờ và tuần trên trang AI accounts. Phần đọc header làm sau khi T001 kiểm xong với tài khoản thật; bộ chuyển tiếp gọi `note_usage` ở T012.
 
+
+---
+
+## Phase 9: Thứ tự tài khoản Claude, giống neb (2026-11-09, FR-120)
+
+- [X] T040 `db.py`: cột `claude_account.position` (thêm khi mở cơ sở dữ liệu cũ, giá trị đầu = slot); cài đặt `claude_order` mặc định `auto`. `claude_plan.py`: `accounts()` theo `position`; `usable()` theo `position` khi `manual`, theo token 5 giờ khi `auto`; `set_order(mode)`, `move_to_top(slot)` (đặt lên đầu, chuyển `manual`); tài khoản mới đứng cuối.
+- [X] T041 `api_online.py`: `PUT /admin/claude/order`, `POST /admin/claude/accounts/{slot}/top`, trường `order` trong `GET /admin/claude`. `web/app.js`: công tắc "Auto: least used first / Manual: top to bottom" ở chân thẻ Claude · plan, mục ⋯ **Move to top** (không có ở tài khoản đầu khi đang Manual), nhãn "Used first" trên tài khoản đầu khi Manual.
+- [X] T042 Test (`test_claude_login.py`, `test_rotation.py`, `browser_claude.cjs`): Manual dùng tài khoản trên cùng dù đã dùng nhiều hơn; trên cùng chạm hạn mức thì xuống tài khoản kế; Move to top chuyển sang Manual và đổi thứ tự; Auto không đổi hành vi cũ; mã lỗi.
+
 ---
 
 ## Dependencies & Execution Order
