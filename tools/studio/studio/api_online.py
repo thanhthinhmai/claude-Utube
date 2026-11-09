@@ -286,6 +286,7 @@ def view(j: dict, account, positions: dict = None) -> dict:
     v["tokens"] = int(j.get("tokens") or 0)
     if account["role"] != "admin":
         v.pop("cost_usd", None)                   # only the API-key part costs money; the owner sees it
+        v.pop("agent_runs", None)                 # what the agent read: for the owner only
     return v
 
 

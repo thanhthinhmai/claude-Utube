@@ -7,6 +7,7 @@ Every tick (2 s):
 
 RUNNER=docker (default) starts `studio-job` containers; RUNNER=local runs the agent as a plain process
 (tests, or a machine without Docker; no sandbox). Run: STUDIO_MODE=online python tools/runner/worker.py"""
+import collections
 import json
 import logging
 import os
@@ -193,6 +194,39 @@ class DockerRunner:
         p = subprocess.run([self.docker, "run", "--rm", *self._flags(work, network),
                             "--entrypoint", cmd[0], self.image, *cmd[1:]], capture_output=True, text=True, timeout=timeout)
         return p.returncode, p.stdout + p.stderr
+
+
+def agent_stats(work: Path) -> dict:
+    """What one agent run spent its context on, from Claude Code's transcript in the job folder (kept with the job
+    before the folder goes): turns, tools used, files and images read, and the biggest tool results. Never text."""
+    turns, tools, reads, images, big = 0, collections.Counter(), 0, 0, []
+    names = {}
+    for f in sorted((work / ".home" / ".claude" / "projects").glob("*/*.jsonl")):
+        for line in f.read_text(errors="replace").splitlines():
+            try:
+                r = json.loads(line)
+            except ValueError:
+                continue
+            content = (r.get("message") or {}).get("content")
+            if r.get("type") == "assistant":
+                turns += 1
+            if not isinstance(content, list):
+                continue
+            for x in content:
+                if x.get("type") == "tool_use":
+                    tools[x.get("name", "?")] += 1
+                    inp = x.get("input") or {}
+                    names[x.get("id")] = (x.get("name", "?"), str(inp.get("file_path") or inp.get("command") or "")[:120])
+                elif x.get("type") == "tool_result":
+                    name, what = names.get(x.get("tool_use_id"), ("?", ""))
+                    blob = json.dumps(x.get("content"))
+                    if name == "Read":
+                        reads += 1
+                        images += '"type": "image"' in blob[:300]
+                    big.append((len(blob), name, what.replace(str(work), ".")))
+    big.sort(reverse=True)
+    return {"at": store.now_iso(), "turns": turns, "tools": dict(tools), "reads": reads, "images": images,
+            "biggest": [{"kb": round(n / 1024), "tool": t, "what": w} for n, t, w in big[:8]]}
 
 
 def make_runner():
@@ -411,6 +445,11 @@ class Worker:
         proxy.revoke(job_id)
         work = self.work_dir(job_id)
         result = store.read_json(work / ".result.json") or {}
+        try:
+            stats = agent_stats(work)
+            jobs.update(job_id, lambda x: x.setdefault("agent_runs", []).append(stats))
+        except Exception:   # noqa: BLE001 - statistics never stop a job
+            log.exception("job %s: agent stats", job_id)
         j = jobs.load(job_id)
         if result.get("session"):
             jobs.update(job_id, lambda x: x.__setitem__("agent_session", result["session"]))

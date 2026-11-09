@@ -116,9 +116,12 @@ def job_run(a, remote: bool = False) -> int:
             except StudioError:
                 pass
     threading.Thread(target=heartbeat, daemon=True).start()
+    # online, the agent reads only the end (every line it reads is paid again on every later turn); locally all of it
+    quiet = remote
     for line in p.stdout:
-        sys.stdout.write(line)
-        sys.stdout.flush()
+        if not quiet:
+            sys.stdout.write(line)
+            sys.stdout.flush()
         text = line.rstrip("\n")
         # the log keeps the command's output, not tool notes ("[note] WebGL …") or a line repeated right after itself
         if text.startswith("[note] ") or (tail and tail[-1] == text):
@@ -126,6 +129,11 @@ def job_run(a, remote: bool = False) -> int:
         tail.append(text)
     rc = p.wait()
     done.set()
+    if quiet:
+        shown = list(tail)[-20:]
+        if len(tail) > 20:
+            print(f"… ({len(tail) - 20}+ earlier lines are in the job log)")
+        print("\n".join(shown), flush=True)
     add_log(*tail, f"(command exited with code {rc})")
     return rc
 

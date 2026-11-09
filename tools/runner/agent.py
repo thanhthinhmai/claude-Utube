@@ -26,7 +26,9 @@ def rules() -> str:
     return f"""
 You are working for a customer of Film Studio, an online service. Nobody is watching this session live.
 
-The studio's own instructions are in {STUDIO}/CLAUDE.md. Follow them, with these changes:
+For a film, your guide is {STUDIO}/tools/runner/JOB.md: read it first and follow it. To learn a style, follow the
+skill named in your task. Do not read the studio's CLAUDE.md, specs/, tests/ or the rest of tools/: they are about
+building the studio, and everything you read is paid again on every later turn. In short:
 - The project folder for this job is {WORK} (your working directory). Films go in {WORK}/films/<name>/.
   {STUDIO} is read-only.
 - LIB = {lib}. Run the library's tools from there.

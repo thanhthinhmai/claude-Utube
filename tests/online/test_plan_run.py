@@ -75,6 +75,8 @@ class PlanRun(unittest.TestCase):
         usage = self.a.get(f"/api/v1/jobs/{jid}").json()["usage"]
         self.assertEqual((usage["calls"], usage["tokens_in"], usage["tokens_out"]), (2, 200_000, 20_000))
         self.assertEqual(c.get(f"/api/v1/jobs/{jid}").json()["tokens"], 220_000)          # members see their tokens
+        self.assertEqual(len(self.a.get(f"/api/v1/jobs/{jid}").json()["agent_runs"]), 1)   # what the agent read, per run
+        self.assertNotIn("agent_runs", c.get(f"/api/v1/jobs/{jid}").json())                 # owner only
 
     def test_not_ready_rejects_new_jobs_and_holds_queued_ones(self):
         c = self.s.signup_verified("m@x.test")
