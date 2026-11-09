@@ -709,3 +709,36 @@ def remove_user(account_id: str, request: Request):
     a = admin(request)
     accounts.remove_user(account_id, a["id"])
     return Response(status_code=204)
+
+
+# ---------- Settings → Worker (specs/009 FR-201-FR-206, contracts/api-tokens-worker.md) ----------
+WORKER_ALIVE_S, WORKER_HIDE_S, LATEST = 30, 600, 20
+
+
+@router.get("/admin/worker")
+def worker_status(request: Request):
+    """Each worker process from its heartbeat, the four counts, and the 20 latest jobs of everyone."""
+    admin(request)
+    with db.read() as con:
+        workers = []
+        for r in con.execute("SELECT * FROM worker_beat ORDER BY started_at"):
+            ago = store.age_seconds(r["beat_at"])
+            if ago > WORKER_HIDE_S:
+                continue
+            workers.append({"id": r["id"], "state": "running" if ago <= WORKER_ALIVE_S else "not_responding",
+                            "busy_with": json.loads(r["busy"] or "[]"), "beat_ago_s": int(ago),
+                            "started_at": r["started_at"]})
+        waiting_claude = claude_plan.waiting_jobs()
+        n = dict(con.execute("SELECT status, count(*) FROM docs WHERE kind = 'job' GROUP BY status").fetchall())
+        rows = con.execute("SELECT d.data, a.email FROM docs d LEFT JOIN accounts a ON a.id = d.owner "
+                           "WHERE d.kind = 'job' ORDER BY d.updated_ns DESC LIMIT ?", (LATEST,)).fetchall()
+    latest = []
+    for data, email in rows:
+        j = json.loads(data)
+        err_text = j.get("error")
+        latest.append({"id": j["id"], "status": jobs.shown_status(j), "kind": j["kind"], "name": j["name"],
+                       "email": email, "step": j.get("step"), "updated_at": j.get("updated_at"),
+                       "error": err_text[:300] if err_text else None})
+    return {"workers": workers, "latest": latest,
+            "counts": {"queued": max(0, n.get("queued", 0) - waiting_claude), "running": n.get("running", 0),
+                       "waiting_review": n.get("waiting_review", 0), "waiting_claude": waiting_claude}}

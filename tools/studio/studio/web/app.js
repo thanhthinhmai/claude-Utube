@@ -707,7 +707,7 @@ const SETTING = [
   ["concurrency", "Jobs at the same time", "int"],
   ["review_timeout_days", "Stop a job after waiting (days)", "int"], ["model", "Claude model", "text"],
 ];
-const SETTINGS_TABS = [["general", "General"], ["users", "Users"], ["usage", "Usage"]];
+const SETTINGS_TABS = [["general", "General"], ["users", "Users"], ["usage", "Usage"], ["worker", "Worker"]];
 const ROLE = { admin: "Owner", customer: "Member" };
 const usd = (v) => `$${Number(v || 0).toFixed(2)}`;
 async function pageSettings(tab = "general") {
@@ -717,6 +717,7 @@ async function pageSettings(tab = "general") {
     <div class="tabs" role="tablist">${SETTINGS_TABS.map(([k, label]) =>
       `<a role="tab" href="#/settings/${k}" class="${k === tab ? "on" : ""}" aria-selected="${k === tab}">${label}</a>`).join("")}</div>`;
   if (tab === "users") return settingsUsers(top);
+  if (tab === "worker") return settingsWorker(top);
   if (tab === "usage") return settingsUsage(top);
   const st = await get("/admin/settings");
   const input = ([k, label, t]) => `<label>${label}<input id="s-${k}" type="${t === "text" ? "text" : "number"}" ${t === "num" ? 'step="0.01"' : ""} value="${esc(st[k])}"></label>`;
@@ -732,6 +733,38 @@ async function pageSettings(tab = "general") {
     await send("PUT", "/admin/settings", data);
     return "Saved.";
   });
+}
+
+// ---------- Settings → Worker (specs/009 FR-201-FR-206; layout from neb-creative-tool) ----------
+let workerTimer = 0;
+const secondsAgo = (n) => (n < 60 ? `${n} s` : n < 3600 ? `${Math.round(n / 60)} min` : `${Math.round(n / 3600)} h`);
+async function settingsWorker(top) {
+  clearTimeout(workerTimer);
+  const w = await get("/admin/worker");
+  const live = w.workers.filter((x) => x.state === "running");
+  const waiting = w.counts.queued + w.counts.waiting_claude + w.counts.waiting_review > 0;
+  const head = live.length
+    ? pill(`Running · ${live.some((x) => x.busy_with.length) ? "busy" : "idle"}`, "ok", live.some((x) => x.busy_with.length) ? "pulse" : "")
+    : w.workers.length ? pill("Not responding", "bad") : pill("Not running", waiting ? "bad" : "warn");
+  const rows = w.workers.map((x) => `<li class="beat"><span class="dot ${x.state === "running" ? "on" : "off"}"></span>
+      <strong>${esc(x.id)}</strong> <span class="muted">${x.state === "running"
+        ? (x.busy_with.length ? `working on ${x.busy_with.map((id) => `<a href="#/jobs/${esc(id)}">${esc(id)}</a>`).join(", ")}` : "idle")
+        : "not responding"}</span><span class="muted beat-ago">last beat ${secondsAgo(x.beat_ago_s)} ago</span></li>`).join("");
+  const count = (n, label) => `<div class="stat panel"><b>${n}</b><span class="muted">${label}</span></div>`;
+  const job = (j) => {
+    const long = j.error && j.error.length > 140;
+    return `<li><div class="latest-head">${badge(j.status)} <span class="muted">${esc(KIND[j.kind] || j.kind)}</span>
+        <a href="#/jobs/${esc(j.id)}"><strong>${esc(j.name)}</strong></a> <span class="muted small">${esc(j.email || "")}</span>
+        <span class="muted small latest-time">${j.updated_at ? `${ago(j.updated_at)} ago` : ""}</span></div>
+      ${j.error ? `<p class="fail small clamp">${esc(j.error)}</p>${long ? `<details class="small"><summary class="muted">Details</summary><p class="small">${esc(j.error)}</p></details>` : ""}` : ""}</li>`;
+  };
+  $app.innerHTML = `${top}
+    <section class="panel card-pad"><div class="provider-head" style="padding:0"><div><h2>Status</h2>
+      <p class="muted">Read every 5 seconds. Starting and stopping the worker stays in the terminal.</p></div>${head}</div>
+      ${rows ? `<ul class="beats">${rows}</ul>` : `<p class="notice${waiting ? " warn" : ""}">No worker is running. Start it in a terminal: <code>sh bin/studio online up</code> on the server, or <code>tools/.venv/bin/python tools/runner/worker.py</code> on this machine.</p>`}
+      <div class="stats">${count(w.counts.queued, "jobs queued")}${count(w.counts.running, "jobs running")}${count(w.counts.waiting_review, "waiting for review")}${count(w.counts.waiting_claude, "waiting for a Claude account")}</div></section>
+    <section class="panel card-pad"><h2>Latest jobs</h2>${w.latest.length ? `<ul class="latest">${w.latest.map(job).join("")}</ul>` : '<p class="muted">No jobs yet.</p>'}</section>`;
+  workerTimer = setTimeout(() => { if (/^#\/settings\/worker/.test(location.hash)) route(); }, 5000);
 }
 
 /** Settings → Users: people who can sign in (specs/008 FR-112). */
@@ -1090,7 +1123,7 @@ const routes = [
   [/^#\/sets$/, pageSets, "sets"], [/^#\/sets\/([^/?]+)$/, pageSet, "sets"],
   [/^#\/library(\?.*)?$/, pageLibrary, "library"], [/^#\/library\/([^/?]+)$/, pageLibStyle, "library"],
   [/^#\/styles$/, pageStyles, "styles"], [/^#\/styles\/([^/?]+)$/, pageStyle, "styles"],
-  [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"], [/^#\/(?:admin|settings)(?:\/(general|users|usage))?(\?.*)?$/, pageSettings, "settings"], [/^#\/admin\/claude$/, pageClaude, "ai"],
+  [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"], [/^#\/(?:admin|settings)(?:\/(general|users|usage|worker))?(\?.*)?$/, pageSettings, "settings"], [/^#\/admin\/claude$/, pageClaude, "ai"],
   [/^#\/account$/, pageAccount, "account"],
 ];
 /** pages open without logging in (online mode) */

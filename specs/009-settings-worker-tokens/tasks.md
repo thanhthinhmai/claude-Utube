@@ -42,10 +42,10 @@
 
 **Independent Test**: spec US1.
 
-- [ ] T007 [US1] `tools/runner/worker.py`: ghi `worker_beat` (`id = <tên máy>:<pid>`) khi khởi động, mỗi 5 giây, và ngay khi bắt đầu hay xong một việc, kèm danh sách việc đang chạy; xoá hàng của mình khi dừng êm; xoá hàng > 24 giờ khi khởi động (research R4).
-- [ ] T008 [US1] `tools/studio/studio/api_online.py`: `GET /admin/worker` đúng contract: `workers` (`running` khi báo sống ≤ 30 giây, `not_responding` khi lâu hơn, ẩn khi > 10 phút), `counts` (`queued`, `running`, `waiting_review`, `waiting_claude`), `latest` (20 việc mới nhất của mọi người, lỗi cắt còn 300 ký tự).
-- [ ] T009 [US1] `tools/studio/studio/web/app.js`, `style.css`: Settings → tab **Worker** (thêm vào `SETTINGS_TABS`): hộp Status (huy hiệu "Running · idle/busy", "Not responding", "No worker is running" kèm lệnh bật worker; từng tiến trình: busy with / idle, "last beat N s ago"), bốn ô đếm, Latest jobs (huy hiệu trạng thái, loại, tên link tới trang việc, email, "… ago", lỗi 2 dòng + "Details"); đọc lại mỗi 5 giây khi tab đang mở, dừng khi rời tab.
-- [ ] T010 [US1] `tests/online/test_worker_status.py` (đồng hồ giả): running / not_responding / ẩn theo ngưỡng; busy_with đúng việc; bốn ô đếm khớp trạng thái thật (SC-203); `latest` đúng 20 việc mới nhất; Member và mã Member bị `403`; mã Owner đọc được. `tests/online/browser_worker.cjs` (khổ điện thoại): tab hiện đúng, tự đọc lại.
+- [X] T007 [US1] `tools/runner/worker.py`: ghi `worker_beat` (`id = <tên máy>:<pid>`) khi khởi động, mỗi 5 giây, và ngay khi bắt đầu hay xong một việc, kèm danh sách việc đang chạy; xoá hàng của mình khi dừng êm; xoá hàng > 24 giờ khi khởi động (research R4).
+- [X] T008 [US1] `tools/studio/studio/api_online.py`: `GET /admin/worker` đúng contract: `workers` (`running` khi báo sống ≤ 30 giây, `not_responding` khi lâu hơn, ẩn khi > 10 phút), `counts` (`queued`, `running`, `waiting_review`, `waiting_claude`), `latest` (20 việc mới nhất của mọi người, lỗi cắt còn 300 ký tự).
+- [X] T009 [US1] `tools/studio/studio/web/app.js`, `style.css`: Settings → tab **Worker** (thêm vào `SETTINGS_TABS`): hộp Status (huy hiệu "Running · idle/busy", "Not responding", "No worker is running" kèm lệnh bật worker; từng tiến trình: busy with / idle, "last beat N s ago"), bốn ô đếm, Latest jobs (huy hiệu trạng thái, loại, tên link tới trang việc, email, "… ago", lỗi 2 dòng + "Details"); đọc lại mỗi 5 giây khi tab đang mở, dừng khi rời tab.
+- [X] T010 [US1] `tests/online/test_worker_status.py` (đồng hồ giả): running / not_responding / ẩn theo ngưỡng; busy_with đúng việc; bốn ô đếm khớp trạng thái thật (SC-203); `latest` đúng 20 việc mới nhất; Member và mã Member bị `403`; mã Owner đọc được. `tests/online/browser_worker.cjs` (khổ điện thoại): tab hiện đúng, tự đọc lại.
 
 **Checkpoint**: MVP. Commit.
 

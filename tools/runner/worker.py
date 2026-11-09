@@ -283,6 +283,9 @@ class Worker:
         self.watchdog = env_seconds("STUDIO_WATCHDOG_S", 1800)      # no answer from Claude for 30 min
         self.run_limit = env_seconds("STUDIO_RUN_LIMIT_S", 3600)    # one run at most 60 min
         self.clean_every = env_seconds("STUDIO_CLEAN_S", 900)
+        import socket
+        self.beat_id = f"{socket.gethostname()}:{os.getpid()}"    # one row per worker process (worker_beat)
+        self.beat_started = store.now_iso()
 
     # ----- helpers -----
     def work_dir(self, job_id: str) -> Path:
@@ -624,7 +627,27 @@ class Worker:
             log.info("account %s erased", aid)
 
     # ----- loop -----
+    # ----- heartbeat (specs/009 FR-202, research R4) -----
+    BEAT_S = 5
+
+    def beat(self, force: bool = False) -> None:
+        """Tell the web this worker is alive and what it runs: every 5 s, and at once when that changes."""
+        busy = sorted(self.runs)
+        if not force and busy == getattr(self, "beat_busy", None) and time.time() - getattr(self, "beat_t", 0) < self.BEAT_S:
+            return
+        now = store.now_iso()
+        with db.tx() as con:
+            con.execute("INSERT INTO worker_beat (id, started_at, beat_at, busy) VALUES (?, ?, ?, ?) "
+                        "ON CONFLICT (id) DO UPDATE SET beat_at = excluded.beat_at, busy = excluded.busy",
+                        (self.beat_id, self.beat_started, now, json.dumps(busy)))
+        self.beat_busy, self.beat_t = busy, time.time()
+
+    def unbeat(self) -> None:
+        with db.tx() as con:
+            con.execute("DELETE FROM worker_beat WHERE id = ?", (self.beat_id,))
+
     def tick(self) -> None:
+        self.beat()
         self.check_runs()
         self.resume_answered()
         while True:
@@ -632,6 +655,7 @@ class Worker:
             if not j:
                 break
             self.start(j)
+        self.beat()                              # at once when a job started or ended in this tick
         if time.time() - getattr(self, "cleaned_at", 0) >= self.clean_every:
             self.cleaned_at = time.time()
             try:
@@ -645,6 +669,10 @@ class Worker:
 
     def run_forever(self, interval: float = 2.0, stop=None) -> None:
         self.recover()
+        with db.tx() as con:                     # rows of workers gone for a day
+            con.execute("DELETE FROM worker_beat WHERE beat_at < ?",
+                        (time.strftime("%Y-%m-%dT%H:%M:%S+00:00", time.gmtime(time.time() - 86400)),))
+        self.beat(force=True)
         while not (stop and stop.is_set()):
             try:
                 self.tick()
@@ -656,6 +684,7 @@ class Worker:
                 time.sleep(interval)
         for job_id, run in list(self.runs.items()):
             self.runner.kill(run.handle)
+        self.unbeat()
 
 
 def main():
