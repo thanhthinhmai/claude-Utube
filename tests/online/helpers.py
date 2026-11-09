@@ -1,4 +1,5 @@
 """Online-mode test project: temporary data folder, mails written to files, a fake style library."""
+import json
 import os
 import re
 import shutil
@@ -189,6 +190,17 @@ def fake_upstream():
         if body.get("model") == "overloaded":
             return JSONResponse({"type": "error", "error": {"type": "overloaded_error", "message": "busy"}},
                                 status_code=529, headers={"retry-after": "1"})
+        if body.get("stream"):                       # SSE like the real API; gzip when the caller accepts it
+            import gzip
+            from fastapi.responses import Response
+            usage_start = {k: v for k, v in FAKE_USAGE.items() if k != "output_tokens"} | {"output_tokens": 1}
+            sse = (f'event: message_start\ndata: {json.dumps({"type": "message_start", "message": {"model": body.get("model"), "usage": usage_start}})}\n\n'
+                   f'event: message_delta\ndata: {json.dumps({"type": "message_delta", "usage": {"output_tokens": FAKE_USAGE["output_tokens"]}})}\n\n'
+                   'event: message_stop\ndata: {"type": "message_stop"}\n\n').encode()
+            headers = {**plan_headers, "content-type": "text/event-stream"}
+            if "gzip" in (request.headers.get("accept-encoding") or ""):
+                sse, headers["content-encoding"] = gzip.compress(sse), "gzip"
+            return Response(sse, headers=headers)
         return JSONResponse({"id": "msg_1", "type": "message", "role": "assistant", "model": body.get("model"),
                              "content": [{"type": "text", "text": "ok"}], "stop_reason": "end_turn", "usage": FAKE_USAGE},
                             headers=plan_headers)

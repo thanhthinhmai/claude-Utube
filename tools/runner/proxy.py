@@ -205,6 +205,7 @@ def create_app() -> FastAPI:
             if beta:
                 headers["anthropic-beta"] = beta
         headers.update(auth)
+        headers["accept-encoding"] = "identity"     # httpx would ask for gzip; streamed answers are relayed raw
         url = upstream + path + (f"?{request.url.query}" if request.url.query else "")
         return await client.send(client.build_request("POST", url, content=body, headers=headers), stream=True)
 

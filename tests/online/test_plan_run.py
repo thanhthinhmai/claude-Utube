@@ -91,6 +91,29 @@ class PlanRun(unittest.TestCase):
         self.s.start()
         self.assertEqual(self.s.wait(jid)["status"], "done")
 
+    def test_streamed_answers_arrive_plain_and_are_counted(self):
+        """httpx asks for gzip by default; a streamed answer relayed raw would reach Claude Code compressed with no
+        content-encoding, and its tokens would count as 0 (seen in the live run, 2026-11-09)."""
+        import urllib.request
+        import proxy
+        from studio import jobs
+        sign_in(self.a, 1, "owner@x.test")
+        c = self.s.signup_verified("m@x.test")
+        jid = film_job(c).json()["id"]
+        jobs.set_status(jid, "running")
+        token = proxy.issue(jid)
+        req = urllib.request.Request(self.s.proxy.url + "/v1/messages?beta=true", method="POST",
+                                     data=json.dumps({"model": "claude-opus-5-5", "stream": True, "messages": []}).encode(),
+                                     headers={"authorization": f"Bearer {token}", "content-type": "application/json",
+                                              "accept-encoding": "gzip, deflate, br"})
+        with urllib.request.urlopen(req, timeout=10) as r:
+            body = r.read()
+            self.assertIsNone(r.headers.get("content-encoding"))
+        self.assertTrue(body.startswith(b"event: message_start"), body[:40])          # readable text, not gzip
+        self.assertEqual([(x["via"], x["model"], x["tokens_in"], x["tokens_out"]) for x in self.calls()],
+                         [("plan:1", "claude-opus-5-5", 100_000, 10_000)])
+        self.assertEqual(self.s.upstream_app.state.seen[-1]["query"], "beta=true")      # the query string is kept
+
     def test_unknown_paths_are_closed(self):
         import urllib.error
         import urllib.request
