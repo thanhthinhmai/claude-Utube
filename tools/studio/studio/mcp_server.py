@@ -48,7 +48,7 @@ def text_of(html_text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", t).strip()
 
 
-def build(app, auth: str, role: str) -> MCPServer:
+def build(app, auth: str, role: str, ip: str = "127.0.0.1") -> MCPServer:
     """A server for one request: its tools call the REST API with the caller's own token."""
     server = MCPServer(name="film-studio", instructions=INSTRUCTIONS)
 
@@ -56,7 +56,8 @@ def build(app, auth: str, role: str) -> MCPServer:
         headers = {"Authorization": auth}
         if idempotency_key:
             headers["Idempotency-Key"] = idempotency_key
-        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://studio.mcp",
+        # client=(ip, 0): the inner REST call logs the agent's IP, not 127.0.0.1
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app, client=(ip, 0)), base_url="http://studio.mcp",
                                      timeout=600) as c:
             r = await c.request(method, path, json=body, params=params, headers=headers)
         ctype = r.headers.get("content-type", "")
@@ -204,7 +205,8 @@ class Endpoint:
     async def __call__(self, scope, receive, send):
         account = (scope.get("state") or {}).get("account") or {}
         headers = dict((k.decode().lower(), v.decode()) for k, v in scope.get("headers", []))
-        server = build(self.app, headers.get("authorization", ""), account.get("role", "customer"))
+        ip = (scope.get("client") or ("127.0.0.1", 0))[0]
+        server = build(self.app, headers.get("authorization", ""), account.get("role", "customer"), ip)
         manager = StreamableHTTPSessionManager(
             app=server._lowlevel_server, json_response=True, stateless=True,
             security_settings=TransportSecuritySettings(enable_dns_rebinding_protection=False))

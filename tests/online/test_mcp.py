@@ -132,6 +132,18 @@ class Mcp(McpBase):
         self.assertEqual(len(rows) - before, 2)
         from studio import tokens
         self.assertFalse([x for x in tokens.log(self.tok["id"]) if x["path"] == "/api/mcp"])   # the protocol is not logged
+        self.assertEqual({x["ip"] for x in rows}, {"127.0.0.1"})                 # the agent's own address (here: local)
+        from studio import mcp_server
+        seen = {}
+
+        async def fake_app(scope, receive, send):
+            seen["client"] = scope["client"]
+            await send({"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/json")]})
+            await send({"type": "http.response.body", "body": b"{}"})
+        import asyncio
+        server = mcp_server.build(fake_app, "Bearer x", "customer", "203.0.113.7")
+        asyncio.run(server.call_tool("list_jobs", {}))
+        self.assertEqual(seen["client"][0], "203.0.113.7")                       # passed on to the inner REST call
         self.assertEqual([(x["path"], x["outcome"]) for x in rows[:2]],
                          [("/api/v1/admin/usage", "forbidden"), ("/api/v1/jobs", "allowed")])
 

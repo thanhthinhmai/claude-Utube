@@ -35,6 +35,8 @@ Nền là 007 và 008: FastAPI một tiến trình web, SQLite ở `$STUDIO_DATA
 - **Rationale**: FR-219 đòi máy chủ MCP như neb; dùng lại thư viện có sẵn và REST có sẵn là cách ít mã nhất.
 - **Alternatives**: tự viết JSON-RPC của MCP: phải theo kịp giao thức. Gọi thẳng hàm Python thay vì REST: phải lặp lại kiểm quyền ở từng công cụ.
 
+- **Ghi chú khi implement (T020):** không dùng `streamable_http_app` + `Context.headers`. Mỗi yêu cầu tới `/api/mcp` dựng một `MCPServer` mới (công cụ theo vai trò thực) và chạy một `StreamableHTTPSessionManager` (stateless, JSON) trong chính yêu cầu đó, vì app con gắn vào không được chạy lifespan (server test chạy `lifespan="off"`). Mã `Authorization` và IP của tác tử được chuyển thẳng vào lệnh REST bên trong (httpx `ASGITransport`), nên nhật ký ghi IP thật.
+
 ## R6. Tải video lên qua MCP (FR-220)
 - **Vấn đề**: máy chủ MCP nằm ở xưởng, không đọc được tệp trên máy tác tử; một lệnh gọi MCP giới hạn 4 MB, còn video tới 500 MB.
 - **Decision**: công cụ MCP `start_upload(filename, size_bytes)` kiểm giới hạn (dung lượng, định dạng) rồi trả một **link tải lên dùng một lần** (`PUT /api/v1/uploads/t/<vé>`, sống 30 phút) và lệnh `curl -T <tệp> <link>` mẫu. Tác tử (Claude Code có Bash) tải tệp lên link đó; xưởng kiểm video như `POST /uploads` hiện nay và trả `upload_id`. Sau đó `learn_style(source="upload", upload_ids=[…])`.
