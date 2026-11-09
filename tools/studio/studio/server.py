@@ -40,6 +40,7 @@ class FreshStaticFiles(StaticFiles):
 
 
 # Online mode (specs/007): paths open without logging in
+MCP_RATE_FACTOR = 5      # protocol messages per tool call (handshake, notice, call), with room to spare
 PUBLIC_API = ("/api/v1/health", "/api/v1/auth/", "/api/v1/uploads/t/", "/api/v1/films/t/")   # tickets: the link is the key
 
 
@@ -73,7 +74,8 @@ def create_app() -> FastAPI:
             return await token_request(request, call_next, bearer)
         if path == "/api/mcp" or path.startswith("/api/mcp/"):
             return err("bad_token", "máy chủ MCP cần mã API (Authorization: Bearer)", 401)
-        if request.method not in SAFE_METHODS:
+        ticket = path.startswith("/api/v1/uploads/t/")         # the link is the key; no cookie is used (specs/009)
+        if request.method not in SAFE_METHODS and not ticket:
             ctype = request.headers.get("content-type", "")
             empty = request.headers.get("content-length", "0") == "0" and "transfer-encoding" not in request.headers
             if request.headers.get("x-studio") != "1" or not (empty or ctype.startswith("application/json")
@@ -112,10 +114,16 @@ def create_app() -> FastAPI:
         if tokens.is_forbidden(method, path):
             tokens.record(token, method, path, "token_forbidden", ip)
             return err("token_forbidden", "mã API không làm được việc này; hãy dùng trình duyệt", 403)
+        # The MCP endpoint itself is only the protocol (handshake, then one POST per tool call); the work of a tool is
+        # an in-process REST call, which counts against the rate and is logged like any other. So /api/mcp has its own,
+        # wider budget and no log row: one tool call = one row (SC-207).
+        mcp = path == "/api/mcp"
         try:
-            ratelimit.hit("token", token["id"], limit=token["rate_per_min"], window=60)
+            ratelimit.hit("token-mcp" if mcp else "token", token["id"],
+                          limit=token["rate_per_min"] * (MCP_RATE_FACTOR if mcp else 1), window=60)
         except StudioError as e:
-            tokens.record(token, method, path, "rate_limit", ip)
+            if not mcp:
+                tokens.record(token, method, path, "rate_limit", ip)
             r = err(e.code, e.message, e.status)
             r.headers["Retry-After"] = str(getattr(e, "retry_after", 60))
             return r
@@ -123,7 +131,8 @@ def create_app() -> FastAPI:
         request.state.account, request.state.token, request.state.token_outcome = account, token, "allowed"
         with store.as_account(account["id"]):
             resp = await call_next(request)
-        tokens.record(token, method, path, request.state.token_outcome, ip)
+        if not mcp:
+            tokens.record(token, method, path, request.state.token_outcome, ip)
         resp.headers["X-Content-Type-Options"] = "nosniff"
         resp.headers["Referrer-Policy"] = "no-referrer"
         return resp
@@ -339,6 +348,27 @@ def create_app() -> FastAPI:
                                 '<meta name="viewport" content="width=device-width, initial-scale=1"><title>Terms · Film Studio</title>'
                                 '<link rel="stylesheet" href="/style.css"></head><body><main class="md" style="max-width:760px">'
                                 + resources.to_html(text) + '<p><a href="/#/signup">Back to sign-up</a></p></main></body></html>')
+        def openapi_for_tokens():
+            """OpenAPI without the paths no API token may use (specs/009 research R7, FR-213)."""
+            if app.openapi_schema:
+                return app.openapi_schema
+            from fastapi.openapi.utils import get_openapi
+            from . import tokens
+            spec = get_openapi(title=app.title, version=app.version, routes=app.routes,
+                               description="Film Studio API. Send `Authorization: Bearer <token>` (make a token on your "
+                                           "account page). MCP server: /api/mcp.")
+            for path in list(spec.get("paths", {})):
+                for method in list(spec["paths"][path]):
+                    if tokens.is_forbidden(method, path):
+                        del spec["paths"][path][method]
+                if not spec["paths"][path]:
+                    del spec["paths"][path]
+            app.openapi_schema = spec
+            return spec
+        app.openapi = openapi_for_tokens
+        from starlette.routing import Route
+        from . import mcp_server
+        app.router.routes.append(Route("/api/mcp", mcp_server.Endpoint(app), include_in_schema=False))
     app.mount("/", FreshStaticFiles(directory=WEB, html=True), name="web")
     return app
 

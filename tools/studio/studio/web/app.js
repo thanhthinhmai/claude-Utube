@@ -707,7 +707,7 @@ const SETTING = [
   ["concurrency", "Jobs at the same time", "int"],
   ["review_timeout_days", "Stop a job after waiting (days)", "int"], ["model", "Claude model", "text"],
 ];
-const SETTINGS_TABS = [["general", "General"], ["users", "Users"], ["usage", "Usage"], ["worker", "Worker"]];
+const SETTINGS_TABS = [["general", "General"], ["users", "Users"], ["usage", "Usage"], ["worker", "Worker"], ["tokens", "API tokens"]];
 const ROLE = { admin: "Owner", customer: "Member" };
 const usd = (v) => `$${Number(v || 0).toFixed(2)}`;
 async function pageSettings(tab = "general") {
@@ -718,6 +718,10 @@ async function pageSettings(tab = "general") {
       `<a role="tab" href="#/settings/${k}" class="${k === tab ? "on" : ""}" aria-selected="${k === tab}">${label}</a>`).join("")}</div>`;
   if (tab === "users") return settingsUsers(top);
   if (tab === "worker") return settingsWorker(top);
+  if (tab === "tokens") {
+    $app.innerHTML = `${top}<div id="tokens"></div>`;
+    return tokensSection(document.getElementById("tokens"), "admin");
+  }
   if (tab === "usage") return settingsUsage(top);
   const st = await get("/admin/settings");
   const input = ([k, label, t]) => `<label>${label}<input id="s-${k}" type="${t === "text" ? "text" : "number"}" ${t === "num" ? 'step="0.01"' : ""} value="${esc(st[k])}"></label>`;
@@ -1230,7 +1234,7 @@ const routes = [
   [/^#\/sets$/, pageSets, "sets"], [/^#\/sets\/([^/?]+)$/, pageSet, "sets"],
   [/^#\/library(\?.*)?$/, pageLibrary, "library"], [/^#\/library\/([^/?]+)$/, pageLibStyle, "library"],
   [/^#\/styles$/, pageStyles, "styles"], [/^#\/styles\/([^/?]+)$/, pageStyle, "styles"],
-  [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"], [/^#\/(?:admin|settings)(?:\/(general|users|usage|worker))?(\?.*)?$/, pageSettings, "settings"], [/^#\/admin\/claude$/, pageClaude, "ai"],
+  [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"], [/^#\/(?:admin|settings)(?:\/(general|users|usage|worker|tokens))?(\?.*)?$/, pageSettings, "settings"], [/^#\/admin\/claude$/, pageClaude, "ai"],
   [/^#\/account$/, pageAccount, "account"],
 ];
 /** pages open without logging in (online mode) */

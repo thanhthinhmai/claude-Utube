@@ -176,6 +176,24 @@ class OwnTokens(TokenBase):                                                    #
         self.assertEqual(self.call(spender, "GET", "/admin/usage").status_code, 403)      # Member token
 
 
+class AllTokens(TokenBase):                                                    # US3: the Owner sees and revokes all
+    def test_owner_lists_and_revokes_everyones_tokens(self):
+        t, secret = self.make(self.member, name="member agent")
+        self.make(self.boss, name="boss agent")
+        self.call(secret, "GET", "/jobs")
+        boss, member = self.s.client(), self.s.client()
+        boss.post("/api/v1/auth/login", json={"email": "boss@x.test", "password": PASSWORD}, headers=W)
+        member.post("/api/v1/auth/login", json={"email": "m@x.test", "password": PASSWORD}, headers=W)
+        listed = boss.get("/api/v1/admin/tokens").json()["tokens"]
+        self.assertEqual(sorted((x["name"], x["owner"]["email"]) for x in listed),
+                         [("boss agent", "boss@x.test"), ("member agent", "m@x.test")])
+        self.assertEqual(boss.get(f"/api/v1/admin/tokens/{t['id']}/log").json()["requests"][0]["path"], "/api/v1/jobs")
+        self.assertEqual(member.get("/api/v1/admin/tokens").status_code, 403)                       # Owner only
+        self.assertEqual(member.delete(f"/api/v1/admin/tokens/{t['id']}", headers=W).status_code, 403)
+        self.assertEqual(boss.delete(f"/api/v1/admin/tokens/{t['id']}", headers=W).status_code, 204)
+        self.assertEqual(self.call(secret, "GET", "/jobs").status_code, 401)                       # at once
+        self.assertEqual(boss.delete("/api/v1/admin/tokens/tok-nope", headers=W).status_code, 404)
+
 
 NODE_MODULES = __import__("helpers").REPO / "lib" / "lemo-opuscar" / "node_modules"
 

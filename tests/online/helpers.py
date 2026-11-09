@@ -292,3 +292,48 @@ def sign_in(c, slot: int, email: str) -> dict:
     r = c.post(f"/api/v1/admin/claude/accounts/{slot}/code", json={"code": f"good-{email}"}, headers=W)
     assert r.status_code == 200, r.text
     return r.json()
+
+
+# ---------- an MCP client, like an agent (specs/009) ----------
+class McpAgent:
+    """Talks to the studio's MCP server at <web>/api/mcp with a real MCP client (Streamable HTTP).
+    `call` returns (is_error, data or error text); one session per call, as the server is stateless."""
+
+    def __init__(self, web_url: str, secret: str = None, headers: dict = None):
+        self.url = web_url + "/api/mcp"
+        self.headers = dict(headers or {})
+        if secret:
+            self.headers["Authorization"] = f"Bearer {secret}"
+
+    def _run(self, fn):
+        import asyncio
+        import httpx2
+        from mcp.client.session import ClientSession
+        from mcp.client.streamable_http import streamable_http_client
+
+        async def go():
+            async with httpx2.AsyncClient(headers=self.headers, timeout=60) as hc:
+                async with streamable_http_client(self.url, http_client=hc) as streams:
+                    async with ClientSession(streams[0], streams[1]) as cs:
+                        await cs.initialize()
+                        return await fn(cs)
+        return asyncio.run(go())
+
+    def tools(self) -> list:
+        return sorted(t.name for t in self._run(lambda cs: cs.list_tools()).tools)
+
+    def call(self, name: str, args: dict = None):
+        r = self._run(lambda cs: cs.call_tool(name, args or {}))
+        text = r.content[0].text if r.content else ""
+        if r.is_error:
+            return True, text
+        return False, json.loads(text) if text[:1] in "{[" else text
+
+    def ok(self, name: str, args: dict = None):
+        err, data = self.call(name, args)
+        assert not err, f"{name}: {data}"
+        return data
+
+    def resource(self, uri: str) -> str:
+        r = self._run(lambda cs: cs.read_resource(uri))
+        return r.contents[0].text

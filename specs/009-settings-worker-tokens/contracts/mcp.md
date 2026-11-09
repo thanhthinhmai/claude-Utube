@@ -4,7 +4,7 @@
 - **Xác thực**: chỉ `Authorization: Bearer fs_…` (không nhận cookie). Không có mã hoặc mã hỏng → `401`.
 - **Nối Claude Code**: `claude mcp add --transport http film-studio <STUDIO_URL>/api/mcp --header "Authorization: Bearer <mã>"`.
 - **Mỗi công cụ là một lệnh gọi REST của xưởng** với cùng mã: cùng quyền, cùng giới hạn, cùng lỗi. Lỗi REST trả về thành lỗi công cụ, kèm `code` và `message`.
-- Mỗi lệnh gọi công cụ tính là một yêu cầu của mã (giới hạn mỗi phút, `requests_today`).
+- Mỗi lệnh gọi công cụ tính là một yêu cầu của mã (giới hạn mỗi phút, `requests_today`) và là một hàng nhật ký. Các gói tin giao thức tới `/api/mcp` (bắt tay, thông báo, POST của lệnh gọi) không ghi nhật ký và dùng một hạn mức riêng gấp 5 lần giới hạn của mã, để mã 10/phút vẫn gọi được 10 công cụ mỗi phút (đã quyết khi implement T020).
 - Danh sách công cụ theo vai trò thực của mã.
 
 ## Công cụ cho mọi mã
