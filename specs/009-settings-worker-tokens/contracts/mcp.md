@@ -12,15 +12,25 @@
 | Công cụ | Tham số | Gọi REST | Trả về |
 |---|---|---|---|
 | `list_styles` | `query?` | `GET /library` và `GET /styles` | phong cách thư viện (slug, tên, nhóm, dòng mô tả) và phong cách của mình |
-| `make_film` | `style, idea, seconds, review_treatment?` | `POST /jobs` (kind `film`) | `{job_id, status, film}` |
-| `revise_film` | `film, note` | `POST /jobs` (sửa phim) | `{job_id, status, film}` |
+| `make_film` | `style, idea, seconds, review_treatment?, idempotency_key?` | `POST /jobs` (kind `film`) | `{job_id, status, film}` |
+| `revise_film` | `film, note, idempotency_key?` | `POST /jobs` (sửa phim) | `{job_id, status, film}` |
 | `start_upload` | `filename, size_bytes` | `POST /uploads/tickets` | `{upload_url, expires_at, curl}`. Tác tử chạy lệnh `curl` để tải tệp, nhận `upload_id` |
-| `learn_style` | `source: "youtube" \| "upload", channel?, count?, upload_ids?, rights_confirmed?` | `POST /jobs` (kind `learn`) | `{job_id, status}`. `youtube` thiếu `rights_confirmed` → lỗi như web |
+| `learn_style` | `source: "youtube" \| "upload", channel?, count?, upload_ids?, rights_confirmed?, idempotency_key?` | `POST /jobs` (kind `learn`) | `{job_id, status}`. `youtube` thiếu `rights_confirmed` → lỗi như web |
 | `list_jobs` | `status?` | `GET /jobs` | việc của mình: id, loại, tên, trạng thái, bước, lỗi |
 | `get_job` | `job_id` | `GET /jobs/{id}` | việc kèm bước, nhật ký ngắn, các yêu cầu duyệt đang chờ, link phim nếu xong |
 | `get_review` | `review_id` | `GET /reviews/{id}` | nội dung cần duyệt (Markdown), các lựa chọn được phép |
 | `answer_review` | `review_id, value, note?` | `POST /reviews/{id}/decision` | quyết định đã ghi |
 | `film_download_url` | `film` | `POST /films/{name}/tickets` | `{download_url, expires_at, curl}`: link tải về dùng một lần, sống 30 phút; tác tử không cần mã trong shell |
+
+## Công cụ chung (như neb), cho mọi mã
+
+| Công cụ | Tham số | Làm gì |
+|---|---|---|
+| `list_operations` | `query?` | liệt kê các API dùng được với mã (phương thức, đường, tóm tắt) từ OpenAPI của xưởng |
+| `describe_operation` | `method, path` | tham số, thân yêu cầu và phản hồi của một API |
+| `api_request` | `method, path, query?, body?, idempotency_key?` | gọi một API dưới `/api/v1/` với cùng mã; không nhận `/api/mcp`, `..`, `%2f`; phản hồi nhị phân không trả về (chỉ kiểu và kích thước; dùng `film_download_url`) |
+
+Tài nguyên MCP: `film-studio://openapi` (OpenAPI của các API dùng được với mã).
 
 ## Công cụ thêm cho mã có vai trò thực Owner (chỉ đọc)
 

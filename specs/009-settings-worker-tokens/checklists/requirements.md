@@ -32,4 +32,5 @@
 ## Notes
 
 - `Authorization: Bearer`, OpenAPI và Claude Code có trong spec vì người dùng nêu đích danh chúng như giao diện mà người dùng thấy; spec không nói cách cài đặt.
+- Đối chiếu với neb (2026-11-09): thêm FR-221, SC-209; sửa FR-202, FR-203, FR-205, FR-209, FR-216–FR-219 (research R11).
 - FR-217 đã làm rõ (2026-11-09): có máy chủ MCP như neb → FR-219, SC-207. MCP, OpenAPI, `Authorization: Bearer` là giao diện người dùng nêu đích danh.

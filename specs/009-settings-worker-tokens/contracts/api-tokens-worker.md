@@ -10,6 +10,14 @@ Thay đổi trên [API của 008](../../008-claude-plan-login/contracts/api-admi
 - Vai trò thực Member gọi API quản trị → `403 forbidden`.
 - Mọi mã gọi các đường sau → `403 token_forbidden` (FR-213): `/me/tokens*`, `/admin/tokens*`, `/admin/users*`, `/admin/claude*`, `PUT /me`, `DELETE /me`.
 - Mã có `can_spend = false` gọi `POST /jobs` → `403 spend_not_allowed`, không trừ lượt, không kiểm nội dung (FR-212).
+- Mỗi yêu cầu có mã ghi một hàng nhật ký (FR-218, data-model: Token request).
+
+## Idempotency-Key (FR-221)
+
+`POST /jobs` nhận header `Idempotency-Key` (≤ 100 ký tự), bằng cookie hoặc mã:
+- khoá mới → như thường (`201`);
+- cùng khoá, cùng thân yêu cầu, trong 24 giờ → `200` với việc đã tạo lần đầu, header `Idempotent-Replayed: true`, không trừ lượt;
+- cùng khoá, khác thân → `409 idempotency_conflict`.
 
 ## Mã của chính mình (mọi người dùng, chỉ bằng cookie; FR-208, FR-209)
 
@@ -18,10 +26,11 @@ Thay đổi trên [API của 008](../../008-claude-plan-login/contracts/api-admi
 | `GET /me/tokens` | `{tokens: [Token]}` (mã của chính mình) | |
 | `POST /me/tokens` `{name, role, can_spend, rate_per_min, expires}` | `201 {token: Token, secret: "fs_…"}`. `secret` chỉ có ở đây, một lần | `422 invalid` (tên rỗng hoặc > 60, giá trị ngoài danh sách) · `403 forbidden` (Member xin `role = admin`) · `409 too_many_tokens` (đã có 20 mã Active) |
 | `DELETE /me/tokens/{id}` | `204`: thu hồi | `404` |
+| `GET /me/tokens/{id}/log?limit=` | `{requests: [{at, method, path, outcome, ip}]}`: mới nhất trước; `limit` mặc định 200, tối đa 500 | `404` |
 
-`expires` ∈ `30d`, `90d` (mặc định), `1y`, `never`. `rate_per_min` ∈ 10, 30, 60 (mặc định), 120, 300. `role` ∈ `customer` (mặc định), `admin`.
+`expires` ∈ `7d`, `30d`, `90d` (mặc định), `1y`, `never`. `rate_per_min` ∈ 10, 30, 60 (mặc định), 120, 300. `role` ∈ `customer` (mặc định), `admin`.
 
-**Token** = `{id, name, prefix, owner: {id, email}, role, can_spend, rate_per_min, created_at, expires_at, revoked_at, last_used_at, requests_today, status: "active" | "ended" | "revoked"}`. Không bao giờ có mã đầy đủ hay bản băm.
+**Token** = `{id, name, prefix, owner: {id, email}, role, can_spend, rate_per_min, created_at, expires_at, revoked_at, last_used_at, requests_today, blocked_today, status: "active" | "ended" | "revoked"}`. Không bao giờ có mã đầy đủ hay bản băm.
 
 ## Mọi mã (chỉ Owner, chỉ bằng cookie; FR-208, FR-216)
 
@@ -29,6 +38,7 @@ Thay đổi trên [API của 008](../../008-claude-plan-login/contracts/api-admi
 |---|---|---|
 | `GET /admin/tokens` | `{tokens: [Token]}` của mọi người dùng | |
 | `DELETE /admin/tokens/{id}` | `204`: thu hồi mã của bất kỳ ai | `404` |
+| `GET /admin/tokens/{id}/log?limit=` | như `/me/tokens/{id}/log`, cho mã của bất kỳ ai | `404` |
 
 ## Tình trạng worker (chỉ Owner; FR-201–FR-206)
 
@@ -43,7 +53,8 @@ Thay đổi trên [API của 008](../../008-claude-plan-login/contracts/api-admi
 ```
 
 - `workers`: tiến trình báo sống trong 10 phút qua. Rỗng thì giao diện hiện "No worker is running" kèm lệnh bật worker.
-- `latest`: 50 việc mới nhất của mọi người dùng, theo `updated_at` giảm dần.
+- `latest`: 20 việc mới nhất của mọi người dùng, theo `updated_at` giảm dần.
+- `state`: `running` khi báo sống ≤ 30 giây trước, `not_responding` khi lâu hơn; ẩn khi > 10 phút.
 - Mã Owner dùng được (chỉ đọc).
 
 ## Tải lên và tải về bằng vé (FR-220, US2, research R6)

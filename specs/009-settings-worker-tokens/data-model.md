@@ -25,13 +25,29 @@ Thay đổi trên [data model của 008](../008-claude-plan-login/data-model.md)
 
 Mỗi người tối đa 20 mã Active (R9).
 
-## Token usage day (mới, bảng `token_day`)
+## Token request (mới, bảng `token_request`): nhật ký của mã, như neb
 
 | Trường | Kiểu | Ràng buộc |
 |---|---|---|
-| token_id | text | khoá chính cùng `day` |
-| day | text | `YYYY-MM-DD` theo giờ Việt Nam |
-| requests | int | số yêu cầu, kể cả qua máy chủ MCP |
+| id | int | tự tăng |
+| token_id | text | chỉ mục cùng `at` |
+| at | time | UTC |
+| method | text | |
+| path | text | đường dẫn, không có chuỗi truy vấn |
+| outcome | text | `allowed`, `replay`, `forbidden`, `token_forbidden`, `no_spend`, `rate_limit` |
+| ip | text | |
+
+Giữ 30 ngày. "Hôm nay" (giờ Việt Nam): `requests` = mọi hàng, `blocked` = hàng không phải `allowed` hay `replay`. Không lưu nội dung.
+
+## Idempotency record (mới, bảng `idempotency`)
+
+| Trường | Kiểu | Ràng buộc |
+|---|---|---|
+| account_id | text | khoá chính cùng `key_hash` |
+| key_hash | text | sha256 của `Idempotency-Key` |
+| request_hash | text | sha256 của thân yêu cầu đã chuẩn hoá |
+| job_id | text | việc đã tạo |
+| created_at | time | giữ 24 giờ |
 
 ## Worker heartbeat (mới, bảng `worker_beat`)
 
@@ -39,10 +55,10 @@ Mỗi người tối đa 20 mã Active (R9).
 |---|---|---|
 | id | text | khoá chính: `<tên máy>:<mã tiến trình>` |
 | started_at | time | |
-| beat_at | time | ghi ít nhất mỗi 15 giây |
+| beat_at | time | ghi ít nhất mỗi 5 giây và khi bắt đầu hay xong một việc |
 | busy | text | JSON: danh sách mã việc đang chạy |
 
-Trạng thái (tính ra): Running (idle nếu `busy` rỗng) khi `beat_at` ≤ 60 giây trước; Not responding khi > 60 giây; ẩn khi > 10 phút. Worker dừng êm thì xoá hàng của mình.
+Trạng thái (tính ra): Running (idle nếu `busy` rỗng) khi `beat_at` ≤ 30 giây trước; Not responding khi > 30 giây; ẩn khi > 10 phút. Worker dừng êm thì xoá hàng của mình.
 
 ## Ticket (mới, bảng `ticket`): vé tải lên và tải về dùng một lần
 
