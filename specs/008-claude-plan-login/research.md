@@ -63,6 +63,7 @@ Các mục có ghi **Kiểm khi implement** dựa trên hành vi của Claude Co
 - **Trần token mỗi việc (FR-116)**: `job_token_cap`, mặc định 40 triệu, tính cả token đọc đệm. Con số này ước từ 007 (trần 5 USD, giá đọc đệm của Opus). Bài chạy thật ghi số token thực tế để chỉnh lại.
 - **Rationale**: đếm theo từng lần gọi thì mọi cách chia đều đúng và test được. Nhóm dưới 20 người nên bảng không lớn.
 - **Alternatives**: cộng dồn theo ngày như Usage day: không chia được theo tài khoản Claude.
+- **Số thật (T035, 2026-11-09)**: phim 30 giây Sci-Fi Sitcom Toon trên gói Pro, model `claude-opus-5-5`: 52 lần gọi, **5,75 triệu token** (5,50 triệu đọc đệm, 158 nghìn ghi đệm, 91 nghìn ra), khoảng **22% hạn mức 5 giờ** và 1% hạn mức tuần của gói Pro. Phiên càng dài thì mỗi lượt đọc lại càng nhiều (cuối phim khoảng 180 nghìn token mỗi lượt). Trần 40 triệu cho mỗi việc vẫn hợp lý (khoảng 7 lần một phim 30 giây), giữ nguyên. Với gói Pro, khoảng 4 phim 30 giây là chạm hạn mức 5 giờ.
 
 ## R8. Người dùng (FR-111–FR-113) — đổi ngày 2026-11-08
 - **Decision**: giống neb-creative-tool. Chủ xưởng thêm người dùng trong Settings → Users: email, mật khẩu, vai trò (Owner = `admin`, Member = `customer`). Không có thư mời. Dùng lại bảng Account và Session của 007; thêm `last_login_at`. Tắt người dùng dùng `locked_at` của 007. `/auth/signup` luôn trả `403`; bỏ `signup_open`.

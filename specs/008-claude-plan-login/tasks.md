@@ -225,7 +225,13 @@
   - đoạn về điều khoản Anthropic: chỉ dùng nội bộ, chủ xưởng chịu trách nhiệm.
 - [X] T033 [P] Sửa `CLAUDE.md` (mục Cấu trúc, câu về chế độ online: gói Claude, `claude_plan.py`, Settings → Users) và `bin/studio` nếu lệnh `online admin` cần đổi.
 - [X] T034 Sửa `tests/online/live.py` và `live.sh`: in token theo việc và `via` thay cho `cost_usd`; không cần `ANTHROPIC_API_KEY` khi có tài khoản gói.
-- [ ] T035 Chạy quickstart bằng tay với tài khoản thật: các bước 1–4 (SC-101, SC-102), rồi `live.sh` (007 T048) để ghi số token thực tế. Chỉnh mặc định `job_token_cap` nếu cần, ghi vào research R7. Ghi kết quả: đạt, đạt một phần hoặc thất bại (hiến pháp IV).
+- [X] T035 Chạy quickstart bằng tay với tài khoản thật: các bước 1–4 (SC-101, SC-102), rồi `live.sh` (007 T048) để ghi số token thực tế. Chỉnh mặc định `job_token_cap` nếu cần, ghi vào research R7. Ghi kết quả: đạt, đạt một phần hoặc thất bại (hiến pháp IV).
+  - **Kết quả (2026-11-09): đạt một phần.**
+    - SC-101: đăng nhập tài khoản Pro trên trang AI accounts xong, dán mã một lần; chưa bấm giờ.
+    - SC-102: **đạt**. Phim 30 giây (`j-20261109-051230-736b`) xong không cần khoá API: −14,0 LUFS, đỉnh −1,1 dB, readcheck đạt. 44 phút, trong đó 20 phút treo (lỗi 4 dưới đây).
+    - Chạy bằng worker trên máy (`RUNNER=local`), **không** qua container Docker: đường Docker cho một phim thật chưa kiểm (ảnh đã dựng, xưởng Docker đã lên được).
+    - 4 lỗi chỉ lộ ra khi chạy thật, đã sửa và có test: dòng trả lời bị nén (`68550b9`); Claude Code giấu mã của việc khỏi Bash nên `job step` không tới (`fe9fcfe`); ảnh trên 1 MB vượt bộ đệm của SDK (`fe9fcfe`); dòng chỉ có ping treo 20 phút và bộ chuyển tiếp không tắt được (`6d0a979`). Thêm 2 sửa nhỏ: `STUDIO_HOME_DIR` khi chạy trên máy (`4b90321`), `HOME` cho Claude Code trong Docker (`9df12b8`).
+    - Số token và hạn mức: research R7.
 
 
 ---
