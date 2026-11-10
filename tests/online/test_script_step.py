@@ -105,6 +105,17 @@ class ScriptStep(unittest.TestCase):
         self.assertLessEqual(m["silence_ratio"], 0.2)
         self.assertLessEqual(m["tail_s"], 1.5)
 
+    def test_changed_version_keeps_its_reviewed_script(self):  # spec Edge Cases: changes to a finished film, T036
+        _, j = self.run_job("A fox [narration]")
+        self.assertEqual(j["status"], "done", j["log"][-6:])
+        r = self.c.post("/api/v1/jobs", json={"kind": "film", "revise_of": j["links"]["film"], "note": "warmer colours"},
+                        headers=W)
+        self.assertEqual(r.status_code, 201, r.text)
+        j2 = self.s.wait(r.json()["id"], timeout=90)
+        self.assertEqual(j2["status"], "done", j2["log"][-6:])
+        self.assertEqual(j2["qa"]["script"]["verdict"], "pass")
+        self.assertTrue(j2["qa"]["film"]["measures"]["voice_matches_script"])
+
     def test_film_without_narration_needs_no_script(self):
         _, j = self.run_job("A fox with no words")
         self.assertEqual(j["status"], "done", j["log"][-6:])

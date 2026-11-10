@@ -104,7 +104,10 @@ def voice_files(film: str) -> None:
     words = {f"l0{i}": [["word", 0.0, 0.3], ["end.", 0.32, 0.6]] for i in (1, 2, 3)}     # fits the 3 s sample film
     (d / "voices" / "words.json").write_text(json.dumps(words))
     (d / "voices" / "dur.json").write_text(json.dumps({k: 0.6 for k in words}))
+    paras = [re.sub(r"^\[P\d+\]\s*", "", ln) for ln in (d / "SCRIPT.md").read_text().splitlines() if ln.startswith("[P")]
+    (d / "lines.json").write_text(json.dumps([{"id": f"l0{i}", "text": t} for i, t in enumerate(paras, 1)]))
     (d / "narration.json").write_text(json.dumps({"words_file": "voices/words.json", "durations_file": "voices/dur.json",
+                                                  "lines_file": "lines.json",
                                                   "lines": [{"id": f"l0{i}", "para": f"P0{i}", "at": round(0.2 + (i - 1) * 0.65, 2)}
                                                             for i in (1, 2, 3)]}))
 
@@ -267,6 +270,15 @@ def main() -> int:
             return 0
         sample = old
         (d / "NOTE.txt").write_text(inp.get("note", ""))
+        src = old.parent
+        if (src / "SCRIPT.md").exists():          # as the revise prompt says: the script and its review come along
+            import shutil
+            for name in ("SCRIPT.md", "SOURCES.md", "checks.json", "narration.json", "lines.json"):
+                if (src / name).exists():
+                    shutil.copy2(src / name, d / name)
+            for sub in (".check", "voices"):
+                if (src / sub).exists():
+                    shutil.copytree(src / sub, d / sub, dirs_exist_ok=True)
     still = "[qc-bad-always]" in idea or ("[qc-bad]" in idea and not (resumed and "quality check" in msg))
     if still:                              # 9 s of a still picture: the studio's qc finds it (specs/010 T027)
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-stream_loop", "2", "-i", str(sample), "-c", "copy",

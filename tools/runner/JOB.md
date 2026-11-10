@@ -48,10 +48,15 @@ Report each stage with `job step` before you start it, using exactly these names
 4. A film with no narration at all (music and picture only): `sh STUDIO/bin/studio script skip <name> --reason "no narration"`.
 5. The voice lines (`lines.json`) are exactly the passed script's sentences, in order. When the voice is done and
    placed, write `films/<name>/narration.json`; `cuts` are the seconds where the picture cuts (from your timeline):
-   `{"words_file": "voices/words.json", "durations_file": "voices/dur.json",
+   `{"words_file": "voices/words.json", "durations_file": "voices/dur.json", "lines_file": "lines.json",
      "lines": [{"id": "l01", "para": "P01", "at": 0.6}, …], "cuts": [0, 4.2, …]}`
-   (`words.json` and `dur.json` are what the library's `tts.py` and `asr_check.py` write; `at` is the second the
-   line starts in the final film).
+   (`words.json` and `dur.json` are what the library's `tts.py` and `asr_check.py` write; `lines_file` is the
+   `lines.json` you gave `tts.py`; `at` is the second the line starts in the final film). `qc` checks that the
+   voice lines say exactly the passed script.
+
+A changed version of a finished film ("Request changes"): copy the old film's SCRIPT.md, SOURCES.md, checks.json
+and `.check/` with the rest. Only when the note changes the narration, change the script as asked and run
+`script check --customer-round` and `script review --customer-round`; otherwise keep script and voice as they are.
 
 If the customer asked to review the treatment, send that review only after the script passed:
 `review request <id> --kind treatment --film <name> --summary <file>` adds the script and its scores. When they ask

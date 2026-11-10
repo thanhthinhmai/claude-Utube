@@ -38,13 +38,54 @@ def load_narration(d: Path):
         if lid not in words or not words[lid]:
             raise QcError(f"narration.json does not match the voice files: no words for line {lid}")
         ws = [(str(w[0]), float(ln["at"]) + float(w[1]), float(ln["at"]) + float(w[2])) for w in words[lid]]
-        if durs and lid in durs and float(words[lid][-1][2]) > float(durs[lid]) + 0.5:
-            raise QcError(f"narration.json does not match the voice files: line {lid} ends after its audio")
+        if durs:          # each line's words end within 0.5 s of its audio (both ways; research R5, T037)
+            if lid not in durs:
+                raise QcError(f"narration.json does not match the voice files: line {lid} is not in {n['durations_file']}")
+            if abs(float(words[lid][-1][2]) - float(durs[lid])) > 0.5:
+                raise QcError(f"narration.json does not match the voice files: line {lid} lasts {float(durs[lid]):.2f} s "
+                              f"but its words end at {float(words[lid][-1][2]):.2f} s")
         lines.append({"id": lid, "para": ln.get("para") or "?", "at": float(ln["at"]), "words": ws})
     if not lines:
         raise QcError("narration.json has no lines")
     cuts = n.get("cuts")
-    return {"lines": sorted(lines, key=lambda x: x["at"]), "cuts": [float(c) for c in cuts] if cuts else None}
+    return {"lines": sorted(lines, key=lambda x: x["at"]), "cuts": [float(c) for c in cuts] if cuts else None,
+            "lines_file": n.get("lines_file")}
+
+
+def _norm(text: str) -> list:
+    return re.sub(r"[^\w\s]", " ", text.lower().replace("’", "'").replace("'", "")).split()
+
+
+def voice_matches_script(d: Path, nar: dict):
+    """None when it matches; else a problem. The voice lines (the library's lines.json, in narration order) must say
+    exactly the passed script (specs/010 US1/AC6, T035). Case, punctuation and spacing do not count."""
+    if not (d / "SCRIPT.md").is_file():
+        return None
+    if not nar.get("lines_file"):
+        return "narration.json has no lines_file, so the voice cannot be checked against SCRIPT.md"
+    try:
+        rows = json.loads((d / nar["lines_file"]).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return f"the voice lines ({nar['lines_file']}) cannot be read: {e}"
+    from filmcheck import script as scriptmod
+    try:
+        sc = scriptmod.read_script(d / "SCRIPT.md")
+    except scriptmod.ScriptError as e:
+        return f"SCRIPT.md cannot be read: {e}"
+    text_of = {r.get("id"): r.get("text", "") for r in rows if isinstance(r, dict)}
+    voice = [w for ln in nar["lines"] for w in _norm(text_of.get(ln["id"], ""))]
+    said, owner = [], []
+    for p in sc["paragraphs"]:
+        ws = _norm(p["text"])
+        said += ws
+        owner += [p["id"]] * len(ws)
+    if voice == said:
+        return None
+    i = next((k for k, (a, b) in enumerate(zip(voice, said)) if a != b), min(len(voice), len(said)))
+    para = owner[min(i, len(owner) - 1)] if owner else "P01"
+    got = " ".join(voice[i:i + 6]) or "(nothing)"
+    want = " ".join(said[i:i + 6]) or "(nothing)"
+    return f"the voice does not say the passed script from {para}: it says \"{got}\" where the script has \"{want}\""
 
 
 def sentences(lines: list) -> list:
@@ -269,6 +310,10 @@ def measure(d: Path, lib=None) -> dict:
         measures.update(m)
         problems += p
         measures["cuts"] = [round(c, 2) for c in cuts]
+        mismatch = voice_matches_script(d, nar)
+        measures["voice_matches_script"] = mismatch is None if (d / "SCRIPT.md").is_file() else None
+        if mismatch:
+            problems.append(mismatch)
     measures["stills_bad"] = stills
     for s in stills:
         problems.append(f"the picture stands still from {s['from']:.1f} s to "

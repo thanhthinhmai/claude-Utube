@@ -23,7 +23,7 @@ Mỗi yêu cầu đi đúng **một** luồng:
    - Sau `TREATMENT.md`, trước giọng đọc: viết `SCRIPT.md` và `SOURCES.md` theo `specs/010-script-review-qc/contracts/files.md`. Tìm số liệu bằng WebSearch (tối đa 5 lượt); mở mọi đường dẫn được dẫn bằng `sh bin/studio web fetch <url> --film <tên>`.
    - `sh bin/studio script check <tên>` tới khi đạt, rồi `sh bin/studio script review <tên>`. Mã 1: chỉ sửa các đoạn bị ghi P1 hoặc P2, rồi chạy lại. Mã 3 (hết 2 vòng sửa): dừng, báo người dùng điểm cuối và các lỗi còn lại.
    - Phim không có lời đọc: `sh bin/studio script skip <tên> --reason "no narration"`.
-   - Lời của `lines.json` lấy đúng từ kịch bản đã đạt; xong giọng thì ghi `narration.json`.
+   - Lời của `lines.json` lấy đúng từ kịch bản đã đạt (`qc` kiểm); xong giọng thì ghi `narration.json` có `lines_file`.
    - Ở bước Self-check: `sh bin/studio qc <tên>` (nhịp lời, cắt cảnh, hình đứng im quá 6 giây, ký tự thiếu phông). Sửa một vòng theo lỗi nó báo; còn lỗi thì báo người dùng một dòng khi giao.
 4. Không sửa file nào trong `lib/` (hiến pháp VI). Muốn dùng phiên bản thư viện mới thì đổi `library.lock` theo quy trình spec-kit.
 5. **Ghi việc lên giao diện** (`specs/003-studio-ui/contracts/skill-integration.md`):

@@ -84,6 +84,28 @@ class Measures(unittest.TestCase):
         (self.root / "my-styles" / "calm-style" / "qc.json").write_text(json.dumps({"still_max": 10}))
         self.assertEqual(qc.measure(d)["measures"]["stills_bad"], [])
 
+    def test_voice_must_say_the_script(self):                 # US1/AC6, T035
+        r = qc.measure(samples.make_film(self.root, "said", script=True))
+        self.assertTrue(r["measures"]["voice_matches_script"], r["problems"])
+        self.assertEqual(r["problems"], [])
+        r = qc.measure(samples.make_film(self.root, "unsaid", script=True, lines_text={"l03": "w0 w1 other words."}))
+        self.assertFalse(r["measures"]["voice_matches_script"])
+        self.assertEqual(len(r["problems"]), 1)
+        self.assertIn("from P02", r["problems"][0])
+        d = samples.make_film(self.root, "nolines", script=True)
+        n = json.loads((d / "narration.json").read_text())
+        del n["lines_file"]
+        (d / "narration.json").write_text(json.dumps(n))
+        self.assertIn("no lines_file", qc.measure(d)["problems"][0])
+
+    def test_line_shorter_than_its_audio(self):              # research R5, T037: both ways
+        d = samples.make_film(self.root, "short")
+        durs = json.loads((d / "voices" / "dur.json").read_text())
+        durs["l02"] = durs["l02"] + 0.8
+        (d / "voices" / "dur.json").write_text(json.dumps(durs))
+        with self.assertRaises(qc.QcError):
+            qc.measure(d)
+
     def test_voice_files_must_match(self):
         d = samples.make_film(self.root, "mismatch")
         (d / "voices" / "dur.json").write_text(json.dumps({"l01": 0.5}))

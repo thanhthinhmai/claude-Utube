@@ -110,7 +110,7 @@ def _end(line):
 
 
 def make_film(root: Path, name: str, *, word=WORD, gap=GAP, pause_in_p01=0.0, extra_cuts=(), move_cut=None,
-              tail=1.1, still_shot=None, write_cuts=True, srt=None) -> Path:
+              tail=1.1, still_shot=None, write_cuts=True, srt=None, script=False, lines_text=None) -> Path:
     """Write films/<name>/ under root. Cuts fall 0.5 s after the last word of P01 and of P02."""
     d = Path(root) / "films" / name
     (d / "voices").mkdir(parents=True, exist_ok=True)
@@ -126,6 +126,16 @@ def make_film(root: Path, name: str, *, word=WORD, gap=GAP, pause_in_p01=0.0, ex
             "lines": [{"id": L["id"], "para": L["para"], "at": L["at"]} for L in lines]}
     if write_cuts:
         narr["cuts"] = cuts
+    if script:            # a SCRIPT.md and the lines.json the voice was made from (T035)
+        said = {L["id"]: " ".join(w[0] for w in L["words"]) for L in lines}
+        paras = {}
+        for L in lines:
+            paras.setdefault(L["para"], []).append(said[L["id"]])
+        (d / "SCRIPT.md").write_text("Title: Test\nTarget: 20s\nLanguage: en\n\n"
+                                     + "\n".join(f"[{p}] {' '.join(t)}" for p, t in paras.items()) + "\n", encoding="utf-8")
+        rows = [{"id": k, "text": (lines_text or {}).get(k, v)} for k, v in said.items()]
+        (d / "lines.json").write_text(json.dumps(rows), encoding="utf-8")
+        narr["lines_file"] = "lines.json"
     (d / "narration.json").write_text(json.dumps(narr), encoding="utf-8")
     (d / "TREATMENT.md").write_text("Style: test-style\n", encoding="utf-8")
     if srt is not None:

@@ -58,7 +58,9 @@ Các mục **Kiểm khi implement** dựa trên hành vi chưa thử. Task đầ
   - Câu: mỗi dòng của `lines.json` là một câu hoặc hơn; `qc` tách thêm theo dấu câu Whisper trả về; hết dòng là hết câu.
   - Mốc cảnh: lấy `cuts` trong `narration.json` nếu agent ghi (từ `timeline.json`); không có thì tìm từ hình bằng bộ lọc `scdet` của ffmpeg, ngưỡng 10 (edge case của spec).
 - **Rationale**: phim cuối có cả nhạc, nên không tách được giọng từ âm thanh. Mốc từng từ đã có sẵn từ bước kiểm giọng của thư viện.
-- **Kiểm chéo**: từ cuối cùng phải kết thúc trước hết phim, và tổng thời lượng các dòng phải khớp ±0,5 giây với `dur.json` của `tts.py`. Lệch thì báo lỗi "narration.json does not match the voice files".
+- **Kiểm chéo**: từ cuối cùng phải kết thúc trước hết phim, và từ cuối của **mỗi dòng** phải kết thúc trong ±0,5 giây so với độ dài của dòng đó trong `dur.json` (cả hai chiều). Lệch thì báo lỗi "narration.json does not match the voice files".
+  - Lúc đầu research ghi so **tổng** thời lượng (±0,5 giây). Phim thật thứ hai (2026-11-10) cho thấy Whisper đặt từ cuối sớm hơn file giọng khoảng 0,1 giây mỗi dòng (tổng 1,25 giây cho 12 dòng), nên so tổng sẽ báo lỗi oan. Vì vậy đổi sang so từng dòng (T037).
+- **Lời đọc khớp kịch bản** (US1/AC6, T035): `narration.json` có `lines_file`; `qc` so chữ của các dòng với lời đọc của `SCRIPT.md`. Đã thử trên phim thật: khớp, và sửa một từ thì báo đúng đoạn.
 - **Alternatives**: tách giọng khỏi nhạc bằng mô hình: nặng, không chính xác.
 
 ## R6. Model của biên tập (FR-007b)

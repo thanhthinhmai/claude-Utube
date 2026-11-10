@@ -40,6 +40,7 @@ Speed: 150            # tuỳ chọn: từ/phút (en, vi) hoặc ký tự/giây 
 {
   "words_file": "voices/words.json",
   "durations_file": "voices/dur.json",
+  "lines_file": "lines.json",
   "lines": [
     {"id": "l01", "para": "P01", "at": 0.60},
     {"id": "l02", "para": "P01", "at": 3.10}
@@ -49,6 +50,8 @@ Speed: 150            # tuỳ chọn: từ/phút (en, vi) hoặc ký tự/giây 
 ```
 
 - `words_file`: tệp `words.json` của `asr_check.py`, gồm `{ "<id>": [[từ, bắt đầu, kết thúc], …] }`, mốc tính từ đầu dòng.
+- `lines_file`: tệp `lines.json` đưa cho `tts.py` (`[{"id", "text", …}]`). `qc` so chữ của các dòng (theo thứ tự trong `lines`) với lời đọc của `SCRIPT.md`; khác chữ là một lỗi QC (bỏ qua hoa thường, dấu câu, khoảng trắng). Bắt buộc khi phim có `SCRIPT.md`.
+- `durations_file`: `dur.json` của `tts.py`. Từ cuối của mỗi dòng phải kết thúc trong ±0,5 giây so với độ dài file giọng của dòng đó.
 - `at`: giây bắt đầu của dòng trong phim cuối.
 - `cuts` (tuỳ chọn): mốc chuyển cảnh, tính bằng giây. Thiếu thì `qc` tìm từ hình.
 - Đường dẫn tương đối với thư mục phim.

@@ -355,7 +355,8 @@ const ago = (iso) => {
 function filmInProgress(j) {
   const seen = new Set(j.log.map((x) => x.line));
   const now = STAGES.indexOf(j.step);
-  const stages = STAGES.filter((st) => (st !== "Storyboard" && st !== "Script") || seen.has(st));
+  const skipped = ((j.qa || {}).script || {}).verdict === "skipped";     // no narration: no Script step (specs/010)
+  const stages = STAGES.filter((st) => (st === "Storyboard" ? seen.has(st) : st !== "Script" || !skipped || seen.has(st)));
   const track = stages.map((st) => {
     const i = STAGES.indexOf(st);
     const cls = i === now ? "now" : seen.has(st) || (now >= 0 && i < now) ? "done" : "next";   // agents may change the order
