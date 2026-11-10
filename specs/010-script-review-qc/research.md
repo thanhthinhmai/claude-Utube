@@ -28,7 +28,7 @@ Các mục **Kiểm khi implement** dựa trên hành vi chưa thử. Task đầ
 ## R3. Biên tập độc lập
 - **Decision**: `script review` tự chạy một tiến trình Claude Code riêng: `claude -p` với lời nhắc và lược đồ trả lời cố định do xưởng viết, `--json-schema`, `--output-format json`, `--no-session-persistence`, `--model` theo cài đặt (R6).
   - Công cụ của biên tập chỉ có `Read`, `Grep`, `WebSearch` và `Bash(sh bin/studio web fetch:*)`.
-  - Biên tập chỉ nhận đường dẫn tới `SCRIPT.md`, `SOURCES.md`, `TREATMENT.md` và yêu cầu của phim (`.input.json` online, hoặc phần tóm tắt yêu cầu local). Nó không có lịch sử của agent.
+  - Biên tập chỉ nhận đường dẫn tới `SCRIPT.md`, `SOURCES.md`, `TREATMENT.md` và yêu cầu của phim (`.input.json` online, hoặc `BRIEF.md` local, contracts/files.md). Nó không có lịch sử của agent.
   - Online: tiến trình chạy trong cùng container, với `CLAUDE_CODE_OAUTH_TOKEN` của việc, nên mọi lần gọi đi qua proxy và token được tính vào việc (FR-016). Local: dùng `claude` trên máy của người dùng.
 - **Rationale**: tiến trình mới không thấy quá trình viết (FR-007). Lời nhắc nằm trong code của xưởng, nên agent không sửa được. Cách gọi giống `moderation.py` của 008, cách đã chạy thật.
 - **Alternatives**: subagent qua công cụ `Agent` trong phiên của agent: agent tự viết lời nhắc cho biên tập, nên tính độc lập phụ thuộc vào agent, và khó test.
@@ -67,7 +67,7 @@ Các mục **Kiểm khi implement** dựa trên hành vi chưa thử. Task đầ
 - **Rationale**: dùng bí danh model của Claude Code, nên không phải đổi khi có model mới.
 
 ## R7. Hình đứng im và chữ ô vuông (FR-012)
-- **Hình đứng im**: bộ lọc `freezedetect=n=0.003:d=6` của ffmpeg trên phim cuối. Phong cách nào cho phép cảnh tĩnh dài hơn thì ghi trong `tools/filmcheck/styles.json` (`{"<slug>": {"still_max": 10}}`), của xưởng, không nằm trong `lib/`. Lúc đầu tệp rỗng. Phong cách riêng ghi `still_max` trong `my-styles/<slug>/qc.json`.
+- **Hình đứng im**: bộ lọc `freezedetect=n=0.003:d=6` của ffmpeg trên phim cuối. Đây là "cài đặt QC của phong cách" của spec FR-012. Phong cách nào cho phép cảnh tĩnh dài hơn thì ghi trong `tools/filmcheck/styles.json` (`{"<slug>": {"still_max": 10}}`), của xưởng, không nằm trong `lib/`. Lúc đầu tệp rỗng. Phong cách riêng ghi `still_max` trong `my-styles/<slug>/qc.json`.
 - **Chữ ô vuông**:
   1. `tools/filmcheck/texts.mjs` mở phim bằng `core/render/page.mjs` của thư viện (chỉ import, không sửa), giống readcheck, và gom chữ của `window.TEXTS(t)` mỗi 0,25 giây, cộng chữ của `<name>.srt`.
   2. Python lấy tập ký tự của các tệp phông trong thư mục phim bằng `fc-scan --format '%{charset}'`, và hỏi phông hệ thống bằng `fc-list ':charset=<mã>'`.

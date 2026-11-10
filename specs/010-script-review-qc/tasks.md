@@ -73,7 +73,7 @@
   - `SOURCES.md`: mỗi dòng `- [Pnn] "<trích>": <tên>, <năm>, <đường dẫn>` (năm 4 chữ số; `para` có trong kịch bản; `quote` có trong đoạn đó, không phân biệt hoa thường), hoặc đúng một dòng `no factual claims`;
   - tách câu, đếm từ hay ký tự theo ngôn ngữ (research R2).
 - [ ] T009 [US1] Viết máy chấm trong `script.py` (`check(film_dir) -> result`):
-  - điều kiện cứng `format`, `sources` (câu có số cần nguồn; đường dẫn phải có trong `.check/opened.json` với mã 2xx, hoặc `provided:`), `length` (±15% `Target` theo tốc độ đọc);
+  - điều kiện cứng `format`, `sources` (câu có con số cần nguồn: chữ số, hoặc số viết bằng chữ từ mười/ten trở lên theo spec FR-004; đường dẫn phải có trong `.check/opened.json` với mã 2xx, hoặc `provided:`), `length` (±15% `Target` theo tốc độ đọc);
   - bảng trừ điểm ở contracts/cli.md: `long_sentence`, `no_hook`, `intro_opening`, `retention_gap`, `cliche`, `risky_number`, `punctuation`, kèm vị trí `Pnn.câu`;
   - tạo `tools/filmcheck/cliches/en.txt` và `vi.txt` (khoảng 40 cụm mỗi tệp), cùng danh sách dấu hiệu hook và câu mở đầu cấm theo ngôn ngữ trong `script.py`.
 - [ ] T010 [US1] Viết so đoạn (research R9) trong `script.py`: có `.check/script-r<n>.md` thì so từng đoạn với bản mới nhất. Đoạn khác mà lượt biên tập trước không ghi P1/P2 cho nó là lỗi cứng `unchanged`; so sánh bỏ khoảng trắng cuối dòng.
@@ -88,7 +88,7 @@
   - chạy `claude_bin()` (dùng lại `studio.claude_plan.claude_bin` nếu import được, không thì `STUDIO_CLAUDE_BIN` hoặc `claude` trên PATH) với `-p`, lời nhắc cố định, `--json-schema` biên tập, `--output-format json`, `--no-session-persistence`, `--allowedTools "Read Grep WebSearch Bash(sh bin/studio web fetch:*)"` và `--model` theo T006;
   - lời nhắc chỉ đưa đường dẫn `SCRIPT.md`, `SOURCES.md`, `TREATMENT.md` và yêu cầu của phim (`/work/.input.json` online, `films/<name>/BRIEF.md` local nếu có);
   - lời nhắc yêu cầu: mở lại nguồn của các con số chính bằng `web fetch` và ghi P1 cho số không khớp (FR-007a); lỗi gắn số đoạn có thật; điểm ≥ 8 chỉ khi không còn P1;
-  - sai lược đồ thì chạy lại một lần; vẫn sai thì tính là một lượt không đạt.
+  - sai lược đồ thì chạy lại một lần; vẫn sai thì tính là một lượt không đạt (thoát 1, hoặc 3 ở lượt cuối; contracts/cli.md).
 - [ ] T013 [US1] Viết `script check|review|status|skip` trong `tools/filmcheck/cli.py` đúng mã thoát ở contracts/cli.md:
   - `review` từ chối khi `check` chưa đạt; lưu `.check/script-r<n>.md` và `review-r<n>.json`; tính vòng: lượt 1 cộng tối đa 2 vòng sửa; hết thì `verdict = failed`, mã 3;
   - `skip` chỉ khi không có `voices/` và `narration.json`;
@@ -111,6 +111,7 @@
 
   Sửa `tools/runner/worker.py`: truyền `STUDIO_EDITOR_MODEL` (từ cài đặt; `inherit` thì không truyền) vào container và vào `LocalRunner`.
 - [ ] T017 [US1] Sửa `tools/runner/JOB.md` và mục "Luồng làm phim" của `CLAUDE.md`:
+  - local: sau bước Brief, ghi `films/<name>/BRIEF.md` theo contracts/files.md;
   - thêm bước `Script` sau `Treatment`: viết `SCRIPT.md` và `SOURCES.md` theo contracts/files.md (tìm bằng WebSearch, mở bằng `web fetch --film`);
   - `script check` tới khi đạt, rồi `script review`; mã 1 thì chỉ sửa đúng các đoạn bị ghi; mã 3 thì dừng (online: `job fail --by studio` với điểm cuối; local: báo người dùng);
   - phim không lời thì `script skip`;
@@ -128,7 +129,8 @@
 - [ ] T020 [US1] Mở rộng `tests/online/fake_agent.py` cho bước Script (thẻ `[narration]`: viết `SCRIPT.md`, `SOURCES.md`, chạy `script check` và `script review` thật với `fake_claude`, sửa đoạn bị ghi, rồi làm phim giả có `narration.json`). Viết `tests/online/test_script_step.py`:
   - việc đạt sau 1 vòng sửa: `checks.json` có 2 lượt biên tập, `fix_rounds = 1`, mốc của lượt đạt trước file giọng giả (SC-001);
   - `[editor-low]`: việc lỗi do xưởng, lượt được trả, không có `voices/`;
-  - `[editor-bad-json]` hai lần: tính một lượt không đạt;
+  - `[editor-bad-json]` hai lần: tính một lượt không đạt (mã 1);
+  - FR-016: các lần gọi của biên tập có hàng Call gắn với việc, và `job.tokens` gồm cả phần đó;
   - duyệt treatment có kịch bản (FR-019): phần tóm tắt của review chứa `[P01]` và điểm;
   - `fake_claude` nhận `--model sonnet` khi cài đặt là `sonnet`, và không nhận `--model` khi `inherit`;
   - `test_web_fetch.py`: proxy chặn `http://proxy:8780`, `http://127.0.0.1` và `http://10.0.0.1`; đếm tới 60; nhật ký không có đường dẫn đầy đủ.

@@ -45,7 +45,7 @@ Người dùng giao một phim có lời đọc. Sau bản tóm tắt, xưởng 
 2. **Given** kịch bản vừa viết, **When** máy chấm chạy, **Then** nó in điểm /10, kết quả từng điều kiện cứng và vị trí từng lỗi (số đoạn và câu), không gọi Claude.
 3. **Given** máy chấm cho dưới 7/10 hoặc trượt một điều kiện cứng, **When** xưởng sửa, **Then** máy chấm chạy lại; xưởng chưa được gửi cho biên tập.
 4. **Given** kịch bản đã qua máy chấm, **When** biên tập viên chấm, **Then** họ chỉ thấy kịch bản, danh sách nguồn, bản tóm tắt và yêu cầu của phim (không thấy quá trình viết), và trả điểm /10 kèm danh sách lỗi P1 (bắt buộc sửa), P2 (nên sửa), P3 (góp ý), mỗi lỗi gắn một số đoạn.
-5. **Given** biên tập cho dưới 8/10 hoặc còn lỗi P1, **When** xưởng sửa, **Then** chỉ các đoạn bị ghi lỗi thay đổi (các đoạn khác giữ nguyên từng chữ), máy chấm chạy lại, rồi biên tập chấm lại.
+5. **Given** biên tập cho dưới 8/10 hoặc còn lỗi P1, **When** xưởng sửa, **Then** chỉ các đoạn bị ghi lỗi P1 hoặc P2 thay đổi (các đoạn khác, kể cả đoạn chỉ có P3, giữ nguyên từng chữ), máy chấm chạy lại, rồi biên tập chấm lại.
 6. **Given** kịch bản đã đạt, **When** xưởng thu giọng, **Then** lời đọc khớp kịch bản đã đạt.
 7. **Given** một phim không có lời đọc (chỉ nhạc và hình), **When** bản tóm tắt xong, **Then** xưởng bỏ qua bước kịch bản và ghi rõ lý do "no narration" vào kết quả.
 8. **Given** việc online mà người giao phim đã chọn duyệt treatment, **When** kịch bản đạt, **Then** người giao phim nhận một lần duyệt gồm bản tóm tắt, kịch bản và điểm chấm; chưa có file giọng nào trước khi họ duyệt (FR-019).
@@ -103,7 +103,7 @@ Người giao phim và chủ xưởng xem được điểm máy chấm, điểm 
 **Máy chấm kịch bản** (chạy bằng máy, không gọi Claude)
 - **FR-004**: Máy chấm MUST kiểm các điều kiện cứng, trượt một điều kiện là không đạt dù điểm cao:
   - đúng định dạng FR-001 (số đoạn, phần đầu file);
-  - mọi câu có con số MUST có nguồn cho đoạn đó trong `SOURCES.md`, trừ khi phim là truyện hư cấu và câu không nêu sự thật;
+  - mọi câu có con số MUST có nguồn cho đoạn đó trong `SOURCES.md`, trừ khi phim là truyện hư cấu và câu không nêu sự thật. "Con số" là số viết bằng chữ số, hoặc số viết bằng chữ từ mười trở lên (ten, hundred, million; mười, trăm, triệu); số nhỏ hơn viết bằng chữ (one man, ba người) không cần nguồn;
   - thời lượng đọc ước tính nằm trong ±15% thời lượng mục tiêu.
 - **FR-005**: Máy chấm MUST cho điểm /10 từ các mục có trọng số:
   - câu dài (> 25 từ, hoặc > 40 ký tự với ngôn ngữ không tách từ);
@@ -129,17 +129,17 @@ Người giao phim và chủ xưởng xem được điểm máy chấm, điểm 
   - mỗi lần chuyển cảnh cách từ cuối của câu đang đọc ít nhất 0,4 giây (không cắt giữa câu);
   - cảnh mang câu cuối của mỗi đoạn hiện ít nhất 2,5 giây;
   - phim hết không quá 1,5 giây sau từ cuối cùng.
-- **FR-012**: Với mọi phim, máy QC MUST báo đoạn hình đứng im quá 6 giây (trừ khi `STYLE.md` của phong cách cho phép cảnh tĩnh dài hơn) và mọi ký tự trên màn hình mà phông chữ không có, kèm mốc thời gian.
+- **FR-012**: Với mọi phim, máy QC MUST báo đoạn hình đứng im quá 6 giây (trừ khi cài đặt QC của phong cách, do xưởng giữ ngoài thư viện, cho phép cảnh tĩnh dài hơn) và mọi ký tự trên màn hình mà phông chữ không có, kèm mốc thời gian.
 - **FR-013**: FR-011 và FR-012 MUST nằm trong cùng cổng QC với độ to, đỉnh âm và chữ đọc được của 007, và theo cùng luật: trượt thì xưởng nhận danh sách lỗi kèm số đo, sửa một vòng, đo lại; vẫn trượt thì việc online lỗi do xưởng (trả lượt). Ở chế độ local, cùng các số đo chạy ở bước Self-check và kết quả được báo cho người dùng khi giao.
 - **FR-014**: Máy QC MUST chạy được trên phim mẫu không cần mạng, và mỗi mục có một phim mẫu cố ý lỗi để test.
 
 **Kết quả và theo dõi**
 - **FR-015**: Mỗi phim MUST có một file kết quả chấm trong thư mục phim: điểm máy chấm và điểm biên tập từng vòng, số lỗi theo mức, số vòng sửa, và từng số đo QC kèm đạt/trượt.
 - **FR-016**: Ở chế độ online, trang việc MUST hiện các kết quả của FR-015 cho người giao việc và chủ xưởng. Token của lượt biên tập MUST được tính vào việc như mọi lần gọi khác (008 FR-114).
-- **FR-017**: Bước `Script` MUST hiện trong danh sách bước của việc, giữa `Treatment` và `Voice`.
+- **FR-017**: Bước `Script` MUST hiện trong danh sách bước của việc, theo thứ tự `Treatment` → `Script` → `Look` → `Voice`.
 
 **Duyệt của người giao phim (online)**
-- **FR-019**: Khi người giao phim chọn duyệt treatment (007), lần duyệt đó MUST diễn ra sau khi kịch bản đạt máy chấm và biên tập, và MUST gồm cả bản tóm tắt, kịch bản và điểm chấm. Vẫn chỉ một lần dừng chờ duyệt. Người giao phim yêu cầu sửa thì xưởng sửa, rồi kịch bản qua lại máy chấm và biên tập trước khi gửi duyệt lại; các vòng này không tính vào giới hạn 2 vòng của FR-010. Phim không có lời đọc thì lần duyệt chỉ gồm bản tóm tắt như 007.
+- **FR-019**: Khi người giao phim chọn duyệt treatment (007), lần duyệt đó MUST diễn ra sau khi kịch bản đạt máy chấm và biên tập, và MUST gồm cả bản tóm tắt, kịch bản và điểm chấm. Vẫn chỉ một lần dừng chờ duyệt. Người giao phim yêu cầu sửa thì xưởng sửa, rồi kịch bản qua lại máy chấm và biên tập trước khi gửi duyệt lại; các vòng này không tính vào giới hạn 2 vòng của FR-010; như lần duyệt treatment của 007, số lần yêu cầu sửa không có trần riêng, và chi phí được chặn bởi trần token của việc (008 FR-116). Phim không có lời đọc thì lần duyệt chỉ gồm bản tóm tắt như 007.
 
 **Giới hạn**
 - **FR-018**: Không sửa file nào trong `lib/` (hiến pháp VI). Không clone giọng của kênh thật; giọng đọc vẫn theo luật hiện có (hiến pháp, bản quyền). Không thêm bộ máy vẽ ảnh AI (hiến pháp VII).
@@ -165,6 +165,7 @@ Người giao phim và chủ xưởng xem được điểm máy chấm, điểm 
 
 ## Assumptions
 
+- Ở chế độ local, việc chấm kịch bản trước khi thu giọng dựa vào hướng dẫn làm phim, vì xưởng không sửa công cụ giọng của thư viện; chỉ chế độ online có cổng chặn bằng máy (worker), nên SC-001 được kiểm tự động ở chế độ online.
 - Lời đọc tạo bằng công cụ giọng sẵn có của thư viện, và bước kiểm giọng của thư viện xuất được mốc thời gian từng từ. Xưởng đọc kết quả này, không sửa thư viện.
 - Thời lượng đọc ước tính theo tốc độ đọc mặc định của ngôn ngữ (ví dụ khoảng 150 từ mỗi phút với tiếng Anh) khi chưa có giọng.
 - Biên tập dùng cùng tài khoản Claude của việc (online) hoặc phiên hiện tại (local); không cần dịch vụ mới.

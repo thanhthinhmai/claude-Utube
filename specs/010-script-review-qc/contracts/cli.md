@@ -35,7 +35,9 @@ Chạy biên tập (R3) khi `script check` đạt; chưa đạt thì thoát 1 v�
 | 0 | đạt (≥ 8, không còn P1): `verdict = pass` |
 | 1 | chưa đạt, còn vòng sửa: in lỗi P1/P2 theo đoạn |
 | 3 | chưa đạt và đã hết 2 vòng sửa: `verdict = failed` (FR-010). Agent dừng; online, worker cho việc lỗi do xưởng |
-| 2 | không chạy được (biên tập trả sai lược đồ hai lần liền: tính là một lượt không đạt, FR edge case) |
+| 2 | không chạy được (thiếu tệp, không gọi được Claude Code) |
+
+Biên tập trả sai lược đồ hai lần liền (edge case của spec): tính là một lượt không đạt, nên thoát 1, hoặc 3 khi đó là lượt cuối.
 
 Lượt 1 là lượt chấm đầu; lượt 2 và 3 là sau vòng sửa 1 và 2. Vòng sửa theo yêu cầu của người giao phim (FR-019) mở thêm lượt, không tính vào giới hạn.
 

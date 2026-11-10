@@ -1,6 +1,10 @@
 # Contract: các tệp trong thư mục phim
 
-Mọi tệp nằm trong `films/<name>/`. Agent viết `SCRIPT.md`, `SOURCES.md`, `narration.json`. Công cụ của xưởng viết `checks.json`, `CHECKS.md` và thư mục `.check/`; agent không sửa chúng.
+Mọi tệp nằm trong `films/<name>/`. Agent viết `BRIEF.md` (chỉ local), `SCRIPT.md`, `SOURCES.md`, `narration.json`. Công cụ của xưởng viết `checks.json`, `CHECKS.md` và thư mục `.check/`; agent không sửa chúng.
+
+## BRIEF.md (agent viết, chỉ local)
+
+Tóm tắt yêu cầu của phim sau bước Brief của thư viện: chủ đề, phong cách, thời lượng, ngôn ngữ, những gì người dùng bắt buộc có hoặc không có. Tối đa 2000 ký tự, chữ thường. Biên tập đọc tệp này như "yêu cầu của phim" (FR-007). Online thì biên tập đọc `/work/.input.json` thay cho tệp này.
 
 ## SCRIPT.md (agent viết, FR-001)
 
