@@ -206,7 +206,7 @@
 
   Sửa `specs/003-studio-ui/contracts/cli.md` cho các lệnh mới. Cập nhật bộ nhớ dự án: chạy 5 bộ test.
 - [X] T032 [P] Dựng lại ảnh `studio-job` và `studio-web` (`sh bin/studio online up` hoặc `docker build`). Kiểm trong container: `sh bin/studio script check` và `qc` chạy được trên phim mẫu (`node`, `ffmpeg`, `fc-list` có sẵn). Sửa `deploy/job.Dockerfile` nếu thiếu gói (ví dụ `fonttools` theo T001).
-- [ ] T033 Chạy 5 bộ test; sửa tới khi đạt.
+- [X] T033 Chạy 5 bộ test; sửa tới khi đạt. (2026-11-10: 71/71, learn 42, ui 37, filmcheck 53, online 149.)
 - [X] T034 Chạy quickstart bằng tay (bước 1–3) với tài khoản thật: một phim local và một phim online (Docker), 45–60 giây có lời đọc và số liệu, có chọn duyệt treatment. Ghi kết quả vào task này: điểm từng lượt, số đo QC, tổng token của việc và phần token của bước kịch bản (SC-005 ≤ 15%), đạt / đạt một phần / thất bại (hiến pháp IV).
   - **Lần 1 (2026-11-10), online qua bộ xưởng Docker, gói Max, phong cách `whiteboard`, 50 giây, có duyệt treatment: đạt một phần.** Việc `j-20261110-100043-614c` dừng ở bước Script sau 5,9 phút (39 lần gọi, 1 133 480 token, toàn bộ qua `plan:1`), lượt được trả.
     - Chuỗi chạy thật trong container: tìm web 4 lượt qua proxy; `web fetch` mở 14 trang qua proxy; biên tập (`claude -p`, Opus) chấm 3 lượt qua proxy, token tính vào việc.
