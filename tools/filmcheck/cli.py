@@ -221,7 +221,25 @@ def fetch_online(url: str) -> dict:
         raise webfetch.FetchError("unreachable", f"the studio proxy cannot be reached: {e}", 502) from None
 
 
+def take_page() -> bool:
+    """One page from the editor's budget, when `script review` set one (STUDIO_FETCH_BUDGET_FILE)."""
+    f = os.environ.get("STUDIO_FETCH_BUDGET_FILE")
+    if not f:
+        return True
+    try:
+        left = int(Path(f).read_text().strip() or 0)
+    except (OSError, ValueError):
+        left = 0
+    if left <= 0:
+        return False
+    Path(f).write_text(str(left - 1))
+    return True
+
+
 def cmd_fetch(a) -> int:
+    if not take_page():
+        print(f"✗ fetch_limit: the editor may open at most {editor.EDITOR_PAGES} pages per review", file=sys.stderr)
+        return 1
     try:
         r = fetch_online(a.url) if online() else webfetch.fetch(a.url)
     except webfetch.FetchError as e:

@@ -123,6 +123,17 @@ class Flow(unittest.TestCase):
         self.assertEqual(self.checks()["script"]["editor"], [])
         self.assertFalse((self.d / ".check/script-r1.md").exists())
 
+    def test_editor_page_budget(self):
+        budget = self.root / "left"
+        budget.write_text("1")
+        self.env["STUDIO_FETCH_BUDGET_FILE"] = str(budget)
+        rc, outp = self.studio("web", "fetch", "http://10.0.0.1/")
+        self.assertIn("blocked_address", outp)                  # the first page is tried (and refused here)
+        self.assertEqual(budget.read_text(), "0")
+        rc, outp = self.studio("web", "fetch", "https://example.org/")
+        self.assertEqual(rc, 1)
+        self.assertIn("at most 3 pages", outp)
+
     def test_web_fetch_refuses_internal_and_records_nothing(self):
         rc, outp = self.studio("web", "fetch", "http://127.0.0.1:8790/", "--film", "baker")
         self.assertEqual(rc, 1)

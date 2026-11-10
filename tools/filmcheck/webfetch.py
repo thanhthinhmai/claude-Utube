@@ -1,7 +1,8 @@
 """Open one web page safely and return its text (specs/010 R4). Used by `studio web fetch` locally and by the proxy.
 
 Only http(s) on ports 80/443; the host is resolved first and private, loopback, link-local, multicast, reserved and
-Docker addresses are refused, again after every redirect (at most 3). At most 2 MB and 15 s; only text-like types."""
+Docker addresses are refused, again after every redirect (at most 3). At most 2 MB and 15 s; only text-like types;
+the text is cut at 8 000 characters."""
 import html
 import ipaddress
 import re
@@ -13,7 +14,7 @@ import http.client
 MAX_BYTES = 2_000_000
 TIMEOUT = 15
 MAX_REDIRECTS = 3
-MAX_TEXT = 20_000
+MAX_TEXT = 8_000            # text kept per page (first live run: 20 000 made the Script step too costly)
 TYPES = ("text/html", "text/plain", "application/json", "application/xml", "text/xml", "application/xhtml+xml")
 UA = "FilmStudio-SourceCheck/1.0"
 

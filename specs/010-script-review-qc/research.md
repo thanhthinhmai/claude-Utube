@@ -39,7 +39,8 @@ Các mục **Kiểm khi implement** dựa trên hành vi chưa thử. Task đầ
 - **Mở trang**: `WebFetch` của Claude Code tải trang ngay trên máy chạy nó. Container không có internet, nên công cụ này không dùng được. Thay bằng `sh bin/studio web fetch <url>`:
   - local: tải thẳng;
   - online: CLI gọi `POST /internal/web/fetch` của proxy (proxy có mạng ra ngoài) bằng mã của việc.
-  - Trả về chữ đã bỏ thẻ HTML, tối đa 20 000 ký tự, kèm mã HTTP và URL cuối.
+  - Trả về chữ đã bỏ thẻ HTML, tối đa 8 000 ký tự (lúc đầu là 20 000; hạ xuống sau lần chạy thật đầu tiên, 2026-11-10), kèm mã HTTP và URL cuối.
+  - Biên tập mở tối đa 3 trang mỗi lượt chấm: `script review` đặt `STUDIO_FETCH_BUDGET_FILE` cho lượt chạy của biên tập, và `web fetch` trừ dần.
   - Mỗi lần mở được ghi vào `films/<name>/.check/opened.json`. Máy chấm dùng tệp này để kiểm "mọi đường dẫn trong `SOURCES.md` đã mở được" (FR-002).
 - **An toàn của `web fetch` ở proxy**:
   - chỉ `http` và `https`, cổng 80 và 443;

@@ -107,6 +107,7 @@ class Fetch(unittest.TestCase):
         self.assertEqual(r["status"], 200)
         self.assertIn("6.2 million motorbikes & more", r["text"])
         self.assertNotIn("evil", r["text"])
+        self.assertLessEqual(len(webfetch.text_of(b"word " * 5000, "text/plain")), 8000)
 
     def test_redirect_is_followed(self):
         self.allow_local()

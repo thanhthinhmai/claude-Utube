@@ -56,7 +56,7 @@ In `verdict`, điểm cuối và số vòng sửa. Mã 0 khi `pass` hoặc `skip
 
 ## `sh bin/studio web fetch <url> [--film <film>]`
 
-Mở một trang (R4) và in chữ của trang (tối đa 20 000 ký tự), dòng đầu là `status <mã> <url cuối>`. Có `--film` thì ghi vào `.check/opened.json`.
+Mở một trang (R4) và in chữ của trang (tối đa 8 000 ký tự; biên tập tối đa 3 trang mỗi lượt), dòng đầu là `status <mã> <url cuối>`. Có `--film` thì ghi vào `.check/opened.json`.
 
 - Local: tải thẳng, cùng giới hạn kích thước và loại nội dung.
 - Online: `POST {STUDIO_PROXY}/internal/web/fetch` với `Authorization: Bearer <mã của việc>`, thân `{"url"}`. Proxy trả `{"status", "final_url", "content_type", "text"}`, hoặc `400 blocked_address` / `413 too_large` / `415 unsupported_type` / `429 fetch_limit` / `504 timeout`.
