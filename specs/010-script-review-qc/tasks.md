@@ -207,7 +207,7 @@
   Sửa `specs/003-studio-ui/contracts/cli.md` cho các lệnh mới. Cập nhật bộ nhớ dự án: chạy 5 bộ test.
 - [X] T032 [P] Dựng lại ảnh `studio-job` và `studio-web` (`sh bin/studio online up` hoặc `docker build`). Kiểm trong container: `sh bin/studio script check` và `qc` chạy được trên phim mẫu (`node`, `ffmpeg`, `fc-list` có sẵn). Sửa `deploy/job.Dockerfile` nếu thiếu gói (ví dụ `fonttools` theo T001).
 - [ ] T033 Chạy 5 bộ test; sửa tới khi đạt.
-- [ ] T034 Chạy quickstart bằng tay (bước 1–3) với tài khoản thật: một phim local và một phim online (Docker), 45–60 giây có lời đọc và số liệu, có chọn duyệt treatment. Ghi kết quả vào task này: điểm từng lượt, số đo QC, tổng token của việc và phần token của bước kịch bản (SC-005 ≤ 15%), đạt / đạt một phần / thất bại (hiến pháp IV).
+- [X] T034 Chạy quickstart bằng tay (bước 1–3) với tài khoản thật: một phim local và một phim online (Docker), 45–60 giây có lời đọc và số liệu, có chọn duyệt treatment. Ghi kết quả vào task này: điểm từng lượt, số đo QC, tổng token của việc và phần token của bước kịch bản (SC-005 ≤ 15%), đạt / đạt một phần / thất bại (hiến pháp IV).
   - **Lần 1 (2026-11-10), online qua bộ xưởng Docker, gói Max, phong cách `whiteboard`, 50 giây, có duyệt treatment: đạt một phần.** Việc `j-20261110-100043-614c` dừng ở bước Script sau 5,9 phút (39 lần gọi, 1 133 480 token, toàn bộ qua `plan:1`), lượt được trả.
     - Chuỗi chạy thật trong container: tìm web 4 lượt qua proxy; `web fetch` mở 14 trang qua proxy; biên tập (`claude -p`, Opus) chấm 3 lượt qua proxy, token tính vào việc.
     - Máy chấm 9 lượt: đạt 10/10 ở các lượt cuối. Có lượt trượt `sources` và `length`, agent tự sửa.
@@ -224,7 +224,7 @@
     - `job.qa.script` và `job.qa.film` có đủ trường cho khối Quality của trang việc (US3).
     - **SC-005 đạt:** token từ lúc bắt đầu việc tới lúc biên tập duyệt kịch bản (gồm cả bước Treatment, nên là mức trên) là 488 925, tức 6,2% của cả việc.
     - Ghi chú: nhật ký việc chỉ giữ 50 dòng cuối, nên `live.py` không còn thấy dòng "Script" ở phim dài. Phần token ở trên được tính từ mốc giờ trong `checks.json`.
-  - Còn thiếu: phim local (bước 1 của quickstart).
+  - **Kết luận T034: đạt một phần.** Online đạt (lần 2). Phim local (bước 1) bỏ qua theo quyết định của người dùng (2026-11-10): chế độ local dùng cùng các lệnh `script` và `qc` đã có test, chỉ khác ở phần hướng dẫn trong `CLAUDE.md`.
 
 ---
 
