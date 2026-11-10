@@ -267,6 +267,7 @@ def quality(runner, work: Path, film: str) -> dict:
             qa["problems"].append("some on-screen text is not shown long enough to read: " + text.strip()[-400:])
     qa["problems"] += film_qc(runner, work, film, qa)
     qa["problems"] += script_gate(runner, work, film)
+    qa["script"] = script_summary(work, film)
     qa["pass"] = not qa["problems"]
     return qa
 
@@ -307,6 +308,20 @@ def script_failed(work: Path, film: str):
     last = (s.get("editor") or [{}])[-1]
     return (f"The script did not pass review after 2 fix rounds (last editor score {last.get('score', '–')}, "
             f"{last.get('p1', 0)} must-fix problems). Your credit was given back.")
+
+
+def script_summary(work: Path, film: str):
+    """What the job page shows of the script step (specs/010 FR-016, data-model Job.qa.script); None if no step ran."""
+    s = read_checks(work, film).get("script")
+    if not s or (s.get("verdict") == "pending" and not s.get("machine") and not s.get("editor")):
+        return None
+    last = (s.get("editor") or [{}])[-1]
+    return {"verdict": s.get("verdict"), "skip_reason": s.get("skip_reason"),
+            "machine_score": (s.get("machine") or [{}])[-1].get("score"), "editor_score": last.get("score"),
+            "fix_rounds": s.get("fix_rounds", 0), "p1": last.get("p1", 0), "p2": last.get("p2", 0), "p3": last.get("p3", 0),
+            "model": last.get("model"),
+            "rounds": [{"round": e.get("round"), "score": e.get("score"), "p1": e.get("p1", 0), "p2": e.get("p2", 0),
+                        "p3": e.get("p3", 0), "customer_round": bool(e.get("customer_round"))} for e in s.get("editor") or []]}
 
 
 def has_narration(d: Path) -> bool:

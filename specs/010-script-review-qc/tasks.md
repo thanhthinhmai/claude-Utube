@@ -186,13 +186,13 @@
 
 **Independent Test**: spec US3.
 
-- [ ] T028 [US3] Sửa `tools/runner/worker.py`: sau QC, chép tóm tắt `checks.json` vào `job.qa.script` (`{verdict, machine_score, editor_score, fix_rounds, p1, p2, p3, model}`) và `job.qa.film` (data-model "QC result"). Sửa `api_online.py` `view()` để trả các trường này cho người giao việc và admin.
-- [ ] T029 [US3] Sửa `tools/studio/studio/web/app.js` và `style.css` (giữ `@ts-check`, 0 lỗi):
+- [X] T028 [US3] Sửa `tools/runner/worker.py`: sau QC, chép tóm tắt `checks.json` vào `job.qa.script` (`{verdict, machine_score, editor_score, fix_rounds, p1, p2, p3, model}`) và `job.qa.film` (data-model "QC result"). Sửa `api_online.py` `view()` để trả các trường này cho người giao việc và admin.
+- [X] T029 [US3] Sửa `tools/studio/studio/web/app.js` và `style.css` (giữ `@ts-check`, 0 lỗi):
   - khối "Quality" của trang việc hiện điểm máy chấm và điểm biên tập từng lượt, số lỗi P1/P2/P3, số vòng sửa, model, và bảng số đo QC với ngưỡng và đạt/trượt;
   - Settings → General có ô chọn "Script editor model" (`inherit` hiện là "Same as jobs").
 
   Mọi chữ tiếng Anh.
-- [ ] T030 [US3] Viết `tests/online/test_quality_view.py` (API: `qa.script` và `qa.film` sau một việc giả có 1 vòng sửa) và mở rộng `tests/online/browser_admin.cjs` hoặc một tệp `browser_quality.cjs` mới (trang việc hiện điểm và `fix_rounds = 1`; Settings đổi được editor model).
+- [X] T030 [US3] Viết `tests/online/test_quality_view.py` (API: `qa.script` và `qa.film` sau một việc giả có 1 vòng sửa) và mở rộng `tests/online/browser_admin.cjs` hoặc một tệp `browser_quality.cjs` mới (trang việc hiện điểm và `fix_rounds = 1`; Settings đổi được editor model).
 
 **Checkpoint**: commit.
 
