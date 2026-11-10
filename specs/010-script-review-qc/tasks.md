@@ -208,6 +208,13 @@
 - [X] T032 [P] Dựng lại ảnh `studio-job` và `studio-web` (`sh bin/studio online up` hoặc `docker build`). Kiểm trong container: `sh bin/studio script check` và `qc` chạy được trên phim mẫu (`node`, `ffmpeg`, `fc-list` có sẵn). Sửa `deploy/job.Dockerfile` nếu thiếu gói (ví dụ `fonttools` theo T001).
 - [ ] T033 Chạy 5 bộ test; sửa tới khi đạt.
 - [ ] T034 Chạy quickstart bằng tay (bước 1–3) với tài khoản thật: một phim local và một phim online (Docker), 45–60 giây có lời đọc và số liệu, có chọn duyệt treatment. Ghi kết quả vào task này: điểm từng lượt, số đo QC, tổng token của việc và phần token của bước kịch bản (SC-005 ≤ 15%), đạt / đạt một phần / thất bại (hiến pháp IV).
+  - **Lần 1 (2026-11-10), online qua bộ xưởng Docker, gói Max, phong cách `whiteboard`, 50 giây, có duyệt treatment: đạt một phần.** Việc `j-20261110-100043-614c` dừng ở bước Script sau 5,9 phút (39 lần gọi, 1 133 480 token, toàn bộ qua `plan:1`), lượt được trả.
+    - Chuỗi chạy thật trong container: tìm web 4 lượt qua proxy; `web fetch` mở 14 trang qua proxy; biên tập (`claude -p`, Opus) chấm 3 lượt qua proxy, token tính vào việc.
+    - Máy chấm 9 lượt: đạt 10/10 ở các lượt cuối. Có lượt trượt `sources` và `length`, agent tự sửa.
+    - Biên tập: 6.0 (2 P1) → 6.5 (1 P1) → 7.5 (0 P1, 2 P2). Các lỗi P1 là lỗi thật: số liệu thiếu nguồn, chi tiết thật bị gắn nhãn `fiction`, kịch bản lệch treatment. Hết 2 vòng sửa mà chưa đạt 8, nên việc dừng theo FR-010 (dừng, trả lượt) và chưa thu giọng.
+    - SC-005 chưa đo được vì phim chưa làm xong. Bước Script tốn 650 997 token, tức 57% của 1,13 triệu token đã dùng. So với phim T046 của 008 (4,18 triệu token), phần này khoảng 13–14% của một phim trọn vẹn, sát trần 15%.
+    - US2 (`qc`) và US3 (trang việc) chưa thấy trên phim thật, vì việc dừng trước khi dựng phim.
+    - Local (bước 1 của quickstart): chưa chạy.
 
 ---
 
