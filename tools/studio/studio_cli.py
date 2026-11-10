@@ -196,9 +196,30 @@ def remote_job(a) -> int:
     return 0
 
 
+def with_script(summary: str, a) -> str:
+    """A treatment review shows the passed script and its scores too (specs/010 FR-019)."""
+    if a.kind != "treatment" or not getattr(a, "film", None):
+        return summary
+    d = Path(a.film) if os.sep in a.film else Path(os.environ.get("STUDIO_WORK") or Path.cwd()) / "films" / a.film
+    if not (d / "SCRIPT.md").is_file():
+        d = Path(os.environ.get("STUDIO_ROOT") or Path(__file__).resolve().parents[2]) / "films" / a.film
+    if not (d / "SCRIPT.md").is_file():
+        return summary
+    parts = [summary.rstrip(), "## Script", (d / "SCRIPT.md").read_text(encoding="utf-8").strip()]
+    try:
+        sc = json.loads((d / "checks.json").read_text(encoding="utf-8"))["script"]
+        m = sc["machine"][-1]["score"] if sc.get("machine") else "–"
+        e = sc["editor"][-1] if sc.get("editor") else {}
+        parts += ["## Scores", f"- Machine check: {m}/10", f"- Editor: {e.get('score', '–')}/10 "
+                  f"(P1 {e.get('p1', 0)}, P2 {e.get('p2', 0)}, P3 {e.get('p3', 0)}) · fix rounds: {sc.get('fix_rounds', 0)}"]
+    except (OSError, ValueError, KeyError, IndexError):
+        pass
+    return "\n\n".join(parts) + "\n"
+
+
 def remote_review(a) -> int:
     if a.action == "request":
-        summary = Path(a.summary).read_text(encoding="utf-8")
+        summary = with_script(Path(a.summary).read_text(encoding="utf-8"), a)
         r = proxy_call("POST", "/internal/reviews/request",
                        {"kind": a.kind, "set": a.set, "summary": summary, "final_round": a.final_round})
         Path(os.environ.get("STUDIO_WORK", ".")).joinpath(REVIEW_PENDING).write_text(r["id"])
@@ -234,7 +255,7 @@ def cmd_admin(a):
 # ---------- review ----------
 def cmd_review(a):
     if a.action == "request":
-        summary = Path(a.summary).read_text(encoding="utf-8")
+        summary = with_script(Path(a.summary).read_text(encoding="utf-8"), a)
         r = reviews.create(a.job, a.kind, a.set, summary, a.final_round)
         out(r["id"])
         u = ui_url(f"/#/reviews/{r['id']}")
@@ -289,6 +310,7 @@ def main(argv=None) -> int:
     rs = r.add_subparsers(dest="action", required=True)
     s = rs.add_parser("request"); s.add_argument("job"); s.add_argument("--kind", required=True, choices=sorted(reviews.KINDS))
     s.add_argument("--set", help="reference set (style-1, style-2)"); s.add_argument("--summary", required=True); s.add_argument("--final-round", action="store_true")
+    s.add_argument("--film", help="treatment review: add the film's SCRIPT.md and its scores (specs/010)")
     s = rs.add_parser("wait"); s.add_argument("id"); s.add_argument("--timeout", type=float, default=540)
     s = rs.add_parser("decide"); s.add_argument("id"); s.add_argument("--value", required=True)
     s.add_argument("--note"); s.add_argument("--source", default="chat", choices=sorted(reviews.SOURCES))

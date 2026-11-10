@@ -31,6 +31,7 @@ Speed: 150            # tuỳ chọn: từ/phút (en, vi) hoặc ký tự/giây 
 
 - Mỗi dòng: `- [Pnn] "<trích>": <tên nguồn>, <năm>, <đường dẫn>`.
 - Tài liệu do người giao phim đưa: thay đường dẫn bằng `provided:<tên tệp>`.
+- Chi tiết bịa trong truyện hư cấu (spec FR-004 "truyện hư cấu"): `- [Pnn] "<trích>": fiction`. Biên tập vẫn đọc dòng này và ghi P1 nếu đó là sự thật bị gắn nhãn sai.
 - Không có số liệu: một dòng duy nhất `no factual claims`.
 
 ## narration.json (agent viết, R5)

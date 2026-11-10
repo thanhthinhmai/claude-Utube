@@ -6,7 +6,7 @@ specs/008 contracts/runner.md).
   limit (429) or with a broken sign-in (401) hands the call to the next account. With none left: the fallback
   ANTHROPIC_API_KEY if set, else wait up to 15 s for one, else the job fails as the studio's fault.
   Every call is a row in `call`; tokens count against the job's token cap.
-- `/internal/…`: what `sh bin/studio job …` and `review …` call from inside a container.
+- `/internal/…`: what `sh bin/studio job …`, `review …` and `web fetch` call from inside a container.
 Logs carry token counts and cost only, never prompt text.
 
 Run: STUDIO_MODE=online STUDIO_DATA=/data python tools/runner/proxy.py   (listens on 0.0.0.0:8780)"""
@@ -28,6 +28,8 @@ from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "studio"))
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from filmcheck import webfetch  # noqa: E402
 from studio import claude_plan, db, jobs, quotas, reviews, store  # noqa: E402
 from studio.store import StudioError  # noqa: E402
 
@@ -37,6 +39,7 @@ DROP_HEADERS = ("host", "content-length", "connection", "authorization", "x-api-
                 "proxy-authorization", "transfer-encoding", "keep-alive", "upgrade", "te", "trailer")
 BACK_HEADERS = ("content-type", "retry-after", "request-id", "anthropic-ratelimit-requests-remaining",
                 "anthropic-ratelimit-tokens-remaining", "x-should-retry")
+FETCH_LIMIT = 60               # pages one job may open (specs/010 R4)
 WAIT_FOR_REST_S = 15            # specs/008 FR-110, like neb-creative-tool's WAIT_FOR_REST_MS
 
 
@@ -130,6 +133,17 @@ def _anthropic_error(status: int, kind: str, message: str, retry_after: int = No
 
 
 # ---------- usage ----------
+def _numbers(u) -> dict:
+    """Token counts of a usage block, plus the web search count (specs/010 R4: Claude Code's WebSearch is a call
+    with the server tool `web_search`, counted in server_tool_use)."""
+    u = u or {}
+    out = {k: v for k, v in u.items() if isinstance(v, (int, float))}
+    n = (u.get("server_tool_use") or {}).get("web_search_requests") if isinstance(u.get("server_tool_use"), dict) else None
+    if isinstance(n, (int, float)) and n:
+        out["web_search_requests"] = n
+    return out
+
+
 def usage_of_stream(chunks: list) -> tuple:
     """(model, usage) from the SSE events of a streamed answer: message_start, then message_delta totals."""
     model, usage, buf = None, {}, b"".join(chunks).decode("utf-8", "replace")
@@ -143,9 +157,9 @@ def usage_of_stream(chunks: list) -> tuple:
         if ev.get("type") == "message_start":
             m = ev.get("message") or {}
             model = m.get("model") or model
-            usage.update({k: v for k, v in (m.get("usage") or {}).items() if isinstance(v, (int, float))})
+            usage.update(_numbers(m.get("usage")))
         elif ev.get("type") == "message_delta":
-            usage.update({k: v for k, v in (ev.get("usage") or {}).items() if isinstance(v, (int, float))})
+            usage.update(_numbers(ev.get("usage")))
     return model, usage
 
 
@@ -186,6 +200,10 @@ class DoneIn(BaseModel):
 class FailIn(BaseModel):
     text: str = Field(max_length=2000)
     by: str = "studio"
+
+
+class FetchIn(BaseModel):
+    url: str = Field(max_length=2000)
 
 
 class ReviewIn(BaseModel):
@@ -244,7 +262,7 @@ def create_app() -> FastAPI:
             if metered:
                 try:
                     msg = json.loads(data)
-                    charge(job, via, msg.get("model"), msg.get("usage") or {})
+                    charge(job, via, msg.get("model"), _numbers(msg.get("usage")))
                 except (json.JSONDecodeError, AttributeError):
                     pass
             return Response(data, status_code=r.status_code, headers=back)
@@ -379,6 +397,29 @@ def create_app() -> FastAPI:
         with store.as_account(job["owner"]):        # style-2 reads the customer's set (proof/compare.json)
             r = reviews.create(job["id"], body.kind, body.set, body.summary, body.final_round)
         return {"id": r["id"]}
+
+    @app.post("/internal/web/fetch")
+    async def web_fetch(body: FetchIn, request: Request):
+        """Opens a page for a job container, which has no internet of its own (specs/010 R4). Logs the host only."""
+        job, _ = job_of(request)
+        seen = {}
+
+        def count(j):
+            seen["n"] = int(j.get("web_fetches") or 0)
+            if seen["n"] < FETCH_LIMIT:
+                j["web_fetches"] = seen["n"] + 1
+        jobs.update(job["id"], count)
+        if seen["n"] >= FETCH_LIMIT:
+            raise Denied(429, "fetch_limit", f"a job may open at most {FETCH_LIMIT} pages")
+        from urllib.parse import urlsplit
+        host = urlsplit(body.url).hostname or "?"
+        try:
+            r = await asyncio.to_thread(webfetch.fetch, body.url)
+        except webfetch.FetchError as e:
+            log.info("job %s web fetch %s: %s", job["id"], host, e.code)
+            return JSONResponse({"error": {"code": e.code, "message": e.message}}, status_code=e.http)
+        log.info("job %s web fetch %s: %s", job["id"], host, r["status"])
+        return r
 
     @app.get("/internal/reviews/{rid}")
     def review_status(rid: str, request: Request):

@@ -39,7 +39,7 @@ Bước và nhật ký bằng tiếng Anh, khớp phần còn lại của giao d
 | Kết thúc | `Done` · `Failed` · `Stopped` | `Failed`: nội dung lỗi Claude ghi bằng `job fail`, giữ nguyên |
 
 **Tên bước Claude ghi:**
-- Làm phim: `Treatment`, `Look`, `Storyboard`, `Voice`, `Music`, `Picture`, `Mix`, `Render`, `Self-check`.
+- Làm phim: `Treatment`, `Script`, `Look`, `Storyboard`, `Voice`, `Music`, `Picture`, `Mix`, `Render`, `Self-check`.
 - Học phong cách: `Fetch videos`, `Measure videos`, `Transcribe`, `Summarize`, `Report measurements`, `Analysis (3 agents)`, `Cross-check`, `Write style`, `Proof frame round <n>`, `Save style`.
 
 Xưởng không ép danh sách; đây là chỉ dẫn. Không đổi: tóm tắt duyệt (ngôn ngữ người dùng), thông báo terminal, dòng lệnh con in ra, việc cũ đã lưu.

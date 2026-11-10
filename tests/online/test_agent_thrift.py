@@ -15,7 +15,7 @@ class Thrift(unittest.TestCase):
     def test_film_jobs_follow_the_lean_guide(self):
         import agent
         guide = (REPO / "tools" / "runner" / "JOB.md").read_text()
-        for stage in ("Treatment", "Look", "Voice", "Music", "Picture", "Mix", "Render", "Self-check"):
+        for stage in ("Treatment", "Script", "Look", "Voice", "Music", "Picture", "Mix", "Render", "Self-check"):
             self.assertIn(f"`{stage}`", guide)
         self.assertIn("1280 px", guide)
         rules = agent.rules()

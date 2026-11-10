@@ -172,7 +172,7 @@ class EditorModel(unittest.TestCase):
 class FakeEditor(unittest.TestCase):
     def ask(self, film: Path):
         p = subprocess.run([sys.executable, str(FAKE), "-p", "--json-schema", '{"checked_sources": {}}', "--output-format", "json"],
-                           input=f"Review {film}/SCRIPT.md", capture_output=True, text=True, check=True)
+                           input=f"Review this script. Files:\n- {film}/SCRIPT.md\n", capture_output=True, text=True, check=True)
         return json.loads(p.stdout)["structured_output"]
 
     def test_p1_until_changed(self):

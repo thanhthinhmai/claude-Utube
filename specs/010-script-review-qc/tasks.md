@@ -67,34 +67,34 @@
 
 **Independent Test**: spec US1. Tự động thì dùng việc giả online với `fake_agent.py` và `fake_claude`; bằng tay thì làm theo quickstart bước 1.
 
-- [ ] T008 [US1] Viết phần đọc tệp trong `tools/filmcheck/script.py` theo contracts/files.md và data-model:
+- [X] T008 [US1] Viết phần đọc tệp trong `tools/filmcheck/script.py` theo contracts/files.md và data-model:
   - phần đầu: `Title` (bắt buộc, "≤ 100 ký tự"), `Target` ("số nguyên 5–900" giây, hậu tố `s`), `Language`, `Speed` (tuỳ chọn);
   - đoạn `[Pnn]` "tăng dần từ `P01`, không trùng; nội dung không rỗng"; dòng `>` bỏ qua;
   - `SOURCES.md`: mỗi dòng `- [Pnn] "<trích>": <tên>, <năm>, <đường dẫn>` (năm 4 chữ số; `para` có trong kịch bản; `quote` có trong đoạn đó, không phân biệt hoa thường), hoặc đúng một dòng `no factual claims`;
   - tách câu, đếm từ hay ký tự theo ngôn ngữ (research R2).
-- [ ] T009 [US1] Viết máy chấm trong `script.py` (`check(film_dir) -> result`):
+- [X] T009 [US1] Viết máy chấm trong `script.py` (`check(film_dir) -> result`):
   - điều kiện cứng `format`, `sources` (câu có con số cần nguồn: chữ số, hoặc số viết bằng chữ từ mười/ten trở lên theo spec FR-004; đường dẫn phải có trong `.check/opened.json` với mã 2xx, hoặc `provided:`), `length` (±15% `Target` theo tốc độ đọc);
   - bảng trừ điểm ở contracts/cli.md: `long_sentence`, `no_hook`, `intro_opening`, `retention_gap`, `cliche`, `risky_number`, `punctuation`, kèm vị trí `Pnn.câu`;
   - tạo `tools/filmcheck/cliches/en.txt` và `vi.txt` (khoảng 40 cụm mỗi tệp), cùng danh sách dấu hiệu hook và câu mở đầu cấm theo ngôn ngữ trong `script.py`.
-- [ ] T010 [US1] Viết so đoạn (research R9) trong `script.py`: có `.check/script-r<n>.md` thì so từng đoạn với bản mới nhất. Đoạn khác mà lượt biên tập trước không ghi P1/P2 cho nó là lỗi cứng `unchanged`; so sánh bỏ khoảng trắng cuối dòng.
-- [ ] T011 [US1] Viết `tests/filmcheck/test_script.py`:
+- [X] T010 [US1] Viết so đoạn (research R9) trong `script.py`: có `.check/script-r<n>.md` thì so từng đoạn với bản mới nhất. Đoạn khác mà lượt biên tập trước không ghi P1/P2 cho nó là lỗi cứng `unchanged`; so sánh bỏ khoảng trắng cuối dòng.
+- [X] T011 [US1] Viết `tests/filmcheck/test_script.py`:
   - mỗi kịch bản mẫu lỗi trượt đúng luật của nó và đúng vị trí; kịch bản tốt đạt ≥ 7;
   - edge case phim < 30 giây (cửa sổ hook 20%, không đòi điểm giữ chân);
   - tiếng Trung đếm ký tự (40);
   - `no factual claims`;
   - so đoạn (SC-004);
   - SC-002: kịch bản 300 giây chấm xong < 5 giây và không mở tiến trình con nào (`subprocess` bị chặn trong test).
-- [ ] T012 [US1] Viết `tools/filmcheck/editor.py` (research R3, contracts/cli.md):
+- [X] T012 [US1] Viết `tools/filmcheck/editor.py` (research R3, contracts/cli.md):
   - chạy `claude_bin()` (dùng lại `studio.claude_plan.claude_bin` nếu import được, không thì `STUDIO_CLAUDE_BIN` hoặc `claude` trên PATH) với `-p`, lời nhắc cố định, `--json-schema` biên tập, `--output-format json`, `--no-session-persistence`, `--tools "Read,Grep,WebSearch,Bash"` (giới hạn danh sách) cùng `--allowedTools "Read Grep WebSearch Bash(sh bin/studio web fetch:*)"` (cho phép chạy; kết quả T001), và `--model` theo T006; đặt `XDG_CACHE_HOME=/tmp`;
   - lời nhắc chỉ đưa đường dẫn `SCRIPT.md`, `SOURCES.md`, `TREATMENT.md` và yêu cầu của phim (`/work/.input.json` online, `films/<name>/BRIEF.md` local nếu có);
   - lời nhắc yêu cầu: mở lại nguồn của các con số chính bằng `web fetch` và ghi P1 cho số không khớp (FR-007a); tìm web tối đa 3 lượt (mỗi lượt khoảng 14 000 token, T001); lỗi gắn số đoạn có thật; điểm ≥ 8 chỉ khi không còn P1;
   - sai lược đồ thì chạy lại một lần; vẫn sai thì tính là một lượt không đạt (thoát 1, hoặc 3 ở lượt cuối; contracts/cli.md).
-- [ ] T013 [US1] Viết `script check|review|status|skip` trong `tools/filmcheck/cli.py` đúng mã thoát ở contracts/cli.md:
+- [X] T013 [US1] Viết `script check|review|status|skip` trong `tools/filmcheck/cli.py` đúng mã thoát ở contracts/cli.md:
   - `review` từ chối khi `check` chưa đạt; lưu `.check/script-r<n>.md` và `review-r<n>.json`; tính vòng: lượt 1 cộng tối đa 2 vòng sửa; hết thì `verdict = failed`, mã 3;
   - `skip` chỉ khi không có `voices/` và `narration.json`;
   - mọi lệnh ghi `checks.json` và `CHECKS.md` qua `report.py`;
   - in lỗi dạng `P02.1 long_sentence 31 words`.
-- [ ] T014 [US1] Viết `web fetch` trong `cli.py`:
+- [X] T014 [US1] Viết `web fetch` trong `cli.py`:
   - local thì gọi `webfetch.fetch`;
   - online (`STUDIO_MODE=online` và `STUDIO_JOB`) thì `POST {STUDIO_PROXY}/internal/web/fetch` với mã của việc (cùng cách `studio_cli.proxy_call`);
   - `--film` ghi `.check/opened.json`.
@@ -104,13 +104,14 @@
   - gọi `webfetch.fetch` trong luồng phụ;
   - đếm tối đa 60 trang mỗi việc (`429 fetch_limit`);
   - nhật ký chỉ ghi tên miền và mã.
-- [ ] T015 [US1] Sửa `tools/runner/proxy.py`: đọc `usage.server_tool_use.web_search_requests`, cộng vào hàng Call và vào chi phí khi `via = api` (10 USD cho 1000 lượt, thêm vào `price_table`).
-- [ ] T016 [US1] Sửa `tools/runner/agent.py`:
+- [X] T015 [US1] Sửa `tools/runner/proxy.py`: đọc `usage.server_tool_use.web_search_requests`, cộng vào hàng Call và vào chi phí khi `via = api` (10 USD cho 1000 lượt, thêm vào `price_table`).
+  - Đã làm: số lượt cộng vào `job.web_searches` (không thêm cột cho bảng Call, nên không đổi lược đồ); chi phí qua `quotas.WEB_SEARCH_USD` = 0,01 USD mỗi lượt khi `via = api`.
+- [X] T016 [US1] Sửa `tools/runner/agent.py`:
   - bỏ `WebSearch` khỏi `disallowed_tools` và thêm vào `allowed_tools` (giữ cấm `WebFetch`);
   - `rules()` nói: mở trang bằng `sh bin/studio web fetch <url> --film <name>`.
 
   Sửa `tools/runner/worker.py`: truyền `STUDIO_EDITOR_MODEL` (từ cài đặt; `inherit` thì không truyền) vào container và vào `LocalRunner`.
-- [ ] T017 [US1] Sửa `tools/runner/JOB.md` và mục "Luồng làm phim" của `CLAUDE.md`:
+- [X] T017 [US1] Sửa `tools/runner/JOB.md` và mục "Luồng làm phim" của `CLAUDE.md`:
   - local: sau bước Brief, ghi `films/<name>/BRIEF.md` theo contracts/files.md;
   - thêm bước `Script` sau `Treatment`: viết `SCRIPT.md` và `SOURCES.md` theo contracts/files.md (tìm bằng WebSearch, tối đa 5 lượt theo T001; mở bằng `web fetch --film`);
   - `script check` tới khi đạt, rồi `script review`; mã 1 thì chỉ sửa đúng các đoạn bị ghi; mã 3 thì dừng (online: `job fail --by studio` với điểm cuối; local: báo người dùng);
@@ -118,15 +119,15 @@
   - lời đọc của `lines.json` lấy đúng từ kịch bản đã đạt.
 
   Thêm `Script` vào danh sách tên bước (JOB.md, CLAUDE.md mục 4, `specs/003-studio-ui/contracts/skill-integration.md`) và vào nơi giao diện liệt kê bước nếu có.
-- [ ] T018 [US1] Sửa `tools/runner/worker.py`, phần nhận kết quả của agent:
+- [X] T018 [US1] Sửa `tools/runner/worker.py`, phần nhận kết quả của agent:
   - `checks.json.script.verdict == "failed"` thì `self.failed(job, "The script did not pass review after 2 rounds: …", "studio")` (trả lượt);
   - phim có lời đọc (`narration.json` hoặc `words.json` trong thư mục phim) mà verdict khác `pass` thì đó là một lỗi trong `qa.problems`;
   - worker chạy lại `script check` trong container trước khi chấp nhận.
-- [ ] T019 [US1] FR-019:
+- [X] T019 [US1] FR-019:
   - `review request --kind treatment --film <name>` (trong `tools/studio/studio_cli.py`, cả `remote_review`) gắn nội dung `SCRIPT.md` và bảng điểm vào sau phần tóm tắt khi có kịch bản;
   - `JOB.md` và lời nhắc của `agent.py` khi `review_treatment`: gửi duyệt sau khi kịch bản đạt;
   - việc tiếp tục sau khi người giao phim yêu cầu sửa (`resume_answered`): lời nhắc nói phải qua lại `script check` và `script review`, và vòng này không tính vào giới hạn (`cli.py` nhận `--customer-round`).
-- [ ] T020 [US1] Mở rộng `tests/online/fake_agent.py` cho bước Script (thẻ `[narration]`: viết `SCRIPT.md`, `SOURCES.md`, chạy `script check` và `script review` thật với `fake_claude`, sửa đoạn bị ghi, rồi làm phim giả có `narration.json`). Viết `tests/online/test_script_step.py`:
+- [X] T020 [US1] Mở rộng `tests/online/fake_agent.py` cho bước Script (thẻ `[narration]`: viết `SCRIPT.md`, `SOURCES.md`, chạy `script check` và `script review` thật với `fake_claude`, sửa đoạn bị ghi, rồi làm phim giả có `narration.json`). Viết `tests/online/test_script_step.py`:
   - việc đạt sau 1 vòng sửa: `checks.json` có 2 lượt biên tập, `fix_rounds = 1`, mốc của lượt đạt trước file giọng giả (SC-001);
   - `[editor-low]`: việc lỗi do xưởng, lượt được trả, không có `voices/`;
   - `[editor-bad-json]` hai lần: tính một lượt không đạt (mã 1);

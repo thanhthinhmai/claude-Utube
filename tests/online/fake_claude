@@ -39,7 +39,7 @@ def editor(prompt):
     [editor-pass] (default) score 9; [editor-p1 Pnn] a P1 on Pnn until that paragraph changes; [editor-low] score 6
     every round; [editor-bad-json] an answer without a score."""
     import re
-    m = re.search(r"(\S+/SCRIPT\.md)", prompt)
+    m = re.search(r"^- (.+/SCRIPT\.md)$", prompt, re.M)      # paths may have spaces
     script = open(m.group(1), encoding="utf-8").read() if m else ""
     out = {"score": 9, "issues": [], "checked_sources": []}
     p1 = re.search(r"\[editor-p1 (P\d+)\]", script)
@@ -58,6 +58,20 @@ def editor(prompt):
         if first[para] == text:
             out = {"score": 8, "issues": [{"level": "P1", "para": para, "reason": "this number does not match its source"}],
                    "checked_sources": [{"url": "https://example.org/hanoi-motorbikes", "matches": False}]}
+    if m:                         # the arguments it got, next to the script (online tests read them there)
+        os.makedirs(os.path.join(os.path.dirname(m.group(1)), ".check"), exist_ok=True)
+        json.dump(sys.argv[1:], open(os.path.join(os.path.dirname(m.group(1)), ".check", "editor-args.json"), "w"))
+    base, tok = os.environ.get("ANTHROPIC_BASE_URL"), os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
+    if base and tok:              # like the real editor: its calls go through the studio's proxy (specs/010 FR-016)
+        import urllib.request
+        body = json.dumps({"model": "claude-opus-5-5", "max_tokens": 16, "messages": [{"role": "user", "content": "review"}]})
+        req = urllib.request.Request(base.rstrip("/") + "/v1/messages", data=body.encode(), method="POST",
+                                     headers={"authorization": "Bearer " + tok, "content-type": "application/json",
+                                              "anthropic-version": "2023-06-01", "anthropic-beta": "oauth-2025-04-20"})
+        try:
+            urllib.request.urlopen(req, timeout=30).read()
+        except Exception as e:    # noqa: BLE001
+            print(f"fake editor: proxy call failed: {e}", file=sys.stderr)
     print(json.dumps({"type": "result", "is_error": False, "structured_output": out,
                       "usage": {"input_tokens": 1200, "output_tokens": 300}}))
     return 0

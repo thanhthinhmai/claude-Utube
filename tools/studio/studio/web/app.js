@@ -308,7 +308,7 @@ const decidedHtml = (d, kind = "") => (kind === "question"
   ${d.note ? `<br>Note: ${esc(d.note)}` : ""}</p>`);
 
 // The stages a film job reports (CLAUDE.md: job step); Storyboard only when the job asked for one
-const STAGES = ["Treatment", "Look", "Storyboard", "Voice", "Music", "Picture", "Mix", "Render", "Self-check"];
+const STAGES = ["Treatment", "Script", "Look", "Storyboard", "Voice", "Music", "Picture", "Mix", "Render", "Self-check"];
 const OPEN_STATUS = ["queued", "running", "waiting_review", "waiting_resume"];
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -318,7 +318,7 @@ const ago = (iso) => {
 function filmInProgress(j) {
   const seen = new Set(j.log.map((x) => x.line));
   const now = STAGES.indexOf(j.step);
-  const stages = STAGES.filter((st) => st !== "Storyboard" || seen.has(st));
+  const stages = STAGES.filter((st) => (st !== "Storyboard" && st !== "Script") || seen.has(st));
   const track = stages.map((st) => {
     const i = STAGES.indexOf(st);
     const cls = i === now ? "now" : seen.has(st) || (now >= 0 && i < now) ? "done" : "next";   // agents may change the order

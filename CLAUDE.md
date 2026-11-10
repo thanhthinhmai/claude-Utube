@@ -18,10 +18,16 @@ Mỗi yêu cầu đi đúng **một** luồng:
    - Thư mục phim = `films/<tên>/` của dự án (chữ thường, số, gạch nối). Nội dung `films/` không vào git.
    - Phong cách riêng: đọc danh mục `my-styles/README.md` và lưu vào `my-styles/<slug>/`, **thay cho** `~/lemo-my-styles/`.
    - Cài gói của thư viện bằng `sh bin/studio deps [voice] [music]`, **không** chạy thẳng `setup.sh` của thư viện (nó sẽ tải một bản thư viện khác vào `~/lemo-opuscar`).
-3. Không sửa file nào trong `lib/` (hiến pháp VI). Muốn dùng phiên bản thư viện mới thì đổi `library.lock` theo quy trình spec-kit.
-4. **Ghi việc lên giao diện** (`specs/003-studio-ui/contracts/skill-integration.md`):
+3. **Kịch bản được chấm** (specs/010, phim có lời đọc), xen vào quy trình của thư viện:
+   - Sau bước Brief: ghi `films/<tên>/BRIEF.md` (tóm tắt yêu cầu, tối đa 2000 ký tự).
+   - Sau `TREATMENT.md`, trước giọng đọc: viết `SCRIPT.md` và `SOURCES.md` theo `specs/010-script-review-qc/contracts/files.md`. Tìm số liệu bằng WebSearch (tối đa 5 lượt); mở mọi đường dẫn được dẫn bằng `sh bin/studio web fetch <url> --film <tên>`.
+   - `sh bin/studio script check <tên>` tới khi đạt, rồi `sh bin/studio script review <tên>`. Mã 1: chỉ sửa các đoạn bị ghi P1 hoặc P2, rồi chạy lại. Mã 3 (hết 2 vòng sửa): dừng, báo người dùng điểm cuối và các lỗi còn lại.
+   - Phim không có lời đọc: `sh bin/studio script skip <tên> --reason "no narration"`.
+   - Lời của `lines.json` lấy đúng từ kịch bản đã đạt; xong giọng thì ghi `narration.json`.
+4. Không sửa file nào trong `lib/` (hiến pháp VI). Muốn dùng phiên bản thư viện mới thì đổi `library.lock` theo quy trình spec-kit.
+5. **Ghi việc lên giao diện** (`specs/003-studio-ui/contracts/skill-integration.md`):
    - Khi đã có tên phim: `sh bin/studio job start --kind film --name <tên> --film <tên>`; lưu dòng đầu (mã việc) vào `films/<tên>/.job`; in dòng `URL: …` cho người dùng ("Theo dõi trên giao diện: <URL>").
-   - Đầu mỗi giai đoạn: `sh bin/studio job step <mã> "<giai đoạn>"`, ghi đúng một trong các tên tiếng Anh: `Treatment`, `Look`, `Storyboard`, `Voice`, `Music`, `Picture`, `Mix`, `Render`, `Self-check`.
+   - Đầu mỗi giai đoạn: `sh bin/studio job step <mã> "<giai đoạn>"`, ghi đúng một trong các tên tiếng Anh: `Treatment`, `Script`, `Look`, `Storyboard`, `Voice`, `Music`, `Picture`, `Mix`, `Render`, `Self-check`.
    - Lệnh dài (render, mux, tạo giọng): bọc bằng `sh bin/studio job run <mã> --step "<giai đoạn>" -- <lệnh…>` (cùng danh sách tên trên).
    - Xong: `sh bin/studio job done <mã> --film <tên>`; lỗi không tự sửa được: `sh bin/studio job fail <mã> "<lỗi>"`.
    - Storyboard (nếu người dùng yêu cầu) vẫn duyệt trong khung chat.
