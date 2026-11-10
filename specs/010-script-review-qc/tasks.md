@@ -247,3 +247,12 @@ Phase 6: T031, T032 cùng lúc.
 1. **MVP = Phase 1–3** (US1): kịch bản được chấm và chặn trước khi thu giọng. Dừng, chạy 5 bộ test, commit, cho người dùng xem.
 2. Thêm US2 (QC), rồi US3 (theo dõi). Mỗi story một commit.
 3. Polish và bài chạy thật T034 trước khi tạo PR.
+
+---
+
+## Phase 7: Convergence
+
+- [ ] T035 Kiểm bằng máy rằng lời đọc khớp kịch bản đã đạt per US1/AC6 (partial): thêm `lines_file` (đường tới `lines.json` của thư viện) vào `narration.json` (contracts/files.md, JOB.md, CLAUDE.md); `qc` so chữ của các dòng `lines.json` theo thứ tự với lời đọc của `SCRIPT.md` (bỏ hoa thường, dấu câu và khoảng trắng thừa; dùng trường `asr` không được tính), lệch thì là một lỗi QC kèm đoạn `Pnn` đầu tiên bị lệch; test trong `tests/filmcheck/test_qc.py` và cập nhật `fake_agent.py` cho phim `[narration]`.
+- [ ] T036 Phim sửa sau khi xong (007 "Request changes") có lời đọc phải qua được cổng kịch bản per spec Edge Cases "Phim sửa sau khi xong" (partial): `revise_prompt` trong `tools/runner/agent.py` và `JOB.md` dặn chép cả `SCRIPT.md`, `SOURCES.md`, `checks.json` và `.check/` sang thư mục phim mới; ghi chú của khách đổi lời đọc thì chạy `script check --customer-round` và `script review --customer-round`, không đổi thì để nguyên; test trong `tests/online/test_script_step.py` bằng một phim `[narration]` rồi "Request changes".
+- [ ] T037 Kiểm chéo tổng thời lượng các dòng với `dur.json` (lệch quá 0,5 giây là lỗi "narration.json does not match the voice files") per plan: research R5 (partial): hiện `qc.load_narration` chỉ kiểm từng dòng; thêm phép so tổng và test trong `tests/filmcheck/test_qc.py`.
+- [ ] T038 Bước `Script` hiện trong thanh bước của trang việc ngay từ đầu cho phim online (như các bước khác), chỉ ẩn khi kịch bản đã `skipped` per FR-017 (partial): sửa bộ lọc `STAGES` trong `tools/studio/studio/web/app.js` (đọc `j.qa.script.verdict`), giữ `@ts-check` 0 lỗi.
