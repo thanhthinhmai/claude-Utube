@@ -82,7 +82,7 @@ def write_script(film_dir: Path, script: str, sources: str, opened=OPENED) -> Pa
 
 
 # ---------- films ----------
-WORD, GAP = 0.36, 0.04      # one spoken word and the gap after it (silence ratio about 0.17 for the good film)
+WORD, GAP = 0.39, 0.01      # one spoken word and the gap after it (silence ratio about 0.15 for the good film)
 
 
 def _line(lid, para, at, n, word=WORD, gap=GAP):
@@ -135,8 +135,8 @@ def make_film(root: Path, name: str, *, word=WORD, gap=GAP, pause_in_p01=0.0, ex
 
 
 def _render(mp4: Path, cuts, duration, still_shot):
-    """One moving test pattern per shot, each with its own hue, so scene cuts are clear; `still_shot` (an index)
-    is a flat colour that never moves."""
+    """One moving test picture per shot, different for neighbouring shots, so scene cuts are clear; `still_shot`
+    (an index) is a flat colour that never moves."""
     bounds = list(cuts) + [duration]
     inputs, chains = [], []
     for i in range(len(bounds) - 1):
@@ -144,9 +144,11 @@ def _render(mp4: Path, cuts, duration, still_shot):
         if i == still_shot:
             inputs += ["-f", "lavfi", "-i", f"color=c=0x3366aa:s=320x180:r=24:d={length}"]
             chains.append(f"[{i}:v]format=yuv420p,setsar=1[v{i}]")
-        else:
-            inputs += ["-f", "lavfi", "-i", f"testsrc2=s=320x180:r=24:d={length}"]
-            chains.append(f"[{i}:v]hue=h={(i * 120) % 360},format=yuv420p,setsar=1[v{i}]")
+        else:                           # three clearly different moving pictures, so scene detection finds each cut
+            src, post = [("testsrc2=s=320x180:r=24", ""), ("mandelbrot=s=320x180:r=24", ""),
+                         ("testsrc2=s=320x180:r=24", "negate,")][i % 3]
+            inputs += ["-f", "lavfi", "-t", str(length), "-i", src]
+            chains.append(f"[{i}:v]{post}format=yuv420p,setsar=1[v{i}]")
     n = len(bounds) - 1
     inputs += ["-f", "lavfi", "-i", f"sine=frequency=330:sample_rate=48000:duration={duration}"]
     graph = ";".join(chains) + ";" + "".join(f"[v{i}]" for i in range(n)) + f"concat=n={n}:v=1:a=0[v]"

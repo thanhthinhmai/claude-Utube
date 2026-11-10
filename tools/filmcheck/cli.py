@@ -243,6 +243,33 @@ def cmd_fetch(a) -> int:
     return 0
 
 
+# ---------- qc ----------
+def cmd_qc(a) -> int:
+    from filmcheck import qc
+    d = film_dir(a.film)
+    lib = os.environ.get("STUDIO_LIB") or str(HERE.parents[1] / "lib" / "lemo-opuscar")
+    try:
+        r = qc.measure(d, lib)
+    except qc.QcError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+
+    def save(x):
+        x["film"] = {"pass": r["pass"], "measures": r["measures"], "problems": r["problems"], "at": now()}
+        if x.get("narration") is None:
+            x["narration"] = r["narration"]
+    report.update(d, save)
+    m = r["measures"]
+    lines = [f"  ✗ {p}" for p in r["problems"]]
+    if r["narration"]:
+        lines.append(f"  silence {m['silence_ratio']:.0%} · tail {m['tail_s']:.1f} s · {len(m.get('cuts', []))} cuts")
+    if not m["texts_checked"]:
+        lines.append("  on-screen text not checked (the film has no window.TEXTS); subtitles checked")
+    lines.append(f"{'✓' if r['pass'] else '✗'} qc: " + ("all checks pass" if r["pass"] else f"{len(r['problems'])} problem(s)"))
+    out(a, r, lines)
+    return 0 if r["pass"] else 1
+
+
 # ---------- config ----------
 def cmd_editor_model(a) -> int:
     editor.set_editor_model(a.value)
@@ -286,7 +313,8 @@ def parser() -> argparse.ArgumentParser:
 
 
 COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("script", "status"): cmd_status,
-            ("script", "skip"): cmd_skip, ("web", "fetch"): cmd_fetch, ("config", "editor-model"): cmd_editor_model}
+            ("script", "skip"): cmd_skip, ("web", "fetch"): cmd_fetch, ("config", "editor-model"): cmd_editor_model,
+            ("qc", "qc"): cmd_qc}
 
 
 def main(argv=None) -> int:

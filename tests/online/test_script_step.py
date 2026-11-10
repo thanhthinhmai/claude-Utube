@@ -87,6 +87,24 @@ class ScriptStep(unittest.TestCase):
         self.assertEqual(s["fix_rounds"], 0)
         self.assertTrue(s["editor"][-1]["customer_round"])
 
+    def test_qc_problem_gets_one_fix_round(self):               # FR-013
+        from studio import jobs
+        _, j = self.run_job("A fox [qc-bad]")
+        self.assertEqual(j["status"], "done", j["log"][-6:])
+        self.assertTrue(any("stands still" in ln["line"] for ln in j["log"]))
+        self.assertEqual(j["qa_retries"], 1)
+        self.assertTrue(j["qa"]["film"]["pass"])
+        _, j = self.run_job("A fox [qc-bad-always]")
+        self.assertEqual((j["status"], j["failure_kind"]), ("failed", "studio"))
+        self.assertIn("stands still", j["error"])
+
+    def test_narration_film_is_measured(self):
+        _, j = self.run_job("A fox [narration]")
+        self.assertEqual(j["status"], "done", j["log"][-6:])
+        m = j["qa"]["film"]["measures"]
+        self.assertLessEqual(m["silence_ratio"], 0.2)
+        self.assertLessEqual(m["tail_s"], 1.5)
+
     def test_film_without_narration_needs_no_script(self):
         _, j = self.run_job("A fox with no words")
         self.assertEqual(j["status"], "done", j["log"][-6:])

@@ -146,34 +146,35 @@
 
 **Independent Test**: spec US2, bằng phim mẫu tạo bằng ffmpeg.
 
-- [ ] T021 [US2] Viết phần lời đọc của `tools/filmcheck/qc.py` (research R5):
+- [X] T021 [US2] Viết phần lời đọc của `tools/filmcheck/qc.py` (research R5):
   - đọc `narration.json`, `words.json`, `dur.json`; mốc tuyệt đối = `at` + mốc từ;
   - kiểm chéo: tổng thời lượng khớp `dur.json` ±0,5 giây, từ cuối trước hết phim;
   - đo `silence_ratio` (≤ 0,20), `long_pause` (≥ 0,8 giây chỉ giữa hai đoạn khác nhau), `tail` (≤ 1,5 giây);
   - câu: hết dòng là hết câu, tách thêm theo `.?!` trong chữ Whisper.
-- [ ] T022 [US2] Viết phần hình của `qc.py`:
+- [X] T022 [US2] Viết phần hình của `qc.py`:
   - mốc cảnh từ `cuts`, không có thì `ffmpeg … -vf "scdet=threshold=10"`;
   - `cut_in_sentence` (không cắt trong câu; cắt ≥ min(0,4 giây, khoảng nghỉ) sau từ cuối của câu trước);
   - `key_shot` (cảnh có từ cuối của mỗi đoạn ≥ 2,5 giây);
   - `still` bằng `freezedetect=n=0.003:d=<still_max>`, với `still_max` = 6 hoặc giá trị trong `tools/filmcheck/styles.json` (tạo `{}`) hay `my-styles/<slug>/qc.json`. Slug đọc từ `TREATMENT.md` dòng `Style:` hoặc từ `.input.json`.
-- [ ] T023 [US2] Viết `tools/filmcheck/texts.mjs` (mở phim bằng `$LIB/core/render/page.mjs`, gom chữ của `window.TEXTS(t)` mỗi 0,25 giây, in JSON; không có `TEXTS` thì in `{"texts": null}`) và phần phông trong `qc.py`:
+- [X] T023 [US2] Viết `tools/filmcheck/texts.mjs` (mở phim bằng `$LIB/core/render/page.mjs`, gom chữ của `window.TEXTS(t)` mỗi 0,25 giây, in JSON; không có `TEXTS` thì in `{"texts": null}`) và phần phông trong `qc.py`:
   - ký tự của TEXTS và `<name>.srt`;
   - tập ký tự của phông trong thư mục phim bằng `fc-scan --format '%{charset}'`;
   - ký tự chưa có thì hỏi `fc-list ':charset=<hex>' file` (gộp một lần cho mọi ký tự, có cache);
   - bỏ qua khoảng trắng và ký tự điều khiển; ghi `missing_glyphs` và `texts_checked`.
-- [ ] T024 [US2] Viết `qc` trong `cli.py`: chạy các phần trên, ghi `film` vào `checks.json` và `CHECKS.md`, in từng lỗi kèm mốc giây, mã 0/1/2. Phim không lời chỉ đo `still` và `missing_glyph`.
-- [ ] T025 [US2] Viết `tests/filmcheck/test_qc.py` (SC-003, SC-006):
+- [X] T024 [US2] Viết `qc` trong `cli.py`: chạy các phần trên, ghi `film` vào `checks.json` và `CHECKS.md`, in từng lỗi kèm mốc giây, mã 0/1/2. Phim không lời chỉ đo `still` và `missing_glyph`.
+- [X] T025 [US2] Viết `tests/filmcheck/test_qc.py` (SC-003, SC-006):
   - một phim mẫu đạt (0 lỗi);
   - các phim mẫu lỗi, mỗi phim trượt đúng một mục với mốc đúng ±0,1 giây: lặng 30%, lặng 1,2 giây giữa đoạn, cắt giữa câu, cảnh chốt 1,5 giây, đuôi 3 giây, đứng im 8 giây;
   - ký tự thiếu phông: một `.srt` có ký tự riêng (U+E000), chỉ chạy khi có `fc-list`;
   - `narration.json` lệch `dur.json` thì mã 2;
   - `qc` cho phim 60 giây xong < 60 giây.
-- [ ] T026 [US2] Sửa `tools/runner/worker.py` `quality()`: chạy `sh bin/studio qc <film> --json` trong container qua `runner.exec`; mã 1 thì thêm các lỗi vào `qa.problems` (vòng sửa và trả lượt như 007); mã 2 thì ghi `qa.film = "not_checked"` và một lỗi "the film could not be measured: …".
+- [X] T026 [US2] Sửa `tools/runner/worker.py` `quality()`: chạy `sh bin/studio qc <film> --json` trong container qua `runner.exec`; mã 1 thì thêm các lỗi vào `qa.problems` (vòng sửa và trả lượt như 007); mã 2 thì ghi `qa.film = "not_checked"` và một lỗi "the film could not be measured: …".
 
   Sửa `JOB.md` và `CLAUDE.md`: ghi `narration.json` khi dựng lời (từ `timeline.json` và `words.json`); chạy `qc` ở bước `Self-check` trước `job done`.
-- [ ] T027 [US2] Sửa `tests/online/fake_agent.py` (thẻ `[qc-bad]`: phim có đuôi 3 giây ở lần đầu, sửa ở lần resume) và thêm vào `tests/online/test_script_step.py`:
+- [X] T027 [US2] Sửa `tests/online/fake_agent.py` (thẻ `[qc-bad]`: phim có đuôi 3 giây ở lần đầu, sửa ở lần resume) và thêm vào `tests/online/test_script_step.py`:
   - lần đầu trượt `tail`, resume với số đo, lần hai đạt;
   - `[qc-bad-always]`: việc lỗi do xưởng, lượt được trả.
+  - Đã làm: `[qc-bad]` giao phim đứng im 9 giây (thay cho đuôi 3 giây), vì phim mẫu online không có lời đọc; mục đuôi phim đã có test riêng ở `tests/filmcheck/test_qc.py`.
 
 **Checkpoint**: commit.
 

@@ -24,6 +24,7 @@ Mỗi yêu cầu đi đúng **một** luồng:
    - `sh bin/studio script check <tên>` tới khi đạt, rồi `sh bin/studio script review <tên>`. Mã 1: chỉ sửa các đoạn bị ghi P1 hoặc P2, rồi chạy lại. Mã 3 (hết 2 vòng sửa): dừng, báo người dùng điểm cuối và các lỗi còn lại.
    - Phim không có lời đọc: `sh bin/studio script skip <tên> --reason "no narration"`.
    - Lời của `lines.json` lấy đúng từ kịch bản đã đạt; xong giọng thì ghi `narration.json`.
+   - Ở bước Self-check: `sh bin/studio qc <tên>` (nhịp lời, cắt cảnh, hình đứng im quá 6 giây, ký tự thiếu phông). Sửa một vòng theo lỗi nó báo; còn lỗi thì báo người dùng một dòng khi giao.
 4. Không sửa file nào trong `lib/` (hiến pháp VI). Muốn dùng phiên bản thư viện mới thì đổi `library.lock` theo quy trình spec-kit.
 5. **Ghi việc lên giao diện** (`specs/003-studio-ui/contracts/skill-integration.md`):
    - Khi đã có tên phim: `sh bin/studio job start --kind film --name <tên> --film <tên>`; lưu dòng đầu (mã việc) vào `films/<tên>/.job`; in dòng `URL: …` cho người dùng ("Theo dõi trên giao diện: <URL>").

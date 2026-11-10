@@ -265,9 +265,26 @@ def quality(runner, work: Path, film: str) -> dict:
         qa["readcheck"] = {0: "pass", 1: "fail"}.get(rc, "not_checked")
         if rc == 1:
             qa["problems"].append("some on-screen text is not shown long enough to read: " + text.strip()[-400:])
+    qa["problems"] += film_qc(runner, work, film, qa)
     qa["problems"] += script_gate(runner, work, film)
     qa["pass"] = not qa["problems"]
     return qa
+
+
+def film_qc(runner, work: Path, film: str, qa: dict) -> list:
+    """`studio qc`: narration rhythm, cuts, stills and missing glyphs (specs/010 FR-011–FR-013)."""
+    rc, text = runner.exec(work, lambda root, lib: ["sh", studio_bin(runner), "qc", f"{root}/films/{film}", "--json"])
+    got = next((ln for ln in text.splitlines() if ln.startswith("{")), None)
+    if rc in (0, 1) and got:
+        try:
+            r = json.loads(got)
+        except ValueError:
+            r = None
+        if r is not None:
+            qa["film"] = {"pass": r["pass"], "measures": r["measures"]}
+            return list(r["problems"])
+    qa["film"] = "not_checked"
+    return ["the film could not be measured: " + text.strip()[-300:]]
 
 
 def studio_bin(runner) -> str:

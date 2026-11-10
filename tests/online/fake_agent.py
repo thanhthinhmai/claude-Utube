@@ -3,6 +3,7 @@
 [fail] / [fail-customer] job fail --by studio|customer · [loud] deliver a film at about −4 LUFS
 [spend N] call the API N times through the proxy · [529] keep calling an API that is overloaded
 [slow S] wait S seconds before finishing · [noreport] exit without job done · [crash] exit 3
+[qc-bad] a 9 s still film first, fixed after the quality check · [qc-bad-always]
 [narration] the Script step of specs/010 (SCRIPT.md, script check, script review, fixing flagged paragraphs; exit 3
 of the review fails the job), then voice files and narration.json; editor tags such as [editor-p1 P02] go into
 SCRIPT.md as a note
@@ -100,11 +101,12 @@ def script_step(idea: str, film: str) -> bool:
 def voice_files(film: str) -> None:
     d = WORK / "films" / film
     (d / "voices").mkdir(parents=True, exist_ok=True)
-    words = {f"l0{i}": [["word", 0.0, 0.3], ["end.", 0.35, 0.7]] for i in (1, 2, 3)}
+    words = {f"l0{i}": [["word", 0.0, 0.3], ["end.", 0.32, 0.6]] for i in (1, 2, 3)}     # fits the 3 s sample film
     (d / "voices" / "words.json").write_text(json.dumps(words))
-    (d / "voices" / "dur.json").write_text(json.dumps({k: 0.7 for k in words}))
+    (d / "voices" / "dur.json").write_text(json.dumps({k: 0.6 for k in words}))
     (d / "narration.json").write_text(json.dumps({"words_file": "voices/words.json", "durations_file": "voices/dur.json",
-                                                  "lines": [{"id": f"l0{i}", "para": f"P0{i}", "at": i * 1.0} for i in (1, 2, 3)]}))
+                                                  "lines": [{"id": f"l0{i}", "para": f"P0{i}", "at": round(0.2 + (i - 1) * 0.65, 2)}
+                                                            for i in (1, 2, 3)]}))
 
 
 def result(status: str, error: str = None):
@@ -265,7 +267,12 @@ def main() -> int:
             return 0
         sample = old
         (d / "NOTE.txt").write_text(inp.get("note", ""))
-    (d / f"{film}.mp4").write_bytes(sample.read_bytes())
+    still = "[qc-bad-always]" in idea or ("[qc-bad]" in idea and not (resumed and "quality check" in msg))
+    if still:                              # 9 s of a still picture: the studio's qc finds it (specs/010 T027)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-stream_loop", "2", "-i", str(sample), "-c", "copy",
+                        str(d / f"{film}.mp4")], check=True)
+    else:
+        (d / f"{film}.mp4").write_bytes(sample.read_bytes())
     if "[noreport]" in idea:
         result("ended")
         return 0

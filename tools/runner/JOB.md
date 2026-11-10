@@ -74,6 +74,7 @@ for changes, change the script as asked, then `script check --customer-round` an
 ## Finishing
 
 - Self-check against DIRECTOR.md §11 with one contact sheet and the loudness check, then
-  `job done <id> --film <name>`. The studio checks loudness (−14 ± 1 LUFS, true peak ≤ −1 dB), reading time and
-  the script's review again before delivery.
+  `sh STUDIO/bin/studio qc <name>` (narration rhythm, cuts, stills over 6 s, characters with no font): fix what it
+  reports and run it again. Then `job done <id> --film <name>`. The studio checks loudness (−14 ± 1 LUFS, true peak ≤ −1 dB), reading time, `qc` and
+  the script's review again before delivery; a failure there gives you one round to fix it.
 - If the film cannot be made, `job fail` as your instructions say.
