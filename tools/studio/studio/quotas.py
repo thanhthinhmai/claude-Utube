@@ -118,6 +118,10 @@ def reserve(account, kind: str, name: str, links: dict, job_input: dict) -> dict
             e.extra = {"resets_at": next_reset_vn().isoformat(timespec="seconds")}
             raise e
         store.doc_insert(con, "job", j["id"], j)
+        from . import tokens
+        idem = tokens.current_idem.get()
+        if idem:                                   # same transaction: racing requests with one key make one job
+            tokens.remember(con, idem[0], idem[1], idem[2], j["id"])
     return j
 
 

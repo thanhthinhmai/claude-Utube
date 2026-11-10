@@ -73,12 +73,33 @@ tar -C "$D" -czf "$B/claude.tgz" claude && chmod 600 "$B/claude.tgz"     # tuỳ
 
 Không cần sao lưu `jobs/`, `uploads/` và `tmp/`. Đó là dữ liệu tạm, xưởng tự xoá.
 
+## 6. Mã API và MCP (cho script và tác tử AI)
+
+Mỗi người tự tạo mã API của mình ở **Your account → API tokens → New token**. Mã thay người đó gọi API của xưởng, ví dụ cho Claude Code hoặc một script.
+
+- **Mã chỉ hiện một lần**, lúc tạo. Xưởng chỉ giữ bản băm và 8 ký tự đầu để nhận ra mã.
+- Mặc định mã là Member, **không dùng lượt** (chỉ xem), 60 yêu cầu/phút, hết hạn sau 90 ngày. Muốn tác tử giao phim hay học phong cách thì tick "Can use my film and learn credits". Chỉ Owner tạo được mã Owner.
+- Không mã nào dùng được các đường quản lý mã, người dùng, tài khoản Claude, hay đổi và xoá tài khoản (`403 token_forbidden`). Những việc đó chỉ làm trên trình duyệt.
+- Gửi mã bằng header `Authorization: Bearer <mã>`. Tài liệu API: `https://<tên miền>/api/v1/docs`.
+
+**Nối Claude Code qua MCP.** Khung **For agents** có sẵn lệnh để chép:
+
+```sh
+claude mcp add --transport http film-studio https://<tên miền>/api/mcp --header "Authorization: Bearer <mã>"
+```
+
+Sau đó nhờ Claude Code bằng lời thường, ví dụ "Make a 20-second film in the … style about …, then give me the download link". Claude Code dùng các công cụ `list_styles`, `make_film`, `get_job`, `film_download_url`… Tải video lên và tải phim về đi bằng link dùng một lần (30 phút), nên mã không phải nằm trong lệnh `curl`.
+
+**Mã bị lộ:** thu hồi ngay ở Your account (hoặc Owner thu hồi ở **Settings → API tokens**). Mã bị từ chối từ yêu cầu kế tiếp. Xem **Log** của mã để biết nó đã gọi những gì (giữ 30 ngày, không giữ nội dung yêu cầu).
+
+**Worker:** Owner xem worker có đang chạy không, hàng đợi và các việc gần nhất ở **Settings → Worker**. Bật, tắt worker vẫn làm ở terminal (`sh bin/studio online up|down`).
+
 ## Cách xưởng giữ an toàn
 
 | Phần | Làm gì |
 |---|---|
-| `caddy` | HTTPS, HSTS, CSP; chuyển mọi yêu cầu tới `web` |
-| `web` | giao diện và API; mỗi thành viên chỉ thấy dữ liệu của mình. Đăng nhập tài khoản Claude (chạy Claude Code) và kiểm nội dung ý tưởng qua gói, không lưu phiên |
+| `caddy` | HTTPS, HSTS, CSP; chuyển mọi yêu cầu tới `web`; không ghi nhật ký truy cập, nên không ghi mã API |
+| `web` | giao diện và API; mỗi thành viên chỉ thấy dữ liệu của mình. Đăng nhập tài khoản Claude (chạy Claude Code) và kiểm nội dung ý tưởng qua gói, không lưu phiên. Nhận mã API (chỉ giữ bản băm, có giới hạn mỗi phút và nhật ký) và máy chủ MCP `/api/mcp` |
 | `worker` | chạy việc trong container `studio-job`, mỗi việc một container. Worker gọi Docker qua `docker-proxy`; bộ lọc này chỉ cho tạo, chạy, xem, dừng, xoá container và đọc nhật ký. Worker không giữ `docker.sock` thật, và chỉ chạy ảnh `studio-job:*` |
 | `proxy` | nơi duy nhất container việc gọi được. Proxy thay mã riêng của việc bằng mã của tài khoản Claude dùng ít nhất (hoặc khoá API dự phòng), tự làm mới mã qua Claude Code, đổi tài khoản khi chạm hạn mức, ghi từng lần gọi, và dừng việc khi vượt trần token. Đăng nhập Claude (`/data/claude`) chỉ nằm ở `web` và `proxy`, không bao giờ vào container việc |
 | `egress` | chỉ việc học từ YouTube đi qua đây, và chỉ tới các tên miền của YouTube |

@@ -13,9 +13,11 @@ LIMITS = {
 }
 
 
-def hit(kind: str, key: str) -> None:
-    """Count one hit; raise 429 rate_limited (with retry_after) when the window is full."""
-    limit, window = LIMITS[kind]
+def hit(kind: str, key: str, limit: int = None, window: float = None) -> None:
+    """Count one hit; raise 429 rate_limited (with retry_after) when the window is full.
+    `limit` and `window` override LIMITS[kind] (an API token's own rate per minute, specs/009)."""
+    d_limit, d_window = LIMITS.get(kind, (60, 60))
+    limit, window = limit or d_limit, window or d_window
     k, now = f"{kind}:{(key or '').lower()}", store.clock()
     with db.tx() as con:
         con.execute("DELETE FROM ratelimit WHERE key = ? AND at <= ?", (k, now - window))

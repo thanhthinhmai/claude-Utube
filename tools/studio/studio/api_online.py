@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import List, Literal, Optional
 
 from fastapi import APIRouter, File, Query, Request, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from . import accounts, claude_plan, db, jobs, moderation, quotas, ratelimit, resources, reviews, store
+from . import accounts, claude_plan, db, jobs, tokens, moderation, quotas, ratelimit, resources, reviews, store
 from .store import StudioError
 
 router = APIRouter(prefix="/api/v1")
@@ -205,7 +205,37 @@ def style_exists(slug: str) -> bool:
 
 @router.post("/jobs", status_code=201)
 def post_job(body: JobIn, request: Request):
+    """Make a film, a revision or a learn job. With an API token, only when it may use credits (FR-212);
+    an Idempotency-Key makes a repeat return the first job instead of a second one (FR-221)."""
+    import sqlite3
     a = me(request)
+    token = getattr(request.state, "token", None)
+    if token is not None and not token["can_spend"]:
+        request.state.token_outcome = "no_spend"
+        raise StudioError("spend_not_allowed", "mã API này không được dùng lượt phim", 403)
+    key = request.headers.get("idempotency-key")
+    if not key:
+        return make_job(body, a)
+    body_hash = tokens.request_hash(body.model_dump())
+
+    def replay(job_id):
+        if token is not None:
+            request.state.token_outcome = "replay"
+        return JSONResponse(view(jobs.load(job_id, a["id"]), a), status_code=200,
+                            headers={"Idempotent-Replayed": "true"})
+    done = tokens.replayed(a["id"], key, body_hash)
+    if done:
+        return replay(done)
+    mark = tokens.current_idem.set((a["id"], key, body_hash))
+    try:
+        return make_job(body, a)
+    except sqlite3.IntegrityError:                 # another request with this key made the job a moment ago
+        return replay(tokens.replayed(a["id"], key, body_hash))
+    finally:
+        tokens.current_idem.reset(mark)
+
+
+def make_job(body: JobIn, a) -> dict:
     if not a["email_verified_at"]:
         raise StudioError("unverified", "hãy xác minh email trước khi giao việc", 403)
     if body.kind == "learn":
@@ -385,29 +415,28 @@ def post_learn(body: JobIn, a) -> dict:
     return view(j, a)
 
 
-@router.post("/uploads", status_code=201)
-def post_upload(request: Request, file: UploadFile = File(...)):
-    """One reference video. It is never served back (FR-018); only a learn job of the same customer uses it."""
-    a = me(request)
-    s = quotas.settings()
-    ext = Path(file.filename or "").suffix.lower()
+def upload_ext(filename: str) -> str:
+    ext = Path(filename or "").suffix.lower()
     if ext not in VIDEO_EXT:
         raise StudioError("bad_video", "chỉ nhận tệp video (mp4, mov, mkv, webm, m4v, avi)", 422)
-    d = upload_dir(a["id"])
+    return ext
+
+
+def new_upload(account_id: str, ext: str):
+    d = upload_dir(account_id)
     d.mkdir(parents=True, exist_ok=True)
     uid = f"u-{secrets.token_hex(8)}"
-    dest, limit, size = d / f"{uid}{ext}", s["upload_max_mb"] * 1024 * 1024, 0
-    with open(dest, "wb") as out:
-        while True:
-            chunk = file.file.read(1024 * 1024)
-            if not chunk:
-                break
-            size += len(chunk)
-            if size > limit:
-                out.close()
-                dest.unlink(missing_ok=True)
-                raise StudioError("too_large", f"tệp tối đa {s['upload_max_mb']} MB", 413)
-            out.write(chunk)
+    return uid, d / f"{uid}{ext}"
+
+
+def too_large(dest: Path, s) -> StudioError:
+    dest.unlink(missing_ok=True)
+    return StudioError("too_large", f"tệp tối đa {s['upload_max_mb']} MB", 413)
+
+
+def finish_upload(account_id: str, uid: str, dest: Path, size: int) -> dict:
+    """Check the saved file is a video within the limits, then record it (FR-018: never served back)."""
+    s = quotas.settings()
     try:
         p = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=codec_type", "-of", "json",
                             str(dest)], capture_output=True, text=True, timeout=60)
@@ -422,9 +451,90 @@ def post_upload(request: Request, file: UploadFile = File(...)):
     if seconds > s["upload_max_minutes"] * 60:
         dest.unlink(missing_ok=True)
         raise StudioError("too_long", f"mỗi video dài tối đa {s['upload_max_minutes']} phút", 422)
-    store.write_json(d / f"{uid}.json", {"id": uid, "file": dest.name, "seconds": round(seconds, 2), "bytes": size,
-                                         "created_at": store.now_iso(), "job": None})
+    store.write_json(upload_dir(account_id) / f"{uid}.json", {"id": uid, "file": dest.name, "seconds": round(seconds, 2),
+                                                              "bytes": size, "created_at": store.now_iso(), "job": None})
     return {"upload_id": uid, "seconds": round(seconds, 2)}
+
+
+@router.post("/uploads", status_code=201)
+def post_upload(request: Request, file: UploadFile = File(...)):
+    """One reference video. It is never served back (FR-018); only a learn job of the same customer uses it."""
+    a = me(request)
+    s = quotas.settings()
+    uid, dest = new_upload(a["id"], upload_ext(file.filename))
+    limit, size = s["upload_max_mb"] * 1024 * 1024, 0
+    with open(dest, "wb") as out:
+        while True:
+            chunk = file.file.read(1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > limit:
+                out.close()
+                raise too_large(dest, s)
+            out.write(chunk)
+    return finish_upload(a["id"], uid, dest, size)
+
+
+# ---------- one-time links to upload and download (specs/009 FR-220, research R6) ----------
+class UploadTicketIn(BaseModel):
+    filename: str = Field(min_length=1, max_length=200)
+    size_bytes: int = Field(ge=1)
+
+
+def studio_url(request: Request) -> str:
+    return (os.environ.get("STUDIO_URL") or str(request.base_url)).rstrip("/")
+
+
+@router.post("/uploads/tickets", status_code=201)
+def upload_ticket(body: UploadTicketIn, request: Request):
+    """A link that takes one video with PUT, for 30 minutes: an agent uploads without the token in its shell."""
+    a = me(request)
+    s = quotas.settings()
+    upload_ext(body.filename)
+    if body.size_bytes > s["upload_max_mb"] * 1024 * 1024:
+        raise StudioError("too_large", f"tệp tối đa {s['upload_max_mb']} MB", 413)
+    secret, expires = tokens.make_ticket("upload", a["id"], Path(body.filename).name, body.size_bytes,
+                                         getattr(request.state, "token", None))
+    url = f"{studio_url(request)}/api/v1/uploads/t/{secret}"
+    return {"upload_url": url, "expires_at": expires, "curl": f'curl -T "{Path(body.filename).name}" "{url}"'}
+
+
+@router.put("/uploads/t/{secret}", status_code=201)
+async def upload_by_ticket(secret: str, request: Request):
+    """The file itself (raw body). The link is the key: no cookie, no token (a public path)."""
+    t = tokens.use_ticket("upload", secret)
+    s = quotas.settings()
+    uid, dest = new_upload(t["account_id"], upload_ext(t["filename"]))
+    limit = min(s["upload_max_mb"] * 1024 * 1024, (t["size"] or 0) + 1024 * 1024)   # declared size, some slack
+    size = 0
+    with open(dest, "wb") as out:
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > limit:
+                out.close()
+                raise too_large(dest, s)
+            out.write(chunk)
+    import starlette.concurrency
+    return await starlette.concurrency.run_in_threadpool(finish_upload, t["account_id"], uid, dest, size)
+
+
+@router.post("/films/{name}/tickets", status_code=201)
+def download_ticket(name: str, request: Request):
+    """A link to download one finished film once, for 30 minutes."""
+    a = me(request)
+    resources.film_file(name, "video")                         # 404 unless it is a finished film of this person
+    secret, expires = tokens.make_ticket("download", a["id"], name, None, getattr(request.state, "token", None))
+    url = f"{studio_url(request)}/api/v1/films/t/{secret}"
+    return {"download_url": url, "expires_at": expires, "curl": f'curl -o "{name}.mp4" "{url}"'}
+
+
+@router.get("/films/t/{secret}")
+def download_by_ticket(secret: str):
+    t = tokens.use_ticket("download", secret)
+    with store.as_account(t["account_id"]):
+        path = resources.film_file(t["filename"], "video")
+    return FileResponse(path, media_type="video/mp4", filename=f"{t['filename']}.mp4")
 
 
 @router.delete("/styles/{slug}", status_code=204)
@@ -454,8 +564,11 @@ class AccountIn(BaseModel):
 
 
 def admin(request: Request):
+    """The Owner making this request; with an API token, its role is already capped (specs/009 FR-214)."""
     a = me(request)
     if a["role"] != "admin":
+        if getattr(request.state, "token", None):
+            request.state.token_outcome = "forbidden"
         raise StudioError("forbidden", "chỉ quản trị viên mới dùng được", 403)
     return a
 
@@ -706,3 +819,88 @@ def remove_user(account_id: str, request: Request):
     a = admin(request)
     accounts.remove_user(account_id, a["id"])
     return Response(status_code=204)
+
+
+# ---------- Settings → Worker (specs/009 FR-201-FR-206, contracts/api-tokens-worker.md) ----------
+WORKER_ALIVE_S, WORKER_HIDE_S, LATEST = 30, 600, 20
+
+
+@router.get("/admin/worker")
+def worker_status(request: Request):
+    """Each worker process from its heartbeat, the four counts, and the 20 latest jobs of everyone."""
+    admin(request)
+    with db.read() as con:
+        workers = []
+        for r in con.execute("SELECT * FROM worker_beat ORDER BY started_at"):
+            ago = store.age_seconds(r["beat_at"])
+            if ago > WORKER_HIDE_S:
+                continue
+            workers.append({"id": r["id"], "state": "running" if ago <= WORKER_ALIVE_S else "not_responding",
+                            "busy_with": json.loads(r["busy"] or "[]"), "beat_ago_s": int(ago),
+                            "started_at": r["started_at"]})
+        waiting_claude = claude_plan.waiting_jobs()
+        n = dict(con.execute("SELECT status, count(*) FROM docs WHERE kind = 'job' GROUP BY status").fetchall())
+        rows = con.execute("SELECT d.data, a.email FROM docs d LEFT JOIN accounts a ON a.id = d.owner "
+                           "WHERE d.kind = 'job' ORDER BY d.updated_ns DESC LIMIT ?", (LATEST,)).fetchall()
+    latest = []
+    for data, email in rows:
+        j = json.loads(data)
+        err_text = j.get("error")
+        latest.append({"id": j["id"], "status": jobs.shown_status(j), "kind": j["kind"], "name": j["name"],
+                       "email": email, "step": j.get("step"), "updated_at": j.get("updated_at"),
+                       "error": err_text[:300] if err_text else None})
+    return {"workers": workers, "latest": latest,
+            "counts": {"queued": max(0, n.get("queued", 0) - waiting_claude), "running": n.get("running", 0),
+                       "waiting_review": n.get("waiting_review", 0), "waiting_claude": waiting_claude}}
+
+
+# ---------- API tokens of one's own (specs/009 FR-208-FR-218, contracts/api-tokens-worker.md) ----------
+class TokenIn(BaseModel):
+    name: str = Field(max_length=60)
+    role: Literal["customer", "admin"] = "customer"
+    can_spend: bool = False
+    rate_per_min: Literal[10, 30, 60, 120, 300] = 60
+    expires: Literal["7d", "30d", "90d", "1y", "never"] = "90d"
+
+
+@router.get("/me/tokens")
+def my_tokens(request: Request):
+    return {"tokens": tokens.list_tokens(me(request)["id"])}
+
+
+@router.post("/me/tokens", status_code=201)
+def make_token(body: TokenIn, request: Request):
+    """The secret is in this answer only (FR-210)."""
+    t, secret = tokens.create(me(request), body.name, body.role, body.can_spend, body.rate_per_min, body.expires)
+    return {"token": t, "secret": secret}
+
+
+@router.delete("/me/tokens/{token_id}", status_code=204)
+def revoke_my_token(token_id: str, request: Request):
+    tokens.revoke(token_id, me(request)["id"])
+    return Response(status_code=204)
+
+
+@router.get("/me/tokens/{token_id}/log")
+def my_token_log(token_id: str, request: Request, limit: int = Query(200, ge=1, le=500)):
+    return {"requests": tokens.log(token_id, me(request)["id"], limit)}
+
+
+# ---------- every token, for the Owner (specs/009 FR-208, FR-216) ----------
+@router.get("/admin/tokens")
+def all_tokens(request: Request):
+    admin(request)
+    return {"tokens": tokens.list_tokens()}
+
+
+@router.delete("/admin/tokens/{token_id}", status_code=204)
+def revoke_any_token(token_id: str, request: Request):
+    admin(request)
+    tokens.revoke(token_id)
+    return Response(status_code=204)
+
+
+@router.get("/admin/tokens/{token_id}/log")
+def any_token_log(token_id: str, request: Request, limit: int = Query(200, ge=1, le=500)):
+    admin(request)
+    return {"requests": tokens.log(token_id, None, limit)}
