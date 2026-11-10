@@ -78,7 +78,7 @@ Speed: 150            # tuỳ chọn: từ/phút (en, vi) hoặc ký tự/giây 
     "pass": true,
     "measures": {
       "silence_ratio": 0.14, "long_pauses_bad": [], "cuts_bad": [], "key_shots_bad": [],
-      "tail_s": 0.9, "stills_bad": [], "missing_glyphs": [], "texts_checked": true
+      "tail_s": 0.9, "stills_bad": [], "missing_glyphs": [], "texts_checked": true, "voice_matches_script": true
     },
     "problems": []
   }

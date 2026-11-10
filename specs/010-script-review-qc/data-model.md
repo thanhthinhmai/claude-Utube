@@ -51,6 +51,7 @@ pass ──(người giao phim yêu cầu sửa, FR-019)──► pending
 | stills_bad | danh sách `{from, to}` |
 | missing_glyphs | danh sách `{char, codepoint, text}` |
 | texts_checked | false khi phim không có `window.TEXTS` |
+| voice_matches_script | true khi các dòng của `lines_file` nói đúng lời của `SCRIPT.md`; false khi khác; null khi phim không có `SCRIPT.md` (T035) |
 | problems | các câu lỗi đưa vào `qa.problems` của 007 |
 
 ## Job (online, sửa 007)

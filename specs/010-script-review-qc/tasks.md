@@ -257,3 +257,7 @@ Phase 6: T031, T032 cùng lúc.
 - [X] T037 Kiểm chéo tổng thời lượng các dòng với `dur.json` (lệch quá 0,5 giây là lỗi "narration.json does not match the voice files") per plan: research R5 (partial): hiện `qc.load_narration` chỉ kiểm từng dòng; thêm phép so tổng và test trong `tests/filmcheck/test_qc.py`.
   - Đã làm khác đi: so **từng dòng** theo cả hai chiều (±0,5 giây), không so tổng. Phim thật cho thấy Whisper đặt từ cuối sớm khoảng 0,1 giây mỗi dòng, nên tổng lệch 1,25 giây cho 12 dòng và so tổng sẽ báo lỗi oan. Đã ghi vào research R5.
 - [X] T038 Bước `Script` hiện trong thanh bước của trang việc ngay từ đầu cho phim online (như các bước khác), chỉ ẩn khi kịch bản đã `skipped` per FR-017 (partial): sửa bộ lọc `STAGES` trong `tools/studio/studio/web/app.js` (đọc `j.qa.script.verdict`), giữ `@ts-check` 0 lỗi.
+
+## Phase 8: Convergence
+
+- [X] T039 Ghi trường `voice_matches_script` (true/false; null khi phim không có `SCRIPT.md`) vào data-model "QC result" và ví dụ `checks.json` ở contracts/files.md per US1/AC6 (partial: T035 thêm trường nhưng tài liệu chưa có)
