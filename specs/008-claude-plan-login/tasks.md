@@ -296,4 +296,5 @@ Các thay đổi nhỏ làm thẳng theo CLAUDE.md (≤ 2 tệp, không đổi d
 - [X] T048 Khi `status()` phát hiện đăng nhập không còn hiệu lực, dùng `mark_needs_signin` để gửi đúng 1 thư cho chủ xưởng per FR-109 (partial)
 - [X] T049 Đổi nhãn "At its limit" trên trang AI accounts thành "Limit reached" per FR-102, FR-108 (contradicts)
 - [ ] T050 Bấm giờ một lần đăng nhập tài khoản Claude thật từ lúc bấm Sign in, ghi vào T035 per SC-101 (partial)
+  - **2026-11-10: bỏ qua theo quyết định của người dùng.** Đăng nhập tài khoản Claude thật đã chạy được cả ở bản chạy trên máy và bộ xưởng Docker (gói Max), chỉ chưa bấm giờ cho SC-101.
 - [X] T051 Bỏ mẫu thư `invite` và câu lỗi `daily_cap` không còn dùng per US3, FR-116 (unrequested)
