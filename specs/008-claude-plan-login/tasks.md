@@ -290,7 +290,8 @@ Các thay đổi nhỏ làm thẳng theo CLAUDE.md (≤ 2 tệp, không đổi d
 
 ## Phase 11: Convergence
 
-- [ ] T046 Chạy một phim thật qua bộ xưởng Docker (`sh bin/studio online up`, container `studio-job`, mạng `jobnet`, bộ chuyển tiếp trong compose) và ghi kết quả vào T035 per SC-102, plan: một việc một container (partial)
+- [X] T046 Chạy một phim thật qua bộ xưởng Docker (`sh bin/studio online up`, container `studio-job`, mạng `jobnet`, bộ chuyển tiếp trong compose) và ghi kết quả vào T035 per SC-102, plan: một việc một container (partial)
+  - **Kết quả 2026-11-10: đạt.** `sh bin/studio online up` (Docker Desktop 4.67.0, WSL), 6 container. Phim 30 giây `scifi-toon` (cùng kịch bản đo A/B), giao qua `POST /api/v1/jobs` bằng mã API Owner có quyền dùng lượt và `Idempotency-Key` (009). Worker chạy việc trong một container `studio-job` riêng, container tự xoá khi xong. 12:59:32 → 13:16:19 (**16 phút 47 giây**), **4,18 triệu token**, 50 lần gọi `claude-opus-5-5`, tất cả qua `plan:1` (gói Max), 0 USD qua khoá API. Đủ 9 bước, tự kiểm đạt. Phim 1920×1080, 32 giây, có tiếng, 11 MB; tải về bằng link dùng một lần được 1 lần, lần 2 → 404.
 - [X] T047 Trang AI accounts hiện số việc đang chờ tài khoản Claude ("N jobs are waiting for a Claude account") per FR-110 (partial)
 - [X] T048 Khi `status()` phát hiện đăng nhập không còn hiệu lực, dùng `mark_needs_signin` để gửi đúng 1 thư cho chủ xưởng per FR-109 (partial)
 - [X] T049 Đổi nhãn "At its limit" trên trang AI accounts thành "Limit reached" per FR-102, FR-108 (contradicts)
