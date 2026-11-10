@@ -205,7 +205,7 @@
   - test: `sh tests/filmcheck/run.sh`.
 
   Sửa `specs/003-studio-ui/contracts/cli.md` cho các lệnh mới. Cập nhật bộ nhớ dự án: chạy 5 bộ test.
-- [ ] T032 [P] Dựng lại ảnh `studio-job` và `studio-web` (`sh bin/studio online up` hoặc `docker build`). Kiểm trong container: `sh bin/studio script check` và `qc` chạy được trên phim mẫu (`node`, `ffmpeg`, `fc-list` có sẵn). Sửa `deploy/job.Dockerfile` nếu thiếu gói (ví dụ `fonttools` theo T001).
+- [X] T032 [P] Dựng lại ảnh `studio-job` và `studio-web` (`sh bin/studio online up` hoặc `docker build`). Kiểm trong container: `sh bin/studio script check` và `qc` chạy được trên phim mẫu (`node`, `ffmpeg`, `fc-list` có sẵn). Sửa `deploy/job.Dockerfile` nếu thiếu gói (ví dụ `fonttools` theo T001).
 - [ ] T033 Chạy 5 bộ test; sửa tới khi đạt.
 - [ ] T034 Chạy quickstart bằng tay (bước 1–3) với tài khoản thật: một phim local và một phim online (Docker), 45–60 giây có lời đọc và số liệu, có chọn duyệt treatment. Ghi kết quả vào task này: điểm từng lượt, số đo QC, tổng token của việc và phần token của bước kịch bản (SC-005 ≤ 15%), đạt / đạt một phần / thất bại (hiến pháp IV).
 

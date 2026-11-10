@@ -92,9 +92,8 @@ class Measures(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("fc-list"), "needs fontconfig")
     def test_missing_glyph(self):
-        if subprocess.run(["fc-list", ":charset=e000", "file"], capture_output=True, text=True).stdout.strip():
-            self.skipTest("a font on this machine has U+E000")
-        srt = "1\n00:00:01,000 --> 00:00:02,000\nHello \n"
+        # U+E000 (private use) counts as missing even where GNU Unifont "covers" it with a code box
+        srt = "1\n00:00:01,000 --> 00:00:02,000\nHello \ue000 Xin chào\n"
         r = qc.measure(samples.make_film(self.root, "glyph", srt=srt))
         self.assertEqual([g["codepoint"] for g in r["measures"]["missing_glyphs"]], ["U+E000"])
         self.assertEqual(len(r["problems"]), 1)

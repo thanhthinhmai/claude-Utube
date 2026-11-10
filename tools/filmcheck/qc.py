@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import subprocess
+import unicodedata
 from pathlib import Path
 
 SILENCE_MAX, LONG_PAUSE, CUT_AFTER, KEY_SHOT, TAIL_MAX, STILL_MAX = 0.20, 0.8, 0.4, 2.5, 1.5, 6.0
@@ -238,6 +239,11 @@ def missing_glyphs(d: Path, texts: list) -> tuple:
     missing = []
     for ch, t in chars.items():
         if ord(ch) in have:
+            continue
+        if unicodedata.category(ch) in ("Cn", "Co", "Cs") or ch == "\ufffd":
+            # unassigned, private use, broken text: no system font draws these as text (GNU Unifont, which the job
+            # image has, "covers" them with a box showing the code), so only a font shipped with the film counts
+            missing.append({"char": ch, "codepoint": f"U+{ord(ch):04X}", "text": t[:40]})
             continue
         p = subprocess.run(["fc-list", f":charset={ord(ch):x}", "file"], capture_output=True, text=True, env=font_env())
         if not p.stdout.strip():
