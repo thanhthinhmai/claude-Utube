@@ -68,9 +68,8 @@ def compose(*args, check=True):
 
 
 def make_account(email, role):
-    """The owner (as `online admin` does) and a member (as Settings → Users does)."""
-    make = (f"accounts.signup({email!r}, {PASSWORD!r}, True, role='admin', verified=True)" if role == "admin"
-            else f"accounts.add_user({email!r}, {PASSWORD!r}, {role!r})")
+    """An owner and a member, added the way Settings → Users does (signup makes only the first owner)."""
+    make = f"accounts.add_user({email!r}, {PASSWORD!r}, {role!r})"
     code = f"from studio import accounts\ntry:\n    {make}\nexcept Exception as e:\n    print('exists', e)\n"
     compose("exec", "-T", "web", "/studio/tools/.venv/bin/python", "-c",
             f"import sys; sys.path.insert(0, '/studio/tools/studio')\n{code}")
@@ -113,8 +112,11 @@ def main():
     ap.add_argument("--no-up", action="store_true", help="the stack is already running")
     ap.add_argument("--idea", action="append", help="a film idea of your own (repeat for more films); replaces the built-in ideas")
     ap.add_argument("--style", help="library style for --idea films (default: the first ones in the library)")
+    ap.add_argument("--tag", default="live", help="test accounts are <tag>-admin@example.com and <tag>-customer@example.com")
     ap.add_argument("--review-treatment", action="store_true", help="ask for the treatment review (specs/010 FR-019)")
     a = ap.parse_args()
+    global ADMIN, CUSTOMER
+    ADMIN, CUSTOMER = f"{a.tag}-admin@example.com", f"{a.tag}-customer@example.com"
     if not a.no_up:
         print("↑ sh bin/studio online up …")
         subprocess.run(["sh", str(REPO / "bin/studio"), "online", "up"], check=True)
