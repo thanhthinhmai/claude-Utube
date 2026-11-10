@@ -36,8 +36,8 @@
 
 ## Phase 2: Foundational (chặn mọi user story)
 
-- [ ] T004 Viết `tools/filmcheck/report.py`: đọc và ghi `films/<name>/checks.json` đúng lược đồ ở contracts/files.md (ghi nguyên tử, giữ các phần đã có), và sinh `CHECKS.md` (bảng điểm từng lượt, danh sách lỗi, bảng số đo kèm ngưỡng, kết luận). Test trong `tests/filmcheck/test_report.py`.
-- [ ] T005 [P] Viết `tools/filmcheck/webfetch.py` theo research R4:
+- [X] T004 Viết `tools/filmcheck/report.py`: đọc và ghi `films/<name>/checks.json` đúng lược đồ ở contracts/files.md (ghi nguyên tử, giữ các phần đã có), và sinh `CHECKS.md` (bảng điểm từng lượt, danh sách lỗi, bảng số đo kèm ngưỡng, kết luận). Test trong `tests/filmcheck/test_report.py`.
+- [X] T005 [P] Viết `tools/filmcheck/webfetch.py` theo research R4:
   - `fetch(url) -> {status, final_url, content_type, text}`;
   - chỉ `http`/`https`, cổng 80/443;
   - phân giải tên, từ chối địa chỉ riêng, loopback, link-local, đa hướng, `0.0.0.0/8`, `100.64.0.0/10`, IPv6 ULA; kiểm lại ở mỗi lần chuyển hướng (tối đa 3);
@@ -45,13 +45,13 @@
   - bỏ thẻ HTML, `script` và `style`, gộp khoảng trắng, cắt ở 20 000 ký tự.
 
   Lỗi trả theo mã ở contracts/cli.md (`blocked_address`, `too_large`, `unsupported_type`, `timeout`). Test trong `tests/filmcheck/test_webfetch.py` bằng máy chủ HTTP cục bộ cho phần rút chữ, và bằng hàm phân giải giả cho phần chặn địa chỉ.
-- [ ] T006 [P] Cài đặt model của biên tập (research R6):
+- [X] T006 [P] Cài đặt model của biên tập (research R6):
   - online: thêm `editor_model` vào `tools/studio/studio/db.py` (mặc định `"inherit"`) và `quotas.py` (`RANGES`: một trong `inherit`, `opus`, `sonnet`, `haiku`);
   - local: `config editor-model` trong `tools/filmcheck/cli.py` ghi `.studio/config.json`;
   - hàm `editor_model()` trong `tools/filmcheck/editor.py`: `STUDIO_EDITOR_MODEL` nếu có, không thì `.studio/config.json`, không thì `inherit`. `inherit` nghĩa là không truyền `--model` (Claude Code dùng model của phiên) hoặc truyền `STUDIO_MODEL` khi có.
 
   Test giá trị sai bị từ chối (`422` online, mã 2 local).
-- [ ] T007 [P] Mở rộng `tests/online/fake_claude`: khi `-p` có `--json-schema` chứa `"checked_sources"` thì trả lời như biên tập, và ghi các tham số đã nhận vào `$FAKE_CLAUDE_LOG`. Điều khiển bằng thẻ trong `SCRIPT.md`:
+- [X] T007 [P] Mở rộng `tests/online/fake_claude`: khi `-p` có `--json-schema` chứa `"checked_sources"` thì trả lời như biên tập, và ghi các tham số đã nhận vào `$FAKE_CLAUDE_LOG`. Điều khiển bằng thẻ trong `SCRIPT.md`:
   - `[editor-pass]` (mặc định): score 9, không lỗi;
   - `[editor-p1 Pnn]`: score 8, một P1 ở `Pnn` cho tới khi đoạn đó đổi;
   - `[editor-low]`: score 6 mọi lượt;

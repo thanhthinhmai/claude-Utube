@@ -34,6 +34,35 @@ def token(email, n):
     return f"tok-{email}-{n}"
 
 
+def editor(prompt):
+    """The script editor of specs/010 (T007). Tags in a `>` note line of SCRIPT.md choose the answer:
+    [editor-pass] (default) score 9; [editor-p1 Pnn] a P1 on Pnn until that paragraph changes; [editor-low] score 6
+    every round; [editor-bad-json] an answer without a score."""
+    import re
+    m = re.search(r"(\S+/SCRIPT\.md)", prompt)
+    script = open(m.group(1), encoding="utf-8").read() if m else ""
+    out = {"score": 9, "issues": [], "checked_sources": []}
+    p1 = re.search(r"\[editor-p1 (P\d+)\]", script)
+    if "[editor-bad-json]" in script:
+        out = {"issues": "not a list"}
+    elif "[editor-low]" in script:
+        out = {"score": 6, "issues": [{"level": "P2", "para": "P01", "reason": "the opening is flat"}], "checked_sources": []}
+    elif p1:
+        para = p1.group(1)
+        text = (re.search(rf"^\[{para}\](.*)$", script, re.M) or [None, ""])[1].strip()
+        state = os.path.join(os.path.dirname(m.group(1)), ".check", "fake-editor.json")
+        os.makedirs(os.path.dirname(state), exist_ok=True)
+        first = json.load(open(state)) if os.path.exists(state) else {}
+        first.setdefault(para, text)
+        json.dump(first, open(state, "w"))
+        if first[para] == text:
+            out = {"score": 8, "issues": [{"level": "P1", "para": para, "reason": "this number does not match its source"}],
+                   "checked_sources": [{"url": "https://example.org/hanoi-motorbikes", "matches": False}]}
+    print(json.dumps({"type": "result", "is_error": False, "structured_output": out,
+                      "usage": {"input_tokens": 1200, "output_tokens": 300}}))
+    return 0
+
+
 def main(argv):
     if os.environ.get("FAKE_CLAUDE_SLEEP"):
         time.sleep(float(os.environ["FAKE_CLAUDE_SLEEP"]))
@@ -75,6 +104,12 @@ def main(argv):
         print("Successfully logged out.")
         return 0
     if argv and argv[0] == "-p":
+        if os.environ.get("FAKE_CLAUDE_LOG"):
+            with open(os.environ["FAKE_CLAUDE_LOG"], "a") as f:
+                f.write(json.dumps(argv) + "\n")
+        schema = argv[argv.index("--json-schema") + 1] if "--json-schema" in argv else ""
+        if "checked_sources" in schema:
+            return editor(sys.stdin.read())
         print(json.dumps({"type": "result", "is_error": False, "structured_output": {"allowed": True, "reason": ""}}))
         return 0
     print(f"fake_claude: unknown command {argv}", file=sys.stderr)

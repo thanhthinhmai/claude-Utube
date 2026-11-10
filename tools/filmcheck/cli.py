@@ -44,10 +44,19 @@ def parser() -> argparse.ArgumentParser:
     return p
 
 
+def config_editor_model(a) -> int:
+    from filmcheck import editor
+    editor.set_editor_model(a.value)
+    print(f"✓ script editor model: {a.value}" + (" (same as the film)" if a.value == "inherit" else ""))
+    return 0
+
+
 def main(argv=None) -> int:
     a = parser().parse_args(argv)
     if a.group == "qc":
         a.cmd = "qc"
+    if a.group == "config" and a.cmd == "editor-model":
+        return config_editor_model(a)
     return not_yet(a)
 
 

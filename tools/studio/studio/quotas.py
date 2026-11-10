@@ -7,6 +7,7 @@ from .store import StudioError
 
 VN = dt.timezone(dt.timedelta(hours=7))
 KIND_FIELD = {"film": ("quota_films", "quota_films_default"), "learn": ("quota_learns", "quota_learns_default")}
+EDITOR_MODELS = ("inherit", "opus", "sonnet", "haiku")     # specs/010 FR-007b
 MAX_OPEN = 3            # jobs not finished yet, per customer
 OPEN = ("queued", "running", "waiting_review", "waiting_resume")
 
@@ -23,6 +24,7 @@ RANGES = {
     "concurrency": (int, 1, 16),
     "review_timeout_days": (int, 1, 90),
     "model": (str, None, None),
+    "editor_model": (str, None, None),
 }
 
 
@@ -51,6 +53,8 @@ def update_settings(changes: dict) -> dict:
         if not ok or (lo is not None and not lo <= v <= hi):
             raise StudioError("invalid", f"giá trị của {k} ngoài khoảng cho phép", 422)
         s[k] = typ(v)
+    if s.get("editor_model", "inherit") not in EDITOR_MODELS:
+        raise StudioError("invalid", "editor_model phải là " + ", ".join(EDITOR_MODELS), 422)
     if s.get("claude_order", "auto") not in ("auto", "manual"):
         raise StudioError("invalid", "claude_order phải là auto hoặc manual", 422)
     if s["model"] not in s["price_table"]:

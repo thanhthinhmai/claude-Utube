@@ -47,6 +47,15 @@ class US3(unittest.TestCase):
             self.assertEqual(r.status_code, 422, bad)
         self.assertEqual(self.admin.get("/api/v1/admin/settings").json()["concurrency"], 2)
 
+    def test_editor_model_setting(self):                         # specs/010 FR-007b
+        s = self.admin.get("/api/v1/admin/settings").json()
+        self.assertEqual(s["editor_model"], "inherit")
+        r = self.admin.put("/api/v1/admin/settings", json={"editor_model": "gpt"}, headers=W)
+        self.assertEqual(r.status_code, 422)
+        r = self.admin.put("/api/v1/admin/settings", json={"editor_model": "sonnet"}, headers=W)
+        self.assertEqual((r.status_code, r.json()["editor_model"]), (200, "sonnet"))
+        self.assertEqual(self.c.put("/api/v1/admin/settings", json={"editor_model": "opus"}, headers=W).status_code, 403)
+
     def test_us3_signup_closed(self):
         r = self.admin.put("/api/v1/admin/settings", json={"signup_open": True}, headers=W)
         self.assertEqual(r.status_code, 422)                      # 008: no setting turns sign-up back on
