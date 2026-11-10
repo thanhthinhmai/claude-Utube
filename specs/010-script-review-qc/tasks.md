@@ -200,7 +200,7 @@
 
 ## Phase 6: Polish
 
-- [ ] T031 [P] Sửa `CLAUDE.md`:
+- [X] T031 [P] Sửa `CLAUDE.md`:
   - mục Cấu trúc: thêm `tools/filmcheck/` và lệnh `script`, `web fetch`, `qc`, `config`;
   - test: `sh tests/filmcheck/run.sh`.
 
