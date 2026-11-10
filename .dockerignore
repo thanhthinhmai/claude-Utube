@@ -1,0 +1,14 @@
+.git/
+tools/.venv/
+lib/
+films/
+references/
+data/
+.studio/
+deploy/.env
+**/__pycache__/
+tests/
+specs/
+*.log
+.env*
+my-styles/

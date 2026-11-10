@@ -31,3 +31,9 @@ __pycache__/
 
 # Studio UI runtime state (jobs, reviews, server pid)
 .studio/
+
+# Online mode (specs/007): secrets and server data
+deploy/.env
+/data/
+tests/online/.tmp/
+!deploy/.env.example

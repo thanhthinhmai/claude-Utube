@@ -4,38 +4,41 @@ import re
 from . import jobs, resources, store
 from .store import StudioError
 
-KINDS = {"style-1": "review 1", "style-2": "review 2"}        # job log text is English (005)
+# job log text is English (005); question and treatment are for online film jobs (007 FR-014)
+KINDS = {"style-1": "review 1", "style-2": "review 2", "question": "question", "treatment": "treatment review"}
 VALUES = {"approve", "revise", "accept_anyway", "stop"}
 LABEL = {"approve": "Approve", "revise": "Request changes", "accept_anyway": "Accept anyway", "stop": "Stop"}   # = DECISION in web/app.js
 SOURCES = {"ui", "chat"}
 ID = re.compile(r"^r-\d{8}-\d{6}-[0-9a-f]{4}$")
 RESUME_AFTER = 60       # decided, but nobody waited for this long → the job waits to be resumed
 MAX_SUMMARY = 200_000
+MAX_QUESTIONS = 3       # questions the studio may ask about one film (spec FR-014)
 
 
-def _paths(rid: str):
+def check_id(rid: str) -> str:
     if not ID.match(rid or ""):
         raise StudioError("not_found", f"không có yêu cầu duyệt \"{rid}\"", 404)
-    d = store.state_dir() / "reviews"
-    return d / f"{rid}.json", d / f"{rid}.decision.json"
+    return rid
 
 
-def load(rid: str) -> dict:
-    p, dp = _paths(rid)
-    r = store.read_json(p)
-    if not r:
+def load(rid: str, owner: str = None) -> dict:
+    r = store.doc_get("review", check_id(rid))
+    if not r or (owner and r.get("owner") != owner):
         raise StudioError("not_found", f"không có yêu cầu duyệt \"{rid}\"", 404)
-    r["decision"] = store.read_json(dp)
+    r["decision"] = _decision(rid)
     return r
 
 
 def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: bool = False) -> dict:
     job = jobs.load(job_id)
     if kind not in KINDS:
-        raise StudioError("invalid", "loại duyệt phải là style-1 hoặc style-2", 422)
+        raise StudioError("invalid", "loại duyệt phải là " + ", ".join(sorted(KINDS)), 422)
     if len(summary_md.encode()) > MAX_SUMMARY:
         raise StudioError("invalid", "bản tóm tắt quá dài (tối đa 200 KB)", 422)
-    resources.check_name(set_name)
+    if kind.startswith("style-") or set_name:         # question and treatment reviews have no reference set
+        resources.check_name(set_name)
+    if kind == "question" and sum(1 for x in job["review_ids"] if (store.doc_get("review", x) or {}).get("kind") == "question") >= MAX_QUESTIONS:
+        raise StudioError("too_many_questions", f"mỗi phim chỉ hỏi lại tối đa {MAX_QUESTIONS} câu", 422)
     compare = None
     if kind == "style-2":
         compare = store.read_json(resources.set_dir(set_name) / "proof" / "compare.json")
@@ -44,11 +47,10 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
         compare = {k: compare.get(k) for k in ("luma_diff", "sat_median_diff", "dark_diff_pp", "palette_matched",
                                                 "palette_needed", "pass", "round", "ref", "ours",
                                                 "ref_palette", "our_palette")}
-    r = {"id": jobs.new_id("r"), "owner": "local", "job_id": job_id, "kind": kind, "created_at": store.now_iso(),
-         "summary_md": summary_md, "set": set_name, "compare": compare,
+    r = {"id": jobs.new_id("r"), "owner": job.get("owner", "local"), "job_id": job_id, "kind": kind, "created_at": store.now_iso(),
+         "summary_md": summary_md, "set": set_name or None, "compare": compare,
          "final_round": bool(final_round and kind == "style-2"), "waiting": {"last_poll_at": None}}
-    p, _ = _paths(r["id"])
-    store.write_json(p, r)
+    store.doc_put("review", r["id"], r)
 
     def f(j):
         if j["status"] in jobs.FINAL:
@@ -71,13 +73,16 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui") -> dict:
         raise StudioError("invalid", "nguồn phải là ui hoặc chat", 422)
     if value in ("accept_anyway", "stop") and not (r["kind"] == "style-2" and r["final_round"]):
         raise StudioError("value_not_allowed", "chỉ chọn được khi đã hết vòng sửa ở lần duyệt 2", 422)
+    if r["kind"] == "question" and value != "approve":
+        raise StudioError("value_not_allowed", "câu hỏi chỉ cần trả lời", 422)
+    if r["kind"] == "question" and len(note) < 1:
+        raise StudioError("note_required", "hãy ghi câu trả lời", 422)
     if value == "revise" and len(note) < 3:
         raise StudioError("note_required", "hãy ghi góp ý (ít nhất 3 ký tự) khi yêu cầu sửa", 422)
     if len(note) > 4000:
         raise StudioError("invalid", "góp ý tối đa 4000 ký tự", 422)
     d = {"value": value, "note": note, "source": source, "at": store.now_iso()}
-    _, dp = _paths(rid)
-    if not store.create_exclusive(dp, d):
+    if not store.doc_create("decision", rid, {**d, "owner": r.get("owner", "local")}):
         raise StudioError("already_decided", "yêu cầu này đã được duyệt", 409)
     where = "UI" if source == "ui" else "chat"
     jobs.log(r["job_id"], f"{KINDS[r['kind']].capitalize()}: {LABEL[value]} (via {where})" + (f": {note[:200]}" if note else ""))
@@ -86,14 +91,21 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui") -> dict:
 
 def poll(rid: str):
     """One check by `review wait`: records that someone is waiting, returns the decision or None."""
-    p, dp = _paths(rid)
+    check_id(rid)
     with store.lock(rid):
-        r = store.read_json(p)
+        r = store.doc_get("review", rid)
         if not r:
             raise StudioError("not_found", f"không có yêu cầu duyệt \"{rid}\"", 404)
         r["waiting"] = {"last_poll_at": store.now_iso()}
-        store.write_json(p, r)
-    return store.read_json(dp)
+        store.doc_put("review", rid, r)
+    return _decision(rid)
+
+
+def _decision(rid: str):
+    d = store.doc_get("decision", rid)
+    if d:
+        d.pop("owner", None)
+    return d
 
 
 def resume(rid: str, d: dict) -> None:
@@ -101,15 +113,10 @@ def resume(rid: str, d: dict) -> None:
     jobs.set_status(r["job_id"], "running", f"Resumed after {KINDS[r['kind']]}: {LABEL[d['value']]}")
 
 
-def all_reviews(status: str = None) -> list:
+def all_reviews(status: str = None, owner: str = None) -> list:
     out = []
-    for p in (store.state_dir() / "reviews").glob("r-*.json"):
-        if p.name.endswith(".decision.json"):
-            continue
-        r = store.read_json(p)
-        if not r:
-            continue
-        r["decision"] = store.read_json(p.with_name(p.stem + ".decision.json"))
+    for r in store.doc_list("review", owner):
+        r["decision"] = _decision(r["id"])
         if status == "pending" and r["decision"]:
             continue
         if status == "decided" and not r["decision"]:

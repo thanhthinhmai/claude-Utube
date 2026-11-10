@@ -13,6 +13,8 @@
     <a class="brand" href="#/"><span class="logo">F</span><span>Film Studio</span></a>
     <nav>
       <a href="#/" data-nav="jobs"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h6"/></svg><span>Jobs</span><b id="nav-count" class="count" hidden></b></a>
+      <a href="#/new" data-nav="new" class="online-only" hidden><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>New film</span></a>
+      <a href="#/learn" data-nav="learn" class="online-only" hidden><svg viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg><span>Learn a style</span></a>
       <a href="#/films" data-nav="films"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/></svg><span>Films</span></a>
       <p class="label">Browse</p>
       <a href="#/library" data-nav="library"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/><path d="M9 7h7"/></svg><span>Library</span></a>
@@ -20,11 +22,13 @@
       <a href="#/sets" data-nav="sets"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg><span>Measurements</span></a>
     </nav>
     <div class="side-foot">
-      <a href="/api/v1/docs" target="_blank" rel="noopener"><svg viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg><span>API docs</span></a>
-      <div class="owner"><span class="avatar">M</span><span><strong>This machine</strong><small id="live" class="live" title="Live update connection">Connecting…</small></span></div>
+      <a href="/api/v1/docs" target="_blank" rel="noopener" class="local-only"><svg viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5"/></svg><span>API docs</span></a>
+      <a href="#/admin/claude" data-nav="ai" class="admin-only" hidden><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="3"/><path d="M9 11v2M15 11v2M12 3v3"/></svg><span>AI accounts</span></a>
+      <a href="#/settings" data-nav="settings" class="admin-only" hidden><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Settings</span></a>
+      <div class="owner" id="owner"><span class="avatar">M</span><span><strong>This machine</strong><small id="live" class="live" title="Live update connection">Connecting…</small></span></div>
     </div>
   </aside>
-  <main id="app" aria-live="polite"></main>
+  <div class="col"><div id="acct" class="acct" hidden></div><main id="app" aria-live="polite"></main></div>
 </div>
 <div id="lightbox" class="lightbox" hidden><img alt=""></div>
 <script src="app.js"></script>

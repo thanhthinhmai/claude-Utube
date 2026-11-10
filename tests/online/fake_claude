@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""A fake Claude Code for tests (specs/008 T003). Mirrors what T001 saw on the real one:
+- `auth login --claudeai` prints the URL wrapped in a terminal hyperlink (OSC 8), then waits for the code on stdin;
+- `auth status --json` exits 1 with loggedIn false when signed out.
+Fields of a signed-in status follow research R1 until T001 checks them on a real account.
+
+Codes: `good-<email>` signs in (plan from FAKE_CLAUDE_PLAN, default max); anything else is refused.
+FAKE_CLAUDE_REFRESH=fail makes refreshing an expiring token fail. FAKE_CLAUDE_SLEEP=<s> delays every command."""
+import json
+import os
+import sys
+import time
+
+CFG = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+CRED = os.path.join(CFG, ".credentials.json")
+URL = "https://claude.com/cai/oauth/authorize?code=true&client_id=fake&state=s1"
+
+
+def load():
+    try:
+        with open(CRED) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def save(d):
+    os.makedirs(CFG, exist_ok=True)
+    with open(CRED, "w") as f:
+        json.dump(d, f)
+
+
+def token(email, n):
+    return f"tok-{email}-{n}"
+
+
+def main(argv):
+    if os.environ.get("FAKE_CLAUDE_SLEEP"):
+        time.sleep(float(os.environ["FAKE_CLAUDE_SLEEP"]))
+    if argv[:2] == ["auth", "login"]:
+        print(f"Opening browser to sign in…\nIf the browser didn't open, visit: \x1b]8;;{URL}\x07{URL}\x1b]8;;\x07",
+              flush=True)
+        print("Paste code here if prompted > ", end="", flush=True)
+        code = sys.stdin.readline().strip()
+        if not code.startswith("good-"):
+            print("\nLogin failed: That code wasn't accepted. Please try again.", flush=True)
+            return 1
+        email = code[5:]
+        save({"claudeAiOauth": {"accessToken": token(email, 1), "refreshToken": f"refresh-{email}",
+                                "expiresAt": int((time.time() + 8 * 3600) * 1000), "n": 1,
+                                "subscriptionType": os.environ.get("FAKE_CLAUDE_PLAN", "max"), "email": email}})
+        print("\nLogin successful.", flush=True)
+        return 0
+    if argv[:2] == ["auth", "status"]:
+        d = load()
+        if not d:
+            print(json.dumps({"loggedIn": False, "authMethod": "none", "apiProvider": "firstParty",
+                              "configDirectory": CFG, "loginExpiresAt": None}))
+            return 1
+        o = d["claudeAiOauth"]
+        if o["expiresAt"] / 1000 - time.time() < 600:          # expiring: refresh like the real one does
+            if os.environ.get("FAKE_CLAUDE_REFRESH") == "fail":
+                print(json.dumps({"loggedIn": False, "authMethod": "none", "error": "refresh failed"}))
+                return 1
+            o["n"] += 1
+            o["accessToken"] = token(o["email"], o["n"])
+            o["expiresAt"] = int((time.time() + 8 * 3600) * 1000)
+            save(d)
+        print(json.dumps({"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty",
+                          "email": o["email"], "subscriptionType": o["subscriptionType"], "configDirectory": CFG}))
+        return 0
+    if argv[:2] == ["auth", "logout"]:
+        if os.path.exists(CRED):
+            os.remove(CRED)
+        print("Successfully logged out.")
+        return 0
+    if argv and argv[0] == "-p":
+        print(json.dumps({"type": "result", "is_error": False, "structured_output": {"allowed": True, "reason": ""}}))
+        return 0
+    print(f"fake_claude: unknown command {argv}", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

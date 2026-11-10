@@ -49,6 +49,11 @@ Các lệnh `/speckit-plan`, `/speckit-analyze` và `/speckit-converge` đều k
 ## Bản quyền và nội dung
 
 - Video tải từ kênh tham chiếu chỉ để học nội bộ: **không** đăng lại, **không** gửi đi, **không** commit vào repo.
+- Ở dịch vụ online cho khách (giai đoạn 2), xưởng được tải video từ kênh YouTube khách nêu, **chỉ** để học phong cách, với các điều kiện:
+  - Khách **PHẢI** xác nhận trước khi tải rằng họ có quyền dùng video, hoặc chỉ dùng để nghiên cứu phong cách.
+  - Video nằm riêng trên máy chủ: **không** hiện, **không** phát, **không** cho tải về, **không** chia sẻ cho ai, kể cả chính khách.
+  - Video **PHẢI** bị xoá khi học xong (đạt, dừng hoặc lỗi). Chỉ giữ số đo và vài khung hình làm bằng chứng cho bản phong cách.
+  - Chủ xưởng chịu rủi ro pháp lý (điều khoản YouTube, bản quyền). Nên hỏi luật sư trước khi mở cho công chúng.
 - Phim làm ra chỉ học **phong cách**. Câu chuyện, nhân vật, giọng đọc và nhạc **PHẢI** là của mình. Không nêu tên kênh tham chiếu trong phim.
 - Tài sản bên thứ ba (font, hình, nhạc, mô hình, dữ liệu) chỉ dùng loại có giấy phép rõ ràng (CC0, CC BY, OFL, MIT) và **PHẢI** ghi vào `CREDITS`.
 - Không commit secret, API key hay file media nặng vào repo.
@@ -68,9 +73,10 @@ Các lệnh `/speckit-plan`, `/speckit-analyze` và `/speckit-converge` đều k
 - Hiến pháp này có hiệu lực cao hơn mọi hướng dẫn khác trong dự án.
 - Muốn sửa hiến pháp thì phải ghi lý do, được người dùng duyệt và tăng số phiên bản.
 
-**Version**: 2.0.0 | **Ratified**: 2026-11-05 | **Last Amended**: 2026-11-05
+**Version**: 2.1.0 | **Ratified**: 2026-11-05 | **Last Amended**: 2026-11-07
 
 ### Lịch sử sửa đổi
+- 2.1.0: Cho phép dịch vụ online tải video từ kênh YouTube khách nêu để học phong cách, kèm điều kiện (xác nhận quyền, giữ kín, xoá sau khi học).
 - 2.0.0: Hiến pháp riêng cho claude-Utube. Thêm nguyên tắc VI–IX và mục bản quyền, nội dung.
 - 1.1.0: Thêm 3 mức quy trình (Trực tiếp, Nhẹ, Đầy đủ) để tiết kiệm token.
 - 1.0.0: Hiến pháp chung ban đầu.

@@ -29,3 +29,18 @@ Mã việc sai hoặc không có → mã 1.
 | `review wait <id> [--timeout 540]` | chặn, hỏi mỗi 1 s | có quyết định: JSON quyết định, mã 0 (việc → `running`) · hết giờ: mã 3 |
 | `review decide <id> --value approve\|revise\|accept_anyway\|stop [--note "…"] --source chat` | ghi quyết định từ khung chat | mã 0 · 4 nếu đã có quyết định · 2 nếu thiếu góp ý hay giá trị không hợp lệ |
 | `review status <id>` | JSON yêu cầu và quyết định | mã 0 |
+
+## Chế độ online (specs/007)
+Khi có `STUDIO_MODE=online` và `STUDIO_JOB=<mã việc>` (tức là đang chạy trong container việc), các lệnh `job` và `review` không ghi `.studio/`. Thay vào đó, chúng gọi bộ chuyển tiếp ở `$STUDIO_PROXY/internal/…` bằng `ANTHROPIC_API_KEY` của việc (contracts/runner.md của 007).
+
+| Lệnh | Khác ở chế độ online |
+|---|---|
+| `job start` | Bị từ chối (mã 2): việc đã có sẵn trong `STUDIO_JOB` |
+| `job step`, `log`, `run` | Như trên, nhưng chỉ cho đúng việc trong `STUDIO_JOB`. `job run` gửi nhịp sống bằng cách ghi lại cùng tên bước |
+| `job done <id> [--film F] [--style S]` | Chỉ báo xong. Worker kiểm chất lượng (−14 ±1 LUFS, đỉnh ≤ −1 dB, readcheck) rồi mới giao cho khách |
+| `job fail <id> "<lỗi>" [--by studio\|customer]` | `--by` chỉ có ở online, mặc định `studio`. Lỗi do xưởng thì khách được trả lượt (FR-006a) |
+| `review request <id> --kind question\|treatment\|style-1\|style-2 [--set S] --summary <f>` | `--set` chỉ bắt buộc với `style-1` và `style-2`. Mỗi phim hỏi tối đa 3 câu (`question`). Lệnh ghi `.review_pending`, rồi tác tử kết thúc lượt bằng mã thoát 10 |
+| `review wait` | Không chờ: in "kết thúc lượt: thoát mã 10" rồi thoát mã 10 |
+| `review status <id>` | Đọc qua bộ chuyển tiếp |
+
+Lệnh `admin create <email>` cũng chỉ dùng ở chế độ online. Lệnh này tạo tài khoản quản trị duy nhất; nếu đã có thì báo lỗi, mã 1.

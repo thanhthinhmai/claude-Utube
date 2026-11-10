@@ -6,6 +6,9 @@
 #   sh bin/studio deps learn [--extra]  cài công cụ học phong cách vào tools/.venv (--extra: tải video, chép lời)
 #   sh bin/studio learn <lệnh> …        học phong cách: fetch | measure | transcribe | summary | check-names | compare | save | clean
 #   sh bin/studio deps ui               cài giao diện web (tools/.venv)
+#   sh bin/studio deps online           cài thêm gói cho chế độ online (specs/007)
+#   sh bin/studio admin create <email>  tạo tài khoản quản trị (chế độ online: STUDIO_MODE=online, STUDIO_DATA)
+#   sh bin/studio online up|down|logs|admin <email>  chạy xưởng online bằng Docker Compose (deploy/, xem deploy/README.md)
 #   sh bin/studio ui [open|status|stop] mở / xem / tắt giao diện; job … · review …: sổ việc và duyệt (xem specs/003)
 #   sh bin/studio help
 # Mã thoát: 0 = sẵn sàng / xong · 1 = chưa sẵn sàng / thất bại · 2 = sai cách dùng hoặc library.lock sai.
@@ -378,6 +381,7 @@ cmd_learn() {
 cmd_deps() {
   if [ "${1:-}" = learn ]; then shift; deps_learn "$@"; return 0; fi
   if [ "${1:-}" = ui ]; then deps_tiers ui; return 0; fi
+  if [ "${1:-}" = online ]; then deps_tiers ui online; return 0; fi
   read_lock
   lib_state
   if [ "$LSTATE" != ok ]; then
@@ -387,12 +391,38 @@ cmd_deps() {
   LEMO_OPUSCAR_HOME="$LIB" exec sh "$LIB/plugin/skills/lemo-opuscar/scripts/setup.sh" deps "$@"
 }
 
+# Xưởng online trên máy chủ (specs/007): Docker Compose với deploy/.env. Không tự cài Docker.
+cmd_online() {
+  command -v docker >/dev/null 2>&1 || { echo "✗ cần Docker (có docker compose). Cài Docker rồi chạy lại; xưởng không tự cài." >&2; exit 1; }
+  docker compose version >/dev/null 2>&1 || { echo "✗ cần plugin docker compose" >&2; exit 1; }
+  env_file="$ROOT/deploy/.env"
+  [ -f "$env_file" ] || { echo "✗ chưa có deploy/.env: chép deploy/.env.example rồi điền" >&2; exit 1; }
+  dc() { docker compose -f "$ROOT/deploy/compose.yaml" --env-file "$env_file" "$@"; }
+  case ${1:-} in
+    up)
+      data=$(sed -n 's/^STUDIO_DATA_HOST=//p' "$env_file" | tail -1)
+      [ -n "$data" ] || { echo "✗ deploy/.env thiếu STUDIO_DATA_HOST" >&2; exit 1; }
+      mkdir -p "$data/tmp" || { echo "✗ không tạo được $data" >&2; exit 1; }
+      echo "↓ dựng ảnh studio-job (lần đầu khá lâu)…"
+      docker build -q -f "$ROOT/deploy/job.Dockerfile" -t studio-job:latest "$ROOT" >/dev/null
+      dc up -d --build
+      dc ps ;;
+    down) dc down ;;
+    logs) shift; dc logs -f --tail 100 "$@" ;;
+    admin)
+      [ -n "${2:-}" ] || { echo "dùng: sh bin/studio online admin <email>" >&2; exit 2; }
+      dc exec web /studio/tools/.venv/bin/python /studio/tools/studio/studio_cli.py admin create "$2" ;;
+    *) echo "dùng: sh bin/studio online up | down | logs [dịch vụ] | admin <email>" >&2; exit 2 ;;
+  esac
+}
+
 case ${1:-} in
   setup) shift; cmd_setup "$@" ;;
+  online) shift; cmd_online "$@" ;;
   status) shift; cmd_status "$@" ;;
   deps) shift; cmd_deps "$@" ;;
   learn) shift; cmd_learn "$@" ;;
-  ui | job | review) cmd_studio "$@" ;;
+  ui | job | review | admin) cmd_studio "$@" ;;
   help | -h | --help) usage ;;
   '') usage >&2; exit 2 ;;
   *) echo "✗ lệnh lạ: $1" >&2; usage >&2; exit 2 ;;
