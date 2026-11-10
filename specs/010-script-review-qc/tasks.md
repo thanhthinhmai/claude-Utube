@@ -215,6 +215,16 @@
     - SC-005 chưa đo được vì phim chưa làm xong. Bước Script tốn 650 997 token, tức 57% của 1,13 triệu token đã dùng. So với phim T046 của 008 (4,18 triệu token), phần này khoảng 13–14% của một phim trọn vẹn, sát trần 15%.
     - US2 (`qc`) và US3 (trang việc) chưa thấy trên phim thật, vì việc dừng trước khi dựng phim.
     - Local (bước 1 của quickstart): chưa chạy.
+  - **Lần 2 (2026-11-10), sau khi giảm token (8 000 ký tự mỗi trang, biên tập tối đa 3 trang): đạt** (online). Cùng điều kiện như lần 1, ý tưởng về mật ong.
+    - Việc `j-20261110-152538-1efb` xong sau 43,7 phút (80 lần gọi, 7 922 226 token, toàn bộ qua `plan:1`).
+    - Duyệt treatment gồm cả kịch bản và điểm (FR-019); script tự duyệt thay người giao phim.
+    - Kịch bản đạt ngay lượt đầu: máy chấm 10/10, biên tập 8,5/10 (0 P1, 0 P2, 4 P3), không vòng sửa nào.
+    - Tìm web 2 lượt, mở 9 trang qua proxy.
+    - Cổng chất lượng đạt ngay lần đầu (không vòng sửa QC): −14,0 LUFS, đỉnh −1,6 dB, readcheck đạt. `qc` đo phim thật: lặng 19,3%, đuôi 1,29 s, 0 cắt giữa câu, 0 cảnh chốt ngắn, 0 hình đứng im, 0 ký tự thiếu phông, chữ trên màn hình đã kiểm (`texts_checked`).
+    - `job.qa.script` và `job.qa.film` có đủ trường cho khối Quality của trang việc (US3).
+    - **SC-005 đạt:** token từ lúc bắt đầu việc tới lúc biên tập duyệt kịch bản (gồm cả bước Treatment, nên là mức trên) là 488 925, tức 6,2% của cả việc.
+    - Ghi chú: nhật ký việc chỉ giữ 50 dòng cuối, nên `live.py` không còn thấy dòng "Script" ở phim dài. Phần token ở trên được tính từ mốc giờ trong `checks.json`.
+  - Còn thiếu: phim local (bước 1 của quickstart).
 
 ---
 
