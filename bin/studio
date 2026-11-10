@@ -10,6 +10,8 @@
 #   sh bin/studio admin create <email>  tạo tài khoản quản trị (chế độ online: STUDIO_MODE=online, STUDIO_DATA)
 #   sh bin/studio online up|down|logs|admin <email>  chạy xưởng online bằng Docker Compose (deploy/, xem deploy/README.md)
 #   sh bin/studio ui [open|status|stop] mở / xem / tắt giao diện; job … · review …: sổ việc và duyệt (xem specs/003)
+#   sh bin/studio script check|review|status|skip <phim>  chấm kịch bản (specs/010); web fetch <url>: mở một trang
+#   sh bin/studio qc <phim> [--json]    đo phim xong; config editor-model <inherit|opus|sonnet|haiku>
 #   sh bin/studio help
 # Mã thoát: 0 = sẵn sàng / xong · 1 = chưa sẵn sàng / thất bại · 2 = sai cách dùng hoặc library.lock sai.
 set -eu
@@ -30,7 +32,7 @@ SPARSE_BASE="$SPARSE
 !/styles/*/poster.jpg"
 
 usage() {
-  sed -n '2,11s/^# \{0,1\}//p' "$0"
+  sed -n '2,14s/^# \{0,1\}//p' "$0"
 }
 
 die2() { echo "✗ $*" >&2; exit 2; }
@@ -371,6 +373,12 @@ cmd_studio() {
   STUDIO_ROOT="$ROOT" exec "$VENV/bin/python" "$ROOT/tools/studio/studio_cli.py" "$@"
 }
 
+# Chấm kịch bản và đo phim (specs/010): chỉ cần Python 3, không cần giao diện
+cmd_filmcheck() {
+  py=python3; [ -x "$VENV/bin/python" ] && py="$VENV/bin/python"
+  STUDIO_ROOT="${STUDIO_ROOT:-$ROOT}" STUDIO_LIB="$LIB" exec "$py" "$ROOT/tools/filmcheck/cli.py" "$@"
+}
+
 cmd_learn() {
   if [ ! -x "$VENV/bin/python" ]; then
     echo "✗ chưa cài công cụ học phong cách. Chạy: sh bin/studio deps learn" >&2; exit 1
@@ -423,6 +431,7 @@ case ${1:-} in
   deps) shift; cmd_deps "$@" ;;
   learn) shift; cmd_learn "$@" ;;
   ui | job | review | admin) cmd_studio "$@" ;;
+  script | web | qc | config) cmd_filmcheck "$@" ;;
   help | -h | --help) usage ;;
   '') usage >&2; exit 2 ;;
   *) echo "✗ lệnh lạ: $1" >&2; usage >&2; exit 2 ;;

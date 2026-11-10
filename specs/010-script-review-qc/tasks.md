@@ -16,17 +16,17 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 Kiểm 3 mục "Kiểm khi implement" của research.md và ghi vào mục mới "Kết quả kiểm T001" ở cuối `specs/010-script-review-qc/research.md`:
+- [X] T001 Kiểm 3 mục "Kiểm khi implement" của research.md và ghi vào mục mới "Kết quả kiểm T001" ở cuối `specs/010-script-review-qc/research.md`:
   - R3: trong ảnh `studio-job`, khi một phiên Agent SDK đang chạy, `claude -p` thứ hai với cùng `CLAUDE_CODE_OAUTH_TOKEN` và `ANTHROPIC_BASE_URL` chạy xong và trả JSON theo `--json-schema`. Thử bằng proxy giả của `tests/online/helpers.py`, không cần tài khoản thật;
   - R4: `WebSearch` của Claude Code đi qua proxy ở chế độ gói (một tài khoản thật trên máy này, một câu hỏi), và `usage.server_tool_use.web_search_requests` có trong phản hồi;
   - R7: `fc-scan --format '%{charset}'` đọc được một tệp `.woff2` trong ảnh `studio-job`.
   - **Nếu một mục khác research thì dừng ở đây và hỏi người dùng** (hiến pháp II).
-- [ ] T002 [P] Tạo khung `tools/filmcheck/`:
+- [X] T002 [P] Tạo khung `tools/filmcheck/`:
   - `cli.py` với argparse và các lệnh con rỗng: `script check|review|status|skip`, `web fetch`, `qc`, `config editor-model`;
   - `__init__.py`.
 
   Trong `bin/studio`, thêm `script | web | qc | config` vào `case`; chạy `tools/filmcheck/cli.py` bằng `$VENV/bin/python` nếu có, không thì `python3`; không cần giao diện. Thêm các lệnh này vào `usage`.
-- [ ] T003 [P] Tạo `tests/filmcheck/run.sh` (giống `tests/learn/run.sh`, `unittest discover`) và `tests/filmcheck/samples.py`:
+- [X] T003 [P] Tạo `tests/filmcheck/run.sh` (giống `tests/learn/run.sh`, `unittest discover`) và `tests/filmcheck/samples.py`:
   - kịch bản mẫu tốt (en và vi) và các kịch bản lỗi, mỗi kịch bản một luật của contracts/cli.md;
   - hàm `make_film(path, spec)` tạo phim mẫu bằng ffmpeg: `testsrc2` có cắt cảnh ở mốc cho trước, đoạn đứng im, tiếng `sine`, kèm `narration.json` và `words.json` giả.
 
@@ -85,9 +85,9 @@
   - so đoạn (SC-004);
   - SC-002: kịch bản 300 giây chấm xong < 5 giây và không mở tiến trình con nào (`subprocess` bị chặn trong test).
 - [ ] T012 [US1] Viết `tools/filmcheck/editor.py` (research R3, contracts/cli.md):
-  - chạy `claude_bin()` (dùng lại `studio.claude_plan.claude_bin` nếu import được, không thì `STUDIO_CLAUDE_BIN` hoặc `claude` trên PATH) với `-p`, lời nhắc cố định, `--json-schema` biên tập, `--output-format json`, `--no-session-persistence`, `--allowedTools "Read Grep WebSearch Bash(sh bin/studio web fetch:*)"` và `--model` theo T006;
+  - chạy `claude_bin()` (dùng lại `studio.claude_plan.claude_bin` nếu import được, không thì `STUDIO_CLAUDE_BIN` hoặc `claude` trên PATH) với `-p`, lời nhắc cố định, `--json-schema` biên tập, `--output-format json`, `--no-session-persistence`, `--tools "Read,Grep,WebSearch,Bash"` (giới hạn danh sách) cùng `--allowedTools "Read Grep WebSearch Bash(sh bin/studio web fetch:*)"` (cho phép chạy; kết quả T001), và `--model` theo T006; đặt `XDG_CACHE_HOME=/tmp`;
   - lời nhắc chỉ đưa đường dẫn `SCRIPT.md`, `SOURCES.md`, `TREATMENT.md` và yêu cầu của phim (`/work/.input.json` online, `films/<name>/BRIEF.md` local nếu có);
-  - lời nhắc yêu cầu: mở lại nguồn của các con số chính bằng `web fetch` và ghi P1 cho số không khớp (FR-007a); lỗi gắn số đoạn có thật; điểm ≥ 8 chỉ khi không còn P1;
+  - lời nhắc yêu cầu: mở lại nguồn của các con số chính bằng `web fetch` và ghi P1 cho số không khớp (FR-007a); tìm web tối đa 3 lượt (mỗi lượt khoảng 14 000 token, T001); lỗi gắn số đoạn có thật; điểm ≥ 8 chỉ khi không còn P1;
   - sai lược đồ thì chạy lại một lần; vẫn sai thì tính là một lượt không đạt (thoát 1, hoặc 3 ở lượt cuối; contracts/cli.md).
 - [ ] T013 [US1] Viết `script check|review|status|skip` trong `tools/filmcheck/cli.py` đúng mã thoát ở contracts/cli.md:
   - `review` từ chối khi `check` chưa đạt; lưu `.check/script-r<n>.md` và `review-r<n>.json`; tính vòng: lượt 1 cộng tối đa 2 vòng sửa; hết thì `verdict = failed`, mã 3;
@@ -112,7 +112,7 @@
   Sửa `tools/runner/worker.py`: truyền `STUDIO_EDITOR_MODEL` (từ cài đặt; `inherit` thì không truyền) vào container và vào `LocalRunner`.
 - [ ] T017 [US1] Sửa `tools/runner/JOB.md` và mục "Luồng làm phim" của `CLAUDE.md`:
   - local: sau bước Brief, ghi `films/<name>/BRIEF.md` theo contracts/files.md;
-  - thêm bước `Script` sau `Treatment`: viết `SCRIPT.md` và `SOURCES.md` theo contracts/files.md (tìm bằng WebSearch, mở bằng `web fetch --film`);
+  - thêm bước `Script` sau `Treatment`: viết `SCRIPT.md` và `SOURCES.md` theo contracts/files.md (tìm bằng WebSearch, tối đa 5 lượt theo T001; mở bằng `web fetch --film`);
   - `script check` tới khi đạt, rồi `script review`; mã 1 thì chỉ sửa đúng các đoạn bị ghi; mã 3 thì dừng (online: `job fail --by studio` với điểm cuối; local: báo người dùng);
   - phim không lời thì `script skip`;
   - lời đọc của `lines.json` lấy đúng từ kịch bản đã đạt.

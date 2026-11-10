@@ -37,3 +37,4 @@ deploy/.env
 /data/
 tests/online/.tmp/
 !deploy/.env.example
+tests/filmcheck/.tmp/

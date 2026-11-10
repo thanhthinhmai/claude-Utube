@@ -98,3 +98,16 @@ Các mục **Kiểm khi implement** dựa trên hành vi chưa thử. Task đầ
 - **Decision**: `films/<name>/checks.json` (máy đọc) và `films/<name>/CHECKS.md` (người đọc), cùng nội dung: các lượt chấm, số đo QC, kết luận ([contracts/files.md](contracts/files.md)).
   - Worker chép phần tóm tắt vào `job.qa` (`qa.script`, `qa.film`), để trang việc hiện được (FR-016).
   - Trang việc hiện bảng điểm và số đo trong khối "Quality" đang có của 007.
+
+## Kết quả kiểm T001
+
+Kiểm ngày 2026-11-10 trên máy này, với Claude Code 2.1.319 (đi kèm `claude-agent-sdk` 0.2.179) và ảnh `studio-job`. Cả 3 mục đúng với research; có 2 chi tiết về cờ dòng lệnh.
+
+- **R3, đạt.** Trong ảnh `studio-job` (chạy `--read-only`, uid 1000, `HOME=/tmp/home`), hai tiến trình `claude -p` chạy cùng lúc với cùng `CLAUDE_CODE_OAUTH_TOKEN` (một tiến trình bị dịch vụ giả làm chậm 8 giây). Tiến trình kia xong sau 2 giây, cả hai thoát 0.
+  - **Chi tiết 1**: `--allowedTools` chỉ cho phép chạy, không giới hạn danh sách: Claude Code vẫn gửi Bash, Edit, Write… Muốn giới hạn thì dùng `--tools "Read,Grep,WebSearch,Bash"`, và vẫn cần `--allowedTools` cho các công cụ được chạy không hỏi. Ở chế độ `-p`, công cụ không có trong `--allowedTools` bị từ chối.
+- **R4, đạt.** Thử bằng một tài khoản Max qua một bộ chuyển tiếp nhỏ làm đúng việc của proxy (đổi mã của việc thành mã của tài khoản):
+  - Claude Code gửi lượt tìm thành một lệnh `POST /v1/messages?beta=true` riêng, có công cụ phía máy chủ `web_search`, qua `ANTHROPIC_BASE_URL`. Mã 200.
+  - `usage.server_tool_use.web_search_requests = 1` có trong phản hồi của lệnh đó, nên proxy đếm được. Kết quả cuối của `claude -p` lại báo 0, vì nó không cộng lệnh con này.
+  - **Chi tiết 2**: lệnh tìm tốn khoảng 13 900 token vào và 600 token ra cho mỗi lượt tìm. Bài chạy thật (T034) cần đo phần này cho SC-005 (≤ 15%). Lời nhắc của người viết và biên tập nên giới hạn số lượt tìm (ví dụ tối đa 5 cho người viết, 3 cho biên tập).
+  - Không cần tắt `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`: `WebSearch` vẫn có khi biến này bằng 1.
+- **R7, đạt.** `fc-scan --format '%{family}|%{charset}'` đọc được `core/fonts/f0.woff2` của thư viện trong ảnh `studio-job` (ZCOOL KuaiLe, có bảng ký tự). `fc-list ':charset=4e2d' family` trả các phông hệ thống có chữ 中. Fontconfig in "No writable cache directories" khi `/` chỉ đọc; đặt `XDG_CACHE_HOME=/tmp` để tắt. Không cần `fonttools`.
