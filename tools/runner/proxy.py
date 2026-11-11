@@ -174,7 +174,8 @@ def charge(job: dict, via: str, model: str, usage: dict) -> None:
 
 
 def over_cap(job_id: str) -> None:
-    quotas.fail(job_id, "The job used more than its token limit and was stopped. Your credit was refunded.", "studio")
+    if not jobs.publish_cut(job_id, "the job reached its token limit during the Publish step"):   # specs/011 R7
+        quotas.fail(job_id, "The job used more than its token limit and was stopped. Your credit was refunded.", "studio")
     revoke(job_id)
 
 

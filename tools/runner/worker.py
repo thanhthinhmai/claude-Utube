@@ -324,6 +324,30 @@ def script_summary(work: Path, film: str):
                         "p3": e.get("p3", 0), "customer_round": bool(e.get("customer_round"))} for e in s.get("editor") or []]}
 
 
+def publish_summary(runner, work: Path, film: str, cut=None):
+    """What the job page shows of the publish pack (specs/011 data-model Job.qa.publish), or None when there is no
+    pack. Never changes whether the film is delivered (FR-010)."""
+    d = work / "films" / (film or "")
+    if not (d / "publish" / "pack.json").is_file():
+        return {"pass": False, "cut": cut, "applicable": {}, "problems": [], "titles": [], "files": []} if cut else None
+    rc, text = runner.exec(work, lambda root, lib: ["sh", studio_bin(runner), "publish", f"{root}/films/{film}",
+                                                    "--check-only", "--json"])
+    got = next((ln for ln in text.splitlines() if ln.startswith("{")), None)
+    try:
+        r = json.loads(got) if rc in (0, 1) and got else None
+    except ValueError:
+        r = None
+    if r is None:
+        r = {"pass": False, "applicable": {}, "problems": ["the publish pack could not be checked: " + text.strip()[-200:]]}
+    try:
+        titles = [t["text"] for t in json.loads((d / "publish" / "pack.json").read_text(encoding="utf-8"))["titles"]]
+    except (OSError, ValueError, KeyError, TypeError):
+        titles = []
+    files = sorted(f.name for f in (d / "publish").iterdir() if f.is_file() and f.name not in ("pack.json", "thumbs.json"))
+    return {"pass": bool(r.get("pass")) and not cut, "cut": cut, "applicable": r.get("applicable", {}),
+            "problems": r.get("problems", []), "titles": titles, "files": files}
+
+
 def has_narration(d: Path) -> bool:
     return (d / "narration.json").is_file() or (d / "voices").is_dir() or any(d.glob("**/words.json"))
 
@@ -548,6 +572,9 @@ class Worker:
             self.notify(j, "review_needed")
             return
         rep = j.get("reported") or {}
+        cut = j.get("publish_cut") if j["kind"] == "film" else None
+        if cut and not rep.get("done"):            # stopped during Publish: the film is delivered (specs/011 R7)
+            rep = {**rep, "done": True, "film": rep.get("film") or (j.get("input") or {}).get("film")}
         if j["kind"] == "film":
             why = script_failed(work, rep.get("film") or (j.get("input") or {}).get("film"))
             if why:                        # 2 fix rounds used up: stop, the studio's fault (specs/010 FR-010)
@@ -565,9 +592,10 @@ class Worker:
             qa = quality(self.runner, work, film)
             jobs.update(job_id, lambda x: x.__setitem__("qa", qa))
             if not qa["pass"]:
-                if j.get("qa_retries", 0) < 1:
+                if j.get("qa_retries", 0) < 1 and not cut:
                     msg = ("The studio's quality check failed: " + "; ".join(qa["problems"])
-                           + ". Fix the film, render it again, check it, then run `job done` again.")
+                           + ". Fix the film, render it again, check it, run `studio publish <name>` again (the thumbnails come from the "
+                           "new render), then run `job done` again.")
 
                     def f(x):
                         x["status"], x["step"], x["resume"] = "queued", "Queued", msg
@@ -577,6 +605,10 @@ class Worker:
                     return
                 self.failed(job_id, "The film did not pass the quality check: " + "; ".join(qa["problems"]))
                 return
+            pub = publish_summary(self.runner, work, film, cut)
+            jobs.update(job_id, lambda x: (x["qa"].__setitem__("publish", pub), x["log"].append(jobs._line(
+                "Publish check: " + ("not made" if pub is None else "pass" if pub["pass"]
+                                     else f"{len(pub['problems'])} problems" + (" (stopped)" if cut else ""))))))
             dest = store.account_dir(j["owner"]) / "films" / film
             shutil.copytree(work / "films" / film, dest, dirs_exist_ok=True)
             j = jobs.finish(job_id, "done", links={"film": film})
@@ -618,23 +650,32 @@ class Worker:
             rc = self.runner.poll(run.handle)
             if rc is None:
                 quiet = now - max(run.started, proxy.last_ok(job_id))
-                if quiet > self.watchdog:
-                    self.runner.kill(run.handle)
-                    del self.runs[job_id]
-                    proxy.revoke(job_id)
-                    self.failed(job_id, f"Claude did not answer for {int(self.watchdog // 60) or 1} minutes.")
+                why = None
+                if j.get("publish_cut"):            # the proxy stopped it at the token limit during Publish
+                    why = j["publish_cut"]
+                elif quiet > self.watchdog:
+                    why = f"Claude did not answer for {int(self.watchdog // 60) or 1} minutes."
                 elif now - run.started > self.run_limit:
-                    self.runner.kill(run.handle)
-                    del self.runs[job_id]
-                    proxy.revoke(job_id)
-                    self.failed(job_id, f"One run of the job took longer than {int(self.run_limit // 60) or 1} minutes.")
+                    why = f"One run of the job took longer than {int(self.run_limit // 60) or 1} minutes."
+                if why is None:
+                    continue
+                self.runner.kill(run.handle)
+                del self.runs[job_id]
+                proxy.revoke(job_id)
+                if j.get("publish_cut") or jobs.publish_cut(job_id, why):     # specs/011 R7: keep the film
+                    self.finish_safely(job_id, 0)
+                else:
+                    self.failed(job_id, why)
                 continue
             del self.runs[job_id]
-            try:
-                self.finished(job_id, rc)
-            except Exception as e:    # noqa: BLE001 - never let one job stop the worker
-                log.exception("job %s: finishing failed", job_id)
-                self.failed(job_id, f"The studio could not finish the job ({type(e).__name__}).")
+            self.finish_safely(job_id, rc)
+
+    def finish_safely(self, job_id: str, rc: int) -> None:
+        try:
+            self.finished(job_id, rc)
+        except Exception as e:    # noqa: BLE001 - never let one job stop the worker
+            log.exception("job %s: finishing failed", job_id)
+            self.failed(job_id, f"The studio could not finish the job ({type(e).__name__}).")
 
     # ----- cleaning (every 15 minutes, R10) -----
     def purge(self, j: dict) -> None:

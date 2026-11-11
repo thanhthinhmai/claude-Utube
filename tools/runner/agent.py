@@ -44,7 +44,8 @@ building the studio, and everything you read is paid again on every later turn. 
 - To ask the customer something, write a short Markdown file and run
   `sh {STUDIO}/bin/studio review request {job} --kind question --summary <file>`; then end your turn at once.
   You are resumed later with their answer. Never use `review wait`.
-- When the film is finished and checked, run `sh {STUDIO}/bin/studio job done {job} --film <name>`.
+- When the film is finished and checked, make its publish pack (JOB.md, Publish step: `job step {job} Publish`,
+  write publish/pack.json, `sh {STUDIO}/bin/studio publish <name>`), then run `sh {STUDIO}/bin/studio job done {job} --film <name>`.
   The studio then checks loudness (−14 ± 1 LUFS, true peak ≤ −1 dB) and reading time before it is delivered.
 - If the job cannot be done, run `sh {STUDIO}/bin/studio job fail {job} "<reason>" --by studio|customer`:
   `customer` only when the customer's request itself cannot be made (for example the idea breaks the rules);
@@ -61,6 +62,8 @@ def revise_prompt(inp: dict) -> str:
             f"note changes the narration, change only what it asks, then run `script check --customer-round` and "
             f"`script review --customer-round` until it passes, and make the voice again (JOB.md, Script step). If it "
             f"does not, keep the script and the voice as they are.\n"
+            f"- Do not copy the old `publish/` folder: make the publish pack again for the new film (JOB.md, Publish step) "
+            f"before `job done`.\n"
             f"- Style: `{inp['style']}`. Length: about {inp['seconds']} seconds unless the note asks otherwise.\n"
             f"- The original idea:\n<idea>\n{inp.get('idea') or ''}\n</idea>\n"
             f"- What the customer wants changed:\n<note>\n{inp['note']}\n</note>\n\n"

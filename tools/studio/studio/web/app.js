@@ -215,6 +215,48 @@ function qualityHtml(qa) {
     ${qa.film === "not_checked" ? `<p class="muted">The film could not be measured.</p>` : ""}</div>`;
 }
 
+const ANGLE = { curiosity: "Curiosity", number: "Number", question: "Question" };
+/** The Publish block of a finished film job (specs/011 contracts/api.md). @param {string} film @param {any} sum */
+async function fillPublish(film, sum) {
+  const box = document.getElementById("publish");
+  if (!box) return;
+  const base = `${API}/films/${encodeURIComponent(film)}/publish`;
+  let p;
+  try { p = await get(`/films/${encodeURIComponent(film)}/publish`); }
+  catch { box.innerHTML = `<p class="section-title">Publish</p><p class="muted">${sum.cut ? `The publish step was stopped: ${esc(sum.cut)}` : "No publish pack for this film."}</p>`; return; }
+  const check = p.check.cut ? `The publish step was stopped: ${esc(p.check.cut)}`
+    : p.check.pass ? "Publish check: pass" : `Publish check: ${p.check.problems.length} problem${p.check.problems.length === 1 ? "" : "s"}`;
+  box.innerHTML = `<p class="section-title">Publish</p>
+    <div class="pub-grid">${p.titles.map((/** @type {any} */ t, /** @type {number} */ i) => `<div class="pub-card">
+      ${t.thumbnail ? `<img loading="lazy" src="${base}/${encodeURIComponent(t.thumbnail)}" alt="Thumbnail ${i + 1}">` : `<div class="pub-none muted">No picture</div>`}
+      <p class="muted">${esc(ANGLE[t.angle] || t.angle)}${t.thumb_text ? ` · on the picture: “${esc(t.thumb_text)}”` : ""}</p>
+      <p class="pub-title">${esc(t.text)}</p>
+      <button class="copy" data-copy="t${i}">Copy title</button></div>`).join("")}</div>
+    <p class="section-title" style="margin-top:14px">Description</p>
+    <pre class="pub-desc" id="pub-desc">${esc(p.description)}</pre>
+    <div class="row"><button class="copy" data-copy="desc">Copy description</button>
+      ${p.subtitles ? `<a class="button" href="${base}/subtitles.srt">Download subtitles</a>` : ""}
+      <a class="button" href="${base}.zip">Download pack</a></div>
+    <p class="${p.check.pass && !p.check.cut ? "pass" : "muted"}" style="margin-top:10px">${check}</p>
+    ${p.check.problems.length ? `<ul class="muted">${p.check.problems.map((/** @type {string} */ x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}`;
+  const texts = /** @type {Record<string, string>} */ ({ desc: p.description });
+  p.titles.forEach((/** @type {any} */ t, /** @type {number} */ i) => { texts[`t${i}`] = t.text; });
+  box.querySelectorAll("button.copy").forEach((el) => {
+    const b = /** @type {HTMLButtonElement} */ (el);
+    b.onclick = async () => {
+      const text = texts[b.dataset.copy || ""] || "";
+      try { await navigator.clipboard.writeText(text); }
+      catch {                                    // no clipboard: select the description so it can be copied by hand
+        const r = document.createRange(); r.selectNodeContents(/** @type {Node} */ (document.getElementById("pub-desc")));
+        const sel = window.getSelection(); if (sel) { sel.removeAllRanges(); sel.addRange(r); }
+        return;
+      }
+      const old = b.textContent; b.textContent = "Copied";
+      setTimeout(() => { b.textContent = old; }, 2000);
+    };
+  });
+}
+
 async function pageJob(id) {
   const j = await get(`/jobs/${encodeURIComponent(id)}`);
   const pct = j.progress ? Math.round((100 * j.progress.done) / j.progress.total) : null;
@@ -248,6 +290,7 @@ async function pageJob(id) {
     <div class="panel"><p class="section-title">Current step</p><p style="font-size:16px;font-weight:600">${esc(j.step)}</p>
       ${pct !== null ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ""}</div>
     ${qualityHtml(j.qa)}
+    ${j.status === "done" && j.links.film && j.qa && j.qa.publish ? `<div class="panel" id="publish"><p class="section-title">Publish</p><p class="muted">Loading…</p></div>` : ""}
     ${revs ? `<h2>Reviews</h2><ul class="reviews">${revs}</ul>` : ""}
     <h2>Log</h2><pre class="log">${j.log.map((l) => `${new Date(l.t).toLocaleTimeString("en-GB")}  ${esc(l.line)}`).join("\n") || "No lines yet."}</pre>
     </div><aside class="aside panel"><p class="section-title">Summary</p><dl class="kv">
@@ -260,6 +303,7 @@ async function pageJob(id) {
         <p class="muted" style="font-size:13px">Stopping keeps the film credit used.</p>` : ""}
       ${links ? `<p class="section-title" style="margin-top:18px">Results</p><p style="display:grid;gap:4px;margin:0">${links.replaceAll(" · ", "")}</p>` : ""}
     </aside></div>`;
+  if (j.status === "done" && j.links.film && j.qa && j.qa.publish) fillPublish(j.links.film, j.qa.publish);
   const sendAnswer = /** @type {HTMLButtonElement | null} */ (document.getElementById("send-answer"));
   if (sendAnswer) sendAnswer.onclick = async () => {
     const note = field("answer").value.trim(), msg = document.getElementById("answer-msg");
@@ -345,7 +389,7 @@ const decidedHtml = (d, kind = "") => (kind === "question"
   ${d.note ? `<br>Note: ${esc(d.note)}` : ""}</p>`);
 
 // The stages a film job reports (CLAUDE.md: job step); Storyboard only when the job asked for one
-const STAGES = ["Treatment", "Script", "Look", "Storyboard", "Voice", "Music", "Picture", "Mix", "Render", "Self-check"];
+const STAGES = ["Treatment", "Script", "Look", "Storyboard", "Voice", "Music", "Picture", "Mix", "Render", "Self-check", "Publish"];
 const OPEN_STATUS = ["queued", "running", "waiting_review", "waiting_resume"];
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));

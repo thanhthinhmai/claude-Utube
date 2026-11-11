@@ -7,6 +7,9 @@
 [narration] the Script step of specs/010 (SCRIPT.md, script check, script review, fixing flagged paragraphs; exit 3
 of the review fails the job), then voice files and narration.json; editor tags such as [editor-p1 P02] go into
 SCRIPT.md as a note
+Every film ends with the Publish step of specs/011 (pack.json, three plain thumbnails, `publish --no-draw`);
+[publish-bad] writes a 120-character title · [publish-cap] calls the API until the proxy stops it, then exits
+without job done · [529-publish] keeps calling an overloaded API during Publish
 Learn jobs: makes a reference set with videos, sheets, transcripts and proof frames, asks review 1, then
 review 2 (exit 10 each time), then saves my-styles/<slug>/. A channel URL with "fail" in it fails the job,
 one with "hang" waits until stopped."""
@@ -110,6 +113,39 @@ def voice_files(film: str) -> None:
                                                   "lines_file": "lines.json",
                                                   "lines": [{"id": f"l0{i}", "para": f"P0{i}", "at": round(0.2 + (i - 1) * 0.65, 2)}
                                                             for i in (1, 2, 3)]}))
+
+
+def publish_step(idea: str, film: str):
+    """The Publish step of JOB.md. Returns an exit code when the run ends here ([publish-cap]), else None."""
+    studio("job", "step", JOB, "Publish")
+    d = WORK / "films" / film
+    sys.path.insert(0, str(REPO / "tests" / "filmcheck"))
+    import samples
+    samples.fake_thumbs(d)                       # no page to draw from: three plain pictures that pass
+    pack = {"language": "en",
+            "titles": [{"angle": "curiosity", "text": "The Fox Who Found a Lantern in the Snow",
+                        "thumb": {"t": 0.5, "text": "Still glowing"}},
+                       {"angle": "number", "text": "One Small Light Changed the Whole Forest",
+                        "thumb": {"t": 1.5, "text": "Not dark anymore"}},
+                       {"angle": "question", "text": "Why Does a Fox Walk Alone at Night?",
+                        "thumb": {"t": 2.5, "text": "Looking for light"}}],
+            "hook": ["A small fox walks alone at night.", "She is looking for light."],
+            "summary": "A short story about a fox, a lantern and a forest that is not dark anymore.",
+            "chapters": [], "hashtags": ["#fox", "#story", "#animation"]}
+    if "[publish-bad]" in idea:
+        pack["titles"][0]["text"] = "The Fox " + "x" * 112
+    (d / "publish" / "pack.json").write_text(json.dumps(pack))
+    if "[529-publish]" in idea:                   # Claude stops answering during Publish: the watchdog
+        while True:
+            call_api("overloaded")
+            time.sleep(0.2)
+    if "[publish-cap]" in idea:
+        while call_api() == 200:
+            pass
+        result("ended")
+        return 1
+    studio_rc("publish", str(d), "--no-draw")
+    return None
 
 
 def result(status: str, error: str = None):
@@ -288,6 +324,9 @@ def main() -> int:
     if "[noreport]" in idea:
         result("ended")
         return 0
+    rc = publish_step(idea, film)
+    if rc is not None:
+        return rc
     studio("job", "done", JOB, "--film", film)
     result("ended")
     return 0

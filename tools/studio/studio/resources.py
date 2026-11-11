@@ -11,6 +11,7 @@ from .store import StudioError
 NAME = re.compile(r"^[a-z0-9-]{1,60}$")
 SHEET = re.compile(r"^v\d{2}_\d{4}\.jpg$")
 PROOF = re.compile(r"^(ref|ours_r\d+_[\d.]+)\.jpg$")
+PUBLISH_FILES = re.compile(r"^(thumbnail-[123]\.(png|jpg)|subtitles\.srt|titles\.md|description\.md|PUBLISH\.md)$")
 PRIVATE = {"origin", "title", "channel", "handle", "source_id", "src_name", "src_size"}
 
 
@@ -89,6 +90,50 @@ def film(name: str) -> dict:
 def film_file(name: str, kind: str) -> Path:
     d = film_dir(name)
     return _need({"video": d / f"{name}.mp4", "poster": d / "poster.jpg", "srt": d / f"{name}.srt"}[kind])
+
+
+# ---------- publish pack (specs/011 contracts/api.md) ----------
+def publish_file(name: str, file: str) -> Path:
+    if not PUBLISH_FILES.match(file or ""):
+        raise StudioError("not_found", "không có tệp này", 404)
+    return _need(film_dir(name) / "publish" / file)
+
+
+def publish_view(name: str) -> dict:
+    import json
+    pub = film_dir(name) / "publish"
+    _need(pub / "PUBLISH.md")
+    def read(p: Path) -> dict:
+        try:
+            x = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        return x if isinstance(x, dict) else {}
+    pack = read(pub / "pack.json")
+    checks = read(film_dir(name) / "checks.json").get("publish") or {}
+    files = sorted(f.name for f in pub.iterdir() if f.is_file() and PUBLISH_FILES.match(f.name))
+    thumb = lambda n: next((f for f in files if f.startswith(f"thumbnail-{n}.")), None)   # noqa: E731
+    titles = [{"angle": t.get("angle"), "text": t.get("text"), "thumbnail": thumb(i + 1),
+               "thumb_text": (t.get("thumb") or {}).get("text")} for i, t in enumerate(pack.get("titles") or [])]
+    desc = pub / "description.md"
+    return {"titles": titles, "description": desc.read_text(encoding="utf-8") if desc.is_file() else "",
+            "subtitles": "subtitles.srt" if "subtitles.srt" in files else None, "files": files,
+            "check": {"pass": bool(checks.get("pass")), "cut": checks.get("cut"), "problems": checks.get("problems", [])}}
+
+
+def publish_zip(name: str) -> bytes:
+    import io
+    import zipfile
+    pub = film_dir(name) / "publish"
+    _need(pub / "PUBLISH.md")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for f in sorted(pub.iterdir()):
+            if f.is_file() and PUBLISH_FILES.match(f.name):
+                z.write(f, f.name)
+                if f.name == "subtitles.srt":
+                    z.write(f, f"{name}.srt")
+    return buf.getvalue()
 
 
 # ---------- reference sets ----------

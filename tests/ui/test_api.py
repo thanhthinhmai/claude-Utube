@@ -3,7 +3,7 @@ import time
 import unittest
 from pathlib import Path
 
-from helpers import W, Project, client
+from helpers import W, Project, client, jpg
 from studio import jobs, reviews
 
 CONTRACT = Path(__file__).resolve().parents[2] / "specs" / "003-studio-ui" / "contracts" / "api-v1.md"
@@ -80,6 +80,33 @@ class Api(unittest.TestCase):
         self.assertTrue(vtt.startswith("WEBVTT"))
         self.assertIn("00:00:00.000 --> 00:00:01.000", vtt)
         self.assertEqual(self.c.get("/api/v1/films/half-done/video").json()["error"]["code"], "not_found")
+
+    def test_publish_pack(self):  # specs/011 contracts/api.md
+        import io
+        import json
+        import zipfile
+        pub = self.p.dir / "films" / "demo-film" / "publish"
+        pub.mkdir()
+        jpg(pub / "thumbnail-1.png")
+        (pub / "pack.json").write_text(json.dumps({"titles": [{"angle": "curiosity", "text": "A <b> title",
+                                                               "thumb": {"t": 0.5, "text": "Look"}}]}), encoding="utf-8")
+        (pub / "description.md").write_text("Line one.\nLine two.\n", encoding="utf-8")
+        (pub / "subtitles.srt").write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n", encoding="utf-8")
+        (pub / "PUBLISH.md").write_text("# Publish\n", encoding="utf-8")
+        (pub / "thumbs.json").write_text("[]", encoding="utf-8")
+        v = self.c.get("/api/v1/films/demo-film/publish").json()
+        self.assertEqual(v["titles"][0], {"angle": "curiosity", "text": "A <b> title", "thumbnail": "thumbnail-1.png",
+                                          "thumb_text": "Look"})
+        self.assertEqual((v["description"], v["subtitles"]), ("Line one.\nLine two.\n", "subtitles.srt"))
+        self.assertNotIn("pack.json", v["files"])
+        r = self.c.get("/api/v1/films/demo-film/publish/subtitles.srt")
+        self.assertIn("demo-film.srt", r.headers["content-disposition"])
+        for bad in ("pack.json", "thumbs.json", "..%2Fdemo-film.mp4"):
+            self.assertEqual(self.c.get(f"/api/v1/films/demo-film/publish/{bad}").status_code, 404, bad)
+        z = zipfile.ZipFile(io.BytesIO(self.c.get("/api/v1/films/demo-film/publish.zip").content))
+        self.assertEqual(sorted(z.namelist()), ["PUBLISH.md", "demo-film.srt", "description.md", "subtitles.srt",
+                                                "thumbnail-1.png"])
+        self.assertEqual(self.c.get("/api/v1/films/half-done/publish").status_code, 404)
 
     def test_sets_and_styles(self):  # FR-013, FR-014
         self.assertEqual(self.c.get("/api/v1/sets").json()["sets"][0]["set"], "demo-set")

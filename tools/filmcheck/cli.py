@@ -1,4 +1,4 @@
-"""Script review and film checks (specs/010): sh bin/studio script|web|qc|config …
+"""Script review, film checks and the publish pack (specs/010, 011): sh bin/studio script|web|qc|publish|config …
 
 Runs the same way locally and inside an online job container. Only `script review` calls Claude (contracts/cli.md)."""
 import argparse
@@ -288,6 +288,36 @@ def cmd_qc(a) -> int:
     return 0 if r["pass"] else 1
 
 
+# ---------- publish (specs/011) ----------
+def cmd_publish(a) -> int:
+    from filmcheck import publish
+    d = film_dir(a.film)
+    lib = os.environ.get("STUDIO_LIB") or str(HERE.parents[1] / "lib" / "lemo-opuscar")
+    try:
+        pack = publish.read_pack(d)
+        made = [] if a.check_only else publish.build(d, lib, draw=not a.no_draw)
+        r = publish.check(d, pack)
+    except publish.PublishError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    for p in made:                      # a thumbnail that could not be drawn is reported by the check too
+        if p not in r["problems"] and not any(x.startswith(p.split(":")[0]) for x in r["problems"]):
+            r["problems"].append(p)
+    r["pass"] = not r["problems"]
+    publish.save(d, r, now())
+    if not a.check_only:
+        publish.finish(d, r)
+    lines = [f"  ✗ {p}" for p in r["problems"]]
+    na = [k for k, v in r["applicable"].items() if not v]
+    if na:
+        lines.append("  not applicable: " + ", ".join(na))
+    lines.append(f"{'✓' if r['pass'] else '✗'} publish: " + ("the pack passes every check" if r["pass"]
+                                                             else f"{len(r['problems'])} problem(s)")
+                 + f" · films/{d.name}/publish/PUBLISH.md")
+    out(a, {**r}, lines)
+    return 0 if r["pass"] else 1
+
+
 # ---------- config ----------
 def cmd_editor_model(a) -> int:
     editor.set_editor_model(a.value)
@@ -324,6 +354,12 @@ def parser() -> argparse.ArgumentParser:
     q.add_argument("film")
     q.add_argument("--json", action="store_true")
 
+    pb = sub.add_parser("publish", help="make and check a film's publish pack (specs/011)")
+    pb.add_argument("film")
+    pb.add_argument("--check-only", action="store_true", help="check the files as they are; draw nothing")
+    pb.add_argument("--no-draw", action="store_true", help="make the text files only; keep the thumbnails as they are")
+    pb.add_argument("--json", action="store_true")
+
     c = sub.add_parser("config", help="local settings").add_subparsers(dest="cmd", required=True)
     s = c.add_parser("editor-model")
     s.add_argument("value", choices=list(editor.MODELS))
@@ -332,13 +368,13 @@ def parser() -> argparse.ArgumentParser:
 
 COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("script", "status"): cmd_status,
             ("script", "skip"): cmd_skip, ("web", "fetch"): cmd_fetch, ("config", "editor-model"): cmd_editor_model,
-            ("qc", "qc"): cmd_qc}
+            ("qc", "qc"): cmd_qc, ("publish", "publish"): cmd_publish}
 
 
 def main(argv=None) -> int:
     a = parser().parse_args(argv)
-    if a.group == "qc":
-        a.cmd = "qc"
+    if a.group in ("qc", "publish"):
+        a.cmd = a.group
     return COMMANDS.get((a.group, a.cmd), not_yet)(a)
 
 

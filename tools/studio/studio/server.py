@@ -246,6 +246,24 @@ def create_app() -> FastAPI:
         srt = resources.film_file(name, "srt").read_text(encoding="utf-8", errors="replace")
         return Response(resources.srt_to_vtt(srt), media_type="text/vtt; charset=utf-8")
 
+    # ---------- publish pack (specs/011) ----------
+    @app.get(api + "/films/{name}/publish")
+    def film_publish(name: str):
+        return resources.publish_view(name)
+
+    @app.get(api + "/films/{name}/publish.zip")
+    def film_publish_zip(name: str):
+        return Response(resources.publish_zip(name), media_type="application/zip",
+                        headers={"Content-Disposition": f'attachment; filename="{name}-publish.zip"'})
+
+    @app.get(api + "/films/{name}/publish/{file}")
+    def film_publish_file(name: str, file: str):
+        p = resources.publish_file(name, file)
+        if p.suffix == ".srt":
+            return FileResponse(p, media_type="application/x-subrip; charset=utf-8", filename=f"{name}.srt")
+        types = {".png": "image/png", ".jpg": "image/jpeg", ".md": "text/markdown; charset=utf-8"}
+        return FileResponse(p, media_type=types[p.suffix])
+
     # ---------- reference sets ----------
     @app.get(api + "/sets")
     def list_sets():
