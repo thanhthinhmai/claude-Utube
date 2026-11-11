@@ -16,6 +16,12 @@ Mỗi yêu cầu đi đúng **một** luồng:
 - `app status` · `app stop` (còn việc đang chạy thì từ chối, `--force` để dừng) · `app import` (chép `films/`, `my-styles/`, `channels/` của dự án vào app).
 - Khi app đang chạy, việc của luồng làm phim bằng chat (`job …`, `review …`) ghi vào sổ việc của app: xem và duyệt trên app; phim xong được chép (hard link) vào kho của chủ xưởng.
 
+### App desktop (specs/015)
+- `desktop/`: vỏ Electron (JavaScript thuần có `@ts-check`). Logic trong `desktop/core.js` (test: `node --test desktop/test/*.test.js`, đã nằm trong `tests/ui/run.sh`); cửa sổ, khay, thoát trong `desktop/main.js`. App chỉ gọi `sh bin/studio app …` của 014: macOS chạy thẳng, Windows chạy trong WSL2 (`wsl.exe -d <bản Linux> --cd <studio> -- sh bin/studio app …`).
+- Chạy khi phát triển: `cd desktop && npm ci && npx electron .`. Terminal của VS Code đặt sẵn `ELECTRON_RUN_AS_NODE=1`, nên phải chạy `env -u ELECTRON_RUN_AS_NODE npx electron .`. Chạy thử không cần phần lõi thật: `CU_CONFIG_DIR=$(mktemp -d) CU_CORE_CMD='["node","test/fake-core.mjs"]' npx electron . --smoke`.
+- GitHub Actions `.github/workflows/desktop.yml` chạy smoke trên Windows và macOS khi đẩy nhánh `NNN-desktop-*` hoặc bấm chạy tay (tốn phút chạy, macOS tốn gấp 10 lần).
+- Bật WSL chỉ khi người dùng bấm "Turn on WSL" và đồng ý quyền quản trị (hiến pháp 2.2.0).
+
 ### Luồng làm phim
 1. Chạy `sh bin/studio status`. Nếu chưa sẵn sàng thì chạy `sh bin/studio setup` và báo người dùng công cụ còn thiếu (xưởng không tự cài phần mềm hệ thống).
 2. Đọc `lib/lemo-opuscar/AGENTS.md` và làm theo, **ở chế độ skill** của thư viện, với các điểm thay thế sau:
@@ -105,6 +111,7 @@ Lệnh phụ: `/speckit-checklist <lĩnh vực>` tạo checklist kiểm tra ch�
 - `tools/style-learn/`: công cụ đo và lưu phong cách (venv riêng `tools/.venv`, không vào git); skill `.claude/skills/style-learn/`
 - `library.lock`: phiên bản thư viện đã ghim; `lib/lemo-opuscar/`: thư viện (không vào git, không sửa)
 - `channels/`: hồ sơ kênh của chính xưởng và bài học (vào git, specs/012) · `my-styles/`: phong cách riêng (vào git) · `films/`: phim (không vào git) · `references/`: video tham chiếu (không vào git) · `tools/`: công cụ tự viết
+- `desktop/`: app desktop (Electron, specs/015) · `CREDITS`: giấy phép của phần mềm bên thứ ba
 - `.specify/memory/constitution.md`: hiến pháp
 - `.specify/templates/`: mẫu cho spec, plan, tasks, checklist
 - `.specify/scripts/bash/`: script tạo nhánh và thư mục tính năng

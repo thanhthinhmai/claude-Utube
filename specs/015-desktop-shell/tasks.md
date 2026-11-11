@@ -14,13 +14,13 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Tạo `desktop/package.json`:
+- [X] T001 [P] Tạo `desktop/package.json`:
   - tên `claude-utube-desktop`, `main` là `main.js`;
   - `devDependencies` chỉ có `electron` ghim đúng bản `33.2.1`;
   - scripts `start` (`electron .`) và `test` (`node --test test`).
 
   Chạy `npm install --package-lock-only` để có `package-lock.json`. Thêm `desktop/node_modules/` vào `.gitignore`.
-- [ ] T002 [P] Vẽ icon bằng code (Python thuần, ghi PNG bằng zlib, không thư viện ngoài) trong `desktop/assets/make_icons.py`, rồi tạo:
+- [X] T002 [P] Vẽ icon bằng code (Python thuần, ghi PNG bằng zlib, không thư viện ngoài) trong `desktop/assets/make_icons.py`, rồi tạo:
   - `icon.png` (512×512);
   - `tray.png` (32×32);
   - `trayTemplate.png` (16×16) và `trayTemplate@2x.png` (32×32): đen trên nền trong suốt.
@@ -29,12 +29,12 @@
 
 ## Phase 2: Foundational
 
-- [ ] T003 Trong `tools/studio/studio/host.py` và `tools/studio/studio_cli.py`, viết:
+- [X] T003 Trong `tools/studio/studio/host.py` và `tools/studio/studio_cli.py`, viết:
   - `app check [--json]` → `{"ok", "missing", "data_default"}` (R2);
   - thêm `jobs: [{id, name, status}]` (các việc `running` có `charged`) vào `status()`.
 
   Test trong `tests/online/test_host.py::Check`: `app check --json` có khoá; thiếu ffmpeg thì `ok` là `false`; `app status --json` có `jobs` chứa tên một việc đang chạy.
-- [ ] T004 Viết `desktop/core.js` (`// @ts-check`, CommonJS, không import Electron):
+- [X] T004 Viết `desktop/core.js` (`// @ts-check`, CommonJS, không import Electron):
   - `loadConfig(dir)` và `saveConfig(dir, cfg)`; `configUsable(cfg, exists)`;
   - `coreCommand(cfg, args, env)` theo R1, gồm `CU_CORE_CMD`;
   - `parseUrl(stdout)`; `parseStatus(stdout)`;
@@ -53,7 +53,7 @@
 
 ### Tests for User Story 1
 
-- [ ] T005 [P] [US1] Viết `desktop/test/core.test.js` (node --test):
+- [X] T005 [P] [US1] Viết `desktop/test/core.test.js` (node --test):
   - `coreCommand` cho macOS và Windows (đường dẫn, `--data`, `CU_CORE_CMD`);
   - `parseUrl`; `parseStatus` (có và không có `jobs`);
   - `parseWslList` với đầu ra UTF-16LE mẫu (có BOM, có dấu `*`, có bản VERSION 1 bị bỏ);
@@ -62,7 +62,7 @@
   - `configUsable`; `expandHome`.
 
   Sửa `tests/ui/run.sh` để chạy `node --test desktop/test` khi có `node` (không có thì in "skipped").
-- [ ] T006 [P] [US1] Viết `desktop/test/fake-core.mjs`, một phần lõi giả theo contracts/core.md:
+- [X] T006 [P] [US1] Viết `desktop/test/fake-core.mjs`, một phần lõi giả theo contracts/core.md:
   - `app start` mở một máy chủ HTTP tách riêng (trang tiêu đề "fake core" và `/api/v1/health`), ghi `pid` và cổng vào thư mục `--data`, in `URL:`;
   - `app status --json`;
   - `app stop` giết máy chủ đó;
@@ -70,15 +70,15 @@
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Viết `desktop/main.js`:
+- [X] T007 [US1] Viết `desktop/main.js`:
   - `requestSingleInstanceLock`, và `second-instance` thì đưa cửa sổ lên trước;
   - `splash.html` hiện các bước;
   - chạy `app start` qua `coreCommand`, đọc địa chỉ, rồi mở cửa sổ chính với `contextIsolation`, `sandbox`, không `nodeIntegration`;
   - `setWindowOpenHandler` và `will-navigate` mở liên kết ngoài bằng `shell.openExternal`;
   - lỗi hay quá 60 giây thì `splash.html` hiện lỗi, các dòng log cuối, và các nút Thử lại, Mở thư mục log, Thoát;
   - cấu hình chưa dùng được thì sang màn hình thiết lập (US2).
-- [ ] T008 [US1] Thêm chế độ `--smoke` vào `desktop/main.js` theo contracts/core.md: tự tạo cấu hình với phần lõi giả; kiểm tiêu đề cửa sổ; chạy bản thứ hai; thoát; in các dòng `smoke:`.
-- [ ] T009 [US1] Viết `.github/workflows/desktop.yml` theo R4: ma trận `windows-latest` và `macos-latest`; chạy khi đẩy nhánh `0[0-9][0-9]-desktop-*` và khi bấm chạy tay; các bước `npm ci`, `node --test`, `npx electron . --smoke`, rồi kiểm không còn tiến trình `fake-core`.
+- [X] T008 [US1] Thêm chế độ `--smoke` vào `desktop/main.js` theo contracts/core.md: tự tạo cấu hình với phần lõi giả; kiểm tiêu đề cửa sổ; chạy bản thứ hai; thoát; in các dòng `smoke:`.
+- [X] T009 [US1] Viết `.github/workflows/desktop.yml` theo R4: ma trận `windows-latest` và `macos-latest`; chạy khi đẩy nhánh `0[0-9][0-9]-desktop-*` và khi bấm chạy tay; các bước `npm ci`, `node --test`, `npx electron . --smoke`, rồi kiểm không còn tiến trình `fake-core`.
 
 **Checkpoint**: US1 qua GitHub Actions trên Windows và macOS.
 
@@ -92,20 +92,20 @@
 
 ### Tests for User Story 2
 
-- [ ] T010 [P] [US2] Thêm vào `desktop/test/core.test.js`:
+- [X] T010 [P] [US2] Thêm vào `desktop/test/core.test.js`:
   - `wslStatusChecks` (chưa có WSL; WSL1; chưa bật ảo hoá; đủ);
   - `machineChecks` gộp kết quả `app check` và dung lượng trống (dưới 5 GB thì thiếu);
   - `enableWslCommand` đúng lệnh PowerShell có `-Verb RunAs`.
 
 ### Implementation for User Story 2
 
-- [ ] T011 [US2] Viết `desktop/setup.html` (tiếng Anh, giống giao diện của xưởng):
+- [X] T011 [US2] Viết `desktop/setup.html` (tiếng Anh, giống giao diện của xưởng):
   - danh sách kiểm có trạng thái đạt hay thiếu và cách sửa;
   - Windows: nút "Turn on WSL" với hộp xác nhận nói rõ sẽ bật gì và cần khởi động lại máy; ô chọn bản Linux;
   - đường dẫn studio, thư mục dữ liệu (kèm dung lượng trống), nút Start.
 
   Viết `desktop/preload.js` theo contracts/core.md, và các `ipcMain.handle` tương ứng trong `main.js`.
-- [ ] T012 [US2] Trong `desktop/main.js`, thêm mục khay "Change setup": dừng phần lõi (hỏi như khi thoát), mở `setup.html`, không xoá dữ liệu. Thêm vào smoke: không có cấu hình thì `setup.html` hiện ra (`smoke: setup ok`), rồi smoke tự hoàn tất thiết lập với phần lõi giả.
+- [X] T012 [US2] Trong `desktop/main.js`, thêm mục khay "Change setup": dừng phần lõi (hỏi như khi thoát), mở `setup.html`, không xoá dữ liệu. Thêm vào smoke: không có cấu hình thì `setup.html` hiện ra (`smoke: setup ok`), rồi smoke tự hoàn tất thiết lập với phần lõi giả.
 
 ## Phase 5: User Story 3 - Icon khay và thoát an toàn (P3)
 
@@ -117,18 +117,18 @@
 
 ### Implementation for User Story 3
 
-- [ ] T013 [US3] Trong `desktop/main.js`:
+- [X] T013 [US3] Trong `desktop/main.js`:
   - icon khay với các mục của FR-011 (macOS dùng `trayTemplate`);
   - đóng cửa sổ thì `hide()`, kèm thông báo lần đầu;
   - `before-quit` đi qua `quitPlan` và `dialog.showMessageBox`, rồi `app stop [--force]`;
   - theo dõi phần lõi 10 giây một lần, và tải `stopped.html` khi phần lõi dừng.
 
   Viết `desktop/stopped.html` với nút Restart.
-- [ ] T014 [US3] Mở rộng phần lõi giả (`--job` khiến `app status` có một việc đang chạy) và chế độ smoke theo Independent Test ở trên. Cập nhật `desktop.yml` để kiểm các dòng smoke mới.
+- [X] T014 [US3] Mở rộng phần lõi giả (`--job` khiến `app status` có một việc đang chạy) và chế độ smoke theo Independent Test ở trên. Cập nhật `desktop.yml` để kiểm các dòng smoke mới.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T015 [P] Trong `CLAUDE.md`, thêm mục "App desktop (specs/015)": cách chạy khi phát triển (`cd desktop && npm install && npx electron .`), Windows dùng bản Linux WSL có studio, GitHub Actions `desktop.yml`. Thêm `desktop/` vào mục Cấu trúc.
+- [X] T015 [P] Trong `CLAUDE.md`, thêm mục "App desktop (specs/015)": cách chạy khi phát triển (`cd desktop && npm install && npx electron .`), Windows dùng bản Linux WSL có studio, GitHub Actions `desktop.yml`. Thêm `desktop/` vào mục Cấu trúc.
 - [ ] T016 Chạy đủ 5 bộ test. Đẩy nhánh để GitHub Actions chạy trên Windows và macOS, rồi ghi kết quả (đạt hay không, thời gian, phút đã dùng) vào cuối `specs/015-desktop-shell/quickstart.md`. Đối chiếu FR và SC, ghi bảng vào cuối `specs/015-desktop-shell/tasks.md`. Bài chạy bằng tay trên máy Windows và Mac thật (quickstart mục 3–4) cần người dùng làm.
 
 ## Dependencies & Execution Order

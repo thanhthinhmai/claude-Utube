@@ -352,7 +352,14 @@ def _db_jobs(data: Path) -> list:
 
 def _job_counts(data: Path) -> dict:
     js = [j for j in _db_jobs(data) if "charged" in j]
-    return {"jobs_running": sum(j["status"] == "running" for j in js), "jobs_queued": sum(j["status"] == "queued" for j in js)}
+    return {"jobs_running": sum(j["status"] == "running" for j in js), "jobs_queued": sum(j["status"] == "queued" for j in js),
+            "jobs": [{"id": j["id"], "name": j["name"], "status": j["status"]} for j in js if j["status"] == "running"]}
+
+
+def check(project: Path = PROJECT) -> dict:
+    """What the desktop app shows on its setup screen (specs/015 R2)."""
+    missing = check_tools(project)
+    return {"ok": not missing, "missing": missing, "data_default": str(default_data_dir())}
 
 
 def stop(data=None, force=False, out=print) -> int:

@@ -1,0 +1,47 @@
+# The desktop shell on real Windows and macOS (specs/015 R4, FR-016): the logic tests, then a smoke run of the app with
+# a fake studio core (GitHub's Windows machines have no WSL2). Runs on desktop branches and by hand only, to save minutes.
+name: desktop
+on:
+  push:
+    branches: ["[0-9][0-9][0-9]-desktop-*"]
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: node --test test/core.test.js
+      - name: smoke run (fake core)
+        shell: bash
+        env:
+          CU_CORE_CMD: '["node","test/fake-core.mjs"]'
+        run: |
+          export CU_CONFIG_DIR="$RUNNER_TEMP/cu-config"
+          npx electron . --smoke 2>&1 | tee smoke.log
+          for line in "setup ok" "window ok" "external ok" "second instance ok" "hide ok" "stopped ok" "quit cancel ok" "quit ok"; do
+            grep -q "smoke: $line" smoke.log || { echo "missing: smoke: $line"; exit 1; }
+          done
+          ! grep -q "smoke: fail" smoke.log
+      - name: no fake core left (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $left = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'fake-core' }
+          if ($left) { $left | Format-List ProcessId,CommandLine; exit 1 }
+      - name: no fake core left (macOS)
+        if: runner.os == 'macOS'
+        run: "! pgrep -fl fake-core"

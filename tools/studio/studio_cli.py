@@ -298,6 +298,11 @@ def cmd_app(a):
             return 0 if s["running"] else 1
         if a.action == "stop":
             return host.stop(a.data, a.force, out=out)
+        if a.action == "check":
+            c = host.check()
+            out(json.dumps(c, ensure_ascii=False) if a.json else
+                ("✓ everything the studio needs is here" if c["ok"] else "\n".join(f"✗ {m}" for m in c["missing"])))
+            return 0 if c["ok"] else 1
         if a.action == "import":
             return host.import_project(a.data, Path(a.source).resolve() if a.source else PROJECT, out=out)
     except host.HostError as e:
@@ -402,6 +407,9 @@ def main(argv=None) -> int:
     s = aps.add_parser("stop")
     s.add_argument("--data")
     s.add_argument("--force", action="store_true")
+    s = aps.add_parser("check")
+    s.add_argument("--json", action="store_true")
+    s.add_argument("--data")
     s = aps.add_parser("import")
     s.add_argument("--data")
     s.add_argument("--from", dest="source")
