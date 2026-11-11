@@ -109,18 +109,13 @@ jobs:
           for line in "update ready ok" "quit ok"; do grep -q "smoke: $line" update.log || { echo "missing: smoke: $line"; exit 1; }; done
           ! grep -q "smoke: fail" packed.log update.log
           if [ "$RUNNER_OS" = Windows ]; then
-            # wait here: the runner ends a step's child processes when the step ends, and the installer starts 3 s late
             inst="$LOCALAPPDATA/Programs/claude-Utube/claude-Utube.exe"
-            for i in $(seq 1 90); do [ -f "$inst" ] && break; sleep 2; done
-            if [ ! -f "$inst" ]; then
-              echo "the silent install did not put the app in $inst"
-              echo "--- updates folder:"; ls -la "$CU_CONFIG_DIR/updates" || true
-              echo "--- config:"; cat "$CU_CONFIG_DIR/config.json" || true
-              dl=$(ls "$CU_CONFIG_DIR"/updates/*.exe 2>/dev/null | head -1)
-              echo "--- running the downloaded installer by hand: $dl"
-              [ -n "$dl" ] && "$dl" /S --updated; echo "exit $?"; sleep 5; ls "$LOCALAPPDATA/Programs" || true
-              exit 1
-            fi
+            for i in $(seq 1 60); do
+              [ -f "$inst" ] && break
+              powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { \$_.Name -match 'claude|Setup|Un_' } | ForEach-Object { '{0} {1} {2}' -f \$_.ProcessId, \$_.Name, \$_.CommandLine }" | head -8
+              echo "--- $i"; sleep 3
+            done
+            [ -f "$inst" ] || { echo "the silent install did not put the app in $inst"; exit 1; }
             sleep 10
           fi
       - name: the downloaded installer installs the app silently and starts it (Windows, specs/017 R6)
