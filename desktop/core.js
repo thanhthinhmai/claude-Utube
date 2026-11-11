@@ -62,7 +62,7 @@ function coreCommand(cfg, args, env = process.env) {
   }
   const studio = expandHome(cfg.studio, cfg.home);
   const pathVar = ["/opt/homebrew/bin", "/usr/local/bin", env.PATH || "/usr/bin:/bin"].join(":");
-  return { file: "/bin/sh", args: [path.join(studio, "bin", "studio"), ...tail], env: { PATH: pathVar } };
+  return { file: "/bin/sh", args: [path.posix.join(studio, "bin", "studio"), ...tail], env: { PATH: pathVar } };
 }
 
 /** A command inside the core's machine (WSL or this Mac), for setup checks. @param {Config} cfg @param {string} sh */
