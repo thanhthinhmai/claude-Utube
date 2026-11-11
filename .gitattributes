@@ -1,0 +1,2 @@
+# Signed test files: exact bytes, never line-ending conversion (specs/017)
+desktop/test/vectors/* -text

@@ -21,9 +21,21 @@ Cần khoảng **10 GB** trống trên ổ C.
 
 Cần khoảng **8 GB** trống.
 
-## Cài bản mới
+## License key
 
-Chạy bộ cài của bản mới đè lên bản cũ. Lần mở đầu tiên, app hỏi cài lại phần lõi: phim, kênh và tài khoản được giữ nguyên.
+Từ bản 0.2.0, lần mở đầu app hỏi **license key** dạng `CU-XXXX-XXXX-XXXX-XXXX` do chủ xưởng gửi.
+- Cần có mạng lúc nhập key. Sau đó app vẫn chạy được tới 7 ngày khi mất mạng.
+- Mỗi key dùng được trên một số máy nhất định. Đổi máy thì nhờ chủ xưởng gỡ máy cũ.
+- Khi key bị tắt hoặc hết hạn, app khoá lại: phim đang dựng vẫn làm xong, dữ liệu giữ nguyên. Nhập key mới để mở lại.
+- Xem hoặc đổi key: biểu tượng claude-Utube trên khay → **License…**.
+
+## Cập nhật
+
+App tự tìm bản mới (lúc mở, rồi mỗi 4 giờ; hoặc bấm **Check for updates** trên khay). Bản mới chỉ tải được khi key còn hợp lệ.
+- **Windows**: app tải xong thì báo; bản mới được cài khi bạn thoát app (hoặc bấm **Restart to update** trên khay). Lần mở sau, app cài lại phần lõi; phim, kênh và tài khoản giữ nguyên.
+- **macOS**: app mở tệp `.dmg` mới; kéo **claude-Utube** vào **Applications** để thay bản cũ.
+
+Bản 0.1.0 không tự cập nhật: cài bản 0.2.0 bằng tay một lần (chạy bộ cài mới đè lên bản cũ).
 
 ## Gỡ
 

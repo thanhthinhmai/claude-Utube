@@ -1,0 +1,6 @@
+# The license server (specs/017). Runs on the owner's VPS (deploy/license/); tests use tools/.venv.
+fastapi>=0.110
+uvicorn>=0.29
+cryptography>=42
+argon2-cffi>=23.1
+httpx>=0.27

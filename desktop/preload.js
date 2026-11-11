@@ -12,6 +12,11 @@ if (location.protocol === "file:") {
     installCore: (opts) => ipcRenderer.invoke("setup:installCore", opts),
     onProgress: (fn) => ipcRenderer.on("setup:progress", (_e, msg) => fn(msg)),
   });
+  contextBridge.exposeInMainWorld("license", {
+    state: () => ipcRenderer.invoke("license:state"),
+    submit: (key) => ipcRenderer.invoke("license:submit", key),
+    onMode: (fn) => ipcRenderer.on("license:mode", (_e, mode) => fn(mode)),
+  });
   contextBridge.exposeInMainWorld("core", {
     restart: () => ipcRenderer.invoke("core:restart"),
     retry: () => ipcRenderer.invoke("core:retry"),

@@ -11,6 +11,10 @@ files:
   - main.js
   - core.js
   - preload.js
+  - license.js
+  - updates.js
+  - license-public-key.txt
+  - "build-config.json"
   - "*.html"
   - assets/*.png
   - package.json

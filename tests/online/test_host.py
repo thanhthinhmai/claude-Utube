@@ -316,6 +316,56 @@ class WriteGuard(unittest.TestCase):                                            
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class Gate(_Base):                                                                      # specs/017 T012, SC-002
+    def write_gate(self, **over):
+        sys.path.insert(0, str(REPO / "tools" / "license"))
+        import signing
+        now = int(time.time())
+        payload = {"v": 1, "lid": "l1", "did": "d" * 64, "label": "An", "iat": now, "exp": now + 7 * 86400, "keyExp": None}
+        payload.update(over.pop("payload", {}))
+        doc = {"deviceId": "d" * 64, "lease": signing.sign_lease(self.priv, payload), "clock": now, "refused": None, **over}
+        tmp = self.gate.with_suffix(".tmp")
+        tmp.write_text(json.dumps(doc))
+        tmp.replace(self.gate)
+
+    def test_locked_and_open(self):
+        sys.path.insert(0, str(REPO / "tools" / "license"))
+        import signing
+        self.priv, pub = signing.new_keypair()
+        self.gate = self.tmp / "gate.json"
+        self.env["CU_LICENSE_PUBLIC_KEY"] = pub
+        self.write_gate()
+        self.assertEqual(self.app("start", "--gate", str(self.gate)).returncode, 0)
+        w = self.owner()
+        a = self.film(w, "A fox [slow 20]")
+        self.wait(w, a, ("running",), 30)
+        b = self.film(w, "A second fox")                                           # waits: one job per person
+        for bad in ({"refused": "revoked"}, {"payload": {"exp": int(time.time()) - 5}}, {"deviceId": "e" * 64},
+                    {"clock": int(time.time()) + 3600}, {"lease": "forged.lease"}):
+            self.write_gate(**bad)
+            code, j = w.call("GET", "/api/v1/jobs")
+            self.assertEqual((code, j["error"]["code"]), (423, "license_locked"), bad)
+            r = urllib.request.urlopen(f"http://127.0.0.1:{self.state()['web']}/api/v1/health", timeout=10)
+            self.assertEqual(r.status, 200)
+            try:
+                urllib.request.urlopen(f"http://127.0.0.1:{self.state()['web']}/", timeout=10)
+                self.fail("the page opened while locked")
+            except urllib.error.HTTPError as e:
+                self.assertEqual(e.code, 423)
+                self.assertIn(b"claude-Utube is locked", e.read())
+        # the running film finishes; the queued one does not start while locked
+        con = lambda: sqlite3.connect(self.data / "studio.db")                     # noqa: E731
+        status = lambda jid: json.loads(con().execute("SELECT data FROM docs WHERE id = ?", (jid,)).fetchone()[0])["status"]   # noqa: E731
+        end = time.time() + 90
+        while status(a) == "running" and time.time() < end:
+            time.sleep(0.5)
+        self.assertEqual(status(a), "done")
+        time.sleep(2)
+        self.assertEqual(status(b), "queued")
+        self.write_gate()
+        self.assertEqual(self.wait(w, b)["status"], "done")
+
+
 class Packaged(unittest.TestCase):                                                     # specs/016 T007
     def run_cli(self, *args, env=None):
         return subprocess.run(["sh", str(STUDIO), "app", *args], capture_output=True, text=True, timeout=60,

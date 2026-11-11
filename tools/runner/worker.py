@@ -24,7 +24,7 @@ sys.path.insert(0, str(HERE.parent / "studio"))
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))           # tools/: filmcheck (channels, specs/012)
 
-from studio import accounts, claude_plan, db, jobs, mail, quotas, reviews, store  # noqa: E402
+from studio import accounts, claude_plan, db, gate, jobs, mail, quotas, reviews, store  # noqa: E402
 
 WAITING = "Waiting for a Claude account"   # specs/008 FR-110
 from studio.store import StudioError  # noqa: E402
@@ -432,6 +432,8 @@ class Worker:
         Nothing starts while no Claude account and no API key can take its calls (specs/008 FR-110)."""
         if not claude_plan.ready():
             self.mark_waiting()
+            return None
+        if not gate.check()[0]:              # the desktop app is locked (specs/017): running jobs finish, no new one
             return None
         n = quotas.settings()["concurrency"]
         with db.tx() as con:

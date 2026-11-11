@@ -28,6 +28,19 @@ Mỗi yêu cầu đi đúng **một** luồng:
 - Phần lõi đóng gói có tệp `.core-version` (bỏ qua kiểm git của thư viện) và, trên macOS, `env.sh` (PATH tới Node, FFmpeg đi kèm). Thêm gói Python hay npm thì `desktop/core-build/credits-check.py` báo phải ghi vào `CREDITS`.
 - Sandbox Bash của agent bật khi có `bwrap` và `socat` (bản Linux của app có sẵn) hoặc trên macOS (`STUDIO_AGENT_SANDBOX=1`).
 
+### License và tự cập nhật (specs/017)
+- Máy chủ license `tools/license/` (FastAPI, SQLite; triển khai bằng `deploy/license/`, xem README ở đó):
+  - cấp key `CU-XXXX-…` (chỉ lưu mã băm), quản lý máy;
+  - ký lease Ed25519 có hạn 7 ngày, app gia hạn mỗi khoảng 15 phút;
+  - trang quản lý `/admin`, đăng nhập bằng mật khẩu đặt bằng `cli.py admin-password` trên VPS;
+  - chuyển bản phát hành riêng tư cho app có lease còn tốt.
+- App:
+  - `desktop/license.js` (logic thuần) và `license.html`: hỏi key, khoá khi bị thu hồi hoặc hết hạn;
+  - `desktop/updates.js`: kiểm `release.json` có chữ ký và SHA-256; Windows cài im lặng khi thoát, macOS mở `.dmg`.
+- Phần lõi: `app start --gate <gate.json>`. `tools/studio/studio/gate.py` kiểm lease: khi cổng đóng, web trả 423 và worker không nhận việc mới.
+- Bản build chỉ có license khi có biến repo `LICENSE_SERVER_URL` và khoá công khai trong `desktop/license-public-key.txt`. Khoá riêng chỉ nằm ở secret `LICENSE_SIGNING_KEY` và `.env` của VPS, **không bao giờ** vào repo hay vào chat.
+- Test dùng khoá thử ở `desktop/test/vectors/` và máy chủ license giả `desktop/test/fake-license.mjs`.
+
 ### Luồng làm phim
 1. Chạy `sh bin/studio status`. Nếu chưa sẵn sàng thì chạy `sh bin/studio setup` và báo người dùng công cụ còn thiếu (xưởng không tự cài phần mềm hệ thống).
 2. Đọc `lib/lemo-opuscar/AGENTS.md` và làm theo, **ở chế độ skill** của thư viện, với các điểm thay thế sau:
@@ -110,7 +123,7 @@ Mẹo chung để tiết kiệm token:
 Lệnh phụ: `/speckit-checklist <lĩnh vực>` tạo checklist kiểm tra chất lượng spec (UX, bảo mật…). `/speckit-constitution` dùng để sửa hiến pháp.
 
 ## Cấu trúc
-- `bin/studio`: `setup` · `status [--json]` · `deps [voice] [music]` · `deps learn [--extra]` · `learn <lệnh>` · `deps ui` · `ui [open|status|stop]` · `job …` · `review …` · `deps online` · `admin create <email>` · `online up|down|logs|admin <email>` · `script check|review|status|skip <phim>` · `web fetch <url>` · `app start|status|stop|import` · `qc <phim>` · `publish <phim>` · `channel …` · `lesson …` · `topics …` · `config youtube-key` · `config editor-model …`; test: `sh tests/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/online/run.sh` (bài chạy thật, tốn tiền: `sh tests/online/live.sh`)
+- `bin/studio`: `setup` · `status [--json]` · `deps [voice] [music]` · `deps learn [--extra]` · `learn <lệnh>` · `deps ui` · `ui [open|status|stop]` · `job …` · `review …` · `deps online` · `admin create <email>` · `online up|down|logs|admin <email>` · `script check|review|status|skip <phim>` · `web fetch <url>` · `app start|status|stop|import` · `qc <phim>` · `publish <phim>` · `channel …` · `lesson …` · `topics …` · `config youtube-key` · `config editor-model …`; test: `sh tests/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/online/run.sh`, `sh tests/license/run.sh` (bài chạy thật, tốn tiền: `sh tests/online/live.sh`)
 - `tools/studio/`: giao diện web và API v1 (chỉ `127.0.0.1`), sổ việc và yêu cầu duyệt trong `.studio/` (không vào git)
 - Chế độ online (specs/007, specs/008, `STUDIO_MODE=online`): xưởng nội bộ chạy bằng gói Claude Pro/Max của chủ xưởng. Tài khoản, hạn mức, việc và từng lần gọi Claude nằm trong SQLite ở `$STUDIO_DATA`; đăng nhập các tài khoản Claude nằm ở `$STUDIO_DATA/claude/slot-<n>` (quyền 700, không vào git, không vào container). `tools/studio/studio/claude_plan.py`: đăng nhập, làm mới mã, chọn tài khoản. Không có đăng ký công khai: chủ xưởng thêm người trong Settings → Users. `tools/runner/` gồm `worker.py` (hàng đợi, chạy mỗi việc trong một container), `proxy.py` (đổi mã của việc sang tài khoản Claude dùng ít nhất, khoá API chỉ là dự phòng, ghi token) và `agent.py` (Claude Agent SDK trong container). Mã API (specs/009): `tools/studio/studio/tokens.py` (mã, nhật ký, vé dùng một lần, Idempotency-Key); mỗi người tự tạo mã ở Your account, Owner xem và thu hồi ở Settings → API tokens; Settings → Worker xem worker và việc gần nhất. Máy chủ MCP ở `/api/mcp` (`tools/studio/studio/mcp_server.py`, chỉ nhận mã): mỗi công cụ là một lệnh REST với cùng mã. `deploy/` chứa Dockerfile, `compose.yaml`, Caddyfile và hướng dẫn `deploy/README.md`
 - `tools/filmcheck/` (specs/010, 011): gói đăng (`publish.py`, thumbnail vẽ từ trang của phim bằng `thumbs.mjs`), kênh và bài học (`channels.py`, specs/012), chọn đề (`topics.py`, `topics_fit.py`, specs/013), máy chấm kịch bản (`script.py`), biên tập độc lập (`editor.py`, một `claude -p` riêng), mở trang an toàn (`webfetch.py`, online đi qua bộ chuyển tiếp), đo phim (`qc.py`), kết quả `checks.json` và `CHECKS.md` trong thư mục phim (`report.py`). Chỉ cần Python 3
