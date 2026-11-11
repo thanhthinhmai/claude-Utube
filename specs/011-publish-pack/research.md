@@ -76,7 +76,7 @@ Lệnh này không gọi Claude. Nó dựng mọi tệp còn lại rồi kiểm 
 - Thời gian lấy từ `qc.load_narration` (mốc tuyệt đối của từng từ ASR). Từ thứ i trong m từ của dòng chữ ánh xạ sang từ ASR thứ ⌊i·n/m⌋ trong n từ ASR. Khối bắt đầu ở mốc bắt đầu của từ ASR đầu tiên và kết thúc ở mốc kết thúc của từ ASR cuối cùng. Khối < 1 giây được kéo dài tới 1 giây nhưng không đè lên khối sau.
 - Chữ SRT viết bằng code (khoảng 15 dòng), không gọi `srt.py` của thư viện, để test được không cần thư viện.
 - Phim bỏ bước kịch bản: vẫn dùng `lines.json`. Phim không có `narration.json`: không có phụ đề.
-- Máy kiểm: chữ của mọi khối ghép lại, chuẩn hoá bằng `qc._norm`, phải bằng chữ của `SCRIPT.md` (bằng `lines.json` nếu không có `SCRIPT.md`); ≤ 2 dòng; mỗi dòng ≤ 42 đơn vị; mỗi khối 1–7 giây; mốc tăng dần, không đè nhau.
+- Máy kiểm: chữ của mọi khối ghép lại, chuẩn hoá bằng `qc.norm_words` (tên công khai mới cho `qc._norm`), phải bằng chữ của `SCRIPT.md` (bằng `lines.json` nếu không có `SCRIPT.md`); ≤ 2 dòng; mỗi dòng ≤ 42 đơn vị; mỗi khối 1–7 giây; mốc tăng dần, không đè nhau.
 - SC-006 (lệch ≤ 0,3 giây) được test trên dữ liệu mẫu.
 
 **Alternatives considered**: Lấy `<tên>.srt` mà thư viện đã xuất. Bị loại vì đó là phụ đề đốt vào hình do agent thiết kế, có thể rút gọn và không bảo đảm khớp kịch bản.

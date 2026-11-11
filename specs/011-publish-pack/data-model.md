@@ -24,7 +24,7 @@ Mọi tệp nằm trong `films/<tên>/publish/` (contracts/files.md). Online kh�
 | Tệp | Khi nào có | Nguồn |
 |---|---|---|
 | `thumbnail-1..3.png` (hoặc `.jpg`) | luôn có | R2 |
-| `thumbs.json` | luôn có | Số đo từng ảnh (R3): `file`, `w`, `h`, `bytes`, `text_height_ratio`, `contrast`, `missing_glyphs`, `font` |
+| `thumbs.json` | luôn có | Số đo từng ảnh (R3): `file`, `w`, `h`, `bytes`, `text_height_ratio`, `contrast`, `missing_glyphs`, `font`, `font_loaded` |
 | `titles.md` | luôn có | `pack.titles` |
 | `description.md` | luôn có | hook + summary + chương + nguồn + hashtag |
 | `subtitles.srt` | khi có `narration.json` và `lines_file` | R5 |
