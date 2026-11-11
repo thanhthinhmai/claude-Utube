@@ -274,6 +274,33 @@ def check(film_dir: Path, customer_round: bool = False) -> dict:
             hard["unchanged"] = False
             issues.append(i)
 
+    # the channel's rules and lessons (specs/012), only for a film with a channel snapshot
+    from filmcheck import channels
+    snap = channels.snapshot(film_dir)
+    if snap:
+        rules = snap["rules"]
+        hard["channel_language"] = lang == (rules.get("language") or lang)
+        if not hard["channel_language"]:
+            add("P01", 0, "channel_language", f"the script is in '{lang}' but the channel is in '{rules['language']}'")
+        hard["banned_word"] = True
+        for s in sents:
+            for w, _ in channels.find_banned(s["text"], rules.get("banned") or []):
+                hard["banned_word"] = False
+                add(s["para"], s["n"], "banned_word", f'"{w}" is on the channel\'s never-use list')
+        hard["lesson_rule"] = True
+        for n, scope, phrase in channels.lesson_rules(snap, "phrase"):
+            for s in sents:
+                if channels.find_banned(s["text"], [phrase]):
+                    hard["lesson_rule"] = False
+                    issues.append({"para": s["para"], "sentence": s["n"], "rule": "lesson_rule", "lesson": n,
+                                   "detail": f'repeats lesson {channels.lesson_label(n, scope)}: "{phrase}"'})
+        for n, scope, most in channels.lesson_rules(snap, "max_sentence_words"):
+            for s in sents:
+                if s["units"] > most:
+                    hard["lesson_rule"] = False
+                    issues.append({"para": s["para"], "sentence": s["n"], "rule": "lesson_rule", "lesson": n,
+                                   "detail": f"repeats lesson {channels.lesson_label(n, scope)}: {s['units']} {'characters' if lang in CHAR_LANGS else 'words'} (at most {most})"})
+
     score = 10.0
     # long sentences
     limit = LONG_CHARS if lang in CHAR_LANGS else LONG_WORDS

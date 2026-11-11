@@ -32,6 +32,15 @@ class Thrift(unittest.TestCase):
         self.assertIn("publish", p)
         self.assertIn("Publish", agent.rules())
 
+    def test_channel_films_read_the_brief(self):                    # specs/012 T014
+        import agent
+        inp = {"style": "s", "seconds": 40, "film": "f", "idea": "i"}
+        self.assertNotIn("CHANNEL_BRIEF", agent.film_prompt(inp))
+        p = agent.film_prompt({**inp, "channel": "honey-facts"})
+        self.assertIn("CHANNEL_BRIEF.md", p)
+        self.assertIn("lines.json", p)
+        self.assertIn("CHANNEL_BRIEF.md names another language", agent.rules())
+
     def test_agent_stats_from_a_transcript(self):
         import tempfile
         from pathlib import Path

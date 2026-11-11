@@ -13,6 +13,10 @@ your context for the rest of the job.
 
 ## How to make the film (the library's workflow, skill mode)
 
+If `films/<name>/CHANNEL_BRIEF.md` exists, the film belongs to one of the customer's channels: read it first and
+follow it (language, length, style, voice and speed in `lines.json`, title and thumbnail rules, never-use words,
+hashtags, lessons). The studio checks the channel's rules and lessons in `script check`, `qc` and `publish`.
+
 Read in this order, and only these, when you reach them:
 
 1. `LIB/styles/<slug>/STYLE.md` in full (or `my-styles/<slug>/STYLE.md`): the style's fixed rules.

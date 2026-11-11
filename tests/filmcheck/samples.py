@@ -275,3 +275,24 @@ def fake_thumbs(d: Path, rows=None, size=None) -> None:
     for i, r in enumerate(rows or []):
         out[i].update(r)
     (pub / "thumbs.json").write_text(json.dumps(out), encoding="utf-8")
+
+
+# ---------- channels and lessons (specs/012) ----------
+def make_channel(root: Path, slug: str = "honey-facts", **over) -> dict:
+    """A valid channel profile under root/channels/ (and the style it names under root/my-styles/)."""
+    from filmcheck import channels
+    style = over.get("style", "test-style")
+    (Path(root) / "my-styles" / style).mkdir(parents=True, exist_ok=True)
+    (Path(root) / "my-styles" / style / "style.json").write_text("{}", encoding="utf-8")
+    ch = {"slug": slug, "name": "Honey Facts", "niche": "food science", "audience": "curious adults",
+          "language": "en", "seconds": 50, "style": style, "voice": "af_bella", "speed": 1.0,
+          "title_rules": "Lead with the surprise.", "thumbnail_rules": "Two to four words.", "title_max": 70,
+          "hashtags": ["#honey"], "banned": ["shocking"], "decisions": [{"date": "2026-11-11", "text": "No songs with lyrics."}]}
+    ch.update(over)
+    return channels.save(root, ch, new=not (channels.channel_dir(root, slug) / "channel.json").exists())
+
+
+def make_lesson(root: Path, scope: str, rule=None, status="active", what="A mistake", stop="Do not do it") -> dict:
+    from filmcheck import channels
+    return channels.add_lesson(channels.lessons_file(root, scope), what=what, why="Nothing checked it", stop=stop,
+                               rule=rule, status=status)

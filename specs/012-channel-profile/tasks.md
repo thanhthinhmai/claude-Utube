@@ -11,19 +11,19 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Thêm `channel` và `lesson` vào `case` của `bin/studio` (chuyển tới `cmd_filmcheck`) và thêm dòng `usage`. Trong `tools/filmcheck/cli.py`, thêm parser cho các lệnh của contracts/cli.md, tạm thời trả mã 2 với dòng "not built yet". Tạo `tools/filmcheck/channels.py` có docstring trỏ tới specs/012.
-- [ ] T002 [P] Trong `tests/filmcheck/samples.py`, thêm `make_channel(root, slug="khoa-hoc-vui", **over)` (ghi `channels/<slug>/channel.json` hợp lệ với `language` = `"en"`, `seconds` = 50, `style` = `"test-style"`, `hashtags` = `["#honey"]`, `banned` = `["shocking"]`, `title_max` = 70, `voice` = `"af_bella"`, `speed` = 1.0) và `make_lesson(root, scope, rule, status="active")`.
+- [X] T001 [P] Thêm `channel` và `lesson` vào `case` của `bin/studio` (chuyển tới `cmd_filmcheck`) và thêm dòng `usage`. Trong `tools/filmcheck/cli.py`, thêm parser cho các lệnh của contracts/cli.md, tạm thời trả mã 2 với dòng "not built yet". Tạo `tools/filmcheck/channels.py` có docstring trỏ tới specs/012.
+- [X] T002 [P] Trong `tests/filmcheck/samples.py`, thêm `make_channel(root, slug="khoa-hoc-vui", **over)` (ghi `channels/<slug>/channel.json` hợp lệ với `language` = `"en"`, `seconds` = 50, `style` = `"test-style"`, `hashtags` = `["#honey"]`, `banned` = `["shocking"]`, `title_max` = 70, `voice` = `"af_bella"`, `speed` = 1.0) và `make_lesson(root, scope, rule, status="active")`.
 
 ## Phase 2: Foundational
 
-- [ ] T003 Trong `tools/filmcheck/channels.py`, viết phần đọc, kiểm và ghi theo data-model.md và R1:
+- [X] T003 Trong `tools/filmcheck/channels.py`, viết phần đọc, kiểm và ghi theo data-model.md và R1:
   - `root_dir()` (= `STUDIO_ROOT` hoặc gốc truyền vào), `shared_file(root, online=False)`;
   - `validate(ch) -> list[str]`, kiểm mọi luật của bảng Channel, gồm "không có hashtag nào nằm trong `banned`", phong cách tồn tại (`my-styles/<s>/style.json` hoặc `lib/lemo-opuscar/styles/<s>/`) và dạng tên giọng của R7;
   - `load(root, slug)`, `save(root, ch)` (ghi tệp tạm rồi đổi tên; viết lại `CHANNEL.md` và `channels/README.md`), `list_channels(root)`;
   - `load_lessons(path)`, `save_lessons(path, data, title)` (viết lại `LESSONS.md`);
   - `parse_rule(rule) -> (kind, value) | None` cho `phrase:` (1–80 ký tự), `max_sentence_words:` (5–60) và `max_title_chars:` (20–100);
   - `find_banned(text, words, cjk) -> list[(word, start)]`: chữ thường, NFC, trọn từ, hoặc chuỗi con với chữ CJK (R3).
-- [ ] T004 Trong `tests/filmcheck/test_channels.py::Store`, viết test cho T003:
+- [X] T004 Trong `tests/filmcheck/test_channels.py::Store`, viết test cho T003:
   - mã sai, mã trùng, hashtag nằm trong `banned`, giọng dạng đường dẫn tệp → lỗi;
   - lưu rồi đọc lại giống hệt; `CHANNEL.md` có tên kênh; `README.md` có một dòng cho kênh;
   - `find_banned("sốt", ["sốc"])` = []; `find_banned("Thật SỐC!", ["sốc"])` có 1 chỗ.
@@ -36,8 +36,8 @@
 
 ### Tests for User Story 1
 
-- [ ] T005 [P] [US1] Trong `tests/filmcheck/test_channels.py::Rules`, viết một test cho mỗi mã của contracts/cli.md (`channel_language`, `banned_word`, `channel_hashtags`, `channel_banned`, `channel_title_max`, `channel_voice`). Mỗi test sửa đúng một thứ trên phim mẫu đạt (`samples.make_publish_film` + `channel attach`) và kiểm chỉ đúng mã đó trượt. Phim mẫu đạt có kênh: 0 lỗi kênh. Thêm `test_no_snapshot_no_change`: cùng phim đó không có `channel.json` thì `script.check`, `publish.check` và `qc.measure` cho cùng kết quả như khi chưa có tính năng (SC-006).
-- [ ] T006 [P] [US1] Trong `tests/filmcheck/test_channels.py::Snapshot`, viết test cho `attach`:
+- [X] T005 [P] [US1] Trong `tests/filmcheck/test_channels.py::Rules`, viết một test cho mỗi mã của contracts/cli.md (`channel_language`, `banned_word`, `channel_hashtags`, `channel_banned`, `channel_title_max`, `channel_voice`). Mỗi test sửa đúng một thứ trên phim mẫu đạt (`samples.make_publish_film` + `channel attach`) và kiểm chỉ đúng mã đó trượt. Phim mẫu đạt có kênh: 0 lỗi kênh. Thêm `test_no_snapshot_no_change`: cùng phim đó không có `channel.json` thì `script.check`, `publish.check` và `qc.measure` cho cùng kết quả như khi chưa có tính năng (SC-006).
+- [X] T006 [P] [US1] Trong `tests/filmcheck/test_channels.py::Snapshot`, viết test cho `attach`:
   - giá trị riêng của phim thắng giá trị của hồ sơ;
   - `voice_override` là `true` khi phim chọn giọng khác;
   - `CHANNEL_BRIEF.md` ≤ 6000 ký tự, kể cả khi có 200 bài học dài;
@@ -46,21 +46,21 @@
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Trong `tools/filmcheck/channels.py`, viết `attach(root, film_dir, slug, shared_path, **override) -> dict` theo R2: viết `channel.json` và `CHANNEL_BRIEF.md` (theo thứ tự: hồ sơ, quyết định, bài học có luật, bài học còn lại mới nhất trước; cắt ở 6000 ký tự) và trả cảnh báo khi bị cắt. Phong cách hay giọng của kênh (sau khi áp giá trị riêng) không còn hợp lệ thì báo lỗi và không viết gì (edge case của spec). Thêm `snapshot(film_dir) -> dict | None`.
-- [ ] T008 [US1] Trong `tools/filmcheck/cli.py`, viết các lệnh `channel list|new|show|set|decide|attach` theo contracts/cli.md (`--json` cho list và show). `set` hỗ trợ `--add` và `--remove` cho `hashtags` và `banned`. Mọi lần ghi đều qua `validate`.
-- [ ] T009 [US1] Trong `tools/filmcheck/script.py`, thêm vào `check()` khi `channels.snapshot(film_dir)` có:
+- [X] T007 [US1] Trong `tools/filmcheck/channels.py`, viết `attach(root, film_dir, slug, shared_path, **override) -> dict` theo R2: viết `channel.json` và `CHANNEL_BRIEF.md` (theo thứ tự: hồ sơ, quyết định, bài học có luật, bài học còn lại mới nhất trước; cắt ở 6000 ký tự) và trả cảnh báo khi bị cắt. Phong cách hay giọng của kênh (sau khi áp giá trị riêng) không còn hợp lệ thì báo lỗi và không viết gì (edge case của spec). Thêm `snapshot(film_dir) -> dict | None`.
+- [X] T008 [US1] Trong `tools/filmcheck/cli.py`, viết các lệnh `channel list|new|show|set|decide|attach` theo contracts/cli.md (`--json` cho list và show). `set` hỗ trợ `--add` và `--remove` cho `hashtags` và `banned`. Mọi lần ghi đều qua `validate`.
+- [X] T009 [US1] Trong `tools/filmcheck/script.py`, thêm vào `check()` khi `channels.snapshot(film_dir)` có:
   - điều kiện cứng `channel_language`;
   - `banned_word` (mỗi chỗ một lỗi `{"para", "sentence", "rule": "banned_word", "detail": "<từ>"}`; điều kiện cứng trượt khi có ít nhất một chỗ).
 
   Phim không có bản chụp thì không thêm khoá nào vào `hard`.
-- [ ] T010 [US1] Trong `tools/filmcheck/publish.py`, thêm vào `check()` khi có bản chụp:
+- [X] T010 [US1] Trong `tools/filmcheck/publish.py`, thêm vào `check()` khi có bản chụp:
   - `channel_hashtags` (so không phân biệt hoa thường);
   - `channel_banned` (tiêu đề, `hook`, `summary`, tên chương, chữ trên thumbnail);
   - `channel_title_max`.
-- [ ] T011 [US1] Trong `tools/filmcheck/qc.py`, thêm `channel_voice` vào `measure()` theo R3: đọc `lines_file`; `voice` không ghi thì tính là `af_bella`; `speed` mặc định 1,0, lệch hơn 0,01 là lỗi; bỏ qua khi `voice_override` là `true`. Thêm `measures.channel_voice_bad` và dòng lỗi.
-- [ ] T012 [US1] Trong `tools/filmcheck/editor.py`, đưa `CHANNEL_BRIEF.md` (nếu có) vào danh sách tệp của biên tập và thêm câu vào lời nhắc hệ thống theo R4. Test trong `tests/filmcheck/test_channels.py`: lời nhắc và danh sách tệp có `CHANNEL_BRIEF.md` khi phim có bản chụp, và không có khi phim không có.
-- [ ] T013 [US1] Trong `CLAUDE.md`, luồng làm phim thêm bước "Kênh": khi người dùng nói phim thuộc kênh nào thì chạy `channel attach <tên> <kênh> [giá trị riêng]` ngay sau khi có tên phim, đọc `films/<tên>/CHANNEL_BRIEF.md` trước Treatment, và dùng giọng, tốc độ của kênh trong `lines.json`. Người dùng chốt điều mới thì chạy `channel decide`. Thêm `channels/` vào mục Cấu trúc; thêm lệnh `channel` và `lesson` vào dòng `bin/studio`. Tạo `channels/README.md` (danh mục rỗng, có giải thích) và bỏ `channels/` khỏi `.gitignore` nếu đang bị bỏ qua.
-- [ ] T014 [US1] Trong `tools/runner/JOB.md` và `tools/runner/agent.py`: khi `films/<name>/CHANNEL_BRIEF.md` có, agent đọc nó trước Treatment, viết bằng ngôn ngữ của kênh (thay cho "All text in the film is in English"), và dùng giọng, tốc độ của kênh trong `lines.json`. Test trong `tests/online/test_agent_thrift.py`: lời nhắc của việc có kênh nói tới `CHANNEL_BRIEF.md` và ngôn ngữ của kênh.
+- [X] T011 [US1] Trong `tools/filmcheck/qc.py`, thêm `channel_voice` vào `measure()` theo R3: đọc `lines_file`; `voice` không ghi thì tính là `af_bella`; `speed` mặc định 1,0, lệch hơn 0,01 là lỗi; bỏ qua khi `voice_override` là `true`. Thêm `measures.channel_voice_bad` và dòng lỗi.
+- [X] T012 [US1] Trong `tools/filmcheck/editor.py`, đưa `CHANNEL_BRIEF.md` (nếu có) vào danh sách tệp của biên tập và thêm câu vào lời nhắc hệ thống theo R4. Test trong `tests/filmcheck/test_channels.py`: lời nhắc và danh sách tệp có `CHANNEL_BRIEF.md` khi phim có bản chụp, và không có khi phim không có.
+- [X] T013 [US1] Trong `CLAUDE.md`, luồng làm phim thêm bước "Kênh": khi người dùng nói phim thuộc kênh nào thì chạy `channel attach <tên> <kênh> [giá trị riêng]` ngay sau khi có tên phim, đọc `films/<tên>/CHANNEL_BRIEF.md` trước Treatment, và dùng giọng, tốc độ của kênh trong `lines.json`. Người dùng chốt điều mới thì chạy `channel decide`. Thêm `channels/` vào mục Cấu trúc; thêm lệnh `channel` và `lesson` vào dòng `bin/studio`. Tạo `channels/README.md` (danh mục rỗng, có giải thích) và bỏ `channels/` khỏi `.gitignore` nếu đang bị bỏ qua.
+- [X] T014 [US1] Trong `tools/runner/JOB.md` và `tools/runner/agent.py`: khi `films/<name>/CHANNEL_BRIEF.md` có, agent đọc nó trước Treatment, viết bằng ngôn ngữ của kênh (thay cho "All text in the film is in English"), và dùng giọng, tốc độ của kênh trong `lines.json`. Test trong `tests/online/test_agent_thrift.py`: lời nhắc của việc có kênh nói tới `CHANNEL_BRIEF.md` và ngôn ngữ của kênh.
 
 **Checkpoint**: US1 chạy được ở local trên phim mẫu.
 
@@ -72,7 +72,7 @@
 
 ### Tests for User Story 2
 
-- [ ] T015 [P] [US2] Trong `tests/filmcheck/test_channels.py::Lessons`, viết test:
+- [X] T015 [P] [US2] Trong `tests/filmcheck/test_channels.py::Lessons`, viết test:
   - số bài học tăng dần và không dùng lại sau khi bỏ; nháp → duyệt → bỏ; không có chiều ngược lại;
   - luật sai → `rule_valid: false`, có cảnh báo, không được kiểm;
   - `lesson_rule` trong `script check` (`phrase:` và `max_sentence_words:`) và trong `publish` (`phrase:` và `max_title_chars:`), mỗi lỗi có `#n` (SC-003);
@@ -81,10 +81,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T016 [US2] Trong `tools/filmcheck/channels.py`, viết `add_lesson(path, *, what, why, stop, film=None, rule=None, status)`, `approve(path, n)`, `retire(path, n)` và `edit_draft(path, n, **fields)` theo data-model.md (đủ độ dài các trường, tối đa 200 bài học mỗi tệp).
-- [ ] T017 [US2] Trong `tools/filmcheck/cli.py`, viết các lệnh `lesson list|draft|add|approve|retire` theo contracts/cli.md (`<scope>` = mã kênh hoặc `shared`; local dùng `channels/lessons.json`).
-- [ ] T018 [US2] `lesson_rule` trong `tools/filmcheck/script.py` (`phrase:` trên lời đọc, `max_sentence_words:` trên từng câu; điều kiện cứng) và trong `tools/filmcheck/publish.py` (`phrase:` trên cùng các chữ như `channel_banned`, `max_title_chars:` trên tiêu đề; thêm `measures.lessons_repeated`; `write_publish_md` thêm dòng cảnh báo ở đầu khi có lỗi `lesson_rule`).
-- [ ] T019 [US2] Trong `CLAUDE.md`, thêm cách ghi bài học ở local: người dùng kể lỗi → Claude soạn bằng `lesson draft <kênh|shared> …`, in bài học nháp, hỏi người dùng duyệt trong khung chat → duyệt thì `lesson approve`. Lỗi đúng cho mọi kênh thì dùng `shared`.
+- [X] T016 [US2] Trong `tools/filmcheck/channels.py`, viết `add_lesson(path, *, what, why, stop, film=None, rule=None, status)`, `approve(path, n)`, `retire(path, n)` và `edit_draft(path, n, **fields)` theo data-model.md (đủ độ dài các trường, tối đa 200 bài học mỗi tệp).
+- [X] T017 [US2] Trong `tools/filmcheck/cli.py`, viết các lệnh `lesson list|draft|add|approve|retire` theo contracts/cli.md (`<scope>` = mã kênh hoặc `shared`; local dùng `channels/lessons.json`).
+- [X] T018 [US2] `lesson_rule` trong `tools/filmcheck/script.py` (`phrase:` trên lời đọc, `max_sentence_words:` trên từng câu; điều kiện cứng) và trong `tools/filmcheck/publish.py` (`phrase:` trên cùng các chữ như `channel_banned`, `max_title_chars:` trên tiêu đề; thêm `measures.lessons_repeated`; `write_publish_md` thêm dòng cảnh báo ở đầu khi có lỗi `lesson_rule`).
+- [X] T019 [US2] Trong `CLAUDE.md`, thêm cách ghi bài học ở local: người dùng kể lỗi → Claude soạn bằng `lesson draft <kênh|shared> …`, in bài học nháp, hỏi người dùng duyệt trong khung chat → duyệt thì `lesson approve`. Lỗi đúng cho mọi kênh thì dùng `shared`.
 
 **Checkpoint**: US1 và US2 chạy ở local.
 
