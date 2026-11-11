@@ -307,6 +307,16 @@ def cmd_publish(a) -> int:
     publish.save(d, r, now())
     if not a.check_only:
         publish.finish(d, r)
+    if r["pass"]:                     # the film of a taken topic is made (specs/013 R4)
+        from filmcheck import channels, topics
+        snap = channels.snapshot(d)
+        if snap and snap.get("topic"):
+            try:
+                data = topics.load(root(), snap["channel"])
+                topics.mark_made(data, snap["topic"], d.name)
+                topics.save(root(), snap["channel"], data)
+            except topics.TopicError:
+                pass
     lines = [f"  ✗ {p}" for p in r["problems"]]
     na = [k for k, v in r["applicable"].items() if not v]
     if na:
@@ -398,7 +408,7 @@ def cmd_channel_decide(a, channels):
 
 @channel_cmd
 def cmd_channel_attach(a, channels):
-    over = {k: getattr(a, k) for k in ("style", "seconds", "language", "voice", "speed") if getattr(a, k) is not None}
+    over = {k: getattr(a, k) for k in ("style", "seconds", "language", "voice", "speed", "topic") if getattr(a, k) is not None}
     r = channels.attach(root(), film_dir(a.film) if not a.new else Path(root()) / "films" / a.film, a.slug,
                         lib=lib_dir(), **over)
     if r["warning"]:
@@ -451,6 +461,175 @@ def cmd_lesson_approve(a, channels):
 def cmd_lesson_retire(a, channels):
     x = channels.retire(scope_path(channels, a.scope), a.n, a.scope)
     print(f"✓ lesson #{x['n']} retired")
+
+
+# ---------- topics (specs/013) ----------
+DAILY_UNITS = 9000
+
+
+def topic_cmd(fn):
+    def run(a):
+        from filmcheck import channels, topics
+        try:
+            return fn(a, topics, channels) or 0
+        except (topics.TopicError, channels.ChannelError) as e:
+            print(f"✗ {e}", file=sys.stderr)
+            return 2
+        except topics.QuotaError as e:
+            print(f"✗ {e}", file=sys.stderr)
+            return 3
+    return run
+
+
+def usage_obj(topics):
+    return topics.Usage(root() / ".studio" / "youtube-usage.json", int(os.environ.get("STUDIO_YOUTUBE_DAILY") or DAILY_UNITS))
+
+
+def local_fetcher(topics):
+    key = topics.read_key()
+    if not key:
+        raise topics.TopicError("no YouTube key yet: run `sh bin/studio config youtube-key` in your own terminal "
+                                "(never paste the key into a chat)")
+    return topics.Fetcher.local(key, usage_obj(topics), topics.Cache(root() / ".studio" / "youtube-cache")), key
+
+
+def topic_line(t):
+    s = t["scores"]
+    tv = (t.get("evidence") or {}).get("top_video")
+    line = (f"#{t['n']} {t['verdict']} {t['total']}/50  demand {s['demand']} · heat {s['heat']} · competition "
+            f"{s['competition']} · overlap {s['overlap']} · fit {s['fit'] if s['fit'] is not None else '–'}  [{t['type']}]"
+            f"  \"{t['text']}\"")
+    if tv:
+        line += f"\n   top: \"{tv['title'][:70]}\" · {tv['views']:,} views · {tv['age_days']} days"
+    if t.get("note"):
+        line += f"\n   note: {t['note']}"
+    return line
+
+
+def save_topics(topics, channels, slug, data):
+    ch = channels.load(root(), slug)
+    u = usage_obj(topics)
+    topics.save(root(), slug, data, ch.get("name"), u.today(), u.limit)
+
+
+def _score(a, topics, channels, texts):
+    from filmcheck import topics_fit
+    ch = channels.load(root(), a.channel)
+    fetcher, key = local_fetcher(topics)
+    refs = [r["id"] for r in topics.load_refs(root(), a.channel)]
+    try:
+        r = topics.score_batch(root(), a.channel, ch, texts, fetcher, suggest=getattr(a, "suggest", False), refs=refs,
+                               fit=topics_fit.fit_for(ch))
+    except topics.TopicError as e:
+        raise topics.TopicError(topics.redact(str(e), key)) from None
+    save_topics(topics, channels, a.channel, r["data"])
+    rows = [x for x in r["data"]["topics"] if x["n"] in r["scored"] or x["status"] == "unscored"]
+    lines = [topic_line(x) for x in rows]
+    lines.append(f"{'✓' if not r['stopped'] else '!'} {len(r['scored'])} topic(s) scored · {r['units']} YouTube units · "
+                 f"channels/{a.channel}/TOPICS.md" + (f" · stopped: {r['stopped']}" if r["stopped"] else ""))
+    out(a, {"scored": r["scored"], "units": r["units"], "stopped": r["stopped"],
+            "topics": [{k: v for k, v in x.items() if k != "raw"} for x in rows]}, [topics.redact(x, key) for x in lines])
+    return 3 if r["stopped"] else 0
+
+
+@topic_cmd
+def cmd_topics_score(a, topics, channels):
+    texts = list(a.topics or [])
+    if a.file:
+        texts += [ln.strip() for ln in Path(a.file).read_text(encoding="utf-8").splitlines() if ln.strip()]
+    return _score(a, topics, channels, texts)
+
+
+@topic_cmd
+def cmd_topics_recheck(a, topics, channels):
+    data = topics.load(root(), a.channel)
+    pick = [topics.find(data, n) for n in a.n] if a.n else [t for t in data["topics"] if t["status"] in ("queued", "unscored", "blocked_reference")]
+    if not pick:
+        raise topics.TopicError("nothing to check again")
+    a.suggest = False
+    return _score(a, topics, channels, [t["text"] for t in pick])
+
+
+@topic_cmd
+def cmd_topics_queue(a, topics, channels):
+    data = topics.load(root(), a.channel)
+    order = topics.queue(data)
+    rows = [topics.find(data, n) for n in order]
+    if a.all:
+        rows += [t for t in data["topics"] if t["n"] not in order]
+    out(a, {"queue": order, "topics": [{k: v for k, v in t.items() if k != "raw"} for t in rows]},
+        [topic_line(t) + ("  (stale)" if topics.stale(t) else "") for t in rows] or ["  the queue is empty: topics score …"])
+
+
+@topic_cmd
+def cmd_topics_take(a, topics, channels):
+    data = topics.load(root(), a.channel)
+    t, skipped = topics.take(data, a.film, a.allow_stale)
+    for s in skipped:
+        print(f"  skipped #{s['n']}: {s['reason']}")
+    if not t:
+        print("✗ no topic can be taken now", file=sys.stderr)
+        return 1
+    save_topics(topics, channels, a.channel, data)
+    print(f"✓ topic #{t['n']} is in progress: {t['text']}")
+    print(f"  make the film with: sh bin/studio channel attach <film> {a.channel} --new --topic {t['n']}")
+    return 0
+
+
+@topic_cmd
+def cmd_topics_made(a, topics, channels):
+    data = topics.load(root(), a.channel)
+    topics.mark_made(data, a.n)
+    save_topics(topics, channels, a.channel, data)
+    print(f"✓ topic #{a.n} made")
+
+
+@topic_cmd
+def cmd_topics_type(a, topics, channels):
+    data = topics.load(root(), a.channel)
+    topics.set_type(data, a.n, a.type)
+    save_topics(topics, channels, a.channel, data)
+    print(f"✓ topic #{a.n}: {a.type}")
+
+
+@topic_cmd
+def cmd_topics_fit(a, topics, channels):
+    data = topics.load(root(), a.channel)
+    t = topics.set_fit(data, a.n, a.score, topics.made_items(root(), a.channel, data))
+    save_topics(topics, channels, a.channel, data)
+    print(topic_line(t))
+
+
+@topic_cmd
+def cmd_topics_refs(a, topics, channels):
+    channels.load(root(), a.channel)
+    ids = [r["id"] for r in topics.load_refs(root(), a.channel)]
+    if a.add or a.remove:
+        ids = [i for i in ids + (a.add or []) if i not in (a.remove or [])]
+        topics.save_refs(root(), a.channel, ids)
+    rows = topics.load_refs(root(), a.channel)
+    print("\n".join(f"  {r['id']} (added {r['added']})" for r in rows) or "  no reference channels")
+
+
+@topic_cmd
+def cmd_topics_usage(a, topics, channels):
+    u = usage_obj(topics)
+    print(f"YouTube units used today: {u.today()} of {u.limit}")
+
+
+@topic_cmd
+def cmd_youtube_key(a, topics, channels):
+    import getpass
+    key = (getpass.getpass("YouTube Data API key (not shown): ") if sys.stdin.isatty() else sys.stdin.readline()).strip()
+    if not key:
+        raise topics.TopicError("no key given")
+    f = topics.Fetcher.local(key, usage_obj(topics), topics.Cache(root() / ".studio" / "youtube-cache-check", hours=0))
+    try:
+        f.get("videos", {"part": "id", "id": "dQw4w9WgXcQ"})
+    except topics.TopicError as e:
+        raise topics.TopicError("the key does not work: " + topics.redact(str(e), key)) from None
+    topics.save_key(key)
+    print(f"✓ YouTube key saved (…{key[-4:]}) in {topics.KEY_FILE}")
 
 
 # ---------- config ----------
@@ -528,6 +707,44 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--voice")
     s.add_argument("--speed", type=float)
     s.add_argument("--new", action="store_true", help="the film folder does not exist yet")
+    s.add_argument("--topic", type=int, help="the topic this film makes (specs/013)")
+
+    tp = sub.add_parser("topics", help="score topics with YouTube numbers (specs/013)").add_subparsers(dest="cmd", required=True)
+    s = tp.add_parser("score")
+    s.add_argument("channel")
+    s.add_argument("topics", nargs="*")
+    s.add_argument("--file")
+    s.add_argument("--suggest", action="store_true")
+    s.add_argument("--json", action="store_true")
+    s = tp.add_parser("recheck")
+    s.add_argument("channel")
+    s.add_argument("n", nargs="*", type=int)
+    s.add_argument("--json", action="store_true")
+    s = tp.add_parser("queue")
+    s.add_argument("channel")
+    s.add_argument("--all", action="store_true")
+    s.add_argument("--json", action="store_true")
+    s = tp.add_parser("take")
+    s.add_argument("channel")
+    s.add_argument("--film")
+    s.add_argument("--allow-stale", action="store_true")
+    for name in ("made",):
+        s = tp.add_parser(name)
+        s.add_argument("channel")
+        s.add_argument("n", type=int)
+    s = tp.add_parser("type")
+    s.add_argument("channel")
+    s.add_argument("n", type=int)
+    s.add_argument("type")
+    s = tp.add_parser("fit")
+    s.add_argument("channel")
+    s.add_argument("n", type=int)
+    s.add_argument("score", type=int)
+    s = tp.add_parser("refs")
+    s.add_argument("channel")
+    s.add_argument("--add", nargs="+")
+    s.add_argument("--remove", nargs="+")
+    tp.add_parser("usage")
 
     ls = sub.add_parser("lesson", help="lessons of a channel, or 'shared' (specs/012)").add_subparsers(dest="cmd", required=True)
     s = ls.add_parser("list")
@@ -548,6 +765,7 @@ def parser() -> argparse.ArgumentParser:
         s.add_argument("n", type=int)
 
     c = sub.add_parser("config", help="local settings").add_subparsers(dest="cmd", required=True)
+    c.add_parser("youtube-key", help="save your YouTube Data API key (typed in, not shown)")
     s = c.add_parser("editor-model")
     s.add_argument("value", choices=list(editor.MODELS))
     return p
@@ -560,7 +778,11 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach,
             ("lesson", "list"): cmd_lesson_list, ("lesson", "draft"): cmd_lesson_draft, ("lesson", "add"): cmd_lesson_add,
-            ("lesson", "approve"): cmd_lesson_approve, ("lesson", "retire"): cmd_lesson_retire}
+            ("lesson", "approve"): cmd_lesson_approve, ("lesson", "retire"): cmd_lesson_retire,
+            ("topics", "score"): cmd_topics_score, ("topics", "recheck"): cmd_topics_recheck,
+            ("topics", "queue"): cmd_topics_queue, ("topics", "take"): cmd_topics_take, ("topics", "made"): cmd_topics_made,
+            ("topics", "type"): cmd_topics_type, ("topics", "fit"): cmd_topics_fit, ("topics", "refs"): cmd_topics_refs,
+            ("topics", "usage"): cmd_topics_usage, ("config", "youtube-key"): cmd_youtube_key}
 
 
 def main(argv=None) -> int:

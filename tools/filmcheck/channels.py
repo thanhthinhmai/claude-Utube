@@ -402,7 +402,7 @@ def attach(root: Path, film_dir: Path, slug: str, shared_path: Path = None, lib:
     shared_lessons = load_lessons(lessons_file(root, "shared", shared_path))["lessons"]
     override_voice = bool(override.get("voice") or override.get("speed")) and \
         (film["voice"] != ch.get("voice") or abs(film["speed"] - float(ch.get("speed") or DEFAULT_SPEED)) > 0.01)
-    snap = {"channel": slug, "at": now(), "film": film,
+    snap = {"channel": slug, "at": now(), "film": film, "topic": override.get("topic"),
             "rules": {"language": film["language"], "banned": ch.get("banned") or [], "hashtags": ch.get("hashtags") or [],
                       "title_max": ch.get("title_max"), "voice": film["voice"] if ch.get("voice") or film["voice"] else None,
                       "speed": film["speed"], "voice_override": override_voice},

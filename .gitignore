@@ -38,3 +38,6 @@ deploy/.env
 tests/online/.tmp/
 !deploy/.env.example
 tests/filmcheck/.tmp/
+channels/*/topics.json
+channels/*/TOPICS.md
+channels/*/references.json

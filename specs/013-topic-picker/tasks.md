@@ -11,19 +11,19 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 [P] Thêm `topics` vào `case` của `bin/studio` (chuyển tới `cmd_filmcheck`) và thêm dòng `usage`. Trong `tools/filmcheck/cli.py`, thêm parser cho các lệnh của contracts/cli.md và `config youtube-key`. Thêm `channels/*/topics.json`, `channels/*/TOPICS.md` và `channels/*/references.json` vào `.gitignore`.
-- [ ] T002 [P] Viết `tests/filmcheck/youtube_samples.py`: một YouTube giả nhỏ (hàm `answer(endpoint, params) -> dict`) với 4 đề có kết quả tính tay theo bảng R2, gồm một đề cho từng kết luận: PRIORITY, GO, HOLD (có một mục ≤ 3) và DROP. Thêm một kênh mẫu có video cùng đề 9 ngày trước. Ghi kết quả tính tay vào docstring.
+- [X] T001 [P] Thêm `topics` vào `case` của `bin/studio` (chuyển tới `cmd_filmcheck`) và thêm dòng `usage`. Trong `tools/filmcheck/cli.py`, thêm parser cho các lệnh của contracts/cli.md và `config youtube-key`. Thêm `channels/*/topics.json`, `channels/*/TOPICS.md` và `channels/*/references.json` vào `.gitignore`.
+- [X] T002 [P] Viết `tests/filmcheck/youtube_samples.py`: một YouTube giả nhỏ (hàm `answer(endpoint, params) -> dict`) với 4 đề có kết quả tính tay theo bảng R2, gồm một đề cho từng kết luận: PRIORITY, GO, HOLD (có một mục ≤ 3) và DROP. Thêm một kênh mẫu có video cùng đề 9 ngày trước. Ghi kết quả tính tay vào docstring.
 
 ## Phase 2: Foundational
 
-- [ ] T003 Trong `tools/filmcheck/topics.py`, viết phần nền:
+- [X] T003 Trong `tools/filmcheck/topics.py`, viết phần nền:
   - `PRICE` (`search` 100, các endpoint khác 1);
   - `Usage(path, limit)`: đếm theo ngày giờ Thái Bình Dương, có `charge(endpoint)` ném `QuotaError` khi vượt;
   - `Cache(dir)`: giữ 24 giờ, khoá là sha256 của endpoint và tham số;
   - `redact(text, key)`;
   - `Fetcher.local(key, usage, cache)` (gọi thẳng `https://www.googleapis.com/youtube/v3/…` bằng `urllib`, đổi được bằng `STUDIO_YOUTUBE_URL`) và `Fetcher.proxy(url, token)` (`POST /internal/youtube`);
   - `read_key()`: `YOUTUBE_API_KEY`, hoặc `~/.config/claude-utube/youtube.key`.
-- [ ] T004 Trong `tests/filmcheck/test_topics.py::Plumbing`, viết test:
+- [X] T004 Trong `tests/filmcheck/test_topics.py::Plumbing`, viết test:
   - sang ngày mới thì đếm lại; vượt giới hạn thì `QuotaError`;
   - số liệu tạm trong 24 giờ không cộng đơn vị;
   - `redact` bỏ khoá.
@@ -36,22 +36,22 @@
 
 ### Tests for User Story 1
 
-- [ ] T005 [P] [US1] Trong `tests/filmcheck/test_topics.py::Scores`, viết test:
+- [X] T005 [P] [US1] Trong `tests/filmcheck/test_topics.py::Scores`, viết test:
   - mỗi bảng ngưỡng của R2 (nhu cầu, độ nóng, cạnh tranh, trùng) ở các điểm biên;
   - 4 đề mẫu cho đúng 5 điểm và kết luận (SC-001); chấm lại từ `raw` cho cùng kết quả;
   - đơn vị mỗi đề ≤ 400 (SC-002);
   - phim trùng nằm trong bằng chứng;
   - không có khoá → thoát 2, có hướng dẫn `config youtube-key`;
   - hết hạn mức giữa lô → thoát 3, các đề đã chấm được giữ, đề còn lại `unscored`.
-- [ ] T006 [P] [US1] Thêm vào `tests/filmcheck/test_topics.py::Secret`: chạy mọi lệnh `topics` (gồm cả lỗi 403 giả của YouTube có chứa khoá trong URL) và kiểm rằng khoá mẫu không có trong stdout, stderr, `topics.json`, `TOPICS.md` hay `.studio/` (SC-004).
+- [X] T006 [P] [US1] Thêm vào `tests/filmcheck/test_topics.py::Secret`: chạy mọi lệnh `topics` (gồm cả lỗi 403 giả của YouTube có chứa khoá trong URL) và kiểm rằng khoá mẫu không có trong stdout, stderr, `topics.json`, `TOPICS.md` hay `.studio/` (SC-004).
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Trong `tools/filmcheck/topics.py`, viết `fetch_topic(fetcher, text, lang, ref_videos) -> raw` theo R1, gồm bộ lọc "cùng đề", trung vị lượt xem của 5 kênh đầu, và đơn vị đã dùng.
-- [ ] T008 [US1] Trong `tools/filmcheck/topics.py`, viết các hàm thuần, không mạng, đúng bảng R2: `score_demand`, `score_heat`, `score_competition`, `score_overlap(text, made)`, `verdict(scores)` (gồm PRIORITY), `similarity(a, b)` (Jaccard; tiếng không tách từ dùng cặp ký tự) và `guess_type(text)`.
-- [ ] T009 [US1] Viết `tools/filmcheck/topics_fit.py`: lời nhắc hệ thống cố định, lược đồ JSON và `run(channel_md, topics, suggest)` theo R3. Dùng `editor.claude_bin()` và `editor.model_args()`, với `--tools ""` và `--json-schema`; sai lược đồ thì gọi lại một lần, vẫn sai thì `fit = null`. Trong `tests/online/fake_claude`, thêm chế độ trả lời cho lược đồ này: mỗi đề `score` 7, có `[fit-low]` trong chữ của đề thì 2; khi có `suggest` thì gợi ý 2 đề.
-- [ ] T010 [US1] Trong `tools/filmcheck/topics.py`, viết `score_batch(channel, texts, fetcher, suggest, made, refs) -> result` và các hàm lưu `load/save(root, slug)` (`topics.json` và `TOPICS.md`, gộp đề trùng ≥ 0,8 theo R4). Đề có kiểu chữ khác ngôn ngữ kênh (chữ CJK với kênh không phải zh, ja, ko, hoặc ngược lại) thì có thêm `note` cảnh báo (edge case của spec). Trong `tools/filmcheck/cli.py`, viết `topics score|recheck|fit|type|usage` và `config youtube-key` (getpass, thử bằng `videos.list` một video, ghi tệp quyền 600, chỉ in 4 ký tự cuối).
-- [ ] T011 [US1] Trong `CLAUDE.md`, thêm mục "Chọn đề" vào luồng làm phim: người dùng muốn tìm đề cho kênh thì chạy `topics score <kênh> "<đề>"… [--suggest]`, đọc bảng điểm, rồi `topics take <kênh>` để lấy ý tưởng cho phim kế tiếp; nhắc người dùng tự chạy `config youtube-key` trong terminal của họ và không dán khoá vào chat. Thêm `topics …` vào dòng `bin/studio`.
+- [X] T007 [US1] Trong `tools/filmcheck/topics.py`, viết `fetch_topic(fetcher, text, lang, ref_videos) -> raw` theo R1, gồm bộ lọc "cùng đề", trung vị lượt xem của 5 kênh đầu, và đơn vị đã dùng.
+- [X] T008 [US1] Trong `tools/filmcheck/topics.py`, viết các hàm thuần, không mạng, đúng bảng R2: `score_demand`, `score_heat`, `score_competition`, `score_overlap(text, made)`, `verdict(scores)` (gồm PRIORITY), `similarity(a, b)` (Jaccard; tiếng không tách từ dùng cặp ký tự) và `guess_type(text)`.
+- [X] T009 [US1] Viết `tools/filmcheck/topics_fit.py`: lời nhắc hệ thống cố định, lược đồ JSON và `run(channel_md, topics, suggest)` theo R3. Dùng `editor.claude_bin()` và `editor.model_args()`, với `--tools ""` và `--json-schema`; sai lược đồ thì gọi lại một lần, vẫn sai thì `fit = null`. Trong `tests/online/fake_claude`, thêm chế độ trả lời cho lược đồ này: mỗi đề `score` 7, có `[fit-low]` trong chữ của đề thì 2; khi có `suggest` thì gợi ý 2 đề.
+- [X] T010 [US1] Trong `tools/filmcheck/topics.py`, viết `score_batch(channel, texts, fetcher, suggest, made, refs) -> result` và các hàm lưu `load/save(root, slug)` (`topics.json` và `TOPICS.md`, gộp đề trùng ≥ 0,8 theo R4). Đề có kiểu chữ khác ngôn ngữ kênh (chữ CJK với kênh không phải zh, ja, ko, hoặc ngược lại) thì có thêm `note` cảnh báo (edge case của spec). Trong `tools/filmcheck/cli.py`, viết `topics score|recheck|fit|type|usage` và `config youtube-key` (getpass, thử bằng `videos.list` một video, ghi tệp quyền 600, chỉ in 4 ký tự cuối).
+- [X] T011 [US1] Trong `CLAUDE.md`, thêm mục "Chọn đề" vào luồng làm phim: người dùng muốn tìm đề cho kênh thì chạy `topics score <kênh> "<đề>"… [--suggest]`, đọc bảng điểm, rồi `topics take <kênh>` để lấy ý tưởng cho phim kế tiếp; nhắc người dùng tự chạy `config youtube-key` trong terminal của họ và không dán khoá vào chat. Thêm `topics …` vào dòng `bin/studio`.
 
 **Checkpoint**: US1 chạy được ở local với số liệu mẫu.
 
@@ -63,7 +63,7 @@
 
 ### Tests for User Story 2
 
-- [ ] T012 [P] [US2] Trong `tests/filmcheck/test_topics.py::Queue`, viết test:
+- [X] T012 [P] [US2] Trong `tests/filmcheck/test_topics.py::Queue`, viết test:
   - thứ tự PRIORITY → GO (tổng giảm dần) → HOLD, không có DROP;
   - kiểu đề của 2 phim gần nhất bị bỏ qua, có lý do;
   - `blocked_reference` khi kênh mẫu đăng cùng đề trong 30 ngày, và không chặn khi kênh mẫu đăng 40 ngày trước;
@@ -74,8 +74,8 @@
 
 ### Implementation for User Story 2
 
-- [ ] T013 [US2] Trong `tools/filmcheck/topics.py`, viết `queue(data)`, `take(data, film=None, allow_stale=False) -> (topic, skipped)`, `mark_made(data, n)`, `reference_hits(text, ref_videos)` và `refs load/save` (`references.json`, tối đa 10, `id` đúng dạng). Trong `tools/filmcheck/cli.py`, viết `topics queue|take|made|refs`.
-- [ ] T014 [US2] Ở local, phim gắn đề tự chuyển đề sang `made` khi `publish` của phim đạt: trong `tools/filmcheck/cli.py` `cmd_publish`, khi `channel.json` của phim có `topic`. Trong `tools/filmcheck/channels.py`, `attach` nhận thêm `topic` và ghi vào bản chụp. Lệnh `channel attach` có thêm `--topic N`.
+- [X] T013 [US2] Trong `tools/filmcheck/topics.py`, viết `queue(data)`, `take(data, film=None, allow_stale=False) -> (topic, skipped)`, `mark_made(data, n)`, `reference_hits(text, ref_videos)` và `refs load/save` (`references.json`, tối đa 10, `id` đúng dạng). Trong `tools/filmcheck/cli.py`, viết `topics queue|take|made|refs`.
+- [X] T014 [US2] Ở local, phim gắn đề tự chuyển đề sang `made` khi `publish` của phim đạt: trong `tools/filmcheck/cli.py` `cmd_publish`, khi `channel.json` của phim có `topic`. Trong `tools/filmcheck/channels.py`, `attach` nhận thêm `topic` và ghi vào bản chụp. Lệnh `channel attach` có thêm `--topic N`.
 
 **Checkpoint**: US1 và US2 chạy ở local.
 
