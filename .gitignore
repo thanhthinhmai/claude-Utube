@@ -41,3 +41,7 @@ tests/filmcheck/.tmp/
 channels/*/topics.json
 channels/*/TOPICS.md
 channels/*/references.json
+
+# License server (specs/017): secrets and the build-time server address
+deploy/license/.env
+desktop/build-config.json

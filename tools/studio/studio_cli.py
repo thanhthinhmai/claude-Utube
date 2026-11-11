@@ -284,7 +284,7 @@ def cmd_app(a):
     from studio import host
     try:
         if a.action == "start":
-            return host.start(a.data, a.web_port, a.proxy_port, a.foreground, out=out)
+            return host.start(a.data, a.web_port, a.proxy_port, a.foreground, out=out, gate=a.gate)
         if a.action == "status":
             s = host.status(a.data)
             if a.json:
@@ -403,6 +403,7 @@ def main(argv=None) -> int:
     s.add_argument("--web-port", type=int)
     s.add_argument("--proxy-port", type=int)
     s.add_argument("--foreground", action="store_true")
+    s.add_argument("--gate", help="the desktop app's license file (specs/017)")
     s = aps.add_parser("status")
     s.add_argument("--data")
     s.add_argument("--json", action="store_true")

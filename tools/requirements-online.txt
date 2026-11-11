@@ -1,5 +1,6 @@
 # Chế độ online (specs/007-online-studio). Cần cài kèm tầng ui: sh bin/studio deps online
 argon2-cffi>=23.1
+cryptography>=42           # checks the desktop app's license gate (specs/017)
 python-multipart>=0.0.9
 httpx>=0.27
 anthropic>=1.0

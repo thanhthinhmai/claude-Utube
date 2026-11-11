@@ -296,8 +296,10 @@ def _health(web: int) -> bool:
         return False
 
 
-def start(data=None, web_port=None, proxy_port=None, foreground=False, project: Path = PROJECT, out=print) -> int:
+def start(data=None, web_port=None, proxy_port=None, foreground=False, project: Path = PROJECT, out=print, gate=None) -> int:
     data = check_data_dir(Path(data) if data else default_data_dir(), project)
+    if gate:                         # the desktop app's license file (specs/017 R4); web and worker inherit it
+        os.environ["STUDIO_LICENSE_GATE"] = str(Path(gate).expanduser())
     st = read_state(data)
     if is_locked(data) and st:
         out(f"✓ the studio is already running on this data folder\nURL: http://127.0.0.1:{st['web']}")

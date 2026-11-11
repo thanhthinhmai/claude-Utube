@@ -1,0 +1,16 @@
+{
+ "note": "TEST KEY ONLY (specs/017 T005); never used by a real license server",
+ "public": "EhY2TXxA+D5KBpTh7PgblBnwVx0FAyamGOF/G5paTGc=",
+ "private_test_only": "P+OslMBIqYKBnPAWYnaOBFKUVnfz3EjMnEO2jAJAAJk=",
+ "device": "03204de92e11fc8c528139be419065920eb83dbff1a4663bbea455aa6e9702bd",
+ "payload": {
+  "v": 1,
+  "lid": "lic-1",
+  "did": "03204de92e11fc8c528139be419065920eb83dbff1a4663bbea455aa6e9702bd",
+  "label": "Test person",
+  "iat": 1800000000,
+  "exp": 1800604800,
+  "keyExp": null
+ },
+ "lease": "eyJkaWQiOiIwMzIwNGRlOTJlMTFmYzhjNTI4MTM5YmU0MTkwNjU5MjBlYjgzZGJmZjFhNDY2M2JiZWE0NTVhYTZlOTcwMmJkIiwiZXhwIjoxODAwNjA0ODAwLCJpYXQiOjE4MDAwMDAwMDAsImtleUV4cCI6bnVsbCwibGFiZWwiOiJUZXN0IHBlcnNvbiIsImxpZCI6ImxpYy0xIiwidiI6MX0.03SZjP3IVX51HdLF4XR9K13GcsHWALHalZkKIdWjmZSFykTj_q9qUFmkln-dhwNXAXZI-SDoTVpd0Binhe6BBQ"
+}

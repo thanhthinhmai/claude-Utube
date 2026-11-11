@@ -6,11 +6,11 @@ from typing import Literal, Optional
 
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import APP_ID, VERSION, jobs, resources, reviews, store
+from . import APP_ID, VERSION, gate, jobs, resources, reviews, store
 from urllib.parse import urlsplit
 from .store import StudioError
 
@@ -57,6 +57,12 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def guard(request: Request, call_next):
+        if gate.path() and request.url.path != "/api/v1/health":          # the desktop app's license (specs/017 R4)
+            is_open, why = gate.check()
+            if not is_open:
+                if request.url.path.startswith("/api/"):
+                    return err("license_locked", f"claude-Utube is locked (license: {why})", 423)
+                return HTMLResponse(gate.LOCKED_HTML, status_code=423)
         if online:
             return await online_guard(request, call_next)
         return await local_only(request, call_next)

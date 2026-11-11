@@ -39,4 +39,4 @@ Header `X-CU-Lease: <lease>`. Lease phải hợp lệ, và key cùng máy phải
 
 ## App ↔ phần lõi
 
-`sh bin/studio app start [--gate <tệp gate.json>] …`. Khi cổng đóng, web trả `423`: thân HTML với trình duyệt, `{"code": "license_locked"}` với lời gọi API. `/api/v1/health` luôn mở. Khi cổng đóng, worker không lấy việc mới.
+`sh bin/studio app start [--gate <tệp gate.json>] …`. Khi cổng đóng, web trả `423`: thân HTML với trình duyệt, `{"error": {"code": "license_locked", …}}` với lời gọi API (cùng dạng lỗi của xưởng). `/api/v1/health` luôn mở. Khi cổng đóng, worker không lấy việc mới.
