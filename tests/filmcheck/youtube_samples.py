@@ -57,6 +57,14 @@ def _topics():
     y = [_vid(4, i, f"Royal jelly market report {i}", chs[i % 5], chs[i % 5], 200 + i, 5_000) for i in range(10)]
     n = [_vid(4, 100 + i, f"Royal jelly market today {i}", chs[i], chs[i], d, 300) for i, d in enumerate([5, 40, 50, 60, 70])]
     t["royal jelly market [fit-low]"] = {"y": y, "n": n, "subs": {c: 2_000_000 for c in chs}, "median": {c: 5_000 for c in chs}}
+    # 5. how do bees make wax: 10 on-topic videos (200k), one off-topic hit sharing the words (10.7M) and two titles
+    #    in other scripts (Tamil, Chinese) that a channel in English must not count (added after the live run)
+    y = [_vid(5, i, f"How bees make wax, step {i}", "UCwax", "Wax", 50 + i, 200_000) for i in range(10)]
+    y += [_vid(5, 20, "Let's crack some bees wax squishies!", "UCtoys", "Toys", 61, 10_717_441),
+          _vid(5, 21, "தேனீக்கள் மெழுகு செய்வது எப்படி | bees make wax", "UCta", "Ta", 70, 5_000_000),
+          _vid(5, 22, "蜜蜂如何制造蜂蜡 bees make wax", "UCzh", "Zh", 80, 4_000_000)]
+    t["how do bees make wax"] = {"y": y, "n": [], "subs": {"UCwax": 30_000, "UCtoys": 3_000_000, "UCta": 10_000, "UCzh": 10_000},
+                                 "median": {"UCwax": 150_000, "UCtoys": 9_000_000, "UCta": 3_000_000, "UCzh": 3_000_000}}
     return t
 
 

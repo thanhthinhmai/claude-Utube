@@ -261,6 +261,19 @@ def on_topic(title: str, topic: str) -> bool:
     return not tw or len(tw & words(title)) * 2 >= len(tw)
 
 
+def script_ok(title: str, lang: str) -> bool:
+    """The title is written in the channel's script: ≥ 60% Latin letters for a Latin-script language, ≥ 30% CJK for
+    zh, ja and ko (research, added after the live run). Emoji, digits and punctuation do not count."""
+    letters = [c for c in title if c.isalpha()]
+    if not letters or not lang:
+        return True
+    name = lambda c: unicodedata.name(c, "")              # noqa: E731
+    if lang in CJK_LANGS:
+        cjk = sum(1 for c in letters if any(k in name(c) for k in ("CJK", "HIRAGANA", "KATAKANA", "HANGUL")))
+        return cjk / len(letters) >= 0.3
+    return sum(1 for c in letters if name(c).startswith("LATIN")) / len(letters) >= 0.6
+
+
 def guess_type(text: str) -> str:
     t = _norm(text)
     if re.search(r"\b(vs\.?|versus)\b|so với", t):
@@ -335,8 +348,9 @@ def fetch_topic(fetcher: Fetcher, text: str, lang: str) -> dict:
     ids = lambda b: [i["id"]["videoId"] for i in b.get("items") or [] if (i.get("id") or {}).get("videoId")]  # noqa: E731
     yid, nid = ids(ys), list(dict.fromkeys(ids(n30) + ids(n60)))
     vids = _videos(fetcher, yid + nid)
-    y = [vids[i] for i in yid if i in vids and on_topic(vids[i]["title"], text)]
-    n = [vids[i] for i in nid if i in vids and on_topic(vids[i]["title"], text)]
+    keep = lambda v: on_topic(v["title"], text) and script_ok(v["title"], lang)     # noqa: E731
+    y = [vids[i] for i in yid if i in vids and keep(vids[i])]
+    n = [vids[i] for i in nid if i in vids and keep(vids[i])]
     chans = _channels(fetcher, [v["channel_id"] for v in y + n])
     top = []
     for v in sorted(y, key=lambda v: -v["views"]):
@@ -389,8 +403,14 @@ def _age_days(v: dict, now: datetime) -> float:
         return 9999
 
 
+def on_topic_y(raw: dict) -> list:
+    """The year's videos without the ones the fit run marked as off-topic."""
+    off = set(raw.get("offtopic") or [])
+    return [v for v in raw.get("y365") or [] if v["id"] not in off]
+
+
 def score_demand(raw: dict) -> tuple:
-    y = raw.get("y365") or []
+    y = on_topic_y(raw)
     if not y:
         return 0, 0
     top = sorted((v["views"] for v in y), reverse=True)[:10]
@@ -469,7 +489,7 @@ def score_raw(text: str, raw: dict, made: list, fit=None) -> dict:
     scores = {"demand": demand, "heat": heat, "competition": comp, "overlap": overlap, "fit": fit}
     now = parse_time(raw["fetched_at"])
     recent, older = heat_counts(raw)
-    y = raw.get("y365") or []
+    y = on_topic_y(raw)
     topv = max(y, key=lambda v: v["views"]) if y else None
     ev = {"top_video": {"id": topv["id"], "title": topv["title"], "channel": topv["channel"], "views": topv["views"],
                         "age_days": round(_age_days(topv, now)), "url": f"https://www.youtube.com/watch?v={topv['id']}"}
@@ -642,12 +662,12 @@ def score_batch(root: Path, slug: str, channel: dict, texts: list, fetcher: Fetc
     first = run(texts, "user")
     suggested = []
     if fit and first:
-        got, suggested = fit(channel, [t["text"] for t in first], suggest) or ({}, [])
+        got, suggested = fit(channel, [t["text"] for t in first], suggest, top_videos(first)) or ({}, [])
         _set_fit(first, got)
     if suggest and suggested and not stopped:
         extra = run([s for s in suggested if 3 <= len(s) <= 120][:MAX_SUGGEST], "suggested")
         if fit and extra:
-            got, _ = fit(channel, [t["text"] for t in extra], False) or ({}, [])
+            got, _ = fit(channel, [t["text"] for t in extra], False, top_videos(extra)) or ({}, [])
             _set_fit(extra, got)
         first += extra
     for t in first:
@@ -659,11 +679,19 @@ def score_batch(root: Path, slug: str, channel: dict, texts: list, fetcher: Fetc
     return {"data": data, "scored": scored, "stopped": stopped, "units": fetcher.units}
 
 
+def top_videos(topics: list) -> dict:
+    """{topic text: [(id, title)]}: the 10 most viewed videos of the year, for the fit run to judge (off-topic)."""
+    return {t["text"]: [(v["id"], v["title"]) for v in sorted(t["raw"]["y365"], key=lambda v: -v["views"])[:10]]
+            for t in topics if t.get("raw")}
+
+
 def _set_fit(topics: list, got: dict) -> None:
     for t in topics:
+        g = (got or {}).get(t["text"])
+        if t.get("raw") is not None:
+            t["raw"]["offtopic"] = list((g or {}).get("offtopic") or [])
         if t.get("fit_by") == "user":
             continue
-        g = (got or {}).get(t["text"])
         if g and isinstance(g.get("score"), int):
             t["scores"]["fit"], t["fit_by"], t["fit_reason"] = g["score"], "claude", str(g.get("reason") or "")[:160]
             if g.get("type") in TYPES:

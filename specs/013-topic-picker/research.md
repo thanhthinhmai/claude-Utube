@@ -77,6 +77,22 @@ Quyết định mới, thay cho R1 #2 và hai mục Độ nóng, Cạnh tranh c�
 - **PRIORITY**: tỉ lệ 65% tính trên các video đáng kể của 30 ngày.
 - **Cạnh tranh**: các kênh có video đáng kể trong 90 ngày (cả hai khoảng); trọng số và bảng điểm giữ như cũ.
 
+## Bổ sung: lọc video lạc đề và khác ngôn ngữ (2026-11-11)
+
+Bài chạy thật còn cho thấy hai lỗi:
+- video lạc đề có cùng từ khoá vẫn lọt bộ lọc của R1 ("bees wax squishies", 10,7 triệu lượt xem, cho đề "how do bees make wax");
+- kênh tiếng Anh vẫn nhận video tiếng khác (tiêu đề chủ yếu bằng chữ Tamil).
+
+Quyết định:
+- **Kiểu chữ** (máy, không tốn token): một video chỉ được tính khi tiêu đề của nó hợp kiểu chữ của ngôn ngữ kênh.
+  - Kênh dùng chữ Latin (en, vi, es, fr, de, pt…): ít nhất 60% chữ cái của tiêu đề là chữ Latin.
+  - Kênh zh, ja, ko: tiêu đề có ít nhất 30% chữ CJK (Hán, kana, Hangul).
+  - Emoji, số và dấu câu không tính.
+  - Bộ lọc áp cho mọi danh sách (365 ngày và 90 ngày), trước khi chấm.
+- **Lạc đề** (cùng lượt Claude của R3): với mỗi đề, lời nhắc có thêm tối đa 10 video nhiều lượt xem nhất của `Y`, mỗi video ghi mã và tiêu đề. Câu trả lời có thêm `offtopic: [mã video]` cho từng đề.
+  - Các mã này được lưu vào `raw.offtopic`. `score_raw` bỏ chúng khỏi `Y` trước khi tính nhu cầu và chọn video bằng chứng, nên kết quả vẫn lặp lại được từ `raw`.
+  - Không có câu trả lời của Claude (lỗi, hay chạy không có Claude) thì không bỏ video nào.
+
 ## R3. "Hợp kênh" và gợi ý đề bằng Claude
 
 **Decision**: `topics_fit.run(channel, topics, suggest=False)` gọi một lượt `claude -p`, dùng cách tìm Claude và model của `editor.py` (cài đặt `editor_model`). Lượt gọi này dùng `--tools ""` (không công cụ), `--json-schema` và lời nhắc hệ thống cố định của xưởng. Đầu vào là hồ sơ kênh (CHANNEL.md, không có bài học) và danh sách đề. Đầu ra:

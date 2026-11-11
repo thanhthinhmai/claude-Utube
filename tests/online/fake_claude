@@ -81,9 +81,18 @@ def topics(prompt):
     """The channel-fit judge of specs/013: fit 7 for each topic, 2 with [fit-low]; two suggestions when asked."""
     import re
     block = prompt.split("Topics:", 1)[-1].split("\n\n", 1)[0]
-    names = [ln[2:].strip() for ln in block.splitlines() if ln.startswith("- ")]
+    names, off, cur = [], {}, None
+    for ln in block.splitlines():
+        if ln.startswith("- "):
+            cur = ln[2:].strip()
+            names.append(cur)
+        elif ln.startswith("    [") and cur:              # a video under the topic: "squish" titles are off-topic
+            vid, title = ln.strip()[1:].split("] ", 1)
+            if "squish" in title.lower():
+                off.setdefault(cur, []).append(vid)
     fit = [{"topic": t, "score": 2 if "[fit-low]" in t else 7, "type": "comparison" if re.search(r"\bvs\b", t) else "explainer",
-            "reason": "fits the channel" if "[fit-low]" not in t else "off the channel's niche"} for t in names]
+            "reason": "fits the channel" if "[fit-low]" not in t else "off the channel's niche", "offtopic": off.get(t, [])}
+           for t in names]
     sug = ["how bees make honey", "honey in old medicine"] if "Also suggest" in prompt else []
     print(json.dumps({"type": "result", "is_error": False, "structured_output": {"fit": fit, "suggested": sug},
                       "usage": {"input_tokens": 400, "output_tokens": 120}}))
