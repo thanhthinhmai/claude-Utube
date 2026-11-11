@@ -20,3 +20,11 @@ env -u ELECTRON_RUN_AS_NODE CU_CONFIG_DIR=$(mktemp -d) npx electron .   # chọn
 1. Máy A (Host, đã cài và chạy được 016): khay → **Share with my team…** → bật → **Add a computer**. Cho phép app trong hộp hỏi của tường lửa.
 2. Chủ xưởng tạo tài khoản member ở Settings → Users.
 3. Máy B: cài cùng bộ cài → **Connect to a studio** → nhập địa chỉ và mã → đăng nhập member → giao một phim. Bấm giờ từ lúc mở app tới lúc đăng nhập xong (dưới 3 phút).
+
+## Kết quả tự động (2026-11-12)
+
+6 bộ test đạt (`tests/ui/run.sh` có 33 test Node). Smoke trên GitHub đạt trên cả Windows và macOS: Host chia sẻ, Client ghép đôi, mở trang qua HTTPS đã ghim, cập nhật qua Host, trang offline.
+
+## Còn kiểm bằng tay
+
+SC-001: hai máy thật trong cùng LAN (hoặc Tailscale), bấm giờ từ lúc Client mở app tới lúc đăng nhập xong, rồi giao một phim thật từ Client (SC-005 với phần lõi thật).

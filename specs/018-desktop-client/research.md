@@ -63,3 +63,16 @@
 - Địa chỉ trong `100.64.0.0/10` là Tailscale.
 - Bỏ địa chỉ của WSL (`vEthernet (WSL…)`) và Docker.
 - Mỗi địa chỉ hiện dạng `<ip>:<cổng>`.
+
+## Kết quả khi làm (2026-11-12)
+
+- Bộ test của `share.js` đạt cả 6 test, trong đó có:
+  - máy giả làm Host bị phát hiện trước khi Client gửi bất cứ thứ gì;
+  - bắt luồng byte qua một rơ-le TCP mà không thấy mật khẩu, cookie, mã hay token;
+  - tắt chia sẻ thì cổng đóng dưới 2 giây.
+- GitHub Actions trên Windows và macOS (lượt chạy 43073997590):
+  - Host bật chia sẻ thật trong app (chứng chỉ do phần lõi giả cấp), ghép đôi một máy, rồi mở trang qua cổng;
+  - Client ghép đôi với một Host giả, mở trang qua HTTPS đã ghim, nhận bản mới qua Host; Host tắt thì Client hiện trang offline.
+- **Bài học**:
+  - `electron-builder.yml` phải liệt kê mọi module mà `main.js` nạp. Thiếu `share.js` thì app đóng gói lỗi ngay lúc mở. Đã thêm test `package-files.test.js`.
+  - Trên máy Windows của GitHub, phải đợi bộ cài chạy xong ngay trong bước gọi nó. Cách gọi bộ cài sau 3 giây qua PowerShell không chạy, nên quay về gọi thẳng như 017.

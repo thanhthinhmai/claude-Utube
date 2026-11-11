@@ -27,7 +27,7 @@
 ## Phase 4: Hoàn thiện
 
 - [X] T012 [P] `CLAUDE.md` (mục "Chế độ Client (specs/018)"), `desktop/INSTALL.md` (thành viên nối vào Host; tường lửa; macOS Local Network)
-- [ ] T013 Chạy đủ 6 bộ test; đối chiếu FR-001…FR-011, SC-001…SC-005; ghi phần còn kiểm bằng tay vào quickstart
+- [X] T013 Chạy đủ 6 bộ test; đối chiếu FR-001…FR-011, SC-001…SC-005; ghi phần còn kiểm bằng tay vào quickstart
 
 ## Dependencies
 
