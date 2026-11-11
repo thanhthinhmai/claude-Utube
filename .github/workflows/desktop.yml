@@ -62,22 +62,49 @@ jobs:
           npx electron . --smoke 2>&1 | tee install.log
           for line in "install ok" "window ok" "quit ok"; do grep -q "smoke: $line" install.log || { echo "missing: smoke: $line"; exit 1; }; done
           ! grep -q "smoke: fail" install.log
-      - name: build the installer (fake studio package) and run the packed app
+      - name: build the installer (fake studio package, test license) and run the packed app
         shell: bash
         env:
           CU_CORE_CMD: '["node","test/fake-core.mjs"]'
           CU_FAKE_INSTALL: "1"
+          CU_SMOKE_KEY: CU-TEST-TEST-TEST-TEST
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: |
           if [ "$RUNNER_OS" = Windows ]; then os=linux; flag=--win; else os=mac; flag=--mac; fi
           node test/fake-package.mjs "../dist/core/$os"
+          # this build checks licenses against the fake server and the TEST key (never a real key)
+          echo '{"licenseServer": "http://127.0.0.1:8913"}' > build-config.json
+          node -p "require('./test/vectors/vectors.json').public" > license-public-key.txt
           npx electron-builder $flag --publish never
           ls -la ../dist/installers
-          if [ "$RUNNER_OS" = Windows ]; then exe="../dist/installers/win-unpacked/claude-Utube.exe"; ls ../dist/installers/*.exe
-          else exe="../dist/installers/mac-arm64/claude-Utube.app/Contents/MacOS/claude-Utube"; ls ../dist/installers/*.dmg; fi
+          if [ "$RUNNER_OS" = Windows ]; then exe="../dist/installers/win-unpacked/claude-Utube.exe"; inst=$(ls ../dist/installers/*.exe | head -1)
+          else exe="../dist/installers/mac-arm64/claude-Utube.app/Contents/MacOS/claude-Utube"; inst=$(ls ../dist/installers/*.dmg | head -1); fi
+          # a "newer" release made of this very installer, signed with the TEST key (specs/017 T020)
+          rel="$RUNNER_TEMP/release"; mkdir -p "$rel"
+          if [ "$RUNNER_OS" = Windows ]; then cp "$inst" "$rel/claude-Utube-Setup-9.9.9.exe"; else cp "$inst" "$rel/claude-Utube-9.9.9-arm64.dmg"; fi
+          node test/sign-release.mjs "$rel" 9.9.9
+          node test/fake-license.mjs 8913 "$rel" > fake-license-packed.log 2>&1 &
+          sleep 1
           export CU_CONFIG_DIR="$RUNNER_TEMP/cu-config-packed"
           "$exe" --smoke 2>&1 | tee packed.log
-          for line in "install ok" "window ok" "quit ok"; do grep -q "smoke: $line" packed.log || { echo "missing: smoke: $line"; exit 1; }; done
+          for line in "license ok" "install ok" "window ok" "quit ok"; do grep -q "smoke: $line" packed.log || { echo "missing: smoke: $line"; exit 1; }; done
+          export CU_CONFIG_DIR="$RUNNER_TEMP/cu-config-update" CU_SMOKE_NO_SETUP=1
+          "$exe" --smoke --smoke-update 2>&1 | tee update.log
+          for line in "license ok" "update ready ok" "quit ok"; do grep -q "smoke: $line" update.log || { echo "missing: smoke: $line"; exit 1; }; done
+          ! grep -q "smoke: fail" packed.log update.log
+      - name: the downloaded installer installs the app silently and starts it (Windows, specs/017 R6)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:LOCALAPPDATA "Programs\claude-Utube\claude-Utube.exe"
+          for ($i = 0; $i -lt 90 -and -not (Test-Path $exe); $i++) { Start-Sleep 2 }
+          if (-not (Test-Path $exe)) { Write-Error "the silent install did not put the app in $exe"; exit 1 }
+          for ($i = 0; $i -lt 30 -and -not (Get-Process claude-Utube -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }); $i++) { Start-Sleep 2 }
+          $running = Get-Process claude-Utube -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
+          if (-not $running) { Write-Error "the installed app was not started again"; exit 1 }
+          "installed and started: $exe"
+          Get-Process claude-Utube -ErrorAction SilentlyContinue | Stop-Process -Force
+          Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'fake-core' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
       - name: no fake core left (Windows)
         if: runner.os == 'Windows'
         shell: pwsh

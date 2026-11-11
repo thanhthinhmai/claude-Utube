@@ -11,9 +11,11 @@ const os = require("node:os");
 const path = require("node:path");
 const core = require("./core.js");
 const lic = require("./license.js");
+const upd = require("./updates.js");
 
 const SMOKE = process.argv.includes("--smoke");
 const LICENSE_SMOKE = process.argv.includes("--smoke-license");
+const UPDATE_SMOKE = process.argv.includes("--smoke-update");
 const SECOND = process.argv.includes("--smoke-second");
 if (process.env.CU_CONFIG_DIR) app.setPath("userData", process.env.CU_CONFIG_DIR);   // tests: own config and own lock
 const CONFIG_DIR = app.getPath("userData");
@@ -145,7 +147,7 @@ function openMain(url) {
   });
   buildTray();
   watchCore();
-  if (SMOKE) win.webContents.once("did-finish-load", () => (LICENSE_SMOKE ? smokeLicense() : smokeMain(port)));
+  if (SMOKE) win.webContents.once("did-finish-load", () => (UPDATE_SMOKE ? smokeUpdate() : LICENSE_SMOKE ? smokeLicense() : smokeMain(port)));
 }
 
 /** @param {string} u */
@@ -188,18 +190,27 @@ function buildTray() {
   if (PLATFORM === "darwin") img.setTemplateImage(true);
   tray = new Tray(img);
   tray.setToolTip("claude-Utube");
+  setTrayMenu();
+  tray.on("click", showMain);
+}
+
+function setTrayMenu() {
+  if (!tray) return;
+  const pending = pendingUpdate();
   tray.setContextMenu(Menu.buildFromTemplate([
+    ...(pending && PLATFORM === "win32" ? [{ label: `Restart to update (${pending.version})`, click: () => app.quit() },
+      { type: /** @type {const} */ ("separator") }] : []),
     { label: "Open the studio", click: showMain },
     { label: "Open in the browser", click: () => appUrl && shell.openExternal(appUrl) },
     { type: "separator" },
     { label: "Data folder", click: () => openFolder("data") },
     { label: "Log folder", click: () => openFolder("logs") },
     { label: "Change setup…", click: changeSetup },
-    ...(LIC ? [{ label: "License…", click: () => showLicense("info") }] : []),
+    ...(LIC ? [{ label: "License…", click: () => showLicense("info") },
+      { label: "Check for updates", click: () => checkUpdates(true) }] : []),
     { type: "separator" },
     { label: "Quit", click: () => app.quit() },
   ]));
-  tray.on("click", showMain);
 }
 
 // ---------- quitting (FR-013) ----------
@@ -226,6 +237,13 @@ app.on("before-quit", async (e) => {
   if (!ok) { if (SMOKE) smoke("quit cancel ok"); return; }
   quitting = true;
   if (monitor) clearInterval(monitor);
+  const pending = PLATFORM === "win32" ? pendingUpdate() : null;
+  if (pending) {                           // the per-user installer replaces the app, then starts it again (R6)
+    const cmd = upd.installCommand(pending.file);
+    spawn(cmd.file, cmd.args, { detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {}).unref();
+    saveLicState({ pendingUpdate: null });
+    smoke("installer started");
+  }
   smoke("quit ok");
   app.exit(0);
 });
@@ -412,8 +430,68 @@ async function submitKey(typed) {
 
 /** Licensed: go on with setup or start the core. */
 async function afterLicense() {
+  const m = cfg && cfg.coreKind === "packaged" ? core.readManifest(PACKAGED_DIR) : null;
+  if (m && cfg && cfg.coreVersion !== m.version) return showSetup();      // a new app brought a new core (016 R7)
   if (core.configUsable(cfg, PLATFORM, await studioThere(cfg))) startCore();
   else showSetup();
+}
+
+// ---------- updates (specs/017 US3) ----------
+const UPDATES = path.join(CONFIG_DIR, "updates");
+let checking = false;
+
+/** A downloaded, checked installer newer than this app, or null. */
+function pendingUpdate() {
+  const p = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || {}).pendingUpdate;
+  return p && p.file && fs.existsSync(p.file) && upd.newer(p.version, app.getVersion()) ? p : null;
+}
+
+/** @param {boolean} manual */
+async function checkUpdates(manual) {
+  if (!LIC || locked || checking) return;
+  const lease = licState().lease;
+  if (!lease) return;
+  checking = true;
+  const say = (/** @type {string} */ m) => { if (manual && !SMOKE) dialog.showMessageBox({ type: "info", message: m }); };
+  try {
+    const h = { "x-cu-lease": lease };
+    const get = (/** @type {string} */ name) => fetch(`${LIC.server}/api/license/releases/${encodeURIComponent(name)}`,
+      { headers: h, signal: AbortSignal.timeout(60_000) }).then(async (r) => { if (r.status !== 200) throw new Error(`answer ${r.status}`); return Buffer.from(await r.arrayBuffer()); });
+    const list = await fetch(`${LIC.server}/api/license/releases`, { headers: h, signal: AbortSignal.timeout(30_000) });
+    if (list.status !== 200) { say("No update could be found right now."); return; }
+    const info = await list.json();
+    if (!upd.newer(info.version, app.getVersion())) { say(`claude-Utube ${app.getVersion()} is the newest version.`); return; }
+    const rel = upd.verifyRelease(LIC.publicKey, await get("release.json"), (await get("release.json.sig")).toString("utf8"));
+    if (!rel || !upd.newer(rel.version, app.getVersion())) throw new Error("the release list is not signed by the studio owner");
+    const asset = upd.pickAsset(rel, PLATFORM);
+    if (!asset) return;
+    const file = await upd.downloadTo(`${LIC.server}/api/license/releases/${encodeURIComponent(asset.name)}`, h,
+      path.join(UPDATES, asset.name), asset);
+    upd.cleanDir(UPDATES, file);
+    saveLicState({ pendingUpdate: { version: rel.version, file } });
+    setTrayMenu();
+    smoke("update ready ok");
+    if (SMOKE) return;
+    if (PLATFORM === "win32") {
+      if (Notification.isSupported()) new Notification({ title: `claude-Utube ${rel.version} is ready`,
+        body: "It is installed when you quit the app, or choose Restart to update in the tray menu." }).show();
+    } else if (PLATFORM === "darwin") {
+      const r = await dialog.showMessageBox({ type: "info", buttons: ["Later", "Open"], defaultId: 1, cancelId: 0,
+        message: `claude-Utube ${rel.version} is ready`, detail: "Open it, then drag claude-Utube into Applications to replace this version." });
+      if (r.response === 1) shell.openPath(file);
+    }
+  } catch (e) {
+    if (SMOKE) smoke(`fail update: ${e}`);
+    say(`The update could not be downloaded: ${e && /** @type {any} */ (e).message || e}`);
+  } finally {
+    checking = false;
+  }
+}
+
+function scheduleUpdates() {
+  if (!LIC) return;
+  const every = Number(!app.isPackaged && process.env.CU_UPDATE_EVERY_MS) || upd.EVERY_MS;
+  setTimeout(() => { checkUpdates(false); setInterval(() => checkUpdates(false), every); }, SMOKE ? 600_000 : upd.FIRST_CHECK_MS);
 }
 
 // ---------- setup (US2) ----------
@@ -611,6 +689,14 @@ ipcMain.handle("core:openLogs", () => openFolder("logs"));
 ipcMain.handle("core:quit", () => app.quit());
 
 // ---------- smoke run (GitHub Actions; specs/015 R4) ----------
+/** specs/017 T020: the fake license server offers a newer release; it downloads, checks, and (Windows) installs on quit. */
+async function smokeUpdate() {
+  smoke("window ok");
+  await checkUpdates(true);
+  if (!pendingUpdate()) return smokeFail("no update ready");
+  app.quit();
+}
+
 /** specs/017 T016: the fake license server turns the key off; the next renewal locks the app. */
 async function smokeLicense() {
   smoke("window ok");
@@ -684,6 +770,7 @@ if (!app.requestSingleInstanceLock()) {
       if (licenseProblem()) return showLicense("needed");
       scheduleRenew();
     }
+    scheduleUpdates();
     afterLicense();
   });
 }
