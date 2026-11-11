@@ -66,6 +66,17 @@ Nếu trung vị lượt xem của các video 30 ngày < 1000 thì điểm tối
 
 **Rationale**: Ngưỡng dùng thang log cho lượt xem, vì lượt xem trên YouTube trải rộng theo cấp số. Có bảng rõ ràng thì tính tay được, nên test được (SC-001).
 
+## Sửa sau bài chạy thật (2026-11-11)
+
+Bài chạy với khoá thật trên 3 đề phổ biến cho thấy cách lấy số liệu của R1 #2 sai. `search order=date` chỉ trả 50 video mới nhất, nên với đề phổ biến, cả 50 video đều nằm trong 30 ngày gần nhất và phần lớn có dưới 100 lượt xem. Hệ quả: `n60 = 0`, `r` lên tới khoảng 90; độ nóng luôn bị trần 5; cạnh tranh luôn có khoảng 45 kênh, toàn kênh rất nhỏ.
+
+Quyết định mới, thay cho R1 #2 và hai mục Độ nóng, Cạnh tranh của R2:
+- Thay lượt tìm #2 bằng **hai lượt tìm theo lượt xem**: `order=viewCount publishedAfter=now-30d`, và `order=viewCount publishedAfter=now-90d publishedBefore=now-30d`. Tổng khoảng 316 đơn vị mỗi đề, vẫn dưới 400.
+- Chỉ đếm **video có ít nhất 1000 lượt xem** (gọi là "video đáng kể") cho cả độ nóng và cạnh tranh. Video gần như không ai xem không phải là nhu cầu, cũng không phải đối thủ.
+- **Độ nóng**: `n30` và `n60` là số video đáng kể của từng khoảng; `r` và bảng điểm giữ như cũ; bỏ trần "trung vị lượt xem < 1000".
+- **PRIORITY**: tỉ lệ 65% tính trên các video đáng kể của 30 ngày.
+- **Cạnh tranh**: các kênh có video đáng kể trong 90 ngày (cả hai khoảng); trọng số và bảng điểm giữ như cũ.
+
 ## R3. "Hợp kênh" và gợi ý đề bằng Claude
 
 **Decision**: `topics_fit.run(channel, topics, suggest=False)` gọi một lượt `claude -p`, dùng cách tìm Claude và model của `editor.py` (cài đặt `editor_model`). Lượt gọi này dùng `--tools ""` (không công cụ), `--json-schema` và lời nhắc hệ thống cố định của xưởng. Đầu vào là hồ sơ kênh (CHANNEL.md, không có bài học) và danh sách đề. Đầu ra:

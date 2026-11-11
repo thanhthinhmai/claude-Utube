@@ -26,6 +26,7 @@ KEY_FILE = Path.home() / ".config" / "claude-utube" / "youtube.key"
 MAX_TOPICS, MAX_SUGGEST, MAX_REFS, STALE_DAYS, CACHE_HOURS = 20, 10, 10, 14, 24
 TYPES = ("explainer", "comparison", "list", "true story", "q&a", "other")
 VERDICT_ORDER = {"PRIORITY": 0, "GO": 1, "HOLD": 2}
+MEANINGFUL = 1000          # views: a video below this is neither demand nor a competitor (research, fix after the live run)
 REGION = {"en": "US", "vi": "VN", "zh": "TW", "ja": "JP", "ko": "KR", "es": "ES", "fr": "FR", "de": "DE", "pt": "BR"}
 CJK_LANGS = ("zh", "ja", "ko")
 STOP = set("""a an and are as at be by can did do does for from has have how i in is it its of on or so that the this to
@@ -169,8 +170,9 @@ def save_online_key(data_dir: Path, key: str) -> None:
 def no_template_params(params: dict) -> dict:
     """Times rounded to the hour, so a recheck within the hour hits the cache."""
     out = dict(params)
-    if "publishedAfter" in out:
-        out["publishedAfter"] = out["publishedAfter"][:13] + ":00:00Z"
+    for k in ("publishedAfter", "publishedBefore"):
+        if k in out:
+            out[k] = out[k][:13] + ":00:00Z"
     return out
 
 
@@ -326,9 +328,12 @@ def fetch_topic(fetcher: Fetcher, text: str, lang: str) -> dict:
     t0 = now_utc()
     base = {"part": "snippet", "q": text, "type": "video", "maxResults": 50, **_region(lang)}
     ys = fetcher.get("search", {**base, "order": "viewCount", "publishedAfter": iso(t0 - timedelta(days=365))})
-    ns = fetcher.get("search", {**base, "order": "date", "publishedAfter": iso(t0 - timedelta(days=90))})
-    yid = [i["id"]["videoId"] for i in ys.get("items") or [] if (i.get("id") or {}).get("videoId")]
-    nid = [i["id"]["videoId"] for i in ns.get("items") or [] if (i.get("id") or {}).get("videoId")]
+    # two windows by views, not one by date: the newest 50 of a popular topic are all from the last days (live run)
+    n30 = fetcher.get("search", {**base, "order": "viewCount", "publishedAfter": iso(t0 - timedelta(days=30))})
+    n60 = fetcher.get("search", {**base, "order": "viewCount", "publishedAfter": iso(t0 - timedelta(days=90)),
+                                 "publishedBefore": iso(t0 - timedelta(days=30))})
+    ids = lambda b: [i["id"]["videoId"] for i in b.get("items") or [] if (i.get("id") or {}).get("videoId")]  # noqa: E731
+    yid, nid = ids(ys), list(dict.fromkeys(ids(n30) + ids(n60)))
     vids = _videos(fetcher, yid + nid)
     y = [vids[i] for i in yid if i in vids and on_topic(vids[i]["title"], text)]
     n = [vids[i] for i in nid if i in vids and on_topic(vids[i]["title"], text)]
@@ -397,7 +402,7 @@ def score_demand(raw: dict) -> tuple:
 
 def heat_counts(raw: dict) -> tuple:
     now = parse_time(raw["fetched_at"])
-    n = raw.get("n90") or []
+    n = [v for v in raw.get("n90") or [] if v["views"] >= MEANINGFUL]
     recent = [v for v in n if _age_days(v, now) <= 30]
     older = [v for v in n if 30 < _age_days(v, now) <= 90]
     return recent, older
@@ -408,10 +413,7 @@ def score_heat(raw: dict) -> int:
     if not recent:
         return 0
     r = (len(recent) / 30) / max(len(older) / 60, 1 / 60)
-    pts = _step(r, HEAT)
-    if statistics.median(v["views"] for v in recent) < 1000:
-        pts = min(pts, 5)
-    return pts
+    return _step(r, HEAT)
 
 
 def cooling(raw: dict) -> bool:
@@ -428,7 +430,7 @@ def weight(subs) -> float:
 
 
 def score_competition(raw: dict) -> tuple:
-    chans = {v["channel_id"] for v in raw.get("n90") or []}
+    chans = {v["channel_id"] for v in raw.get("n90") or [] if v["views"] >= MEANINGFUL}
     w = sum(weight((raw["channels"].get(c) or {}).get("subs")) for c in chans)
     pts = 1
     for th, p in COMPETITION:

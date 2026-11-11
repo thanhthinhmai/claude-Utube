@@ -11,8 +11,9 @@ API would, for four topics whose scores were worked out by hand from research R2
                              (a reference channel posted "Honey vs sugar: which is healthier" 9 days ago)
   "bee dances explained"     demand 8 (median 2M) · heat 0 (n30 = 0) · competition 10 (one 50k channel = 1)
                              overlap 10 · fit 7 → 35, but heat ≤ 3 → HOLD
-  "royal jelly market [fit-low]"  demand 2 (median 5k) · heat 2 (n30 = 1, n60 = 4 → r = 0.5; views 300 → cap 5)
-                             competition 4 (5 channels × 2M = 15) · overlap 10 · fit 2 → 20 → DROP"""
+  "royal jelly market [fit-low]"  demand 2 (median 5k) · heat 0 (its recent videos have 300 views: none counts)
+                             competition 10 (no video of 1000+ views) · overlap 10 · fit 2 → 24 → DROP
+Only videos with 1000 views or more count for heat and competition (research, fix after the live run)."""
 from datetime import datetime, timedelta, timezone
 
 REF_CHANNEL = "UCreferencechannel0000001"[:24].ljust(24, "0")
@@ -64,7 +65,7 @@ EXPECTED = {
     "why honey never spoils": ({"demand": 10, "heat": 10, "competition": 8, "overlap": 10, "fit": 7}, "PRIORITY"),
     "honey vs sugar": ({"demand": 6, "heat": 10, "competition": 6, "overlap": 10, "fit": 7}, "GO"),
     "bee dances explained": ({"demand": 8, "heat": 0, "competition": 10, "overlap": 10, "fit": 7}, "HOLD"),
-    "royal jelly market [fit-low]": ({"demand": 2, "heat": 2, "competition": 4, "overlap": 10, "fit": 2}, "DROP"),
+    "royal jelly market [fit-low]": ({"demand": 2, "heat": 0, "competition": 10, "overlap": 10, "fit": 2}, "DROP"),
 }
 REF_VIDEOS = [{"id": "vref1", "title": "Honey vs sugar: which is healthier", "days": 9},
               {"id": "vref2", "title": "Why bees dance", "days": 40}]
@@ -87,7 +88,14 @@ def answer(endpoint, params, seen_keys=None):
         seen_keys.append(params["key"])
     if endpoint == "search":
         d = TOPICS.get(params.get("q", ""), {"y": [], "n": []})
-        vs = d["y"] if params.get("order") == "viewCount" else d["n"]
+        after = datetime.strptime(params.get("publishedAfter", "1970-01-01T00:00:00Z")[:19], "%Y-%m-%dT%H:%M:%S")
+        span = (datetime.now(timezone.utc).replace(tzinfo=None) - after).days
+        if params.get("publishedBefore"):                    # days 31–90
+            vs = [v for v in d["n"] if v["days"] > 30]
+        elif span > 200:                                     # the last year
+            vs = d["y"]
+        else:                                                # the last 30 days
+            vs = [v for v in d["n"] if v["days"] <= 30]
         return {"items": [{"id": {"kind": "youtube#video", "videoId": v["id"]}, "snippet": _snippet(v)} for v in vs]}
     if endpoint == "videos":
         allv, items = _all_videos(), []
