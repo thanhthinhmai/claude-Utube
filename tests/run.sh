@@ -242,6 +242,13 @@ echo 'echo envsh-loaded >&2' > "$P/env.sh"
 run help
 check "có env.sh thì nạp" has "envsh-loaded"
 rm -f "$P/env.sh"
+mv "$L/.git" "$W/libgit"
+run status
+check "không có .git: thư viện không do xưởng quản lý" has "không phải thư viện do xưởng quản lý"
+echo 0.1.0 > "$P/.core-version"
+run status
+check "bản đóng gói: thư viện đúng phiên bản dù không có git" has "đúng phiên bản"
+rm -f "$P/.core-version"; mv "$W/libgit" "$L/.git"
 run help
 check "không có env.sh thì bỏ qua" sh -c '! printf "%s" "$1" | grep -q envsh-loaded' _ "$OUT"
 
