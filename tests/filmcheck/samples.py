@@ -185,11 +185,12 @@ PUB_SOURCES = ('- [P01] "3,000 years old": Smithsonian Magazine, 2013, https://e
                '- [P05] "hydrogen peroxide": National Honey Board, 2020, https://example.org/acid\n')
 PUB_PAGE = """<!doctype html><html><body style="margin:0;background:#000">
 <div id="bg" style="position:fixed;inset:0"></div>
-<div id="t" style="position:fixed;left:10%;top:10%;font:700 60px sans-serif;color:#fff">Honey</div>
+<div id="t" style="position:fixed;left:0;right:0;top:7%;text-align:center;font:700 60px sans-serif;color:#fff"><span>Honey</span></div>
 <script>
 window.DUR = DURATION;
 window.render = (t) => { document.getElementById('bg').style.background = `hsl(${(t * 7) % 360},60%,30%)`; };
-window.TEXTS = (t) => [{id: 't', text: 'Honey', x0: 100, y0: 60, x1: 400, y1: 140}];
+window.TEXTS = (t) => { const r = document.querySelector('#t span').getBoundingClientRect();
+  return [{id: 't', text: 'Honey', x0: r.left, y0: r.top, x1: r.right, y1: r.bottom}]; };
 render(0); window.READY = true;
 </script></body></html>
 """
@@ -200,7 +201,7 @@ def pub_pack() -> dict:
             "titles": [{"angle": "curiosity", "text": "Why Honey From a Tomb Was Still Good to Eat",
                         "thumb": {"t": 5, "text": "Still sweet"}},
                        {"angle": "number", "text": "3,000 Years Old and Still Fine: The Secret of Honey",
-                        "thumb": {"t": 20, "text": "Bees did this", "position": "top"}},
+                        "thumb": {"t": 20, "text": "Bees did this", "position": "center"}},
                        {"angle": "question", "text": "Can Honey Really Last Forever?",
                         "thumb": {"t": 35, "text": "Forever food?", "color": "#ffd23f", "plate": "#1a1a1a",
                                   "plate_opacity": 0.75}}],

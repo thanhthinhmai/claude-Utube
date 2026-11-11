@@ -125,6 +125,36 @@ class ChannelsApi(unittest.TestCase):
         self.assertEqual(r.status_code, 422)
 
     @unittest.skipUnless(shutil.which("node") and (NODE_MODULES / "playwright-core").is_dir(), "needs node and playwright-core")
+    def test_save_as_lesson_in_a_browser(self):                     # specs/012 T027, US3/AC5
+        from helpers import Server, film_job
+        from studio import jobs
+        from studio.server import create_app
+        self.c.post("/api/v1/channels", json=channel_body(), headers=W)
+        chan = self.c.post("/api/v1/jobs", json={"kind": "film", "idea": "A fox and a lantern", "channel": "honey-facts"},
+                           headers=W).json()["id"]
+        plain = film_job(self.c).json()["id"]
+        self.s.start()
+        for jid in (chan, plain):
+            self.assertEqual(self.s.wait(jid, timeout=90)["status"], "done")
+        web = Server(create_app())
+        try:
+            r = subprocess.run(["node", str(Path(__file__).with_name("browser_lesson.cjs")), web.url, "maker@example.com",
+                                PASSWORD, chan, plain], capture_output=True, text=True, timeout=90,
+                               env={**os.environ, "NODE_PATH": str(NODE_MODULES)})
+            if r.returncode == 77:
+                self.skipTest("cannot start a browser")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            res = json.loads(r.stdout.strip().splitlines()[-1])
+            self.assertEqual(res["errors"], [])
+            self.assertEqual(res["plainHasBox"], 0)
+            self.assertIn("honey-facts", res["label"])
+            j = jobs.load(res["newJob"])
+            self.assertEqual((j["input"]["lesson"], j["input"]["channel"], j["input"]["note"]),
+                             (True, "honey-facts", "The ending is too fast"))
+        finally:
+            web.close()
+
+    @unittest.skipUnless(shutil.which("node") and (NODE_MODULES / "playwright-core").is_dir(), "needs node and playwright-core")
     def test_pages_in_a_browser(self):
         from helpers import Server
         from studio.server import create_app

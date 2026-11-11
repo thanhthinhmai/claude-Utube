@@ -52,3 +52,7 @@ Chạy mục 2 trên phim có sẵn `banh-mi-dem` (20 giây, làm trước 010, 
 - 3 thumbnail 1280×720 (417–532 KB) dùng đúng phông `Baloo VN` của phim. Chữ cao 0,228 chiều cao ảnh; độ tương phản 5,61, 14,93 và 7,34.
 - Chương và phụ đề được ghi "không áp dụng". `PUBLISH.md` có mục `## Missing` ghi 2 lý do: không có `narration.json`, và không kiểm được số vì thiếu kịch bản và nguồn.
 - Xem bằng mắt: ảnh đúng phong cách phim, chữ đọc rõ. Ảnh 2 (`position: top`) đè lên đồng hồ "02:00" của chính phim; agent tránh được bằng cách chọn `position` khác. Máy kiểm không bắt lỗi này, vì không có luật về chữ của phim nằm dưới chữ của thumbnail.
+
+## Kết quả T033 (2026-11-11)
+
+Chạy lại `publish banh-mi-dem` sau khi thêm luật `thumb_covers_text`. `texts_checked` là `true` cho cả 3 ảnh. Ảnh 2 (`position: top`) che hộp chữ "02:00" của phim 6,9%, dưới ngưỡng 10%: hai chữ chạm mép nhau chứ không che nhau, khớp với lần xem bằng mắt ở T029. Gói vẫn đạt.

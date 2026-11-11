@@ -249,3 +249,8 @@ T017 CLAUDE.md + skill-integration.md   ‖  T014 JOB.md
 
 - [X] T031 Add a test in tests/online/test_agent_thrift.py that the QC fix-round message (tools/runner/worker.py) and the revise prompt (tools/runner/agent.py) both tell the agent to run `studio publish` again per T015 / FR-001 (missing)
 - [X] T032 Add a test in tests/filmcheck/test_thumbs.py that a thumbnail over the size limit is saved as `thumbnail-n.jpg` and still passes `thumb_size` per FR-002 (partial)
+
+## Phase 8: Bổ sung (2026-11-11, người dùng yêu cầu)
+
+- [X] T033 Trong `tools/filmcheck/thumbs.mjs`, đo phần chữ của thumbnail che lên các hộp `window.TEXTS(t)` của phim (diện tích giao ÷ diện tích hộp chữ của phim) và in `covers: [{text, ratio}]` cùng `texts_checked`. Trong `tools/filmcheck/publish.py`, thêm luật `thumb_covers_text` (> 0,10) per FR-009 bổ sung
+- [X] T034 Viết test trong `tests/filmcheck/test_thumbs.py`: thumbnail đặt chữ đè lên chữ "Honey" của trang mẫu thì trượt `thumb_covers_text`; đặt chỗ khác thì đạt. Thêm gói mẫu cố ý lỗi `thumb_covers_text` vào `tests/filmcheck/test_publish.py` (bảng `BAD`) per FR-012

@@ -16,7 +16,7 @@ from filmcheck import qc, report, script as scriptmod
 ANGLES = ("curiosity", "number", "question")
 ANGLE_LABEL = {"curiosity": "Curiosity", "number": "Number or benefit", "question": "Question"}
 TITLE_MAX, TITLE_VISIBLE, HOOK_MAX, DESC_MAX, SUMMARY_MAX = 100, 60, 150, 5000, 600
-THUMB_BYTES, THUMB_WORDS, THUMB_CJK, TEXT_HEIGHT, CONTRAST = 2_000_000, 6, 12, 0.08, 4.5
+THUMB_BYTES, THUMB_WORDS, THUMB_CJK, TEXT_HEIGHT, CONTRAST, COVER_MAX = 2_000_000, 6, 12, 0.08, 4.5, 0.10
 CHAPTER_MIN, CHAPTER_COUNT, CHAPTER_TITLE = 10.0, 3, 40
 CUE_LINES, CUE_UNITS, CUE_MIN, CUE_MAX = 2, 42, 1.0, 7.0
 BREAKS = (":", " - ", " — ", " – ", "|", "?", "!")
@@ -526,7 +526,8 @@ def render_thumbs(d: Path, pack: dict, lib) -> tuple:
         rows.append({"file": out.name, "t": g["t"], "w": tw, "h": th, "bytes": out.stat().st_size, "text": g["text"],
                      "font": g.get("font"), "font_loaded": g.get("font_loaded", True),
                      "text_height_ratio": g.get("text_height_ratio"), "contrast": g.get("contrast"),
-                     "bg_luma": g.get("bg_luma"), "missing_glyphs": glyphs})
+                     "bg_luma": g.get("bg_luma"), "missing_glyphs": glyphs,
+                     "texts_checked": g.get("texts_checked", False), "covers": g.get("covers", [])})
     shutil.rmtree(raw, ignore_errors=True)
     (pub / "thumbs.json").write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
     return rows, None
@@ -657,6 +658,12 @@ def check(d: Path, pack: dict = None) -> dict:
                                 + " ".join(g["codepoint"] for g in row["missing_glyphs"]))
             if not row["font_loaded"]:
                 problems.append(f"thumb_font: {f.name} font \"{r.get('font')}\" did not load in the film's page")
+            row["covers"] = [c for c in r.get("covers") or [] if c.get("ratio", 0) > COVER_MAX]
+            row["texts_checked"] = r.get("texts_checked", False)
+            if row["covers"]:
+                problems.append(f"thumb_covers_text: {f.name} text covers the film's own text "
+                                + "; ".join(f"\"{c['text']}\" {c['ratio']:.0%}" for c in row["covers"])
+                                + f" (at most {COVER_MAX:.0%}); move it with position")
             if row["repeats_title"]:
                 problems.append(f"thumb_repeats_title: {f.name} text repeats its title; it should add to the title")
     ts = [t["thumb"]["t"] for t in pack["titles"]]

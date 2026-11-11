@@ -95,6 +95,20 @@ for (let n = 0; n < job.thumbs.length; n++) {
     y1: Math.max(b.y1, r.y + r.h) }), { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity });
   const clip = { x: Math.max(0, box.x0), y: Math.max(0, box.y0), width: Math.max(1, Math.min(L.W, box.x1) - Math.max(0, box.x0)),
     height: Math.max(1, Math.min(L.H, box.y1) - Math.max(0, box.y0)) };
+  // the film's own texts at t, and how much of each the thumbnail text covers (specs/011 thumb_covers_text)
+  const filmTexts = await page.evaluate((t) => (typeof window.TEXTS === 'function' ? (window.TEXTS(t) || []) : null), th.t);
+  const covers = [];
+  for (const b of filmTexts || []) {
+    if (!b || !b.text) continue;
+    const area = Math.max(0, b.x1 - b.x0) * Math.max(0, b.y1 - b.y0);
+    if (!area) continue;
+    let hit = 0;
+    for (const r of L.rects) {
+      const w = Math.min(b.x1, r.x + r.w) - Math.max(b.x0, r.x), h = Math.min(b.y1, r.y + r.h) - Math.max(b.y0, r.y);
+      if (w > 0 && h > 0) hit += w * h;
+    }
+    if (hit > 0) covers.push({ text: String(b.text).slice(0, 60), ratio: +Math.min(1, hit / area).toFixed(3) });
+  }
   const under = await page.screenshot({ clip });            // the overlay is still hidden: this is the picture alone
   const bg = await page.evaluate(luma, 'data:image/png;base64,' + under.toString('base64'));
   await page.evaluate(() => { document.getElementById('studio-thumb').style.visibility = 'visible'; });
@@ -107,7 +121,8 @@ for (let n = 0; n < job.thumbs.length; n++) {
   const eff = bg.map((l) => a * plate + (1 - a) * l);      // what is behind the letters, at both ends of the range
   res.push({ t: th.t, text: th.text, font: L.fam, font_loaded: L.loaded, font_px: L.size,
     text_height_ratio: +(Math.min(...L.rects.map((r) => r.h)) / L.H).toFixed(4),
-    contrast: +Math.min(...eff.map((l) => ratio(text, l))).toFixed(2), bg_luma: bg.map((x) => +x.toFixed(4)) });
+    contrast: +Math.min(...eff.map((l) => ratio(text, l))).toFixed(2), bg_luma: bg.map((x) => +x.toFixed(4)),
+    texts_checked: filmTexts !== null, covers });
 }
 await browser.close();
 P.closeServer();

@@ -199,6 +199,7 @@ BAD = {   # code → how to break a good pack in exactly one way (contracts/cli.
     "thumb_contrast": _thumbs(contrast=3.0),
     "thumb_glyphs": _thumbs(missing_glyphs=[{"char": "", "codepoint": "U+E000", "text": "x"}]),
     "thumb_font": _thumbs(font_loaded=False),
+    "thumb_covers_text": _thumbs(texts_checked=True, covers=[{"text": "02:00", "ratio": 0.4}]),
     "thumb_repeats_title": _set(lambda pk: pk["titles"][2]["thumb"].__setitem__("text", "Honey really last")),
     "thumb_same_time": _set(lambda pk: pk["titles"][1]["thumb"].__setitem__("t", 5.5)),
     "thumb_not_rendered": lambda d: (d / "publish" / "thumbs.json").write_text('{"error": "no browser"}'),
