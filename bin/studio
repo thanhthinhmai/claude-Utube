@@ -21,6 +21,9 @@
 set -eu
 
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
+# Bản đóng gói của app desktop (specs/016): PATH tới node, ffmpeg đi kèm
+# shellcheck disable=SC1091
+if [ -f "$ROOT/env.sh" ]; then . "$ROOT/env.sh"; fi
 LIB_REL=lib/lemo-opuscar
 LIB="$ROOT/$LIB_REL"
 TMP="$ROOT/lib/.lemo-opuscar.tmp"
@@ -143,6 +146,8 @@ print_tools() {
 lib_state() {
   LIB_FOUND=''; MODIFIED=''
   if [ ! -d "$LIB" ] || [ -z "$(ls -A "$LIB" 2>/dev/null)" ]; then LSTATE=missing; return 0; fi
+  # Bản đóng gói của app desktop (specs/016): thư viện được ghim lúc build, máy Mac sạch có thể không có git
+  if [ -f "$ROOT/.core-version" ] && [ -f "$LIB/AGENTS.md" ]; then LIB_FOUND=$LIB_COMMIT; LSTATE=ok; return 0; fi
   # Phải là repo riêng (không để git leo lên repo của dự án) và do xưởng quản lý
   if [ ! -d "$LIB/.git" ] || [ "$(git -C "$LIB" config --get studio.managed 2>/dev/null || true)" != true ]; then
     LSTATE=foreign; return 0

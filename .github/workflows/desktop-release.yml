@@ -1,0 +1,154 @@
+# Build the desktop installers and their studio cores (specs/016 R6, FR-009), check them on clean machines, and
+# publish a private GitHub Release. Runs on a desktop-vX.Y.Z tag, by hand, and on the 016 branch while it is built.
+name: desktop-release
+on:
+  push:
+    tags: ["desktop-v*"]
+    branches: ["[0-9][0-9][0-9]-desktop-installers"]
+    paths: ["deploy/core.Dockerfile", "desktop/core-build/**", "bin/studio", ".github/workflows/desktop-release.yml"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "version, for example 0.1.0-test"
+        required: true
+
+env:
+  VERSION: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/desktop-v') && github.ref_name) || '0.0.0-dev' }}
+
+jobs:
+  core-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: version
+        run: echo "VERSION=${VERSION#desktop-v}" >> "$GITHUB_ENV"
+      - name: build the Linux core
+        run: sh desktop/core-build/build-linux.sh "$VERSION"
+      - name: check the exported Linux (as WSL would run it)
+        run: |
+          # GitHub's Ubuntu blocks user namespaces for unconfined programs; WSL's kernel does not
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          cat dist/core/linux/core-manifest.json
+          docker import "dist/core/linux/claude-utube-core-linux-x64-$VERSION.tar.gz" cu-core-import
+          docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=unconfined \
+            -u studio -e HOME=/home/studio -e LANG=C.UTF-8 -e SMOKE_VOICE=1 -w /home/studio/claude-Utube \
+            -v "$PWD/desktop/core-build:/smoke:ro" -v "$PWD/CREDITS:/smoke-credits:ro" \
+            cu-core-import sh -c 'sh /smoke/smoke-core.sh && python3 /smoke/credits-check.py --root . --sys / --credits /smoke-credits'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-linux
+          path: dist/core/linux/
+          retention-days: 3
+          compression-level: 0
+
+  core-mac:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: version
+        run: echo "VERSION=${VERSION#desktop-v}" >> "$GITHUB_ENV"
+      - name: build the macOS core
+        run: sh desktop/core-build/build-mac.sh "$VERSION"
+      - name: check the core as the app installs it, with a bare PATH (no Homebrew)
+        run: |
+          cat dist/core/mac/core-manifest.json
+          dir="$HOME/Library/Application Support/ClaudeUtube-core/$VERSION"
+          mkdir -p "$dir" && tar -xzf dist/core/mac/claude-utube-core-darwin-arm64-$VERSION.tar.gz -C "$dir"
+          "$dir/python/bin/python3" -m venv --system-site-packages "$dir/tools/.venv"
+          "$dir/python/bin/python3" -m venv --system-site-packages "$dir/lib/lemo-opuscar/.venv"
+          cd "$dir"
+          env -i HOME="$HOME" LANG=en_US.UTF-8 PATH=/usr/bin:/bin:/usr/sbin:/sbin SMOKE_VOICE=1 \
+            sh "$GITHUB_WORKSPACE/desktop/core-build/smoke-core.sh"
+          "$dir/python/bin/python3" "$GITHUB_WORKSPACE/desktop/core-build/credits-check.py" --root "$dir" --credits "$GITHUB_WORKSPACE/CREDITS"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-mac
+          path: dist/core/mac/
+          retention-days: 3
+          compression-level: 0
+
+  installers:
+    needs: [core-linux, core-mac]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, core: linux, flag: --win }
+          - { os: macos-latest, core: mac, flag: --mac }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: version
+        run: v="${VERSION#desktop-v}"; echo "VERSION=$v" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          name: core-${{ matrix.core }}
+          path: dist/core/${{ matrix.core }}
+      - run: npm ci
+      - name: build the installer
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npm pkg set version="$VERSION"
+          npx electron-builder ${{ matrix.flag }} --publish never
+          ls -la ../dist/installers
+      - name: the packed app checks the real studio package (install commands skipped)
+        env:
+          CU_CORE_CMD: '["node","test/fake-core.mjs"]'
+          CU_FAKE_INSTALL: "1"
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then exe="../dist/installers/win-unpacked/claude-Utube.exe"
+          else exe="../dist/installers/mac-arm64/claude-Utube.app/Contents/MacOS/claude-Utube"; fi
+          export CU_CONFIG_DIR="$RUNNER_TEMP/cu-config"
+          "$exe" --smoke 2>&1 | tee packed.log
+          for line in "install ok" "window ok" "quit ok"; do grep -q "smoke: $line" packed.log || { echo "missing: smoke: $line"; exit 1; }; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.core }}
+          path: |
+            dist/installers/*.exe
+            dist/installers/*.dmg
+          retention-days: 3
+          compression-level: 0
+
+  release:
+    needs: [installers]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: version
+        run: echo "VERSION=${VERSION#desktop-v}" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+      - name: collect the files and their SHA-256
+        run: |
+          mkdir out
+          cp files/installer-linux/*.exe files/installer-mac/*.dmg out/
+          cp files/core-linux/core-manifest.json out/core-manifest-linux-x64.json
+          cp files/core-mac/core-manifest.json out/core-manifest-darwin-arm64.json
+          (cd out && sha256sum * > SHA256SUMS && cat SHA256SUMS)
+      - name: publish (tags and runs by hand only; a branch push stops after the check above)
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/desktop-v')
+        uses: softprops/action-gh-release@e598afbe1493e6b1bafb1f389cabb956eab91231 # v3.0.3
+        with:
+          tag_name: desktop-v${{ env.VERSION }}
+          name: claude-Utube desktop ${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ contains(env.VERSION, '-') }}
+          files: out/*
+          body: |
+            Installers of the claude-Utube desktop app (specs/016). Windows 10/11 64-bit (WSL 2) and macOS 14+ on an Apple chip.
+            Check a download with SHA256SUMS. The installers are not signed: Windows asks "More info → Run anyway";
+            macOS asks you to allow it in System Settings → Privacy & Security.

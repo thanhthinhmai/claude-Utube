@@ -8,6 +8,9 @@ if (location.protocol === "file:") {
     check: (draft) => ipcRenderer.invoke("setup:check", draft),
     enableWsl: () => ipcRenderer.invoke("setup:enableWsl"),
     finish: (draft) => ipcRenderer.invoke("setup:finish", draft),
+    packaged: () => ipcRenderer.invoke("setup:packaged"),
+    installCore: (opts) => ipcRenderer.invoke("setup:installCore", opts),
+    onProgress: (fn) => ipcRenderer.on("setup:progress", (_e, msg) => fn(msg)),
   });
   contextBridge.exposeInMainWorld("core", {
     restart: () => ipcRenderer.invoke("core:restart"),

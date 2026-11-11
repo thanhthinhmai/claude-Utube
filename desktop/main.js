@@ -298,7 +298,8 @@ ipcMain.handle("setup:finish", async (_e, draft) => finishSetup(draft));
 /** @param {any} draft */
 async function finishSetup(draft) {
   const c = { platform: PLATFORM, distro: draft.distro || null, studio: draft.studio, data: draft.data, home: draft.home || null,
-    setupAt: new Date().toISOString(), trayNoticeShown: !!(cfg && cfg.trayNoticeShown) };
+    setupAt: new Date().toISOString(), trayNoticeShown: !!(cfg && cfg.trayNoticeShown),
+    coreKind: draft.coreKind || "existing", coreVersion: draft.coreVersion || null, modelsReady: !!draft.modelsReady };
   if (!(await studioThere(c))) return { ok: false, error: `No studio at ${c.studio}` };
   cfg = c;
   core.saveConfig(CONFIG_DIR, c);
@@ -307,6 +308,98 @@ async function finishSetup(draft) {
   startCore();
   return { ok: true };
 }
+
+// ---------- the packaged core (specs/016 T014, T020) ----------
+const FAKE_INSTALL = process.env.CU_FAKE_INSTALL === "1";      // smoke runs: real checks and unpacking, no commands
+const PACKAGED_DIR = process.env.CU_PACKAGED_DIR || (app.isPackaged ? path.join(process.resourcesPath, "core") : null);
+const LOCAL = PLATFORM === "win32" ? path.join(process.env.LOCALAPPDATA || os.homedir(), "ClaudeUtube") : null;
+
+async function packagedInfo() {
+  const manifest = core.readManifest(PACKAGED_DIR);
+  if (!manifest) return { available: false };
+  let installed = null, distroThere = false;
+  if (PLATFORM === "win32" && !FAKE_INSTALL) {
+    const list = await run({ file: "wsl.exe", args: ["-l", "-v"] }, 20_000);
+    distroThere = core.hasOwnDistro(list.stdout);
+    if (distroThere) {
+      const v = await run({ file: "wsl.exe", args: ["-d", core.DISTRO, "--", "cat", "/home/studio/claude-Utube/.core-version"] }, 20_000);
+      installed = v.code === 0 ? v.stdout.toString("utf8").replace(/\0/g, "").trim() : null;
+    }
+  } else if (PLATFORM === "darwin") {
+    const f = path.join(core.macCoreDir(os.homedir(), manifest.version), ".core-version");
+    installed = fs.existsSync(f) ? fs.readFileSync(f, "utf8").trim() : null;
+  }
+  const steps = core.installSteps(PLATFORM, { manifest, coreFile: "", tmpDir: os.tmpdir(), home: os.homedir() }).map((s) => s.id);
+  return { available: true, platform: PLATFORM, manifest, installed, distroThere, steps,
+    reinstall: core.needsReinstall(installed, manifest), smoke: SMOKE };
+}
+
+ipcMain.handle("setup:packaged", async () => packagedInfo());
+
+/** Gunzip the core file into a .tar for `wsl --import` (Windows). @param {string} from @param {string} to */
+function gunzipTo(from, to) {
+  const zlib = require("node:zlib");
+  const { pipeline } = require("node:stream/promises");
+  fs.mkdirSync(path.dirname(to), { recursive: true });
+  return pipeline(fs.createReadStream(from), zlib.createGunzip(), fs.createWriteStream(to));
+}
+
+ipcMain.handle("setup:installCore", async (e, opts) => {
+  const info = await packagedInfo();
+  if (!info.available || !info.manifest) return { ok: false, step: "verify", error: "This copy of the app has no studio package." };
+  const m = info.manifest;
+  const coreFile = path.join(String(PACKAGED_DIR), m.file);
+  const tmpDir = FAKE_INSTALL ? path.join(CONFIG_DIR, "tmp") : (LOCAL ? path.join(LOCAL, "tmp") : os.tmpdir());
+  const steps = core.installSteps(PLATFORM, { manifest: m, coreFile, tmpDir, wslDir: LOCAL ? path.join(LOCAL, "wsl") : undefined,
+    reinstall: info.reinstall, distroThere: info.distroThere, home: os.homedir() });
+  const skipInstall = PLATFORM === "darwin" && info.installed === m.version;       // unpacked before: go on with the models
+  let i = opts && opts.from ? Math.max(0, steps.findIndex((s) => s.id === opts.from)) : 0;
+  const send = (/** @type {any} */ msg) => { if (!e.sender.isDestroyed()) e.sender.send("setup:progress", msg); };
+  for (; i < steps.length; i++) {
+    const st = steps[i];
+    send({ step: st.id, text: st.text, index: i, total: steps.length });
+    try {
+      if (st.id === "verify") {
+        if (!fs.existsSync(coreFile)) throw new Error(`The studio package is missing: ${coreFile}`);
+        if ((await core.sha256File(coreFile)) !== m.sha256) throw new Error("The studio package is damaged (SHA-256 does not match). Download the installer again.");
+      } else if (st.id === "space") {
+        const where = PLATFORM === "win32" ? tmpDir : os.homedir();
+        fs.mkdirSync(where, { recursive: true });
+        const sf = fs.statfsSync(where);
+        const free = sf.bavail * sf.bsize, need = core.spaceNeeded(m, PLATFORM);
+        if (!FAKE_INSTALL && free < need) throw new Error(`Not enough free space: ${(need / 1024 ** 3).toFixed(1)} GB needed, ${(free / 1024 ** 3).toFixed(1)} GB free.`);
+      } else if (st.id === "unpack") {
+        await gunzipTo(coreFile, path.join(tmpDir, "core.tar"));
+      } else if (st.id === "install" && skipInstall) {
+        continue;
+      } else if (st.id === "install" && PLATFORM === "darwin" && !core.espeakPathOk(core.macCoreDir(os.homedir(), m.version))) {
+        throw new Error("Your user folder path is too long for the voice engine (over 160 bytes).");
+      }
+      for (const cmd of st.run) {
+        if (FAKE_INSTALL) { smoke(`install would run ${cmd.file} ${cmd.args[0] || ""}`); continue; }
+        const r = await run(cmd, 60 * 60_000);
+        if (r.code !== 0) {
+          const out = (r.stdout.toString("utf8") + "\n" + r.stderr.toString("utf8")).replace(/\0/g, "").trim().split("\n").slice(-8).join("\n");
+          throw new Error(out || `${cmd.file} failed (code ${r.code})`);
+        }
+      }
+      if (st.id === "install" && PLATFORM === "win32") fs.rmSync(path.join(tmpDir, "core.tar"), { force: true });
+      if (st.id === "check" && !FAKE_INSTALL) {
+        const c = core.packagedConfig(PLATFORM, m, os.homedir());
+        const r = await run(core.coreCommand(c, ["check", "--json"]), 60_000);
+        const check = (() => { try { return JSON.parse(r.stdout.toString("utf8").trim().split("\n").pop() || ""); } catch { return null; } })();
+        if (!check || !check.ok) throw new Error("Missing: " + ((check && check.missing) || ["the studio did not answer"]).join("; "));
+      }
+    } catch (err) {
+      send({ step: st.id, error: String(err && /** @type {any} */ (err).message || err) });
+      return { ok: false, step: st.id, error: String(err && /** @type {any} */ (err).message || err) };
+    }
+  }
+  const c = { ...core.packagedConfig(PLATFORM, m, os.homedir()), modelsReady: true };
+  if (FAKE_INSTALL) c.data = path.join(CONFIG_DIR, "data");
+  smoke("install ok");
+  return finishSetup(c);
+});
 
 ipcMain.handle("core:restart", async () => {
   if (win && !win.isDestroyed()) {
@@ -327,6 +420,7 @@ ipcMain.handle("core:quit", () => app.quit());
 // ---------- smoke run (GitHub Actions; specs/015 R4) ----------
 function smokeSetup() {
   smoke("setup ok");
+  if (PACKAGED_DIR) return;                              // setup.html starts the install itself (smoke-install)
   finishSetup({ distro: null, studio: process.cwd(), data: path.join(CONFIG_DIR, "data") });
 }
 

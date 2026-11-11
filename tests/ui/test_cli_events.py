@@ -150,7 +150,11 @@ class CliAndEvents(unittest.TestCase):
 
     def test_job_run_heartbeat(self):  # research §8
         jid, _ = self.start_job()
-        before = json.loads(self.p.cli("job", "show", jid).stdout)["updated_at"]
+        # an old time, not "now": WSL's clock can step back a second, and the check is only that `job run` writes
+        p = self.p.dir / ".studio" / "jobs" / f"{jid}.json"
+        j = json.loads(p.read_text())
+        before = j["updated_at"] = "2000-01-01T00:00:00+00:00"
+        p.write_text(json.dumps(j, ensure_ascii=False))
         self.p.cli("job", "run", jid, "--", "sleep", "1.5")
         log = json.loads(self.p.cli("job", "show", jid).stdout)
         self.assertGreater(log["updated_at"], before)
