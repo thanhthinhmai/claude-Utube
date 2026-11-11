@@ -165,3 +165,9 @@
 | FR-017 không tải video | chỉ 4 endpoint số liệu, proxy chặn endpoint khác | đọc lại code |
 | SC-001 … SC-006 | | đều có test tự động, như trên |
 | Bài chạy với khoá thật | | **chưa chạy**: người dùng cần tự đặt khoá (`config youtube-key`) trong terminal của họ |
+
+## Phase 8: Bổ sung sau bài chạy thật (2026-11-11)
+
+- [X] T023 Trong `tools/filmcheck/topics.py`, thêm `script_ok(title, lang)` và áp vào `fetch_topic` (bỏ video có kiểu chữ khác ngôn ngữ kênh) theo research "Bổ sung: lọc video lạc đề và khác ngôn ngữ"
+- [X] T024 Trong `tools/filmcheck/topics_fit.py`, đưa tối đa 10 video đầu của mỗi đề vào lời nhắc, thêm `offtopic` vào lược đồ và câu trả lời; `topics.score_batch` lưu vào `raw.offtopic`; `score_raw` bỏ các video đó khỏi nhu cầu và video bằng chứng. Sửa `fake_claude`: đánh dấu lạc đề các tiêu đề có chữ "squish"
+- [X] T025 Viết test trong `tests/filmcheck/test_topics.py`: tiêu đề Tamil hay chữ Trung bị bỏ với kênh tiếng Anh, được giữ với kênh zh; video lạc đề có nhiều lượt xem nhất bị bỏ khỏi nhu cầu và không làm video bằng chứng; không có Claude thì không bỏ gì

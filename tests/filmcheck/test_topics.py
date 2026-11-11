@@ -63,8 +63,9 @@ def fresh():
     return Path(tempfile.mkdtemp(dir=TMP))
 
 
-def fake_fit(channel, texts, suggest):
-    got = {t: {"score": 2 if "[fit-low]" in t else 7, "type": None, "reason": "r"} for t in texts}
+def fake_fit(channel, texts, suggest, videos=None):
+    got = {t: {"score": 2 if "[fit-low]" in t else 7, "type": None, "reason": "r",
+               "offtopic": [vid for vid, title in (videos or {}).get(t, []) if "squish" in title.lower()]} for t in texts}
     return got, (["how bees make honey"] if suggest else [])
 
 
@@ -173,6 +174,59 @@ class Scores(unittest.TestCase):
         self.assertIn("HOLD", r.stdout)                              # bee dances: fit set to 1 by hand
         self.assertEqual(run("topics", "score", "honey", "a brand new honey topic", YOUTUBE_API_KEY=yt.KEY,
                              STUDIO_YOUTUBE_DAILY="50").returncode, 3)
+
+
+class Relevance(unittest.TestCase):                                  # T025: off-topic and other-script videos
+    @classmethod
+    def setUpClass(cls):
+        cls.yt = FakeYouTube()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.yt.close()
+
+    def fetcher(self, root):
+        return topics.Fetcher.local(yt.KEY, topics.Usage(root / "u.json", 9000), topics.Cache(root / "cache"), self.yt.url)
+
+    def test_script(self):
+        self.assertFalse(topics.script_ok("🐈பயந்தாங்கொல்லி பூனை! |  Why do cats purr?🐱", "en"))
+        self.assertFalse(topics.script_ok("蜜蜂如何制造蜂蜡 bees make wax", "vi"))
+        self.assertTrue(topics.script_ok("Vì sao mật ong không hỏng? 🍯", "vi"))
+        self.assertTrue(topics.script_ok("蜜蜂如何制造蜂蜡 bees make wax", "zh"))
+        self.assertFalse(topics.script_ok("How bees make wax", "ja"))
+        self.assertTrue(topics.script_ok("2024 !!! 🐝", "en"))
+
+    def test_other_scripts_are_not_counted(self):
+        root = fresh()
+        r = topics.score_batch(root, "c", {"language": "en"}, ["how do bees make wax"], self.fetcher(root), fit=None, made=[])
+        titles = [v["title"] for v in r["data"]["topics"][0]["raw"]["y365"]]
+        self.assertFalse(any("தேனீ" in x or "蜜蜂" in x for x in titles))
+        r = topics.score_batch(fresh(), "c", {"language": "zh"}, ["how do bees make wax"], self.fetcher(fresh()), fit=None, made=[])
+        self.assertTrue(any("蜜蜂" in v["title"] for v in r["data"]["topics"][0]["raw"]["y365"]))
+
+    def test_offtopic_hit_is_dropped(self):
+        root = fresh()
+        r = topics.score_batch(root, "c", {"language": "en"}, ["how do bees make wax"], self.fetcher(root), fit=fake_fit, made=[])
+        t = r["data"]["topics"][0]
+        self.assertEqual(t["raw"]["offtopic"], ["v5020"])
+        self.assertNotIn("squishies", t["evidence"]["top_video"]["title"])
+        self.assertEqual(t["evidence"]["top_video"]["views"], 200_000)
+        self.assertEqual(t["scores"]["demand"], 5)                   # median 200k; the off-topic 10.7M does not count
+        again = topics.score_raw(t["text"], t["raw"], [], t["scores"]["fit"])
+        self.assertEqual(again["evidence"]["top_video"]["views"], 200_000)
+        root2 = fresh()                                               # no Claude: nothing is dropped
+        r = topics.score_batch(root2, "c", {"language": "en"}, ["how do bees make wax"], self.fetcher(root2), fit=None, made=[])
+        self.assertIn("squishies", r["data"]["topics"][0]["evidence"]["top_video"]["title"])
+
+    def test_cli_with_fake_claude_drops_it(self):
+        root = fresh()
+        samples.make_channel(root, "honey")
+        env = {**os.environ, "STUDIO_ROOT": str(root), "STUDIO_YOUTUBE_URL": self.yt.url, "STUDIO_CLAUDE_BIN": str(FAKE_CLAUDE),
+               "HOME": str(root), "YOUTUBE_API_KEY": yt.KEY}
+        p = subprocess.run(["sh", str(REPO / "bin" / "studio"), "topics", "score", "honey", "how do bees make wax"],
+                           capture_output=True, text=True, env=env)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.assertNotIn("squishies", p.stdout)
 
 
 class Secret(unittest.TestCase):                                     # SC-004

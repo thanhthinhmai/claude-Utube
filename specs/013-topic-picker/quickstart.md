@@ -51,3 +51,9 @@ Kênh thử `kenh-thu` (tiếng Anh, khoa học đời thường), 5 đề, tổ
   - Với kênh tiếng Anh, `regionCode=US` vẫn trả một số video tiếng khác (video bằng chứng của đề "cats purr" là video tiếng Tamil).
   - Mục "hợp kênh" do Claude chấm 7–9, hợp lý với ngách của kênh.
 - Khoá không có trong đầu ra, `topics.json` hay `TOPICS.md` (đã tìm bằng `grep`).
+
+## Kết quả sau khi thêm bộ lọc lạc đề và kiểu chữ (2026-11-11)
+
+Chấm lại 2 đề với khoá thật (kênh tạm tiếng Anh, 204 đơn vị):
+- **how do bees make wax**: Claude đánh dấu 6 video lạc đề (có "bees wax squishies"). Nhu cầu 7 → 5. Video bằng chứng: "The Great Honeycomb Illusion How Bees REALLY Make Hexagons" (148k lượt xem).
+- **why do cats purr**: video tiếng Tamil bị bỏ theo kiểu chữ. Nhu cầu 5 → 3. Video bằng chứng: "Cats Purr For 3 Main Reasons" (296k lượt xem).

@@ -23,7 +23,7 @@
 
 **Evidence**: `top_video {id, title, channel, views, age_days, url}`, `counts {y365, n30, n60, channels90, weight90, outliers}`, `closest_film {name, similarity}` hoặc null, `reference_hit {channel_id, title, age_days}` hoặc null.
 
-**Raw**: `y365: [Video]`, `n90: [Video]`, `channels: {id: {subs, median_views}}`, `fetched_at`. Mỗi Video gồm `{id, title, channel_id, channel, published, views}`.
+**Raw**: `y365: [Video]`, `n90: [Video]`, `channels: {id: {subs, median_views}}`, `fetched_at`, `offtopic: [id]` (video Claude đánh dấu lạc đề, bổ sung 2026-11-11). Mỗi Video gồm `{id, title, channel_id, channel, published, views}`.
 
 ## Reference channels (`channels/<slug>/references.json`, bị git bỏ qua)
 
