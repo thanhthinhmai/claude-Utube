@@ -97,3 +97,16 @@ neb đã chạy thật cách làm này: key ngẫu nhiên, lease ký bằng Ed25
   - `CLOCK_SKEW_S = 600`;
   - khi khoá, việc đang chạy được tối đa 6 giờ (đã có trong worker).
 - **Khi test**: `CU_LICENSE_RENEW_MS` và `CU_UPDATE_EVERY_MS`. Hai biến này chỉ có tác dụng ở bản chưa đóng gói, hoặc khi đặt `CU_SMOKE`.
+
+## Kết quả khi làm (2026-11-11)
+
+- **R6 đã kiểm**: trên máy Windows của GitHub (lượt chạy 43047149036), app đã đóng gói làm đủ các bước:
+  1. nhận key thử;
+  2. tải một bản "9.9.9" từ máy chủ license giả, kiểm chữ ký và SHA-256;
+  3. khi thoát, chạy bộ cài với `/S --updated --force-run`;
+  4. bộ cài cài im lặng vào `%LOCALAPPDATA%\Programs\claude-Utube` rồi tự mở lại app.
+- **macOS**: key được cất trong Keychain. Lần chạy sau, app dùng lại key đó mà không hỏi lại.
+- **Windows giữ đúng byte của tệp mẫu đã ký**: `.gitattributes` đặt `desktop/test/vectors/* -text`, vì Git trên Windows tự đổi kiểu xuống dòng làm hỏng chữ ký.
+- **Chưa chạy được**:
+  - `deploy/license/` thật (máy này không có Docker), chủ xưởng chạy theo README;
+  - workflow phát hành với license (cần biến `LICENSE_SERVER_URL` và secret `LICENSE_SIGNING_KEY`), sẽ kiểm ở tag `desktop-v0.2.0`.
