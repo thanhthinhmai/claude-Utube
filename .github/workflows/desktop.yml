@@ -114,7 +114,10 @@ jobs:
         run: |
           $exe = Join-Path $env:LOCALAPPDATA "Programs\claude-Utube\claude-Utube.exe"
           for ($i = 0; $i -lt 90 -and -not (Test-Path $exe); $i++) { Start-Sleep 2 }
-          if (-not (Test-Path $exe)) { Write-Error "the silent install did not put the app in $exe"; exit 1 }
+          if (-not (Test-Path $exe)) {
+            Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'claude|Setup|powershell' } | Format-Table ProcessId,Name,CommandLine -AutoSize | Out-String -Width 400
+            Write-Error "the silent install did not put the app in $exe"; exit 1
+          }
           for ($i = 0; $i -lt 30 -and -not (Get-Process claude-Utube -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }); $i++) { Start-Sleep 2 }
           $running = Get-Process claude-Utube -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
           if (-not $running) { Write-Error "the installed app was not started again"; exit 1 }

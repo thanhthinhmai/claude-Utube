@@ -49,5 +49,7 @@ test("downloads are checked; one changed byte is refused (SC-004)", async () => 
   await assert.rejects(up.downloadTo("http://x/c.exe", {}, path.join(dir, "c.exe"), want, fakeFetch(data, 403)), /403/);
   up.cleanDir(dir, file);
   assert.deepEqual(fs.readdirSync(dir), ["a.exe"]);
-  assert.deepEqual(up.installCommand("C:\\u\\x.exe"), { file: "C:\\u\\x.exe", args: ["/S", "--updated", "--force-run"] });
+  const cmd = up.installCommand("C:\\Users\\O'Neil\\x.exe");
+  assert.equal(cmd.file, "powershell.exe");
+  assert.match(cmd.args.at(-1), /^Start-Sleep -Seconds 3; Start-Process -FilePath 'C:\\Users\\O''Neil\\x\.exe' -ArgumentList '\/S','--updated','--force-run'$/);
 });

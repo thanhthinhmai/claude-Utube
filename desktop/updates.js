@@ -85,9 +85,12 @@ function cleanDir(dir, keep) {
   }
 }
 
-/** Windows: the per-user NSIS installer, silent, then starts the app again. @param {string} file */
+/** Windows: the per-user NSIS installer, silent, then starts the app again. It starts 3 seconds after the app has
+ *  quit, so no process of the old app is still open when it replaces the files. @param {string} file */
 function installCommand(file) {
-  return { file, args: ["/S", "--updated", "--force-run"] };
+  const quoted = file.replace(/'/g, "''");
+  return { file: "powershell.exe", args: ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command",
+    `Start-Sleep -Seconds 3; Start-Process -FilePath '${quoted}' -ArgumentList '/S','--updated','--force-run'`] };
 }
 
 module.exports = { FIRST_CHECK_MS, EVERY_MS, newer, verifyRelease, pickAsset, sha256File, downloadTo, cleanDir, installCommand };
