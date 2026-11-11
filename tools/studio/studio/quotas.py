@@ -7,6 +7,7 @@ from .store import StudioError
 
 VN = dt.timezone(dt.timedelta(hours=7))
 KIND_FIELD = {"film": ("quota_films", "quota_films_default"), "learn": ("quota_learns", "quota_learns_default")}
+EDITOR_MODELS = ("inherit", "opus", "sonnet", "haiku")     # specs/010 FR-007b
 MAX_OPEN = 3            # jobs not finished yet, per customer
 OPEN = ("queued", "running", "waiting_review", "waiting_resume")
 
@@ -23,6 +24,7 @@ RANGES = {
     "concurrency": (int, 1, 16),
     "review_timeout_days": (int, 1, 90),
     "model": (str, None, None),
+    "editor_model": (str, None, None),
 }
 
 
@@ -51,6 +53,8 @@ def update_settings(changes: dict) -> dict:
         if not ok or (lo is not None and not lo <= v <= hi):
             raise StudioError("invalid", f"giá trị của {k} ngoài khoảng cho phép", 422)
         s[k] = typ(v)
+    if s.get("editor_model", "inherit") not in EDITOR_MODELS:
+        raise StudioError("invalid", "editor_model phải là " + ", ".join(EDITOR_MODELS), 422)
     if s.get("claude_order", "auto") not in ("auto", "manual"):
         raise StudioError("invalid", "claude_order phải là auto hoặc manual", 422)
     if s["model"] not in s["price_table"]:
@@ -152,11 +156,15 @@ def price(model: str) -> dict:
     return max(table.values(), key=lambda p: p["out"])     # unknown model: the dearest price, never undercount
 
 
+WEB_SEARCH_USD = 0.01        # per web search through the API key: 10 USD per 1000 (specs/010 R4)
+
+
 def cost_of(model: str, usage: dict) -> float:
     p = price(model)
     return ((usage.get("input_tokens") or 0) * p["in"] + (usage.get("output_tokens") or 0) * p["out"]
             + (usage.get("cache_creation_input_tokens") or 0) * p["cache_write"]
-            + (usage.get("cache_read_input_tokens") or 0) * p["cache_read"]) / 1_000_000
+            + (usage.get("cache_read_input_tokens") or 0) * p["cache_read"]) / 1_000_000 \
+        + (usage.get("web_search_requests") or 0) * WEB_SEARCH_USD
 
 
 TOKEN_FIELDS = ("input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
@@ -180,6 +188,8 @@ def record_call(job_id, via: str, model: str, usage: dict) -> dict:
                 owner = j["owner"]
                 j["tokens"] = int(j.get("tokens") or 0) + n
                 j["cost_usd"] = round((j.get("cost_usd") or 0.0) + usd, 6)
+                if usage.get("web_search_requests"):
+                    j["web_searches"] = int(j.get("web_searches") or 0) + int(usage["web_search_requests"])
                 store.doc_insert(con, "job", job_id, j)
                 totals = {"tokens": j["tokens"], "cost_usd": j["cost_usd"]}
         con.execute("INSERT INTO call (job_id, account_id, via, model, tokens_in, tokens_out, cache_write, cache_read, "

@@ -18,10 +18,17 @@ Mỗi yêu cầu đi đúng **một** luồng:
    - Thư mục phim = `films/<tên>/` của dự án (chữ thường, số, gạch nối). Nội dung `films/` không vào git.
    - Phong cách riêng: đọc danh mục `my-styles/README.md` và lưu vào `my-styles/<slug>/`, **thay cho** `~/lemo-my-styles/`.
    - Cài gói của thư viện bằng `sh bin/studio deps [voice] [music]`, **không** chạy thẳng `setup.sh` của thư viện (nó sẽ tải một bản thư viện khác vào `~/lemo-opuscar`).
-3. Không sửa file nào trong `lib/` (hiến pháp VI). Muốn dùng phiên bản thư viện mới thì đổi `library.lock` theo quy trình spec-kit.
-4. **Ghi việc lên giao diện** (`specs/003-studio-ui/contracts/skill-integration.md`):
+3. **Kịch bản được chấm** (specs/010, phim có lời đọc), xen vào quy trình của thư viện:
+   - Sau bước Brief: ghi `films/<tên>/BRIEF.md` (tóm tắt yêu cầu, tối đa 2000 ký tự).
+   - Sau `TREATMENT.md`, trước giọng đọc: viết `SCRIPT.md` và `SOURCES.md` theo `specs/010-script-review-qc/contracts/files.md`. Tìm số liệu bằng WebSearch (tối đa 5 lượt); mở mọi đường dẫn được dẫn bằng `sh bin/studio web fetch <url> --film <tên>`.
+   - `sh bin/studio script check <tên>` tới khi đạt, rồi `sh bin/studio script review <tên>`. Mã 1: chỉ sửa các đoạn bị ghi P1 hoặc P2, rồi chạy lại. Mã 3 (hết 2 vòng sửa): dừng, báo người dùng điểm cuối và các lỗi còn lại.
+   - Phim không có lời đọc: `sh bin/studio script skip <tên> --reason "no narration"`.
+   - Lời của `lines.json` lấy đúng từ kịch bản đã đạt (`qc` kiểm); xong giọng thì ghi `narration.json` có `lines_file`.
+   - Ở bước Self-check: `sh bin/studio qc <tên>` (nhịp lời, cắt cảnh, hình đứng im quá 6 giây, ký tự thiếu phông). Sửa một vòng theo lỗi nó báo; còn lỗi thì báo người dùng một dòng khi giao.
+4. Không sửa file nào trong `lib/` (hiến pháp VI). Muốn dùng phiên bản thư viện mới thì đổi `library.lock` theo quy trình spec-kit.
+5. **Ghi việc lên giao diện** (`specs/003-studio-ui/contracts/skill-integration.md`):
    - Khi đã có tên phim: `sh bin/studio job start --kind film --name <tên> --film <tên>`; lưu dòng đầu (mã việc) vào `films/<tên>/.job`; in dòng `URL: …` cho người dùng ("Theo dõi trên giao diện: <URL>").
-   - Đầu mỗi giai đoạn: `sh bin/studio job step <mã> "<giai đoạn>"`, ghi đúng một trong các tên tiếng Anh: `Treatment`, `Look`, `Storyboard`, `Voice`, `Music`, `Picture`, `Mix`, `Render`, `Self-check`.
+   - Đầu mỗi giai đoạn: `sh bin/studio job step <mã> "<giai đoạn>"`, ghi đúng một trong các tên tiếng Anh: `Treatment`, `Script`, `Look`, `Storyboard`, `Voice`, `Music`, `Picture`, `Mix`, `Render`, `Self-check`.
    - Lệnh dài (render, mux, tạo giọng): bọc bằng `sh bin/studio job run <mã> --step "<giai đoạn>" -- <lệnh…>` (cùng danh sách tên trên).
    - Xong: `sh bin/studio job done <mã> --film <tên>`; lỗi không tự sửa được: `sh bin/studio job fail <mã> "<lỗi>"`.
    - Storyboard (nếu người dùng yêu cầu) vẫn duyệt trong khung chat.
@@ -71,9 +78,10 @@ Mẹo chung để tiết kiệm token:
 Lệnh phụ: `/speckit-checklist <lĩnh vực>` tạo checklist kiểm tra chất lượng spec (UX, bảo mật…). `/speckit-constitution` dùng để sửa hiến pháp.
 
 ## Cấu trúc
-- `bin/studio`: `setup` · `status [--json]` · `deps [voice] [music]` · `deps learn [--extra]` · `learn <lệnh>` · `deps ui` · `ui [open|status|stop]` · `job …` · `review …` · `deps online` · `admin create <email>` · `online up|down|logs|admin <email>`; test: `sh tests/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh` (bài chạy thật, tốn tiền: `sh tests/online/live.sh`)
+- `bin/studio`: `setup` · `status [--json]` · `deps [voice] [music]` · `deps learn [--extra]` · `learn <lệnh>` · `deps ui` · `ui [open|status|stop]` · `job …` · `review …` · `deps online` · `admin create <email>` · `online up|down|logs|admin <email>` · `script check|review|status|skip <phim>` · `web fetch <url>` · `qc <phim>` · `config editor-model …`; test: `sh tests/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/online/run.sh` (bài chạy thật, tốn tiền: `sh tests/online/live.sh`)
 - `tools/studio/`: giao diện web và API v1 (chỉ `127.0.0.1`), sổ việc và yêu cầu duyệt trong `.studio/` (không vào git)
 - Chế độ online (specs/007, specs/008, `STUDIO_MODE=online`): xưởng nội bộ chạy bằng gói Claude Pro/Max của chủ xưởng. Tài khoản, hạn mức, việc và từng lần gọi Claude nằm trong SQLite ở `$STUDIO_DATA`; đăng nhập các tài khoản Claude nằm ở `$STUDIO_DATA/claude/slot-<n>` (quyền 700, không vào git, không vào container). `tools/studio/studio/claude_plan.py`: đăng nhập, làm mới mã, chọn tài khoản. Không có đăng ký công khai: chủ xưởng thêm người trong Settings → Users. `tools/runner/` gồm `worker.py` (hàng đợi, chạy mỗi việc trong một container), `proxy.py` (đổi mã của việc sang tài khoản Claude dùng ít nhất, khoá API chỉ là dự phòng, ghi token) và `agent.py` (Claude Agent SDK trong container). Mã API (specs/009): `tools/studio/studio/tokens.py` (mã, nhật ký, vé dùng một lần, Idempotency-Key); mỗi người tự tạo mã ở Your account, Owner xem và thu hồi ở Settings → API tokens; Settings → Worker xem worker và việc gần nhất. Máy chủ MCP ở `/api/mcp` (`tools/studio/studio/mcp_server.py`, chỉ nhận mã): mỗi công cụ là một lệnh REST với cùng mã. `deploy/` chứa Dockerfile, `compose.yaml`, Caddyfile và hướng dẫn `deploy/README.md`
+- `tools/filmcheck/` (specs/010): máy chấm kịch bản (`script.py`), biên tập độc lập (`editor.py`, một `claude -p` riêng), mở trang an toàn (`webfetch.py`, online đi qua bộ chuyển tiếp), đo phim (`qc.py`), kết quả `checks.json` và `CHECKS.md` trong thư mục phim (`report.py`). Chỉ cần Python 3
 - `tools/style-learn/`: công cụ đo và lưu phong cách (venv riêng `tools/.venv`, không vào git); skill `.claude/skills/style-learn/`
 - `library.lock`: phiên bản thư viện đã ghim; `lib/lemo-opuscar/`: thư viện (không vào git, không sửa)
 - `my-styles/`: phong cách riêng (vào git) · `films/`: phim (không vào git) · `references/`: video tham chiếu (không vào git) · `tools/`: công cụ tự viết

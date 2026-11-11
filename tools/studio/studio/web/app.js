@@ -179,6 +179,42 @@ function emptyJobs() {
   });
 }
 
+// ---------- Quality: script scores and film measures (specs/010 US3) ----------
+/** @type {Array<[string, string, (v: any) => string, (v: any) => boolean, string]>} */
+const QC_ROWS = [
+  ["silence_ratio", "Silence in the narration", (v) => `${Math.round(v * 100)}%`, (v) => v <= 0.2, "≤ 20%"],
+  ["long_pauses_bad", "Long pauses inside a paragraph", (v) => String(v.length), (v) => !v.length, "none"],
+  ["cuts_bad", "Cuts too close to a sentence", (v) => String(v.length), (v) => !v.length, "none"],
+  ["key_shots_bad", "Short closing shots", (v) => String(v.length), (v) => !v.length, "none (≥ 2.5 s)"],
+  ["tail_s", "Time after the last word", (v) => `${num(v, 1)} s`, (v) => v <= 1.5, "≤ 1.5 s"],
+  ["stills_bad", "Still pictures", (v) => String(v.length), (v) => !v.length, "none over the style's limit"],
+  ["missing_glyphs", "Characters with no font", (v) => String(v.length), (v) => !v.length, "none"],
+];
+/** @param {any} qa */
+function qualityHtml(qa) {
+  if (!qa || (!qa.script && !qa.film && qa.lufs === undefined)) return "";
+  const ok = (/** @type {boolean} */ good) => `<span class="${good ? "pass" : "fail"}">${good ? "pass" : "fail"}</span>`;
+  const s = qa.script;
+  const script = !s ? "" : s.verdict === "skipped"
+    ? `<p class="muted">Script: skipped (${esc(s.skip_reason || "no narration")})</p>`
+    : `<p><strong>Script:</strong> ${esc(s.verdict)} · machine check ${s.machine_score ?? "–"}/10 · editor ${s.editor_score ?? "–"}/10
+        · fix rounds ${s.fix_rounds}${s.model ? ` · editor model ${esc(s.model)}` : ""}</p>
+      <table class="qa"><tr><th>Round</th><th>Editor</th><th>P1</th><th>P2</th><th>P3</th></tr>${(s.rounds || []).map((/** @type {any} */ r) =>
+        `<tr><td>${r.round}${r.customer_round ? " (your changes)" : ""}</td><td>${r.score ?? "no answer"}</td><td>${r.p1}</td><td>${r.p2}</td><td>${r.p3}</td></tr>`).join("")}</table>`;
+  const m = qa.film && typeof qa.film === "object" ? qa.film.measures || {} : null;
+  const rows = [
+    qa.lufs !== undefined && qa.lufs !== null ? `<tr><td>Loudness</td><td>${num(qa.lufs, 1)} LUFS</td><td>−14 ± 1</td><td>${ok(Math.abs(qa.lufs + 14) <= 1)}</td></tr>` : "",
+    qa.peak_db !== undefined && qa.peak_db !== null ? `<tr><td>True peak</td><td>${num(qa.peak_db, 1)} dB</td><td>≤ −1 dB</td><td>${ok(qa.peak_db <= -1)}</td></tr>` : "",
+    qa.readcheck && qa.readcheck !== "not_checked" ? `<tr><td>Reading time of on-screen text</td><td>${esc(qa.readcheck)}</td><td>enough time</td><td>${ok(qa.readcheck === "pass")}</td></tr>` : "",
+    ...(m ? QC_ROWS.filter(([k]) => m[k] !== undefined).map(([k, label, show, good, rule]) =>
+      `<tr><td>${label}</td><td>${show(m[k])}</td><td>${rule}</td><td>${ok(good(m[k]))}</td></tr>`) : []),
+  ].join("");
+  return `<div class="panel" id="quality"><p class="section-title">Quality</p>${script}
+    ${rows ? `<table class="qa"><tr><th>Measure</th><th>Value</th><th>Rule</th><th></th></tr>${rows}</table>` : ""}
+    ${m && m.texts_checked === false ? `<p class="muted">On-screen text was not checked for missing characters (only subtitles).</p>` : ""}
+    ${qa.film === "not_checked" ? `<p class="muted">The film could not be measured.</p>` : ""}</div>`;
+}
+
 async function pageJob(id) {
   const j = await get(`/jobs/${encodeURIComponent(id)}`);
   const pct = j.progress ? Math.round((100 * j.progress.done) / j.progress.total) : null;
@@ -211,6 +247,7 @@ async function pageJob(id) {
     ${j.error ? `<p class="error">${esc(j.error)}</p>` : ""}
     <div class="panel"><p class="section-title">Current step</p><p style="font-size:16px;font-weight:600">${esc(j.step)}</p>
       ${pct !== null ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ""}</div>
+    ${qualityHtml(j.qa)}
     ${revs ? `<h2>Reviews</h2><ul class="reviews">${revs}</ul>` : ""}
     <h2>Log</h2><pre class="log">${j.log.map((l) => `${new Date(l.t).toLocaleTimeString("en-GB")}  ${esc(l.line)}`).join("\n") || "No lines yet."}</pre>
     </div><aside class="aside panel"><p class="section-title">Summary</p><dl class="kv">
@@ -308,7 +345,7 @@ const decidedHtml = (d, kind = "") => (kind === "question"
   ${d.note ? `<br>Note: ${esc(d.note)}` : ""}</p>`);
 
 // The stages a film job reports (CLAUDE.md: job step); Storyboard only when the job asked for one
-const STAGES = ["Treatment", "Look", "Storyboard", "Voice", "Music", "Picture", "Mix", "Render", "Self-check"];
+const STAGES = ["Treatment", "Script", "Look", "Storyboard", "Voice", "Music", "Picture", "Mix", "Render", "Self-check"];
 const OPEN_STATUS = ["queued", "running", "waiting_review", "waiting_resume"];
 const ago = (iso) => {
   const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -318,7 +355,8 @@ const ago = (iso) => {
 function filmInProgress(j) {
   const seen = new Set(j.log.map((x) => x.line));
   const now = STAGES.indexOf(j.step);
-  const stages = STAGES.filter((st) => st !== "Storyboard" || seen.has(st));
+  const skipped = ((j.qa || {}).script || {}).verdict === "skipped";     // no narration: no Script step (specs/010)
+  const stages = STAGES.filter((st) => (st === "Storyboard" ? seen.has(st) : st !== "Script" || !skipped || seen.has(st)));
   const track = stages.map((st) => {
     const i = STAGES.indexOf(st);
     const cls = i === now ? "now" : seen.has(st) || (now >= 0 && i < now) ? "done" : "next";   // agents may change the order
@@ -706,6 +744,7 @@ const SETTING = [
   ["upload_max_minutes", "Upload length (minutes)", "int"], ["job_token_cap", "Token limit per job", "int"],
   ["concurrency", "Jobs at the same time", "int"],
   ["review_timeout_days", "Stop a job after waiting (days)", "int"], ["model", "Claude model", "text"],
+  ["editor_model", "Script editor model", "choice", [["inherit", "Same as jobs"], ["opus", "Opus"], ["sonnet", "Sonnet"], ["haiku", "Haiku"]]],
 ];
 const SETTINGS_TABS = [["general", "General"], ["users", "Users"], ["usage", "Usage"], ["worker", "Worker"], ["tokens", "API tokens"]];
 const ROLE = { admin: "Owner", customer: "Member" };
@@ -724,7 +763,9 @@ async function pageSettings(tab = "general") {
   }
   if (tab === "usage") return settingsUsage(top);
   const st = await get("/admin/settings");
-  const input = ([k, label, t]) => `<label>${label}<input id="s-${k}" type="${t === "text" ? "text" : "number"}" ${t === "num" ? 'step="0.01"' : ""} value="${esc(st[k])}"></label>`;
+  const input = ([k, label, t, choices]) => t === "choice"
+    ? `<label>${label}<select id="s-${k}">${/** @type {string[][]} */ (choices).map(([v, l]) => `<option value="${v}"${st[k] === v ? " selected" : ""}>${l}</option>`).join("")}</select></label>`
+    : `<label>${label}<input id="s-${k}" type="${t === "text" ? "text" : "number"}" ${t === "num" ? 'step="0.01"' : ""} value="${esc(st[k])}"></label>`;
   $app.innerHTML = `${top}<section class="panel card-pad"><h2>Studio</h2><p class="muted">Limits for every member, and how many films run at once.</p>
     <form class="form" id="settings"><div class="admin-grid">${SETTING.map(input).join("")}</div>
       <div><button class="primary" type="submit">Save settings</button></div></form><p id="msg" class="muted" role="status"></p></section>`;
@@ -732,7 +773,7 @@ async function pageSettings(tab = "general") {
     const data = {};
     for (const [k, , t] of SETTING) {
       const el = field(`s-${k}`);
-      data[k] = t === "text" ? el.value.trim() : Number(el.value);
+      data[k] = t === "text" || t === "choice" ? el.value.trim() : Number(el.value);
     }
     await send("PUT", "/admin/settings", data);
     return "Saved.";

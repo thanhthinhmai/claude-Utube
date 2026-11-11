@@ -97,7 +97,7 @@ class LocalRunner:
             link.parent.mkdir(parents=True, exist_ok=True)
             if not link.is_symlink():
                 link.symlink_to(target, target_is_directory=True)
-        base = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "TZ") if k in os.environ}
+        base = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "TZ", "STUDIO_CLAUDE_BIN") if k in os.environ}
         env = {**base, **env, "STUDIO_WORK": str(work), "HOME": str(work / ".home"),
                "STUDIO_HOME_DIR": str(self.studio)}            # what /studio is in a container: this checkout
         with open(work / ".agent.log", "ab") as out:       # the child keeps its own copy of the file
@@ -265,8 +265,87 @@ def quality(runner, work: Path, film: str) -> dict:
         qa["readcheck"] = {0: "pass", 1: "fail"}.get(rc, "not_checked")
         if rc == 1:
             qa["problems"].append("some on-screen text is not shown long enough to read: " + text.strip()[-400:])
+    qa["problems"] += film_qc(runner, work, film, qa)
+    qa["problems"] += script_gate(runner, work, film)
+    qa["script"] = script_summary(work, film)
     qa["pass"] = not qa["problems"]
     return qa
+
+
+def film_qc(runner, work: Path, film: str, qa: dict) -> list:
+    """`studio qc`: narration rhythm, cuts, stills and missing glyphs (specs/010 FR-011–FR-013)."""
+    rc, text = runner.exec(work, lambda root, lib: ["sh", studio_bin(runner), "qc", f"{root}/films/{film}", "--json"])
+    got = next((ln for ln in text.splitlines() if ln.startswith("{")), None)
+    if rc in (0, 1) and got:
+        try:
+            r = json.loads(got)
+        except ValueError:
+            r = None
+        if r is not None:
+            qa["film"] = {"pass": r["pass"], "measures": r["measures"]}
+            return list(r["problems"])
+    qa["film"] = "not_checked"
+    return ["the film could not be measured: " + text.strip()[-300:]]
+
+
+def studio_bin(runner) -> str:
+    """The studio's own commands: in the job image, or this checkout for a local run (its project may differ)."""
+    return "/studio/bin/studio" if runner.name == "docker" else str(HERE.parents[1] / "bin" / "studio")
+
+
+def read_checks(work: Path, film: str) -> dict:
+    try:
+        return json.loads((work / "films" / (film or "") / "checks.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def script_failed(work: Path, film: str):
+    """The reason to stop when the script editor did not pass the script after 2 fix rounds, else None."""
+    s = (read_checks(work, film).get("script") or {})
+    if s.get("verdict") != "failed":
+        return None
+    last = (s.get("editor") or [{}])[-1]
+    return (f"The script did not pass review after 2 fix rounds (last editor score {last.get('score', '–')}, "
+            f"{last.get('p1', 0)} must-fix problems). Your credit was given back.")
+
+
+def script_summary(work: Path, film: str):
+    """What the job page shows of the script step (specs/010 FR-016, data-model Job.qa.script); None if no step ran."""
+    s = read_checks(work, film).get("script")
+    if not s or (s.get("verdict") == "pending" and not s.get("machine") and not s.get("editor")):
+        return None
+    last = (s.get("editor") or [{}])[-1]
+    return {"verdict": s.get("verdict"), "skip_reason": s.get("skip_reason"),
+            "machine_score": (s.get("machine") or [{}])[-1].get("score"), "editor_score": last.get("score"),
+            "fix_rounds": s.get("fix_rounds", 0), "p1": last.get("p1", 0), "p2": last.get("p2", 0), "p3": last.get("p3", 0),
+            "model": last.get("model"),
+            "rounds": [{"round": e.get("round"), "score": e.get("score"), "p1": e.get("p1", 0), "p2": e.get("p2", 0),
+                        "p3": e.get("p3", 0), "customer_round": bool(e.get("customer_round"))} for e in s.get("editor") or []]}
+
+
+def has_narration(d: Path) -> bool:
+    return (d / "narration.json").is_file() or (d / "voices").is_dir() or any(d.glob("**/words.json"))
+
+
+def script_gate(runner, work: Path, film: str) -> list:
+    """Problems with the script step (specs/010 R8): a film with narration needs a reviewed script that still
+    passes the machine check and was not changed after the editor passed it."""
+    d = work / "films" / film
+    checks = read_checks(work, film)
+    verdict = (checks.get("script") or {}).get("verdict")
+    if not has_narration(d):
+        return []
+    if verdict == "skipped" or not (d / "SCRIPT.md").is_file():
+        return ["the film has narration but its script was not written and reviewed (SCRIPT.md, `script review`)"]
+    problems = []
+    rc, text = runner.exec(work, lambda root, lib: ["sh", studio_bin(runner), "script", "check", f"{root}/films/{film}"])
+    if rc != 0:
+        problems.append("the script no longer passes `script check`: " + text.strip()[-300:])
+    rc, text = runner.exec(work, lambda root, lib: ["sh", studio_bin(runner), "script", "status", f"{root}/films/{film}"])
+    if rc != 0:
+        problems.append("the script has not passed the editor's review: " + text.strip()[-300:])
+    return problems
 
 
 # ---------- the worker ----------
@@ -376,6 +455,8 @@ class Worker:
                "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "STUDIO_MODE": "online",
                "STUDIO_JOB": j["id"], "STUDIO_PROXY": self.proxy_url, "STUDIO_MODEL": s["model"],
                "STUDIO_ROOT": self.runner.root(work)}          # `learn …` and the film tools work in the job folder
+        if s.get("editor_model", "inherit") != "inherit":        # the script editor's model (specs/010 FR-007b)
+            env["STUDIO_EDITOR_MODEL"] = s["editor_model"]
         mounts, network = self.prepare(j, work)
         if network:
             env.update(HTTPS_PROXY=os.environ.get("STUDIO_EGRESS", "http://egress:8888"),
@@ -434,7 +515,9 @@ class Worker:
             else:
                 msg = (f"The customer answered the {reviews.KINDS[r['kind']]} ({r['id']}): {reviews.LABEL[d['value']]}."
                        + (f"\nTheir note: {d['note']}" if d.get("note") else "")
-                       + ("\nChange the treatment as asked and send it for review again." if r["kind"] == "treatment"
+                       + ("\nChange the treatment (and the script, if the film has one) as asked. For a script, run "
+                          "`script check --customer-round` and `script review --customer-round` until it passes, then "
+                          "send the review again with `--film`." if r["kind"] == "treatment"
                           and d["value"] == "revise" else "") + "\nContinue the job.")
 
             def f(x):
@@ -465,6 +548,11 @@ class Worker:
             self.notify(j, "review_needed")
             return
         rep = j.get("reported") or {}
+        if j["kind"] == "film":
+            why = script_failed(work, rep.get("film") or (j.get("input") or {}).get("film"))
+            if why:                        # 2 fix rounds used up: stop, the studio's fault (specs/010 FR-010)
+                self.failed(job_id, why, "studio")
+                return
         if rep.get("done") is False:
             self.failed(job_id, rep.get("error") or "The job could not finish.", rep.get("by", "studio"))
             return

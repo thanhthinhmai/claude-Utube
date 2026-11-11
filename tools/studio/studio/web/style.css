@@ -401,3 +401,7 @@ details.how div { padding-left: 16px; max-width: 640px; } details.how p { margin
 .for-agents summary { cursor: pointer; } .for-agents { margin-top: 12px; }
 .secret-box { margin: 10px 0; } .secret-box p { margin: 6px 0; }
 select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); font: inherit; }
+
+/* Quality block on the job page (specs/010 US3) */
+#quality table.qa { margin: 8px 0 12px; font-size: 13px; }
+#quality table.qa td, #quality table.qa th { padding: 6px 10px; text-align: left; }

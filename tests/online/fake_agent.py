@@ -3,6 +3,10 @@
 [fail] / [fail-customer] job fail --by studio|customer · [loud] deliver a film at about −4 LUFS
 [spend N] call the API N times through the proxy · [529] keep calling an API that is overloaded
 [slow S] wait S seconds before finishing · [noreport] exit without job done · [crash] exit 3
+[qc-bad] a 9 s still film first, fixed after the quality check · [qc-bad-always]
+[narration] the Script step of specs/010 (SCRIPT.md, script check, script review, fixing flagged paragraphs; exit 3
+of the review fails the job), then voice files and narration.json; editor tags such as [editor-p1 P02] go into
+SCRIPT.md as a note
 Learn jobs: makes a reference set with videos, sheets, transcripts and proof frames, asks review 1, then
 review 2 (exit 10 each time), then saves my-styles/<slug>/. A channel URL with "fail" in it fails the job,
 one with "hang" waits until stopped."""
@@ -42,6 +46,70 @@ def call_api(model: str = "claude-opus-5-5") -> int:
             return r.status
     except urllib.error.HTTPError as e:
         return e.code
+
+
+def studio_rc(*args) -> int:
+    env = {k: v for k, v in os.environ.items() if k != "CLAUDE_CODE_OAUTH_TOKEN"}
+    p = subprocess.run(["sh", str(REPO / "bin" / "studio"), *args], capture_output=True, text=True, env=env)
+    if p.returncode not in (0, 1):
+        print(f"studio {args[:2]} → {p.returncode}: {p.stdout[-300:]} {p.stderr[-500:]}", file=sys.stderr)
+    return p.returncode
+
+
+SCRIPT = """Title: A Fox and a Lantern
+Target: 20s
+Language: en
+{tags}
+[P01] Why does a small fox walk alone at night? She is looking for light.
+[P02] She finds an old lantern in the snow. It still glows, warm and gold.
+[P03] Now the whole forest is not dark anymore, and the little fox is never alone again.
+"""
+
+
+def script_step(idea: str, film: str) -> bool:
+    """The Script step of JOB.md. False when the script did not pass (the job is failed)."""
+    d = WORK / "films" / film
+    d.mkdir(parents=True, exist_ok=True)
+    studio("job", "step", JOB, "Script")
+    if not (d / "SCRIPT.md").exists():
+        tags = " ".join(re.findall(r"\[editor-[^\]]+\]", idea))
+        (d / "SCRIPT.md").write_text(SCRIPT.format(tags=f"> {tags}\n" if tags else ""))
+        (d / "SOURCES.md").write_text("no factual claims\n")
+    customer = ["--customer-round"] if (WORK / ".customer_round").exists() else []
+    if (d / "checks.json").exists() and studio_rc("script", "status", film) == 0:
+        return True                                   # passed before this turn and not changed since
+    if studio_rc("script", "check", film, *customer) != 0:
+        studio("job", "fail", JOB, "the script check did not pass", "--by", "studio")
+        return False
+    for _ in range(6):
+        rc = studio_rc("script", "review", film, *customer)
+        if rc == 0:
+            return True
+        if rc != 1:
+            studio("job", "fail", JOB, f"the script did not pass review (exit {rc})", "--by", "studio")
+            return False
+        checks = json.loads((d / "checks.json").read_text())
+        flagged = {i["para"] for i in checks["script"]["editor"][-1]["issues"] if i["level"] in ("P1", "P2")}
+        lines = []
+        for ln in (d / "SCRIPT.md").read_text().splitlines():
+            m = re.match(r"^\[(P\d+)\]", ln)
+            lines.append(ln + " Truly." if m and m.group(1) in flagged else ln)
+        (d / "SCRIPT.md").write_text("\n".join(lines) + "\n")
+    return False
+
+
+def voice_files(film: str) -> None:
+    d = WORK / "films" / film
+    (d / "voices").mkdir(parents=True, exist_ok=True)
+    words = {f"l0{i}": [["word", 0.0, 0.3], ["end.", 0.32, 0.6]] for i in (1, 2, 3)}     # fits the 3 s sample film
+    (d / "voices" / "words.json").write_text(json.dumps(words))
+    (d / "voices" / "dur.json").write_text(json.dumps({k: 0.6 for k in words}))
+    paras = [re.sub(r"^\[P\d+\]\s*", "", ln) for ln in (d / "SCRIPT.md").read_text().splitlines() if ln.startswith("[P")]
+    (d / "lines.json").write_text(json.dumps([{"id": f"l0{i}", "text": t} for i, t in enumerate(paras, 1)]))
+    (d / "narration.json").write_text(json.dumps({"words_file": "voices/words.json", "durations_file": "voices/dur.json",
+                                                  "lines_file": "lines.json",
+                                                  "lines": [{"id": f"l0{i}", "para": f"P0{i}", "at": round(0.2 + (i - 1) * 0.65, 2)}
+                                                            for i in (1, 2, 3)]}))
 
 
 def result(status: str, error: str = None):
@@ -145,6 +213,15 @@ def main() -> int:
             result("waiting")
             return 10
         studio("job", "log", JOB, "question refused")
+    narration = "[narration]" in idea and not inp.get("revise_of")
+    if narration:
+        if resumed and "Their note" in msg and "treatment review" in msg:
+            (WORK / ".customer_round").write_text("1")
+            d = WORK / "films" / inp["film"]
+            (d / "SCRIPT.md").write_text((d / "SCRIPT.md").read_text().replace("warm and gold.", "warm and bright gold."))
+        if not script_step(idea, inp["film"]):
+            result("ended")
+            return 0
     treat_ok = WORK / ".treatment_ok"
     if (inp.get("review_treatment") or "[treatment]" in idea) and not treat_ok.exists():
         if resumed and "treatment review" in msg and ": Approve." in msg:
@@ -152,9 +229,13 @@ def main() -> int:
         else:
             t = WORK / "treatment.md"
             t.write_text("# Treatment\nA fox finds a lantern." + (" (changed)" if "Their note" in msg else ""))
-            studio("review", "request", JOB, "--kind", "treatment", "--summary", str(t))
+            film_arg = ["--film", inp["film"]] if narration else []
+            studio("review", "request", JOB, "--kind", "treatment", "--summary", str(t), *film_arg)
             result("waiting")
             return 10
+    if narration:
+        studio("job", "step", JOB, "Voice")
+        voice_files(inp["film"])
     m = re.search(r"\[spend (\d+)\]", idea)
     for _ in range(int(m.group(1)) if m else 0):
         studio("job", "log", JOB, f"api: {call_api()}")
@@ -189,7 +270,21 @@ def main() -> int:
             return 0
         sample = old
         (d / "NOTE.txt").write_text(inp.get("note", ""))
-    (d / f"{film}.mp4").write_bytes(sample.read_bytes())
+        src = old.parent
+        if (src / "SCRIPT.md").exists():          # as the revise prompt says: the script and its review come along
+            import shutil
+            for name in ("SCRIPT.md", "SOURCES.md", "checks.json", "narration.json", "lines.json"):
+                if (src / name).exists():
+                    shutil.copy2(src / name, d / name)
+            for sub in (".check", "voices"):
+                if (src / sub).exists():
+                    shutil.copytree(src / sub, d / sub, dirs_exist_ok=True)
+    still = "[qc-bad-always]" in idea or ("[qc-bad]" in idea and not (resumed and "quality check" in msg))
+    if still:                              # 9 s of a still picture: the studio's qc finds it (specs/010 T027)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-stream_loop", "2", "-i", str(sample), "-c", "copy",
+                        str(d / f"{film}.mp4")], check=True)
+    else:
+        (d / f"{film}.mp4").write_bytes(sample.read_bytes())
     if "[noreport]" in idea:
         result("ended")
         return 0

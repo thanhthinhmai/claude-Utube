@@ -68,9 +68,8 @@ def compose(*args, check=True):
 
 
 def make_account(email, role):
-    """The owner (as `online admin` does) and a member (as Settings → Users does)."""
-    make = (f"accounts.signup({email!r}, {PASSWORD!r}, True, role='admin', verified=True)" if role == "admin"
-            else f"accounts.add_user({email!r}, {PASSWORD!r}, {role!r})")
+    """An owner and a member, added the way Settings → Users does (signup makes only the first owner)."""
+    make = f"accounts.add_user({email!r}, {PASSWORD!r}, {role!r})"
     code = f"from studio import accounts\ntry:\n    {make}\nexcept Exception as e:\n    print('exists', e)\n"
     compose("exec", "-T", "web", "/studio/tools/.venv/bin/python", "-c",
             f"import sys; sys.path.insert(0, '/studio/tools/studio')\n{code}")
@@ -85,6 +84,25 @@ def loudness(mp4: Path):
     return (float(i[-1]) if i else None), (float(pk[-1]) if pk else None)
 
 
+def script_tokens(j: dict):
+    """Tokens of the calls made during the Script step (writer and editor; specs/010 SC-005): from the log line
+    'Script' to the next stage line."""
+    log = j.get("log") or []
+    stages = ("Treatment", "Script", "Look", "Voice", "Music", "Picture", "Mix", "Render", "Self-check")
+    t0 = next((x["t"] for x in log if x["line"] == "Script"), None)
+    if not t0:
+        return None
+    t1 = next((x["t"] for x in log if x["t"] > t0 and x["line"] in stages and x["line"] != "Script"), None) or "9999"
+    code = (f"import sqlite3; c = sqlite3.connect('/data/studio.db'); "
+            f"print(c.execute(\"SELECT coalesce(sum(tokens_in + tokens_out + cache_write + cache_read), 0) FROM call "
+            f"WHERE job_id = ? AND at >= ? AND at < ?\", ({j['id']!r}, {t0!r}, {t1!r})).fetchone()[0])")
+    r = compose("exec", "-T", "web", "/studio/tools/.venv/bin/python", "-c", code, check=False)
+    try:
+        return int(r.stdout.strip())
+    except ValueError:
+        return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="https://localhost")
@@ -92,7 +110,13 @@ def main():
     ap.add_argument("--films", type=int, default=3)
     ap.add_argument("--seconds", type=int, default=30)
     ap.add_argument("--no-up", action="store_true", help="the stack is already running")
+    ap.add_argument("--idea", action="append", help="a film idea of your own (repeat for more films); replaces the built-in ideas")
+    ap.add_argument("--style", help="library style for --idea films (default: the first ones in the library)")
+    ap.add_argument("--tag", default="live", help="test accounts are <tag>-admin@example.com and <tag>-customer@example.com")
+    ap.add_argument("--review-treatment", action="store_true", help="ask for the treatment review (specs/010 FR-019)")
     a = ap.parse_args()
+    global ADMIN, CUSTOMER
+    ADMIN, CUSTOMER = f"{a.tag}-admin@example.com", f"{a.tag}-customer@example.com"
     if not a.no_up:
         print("↑ sh bin/studio online up …")
         subprocess.run(["sh", str(REPO / "bin/studio"), "online", "up"], check=True)
@@ -111,10 +135,12 @@ def main():
         time.sleep(5)
     me = cust.ok("GET", "/me")
     admin.ok("PUT", f"/admin/accounts/{me['id']}", {"quota_films": a.films + 2, "quota_learns": 2})
-    styles = [s["slug"] for s in cust.ok("GET", "/library")["styles"]][: a.films]
+    ideas = a.idea or IDEAS[: a.films]
+    styles = [a.style] * len(ideas) if a.style else [s["slug"] for s in cust.ok("GET", "/library")["styles"]][: len(ideas)]
     started, ids = {}, []
-    for idea, style in zip(IDEAS, styles):
-        j = cust.ok("POST", "/jobs", {"kind": "film", "style": style, "idea": idea, "seconds": a.seconds})
+    for idea, style in zip(ideas, styles):
+        j = cust.ok("POST", "/jobs", {"kind": "film", "style": style, "idea": idea, "seconds": a.seconds,
+                                      "review_treatment": a.review_treatment})
         ids.append(j["id"])
         started[j["id"]] = time.time()
         print(f"→ film {j['id']} · {style}")
@@ -163,6 +189,23 @@ def main():
               f"{lufs if lufs is not None else '–'} | {peak if peak is not None else '–'} | {rc} |")
     films = [done[i][0] for i in ids if done[i][0]["kind"] == "film"]
     tokens = sum((done[i][0].get("usage") or {}).get("tokens", 0) for i in ids)
+    print("\n| Job | Script | Machine | Editor | Fix rounds | Script-step tokens | Share | QC |\n|---|---|---|---|---|---|---|---|")
+    for jid in ids:
+        j, _ = done[jid]
+        if j["kind"] != "film":
+            continue
+        sc = (j.get("qa") or {}).get("script") or {}
+        film = (j.get("qa") or {}).get("film")
+        qc = ("pass" if film.get("pass") else "fail") if isinstance(film, dict) else (film or "–")
+        st, total = script_tokens(j), (j.get("usage") or {}).get("tokens", 0)
+        share = f"{st / total:.0%}" if total and st is not None else "–"
+        print(f"| {jid} | {sc.get('verdict', '–')} | {sc.get('machine_score', '–')} | {sc.get('editor_score', '–')} | "
+              f"{sc.get('fix_rounds', '–')} | {st if st is not None else '–':,} | {share} | {qc} |"
+              if st is not None else
+              f"| {jid} | {sc.get('verdict', '–')} | {sc.get('machine_score', '–')} | {sc.get('editor_score', '–')} | "
+              f"{sc.get('fix_rounds', '–')} | – | – | {qc} |")
+        for prob in ((j.get("qa") or {}).get("problems") or [])[:5]:
+            print(f"    problem: {prob}")
     print(f"\nFilms done: {sum(f['status'] == 'done' for f in films)}/{len(films)} · {tokens:,} tokens · API key cost "
           f"${sum(done[i][0].get('cost_usd', 0) for i in ids):.2f} · films saved in {out}")
     print("Largest job in tokens (to set the token limit per job, research R7): "

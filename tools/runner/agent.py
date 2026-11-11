@@ -36,7 +36,9 @@ building the studio, and everything you read is paid again on every later turn. 
   Do not run `job start`. Report each stage with `sh {STUDIO}/bin/studio job step {job} "<stage>"` and wrap
   long commands with `job run {job} --step "<stage>" -- <command…>`.
 - Do not install system software and do not run `deps` or `setup`: everything is installed.
-- You have no web access. Do not try to reach the internet.
+- You have no direct internet. To find facts for the script, use WebSearch (at most 5 searches in all; each one
+  is costly) and open a page with `sh {STUDIO}/bin/studio web fetch <url> --film <name>`, which records it as
+  opened for SOURCES.md. Do not try to reach the internet any other way.
 - Never name a YouTube channel, creator or real brand in the film.
 - All text in the film (narration, captions, titles) is in English.
 - To ask the customer something, write a short Markdown file and run
@@ -55,6 +57,10 @@ def revise_prompt(inp: dict) -> str:
     return (f"Make a changed version of the customer's film `{old}`.\n\n"
             f"- The finished film and its build files are in {WORK}/films/{old}/. Leave that folder as it is.\n"
             f"- Copy what you need into the new film folder `{inp['film']}` (use exactly this name) and change it there.\n"
+            f"- If the old film has narration, copy its SCRIPT.md, SOURCES.md, checks.json and .check/ folder too. If the "
+            f"note changes the narration, change only what it asks, then run `script check --customer-round` and "
+            f"`script review --customer-round` until it passes, and make the voice again (JOB.md, Script step). If it "
+            f"does not, keep the script and the voice as they are.\n"
             f"- Style: `{inp['style']}`. Length: about {inp['seconds']} seconds unless the note asks otherwise.\n"
             f"- The original idea:\n<idea>\n{inp.get('idea') or ''}\n</idea>\n"
             f"- What the customer wants changed:\n<note>\n{inp['note']}\n</note>\n\n"
@@ -65,8 +71,9 @@ def revise_prompt(inp: dict) -> str:
 def film_prompt(inp: dict) -> str:
     if inp.get("revise_of"):
         return revise_prompt(inp)
-    treat = ("Before making the picture, write the treatment and send it for review with "
-             "`review request --kind treatment`, then end your turn."
+    treat = ("Before making the picture, write the treatment and, for a film with narration, get the script "
+             "passed (the Script step of JOB.md). Then send both for review with "
+             f"`review request --kind treatment --film {inp['film']}`, and end your turn."
              if inp.get("review_treatment") else
              "Do not ask for a treatment review.")
     treat += (" If the idea is unclear, you may ask the customer up to 3 short questions in all, one review request "
@@ -129,8 +136,8 @@ async def run() -> int:
         add_dirs=[str(STUDIO)],
         setting_sources=["project"],
         system_prompt={"type": "preset", "preset": "claude_code", "append": rules()},
-        allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Skill"],
-        disallowed_tools=["WebFetch", "WebSearch"],
+        allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Skill", "WebSearch"],
+        disallowed_tools=["WebFetch"],          # pages open through the proxy: `studio web fetch` (specs/010 R4)
         permission_mode="acceptEdits",
         model=inp.get("model") or os.environ.get("STUDIO_MODEL"),
         max_turns=MAX_TURNS,

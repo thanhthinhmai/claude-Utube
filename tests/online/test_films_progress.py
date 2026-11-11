@@ -36,6 +36,7 @@ class FilmsInProgress(unittest.TestCase):
             self.assertEqual(res["errors"], [])
             self.assertEqual(res["got"], {"Treatment": "done", "Voice": "done", "Look": "now", "Render": "next"})
             self.assertEqual(res["storyboard"], 0)                # only shown when the job had one
+            self.assertEqual(res["script"], 1)                    # shown from the start unless skipped (specs/010 T038)
             self.assertLessEqual(res["wide"], 360)
         finally:
             p.close()

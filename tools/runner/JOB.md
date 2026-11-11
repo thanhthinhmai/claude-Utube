@@ -22,11 +22,45 @@ Read in this order, and only these, when you reach them:
    §11 (before you deliver) before the self-check. Other sections only when a decision needs them.
 4. Only after `TREATMENT.md` exists: `LIB/styles/<slug>/DEMO.md`, to learn techniques. In `demo/`, read the
    files you will reuse; for the rest look with `grep -n` or `sed -n 'a,bp'`, not whole files.
-5. `LIB/TECHNIQUE.md` §2–§8 as you build (picture, timeline, voice, music, mix, subtitles, review loop);
+5. Right after `TREATMENT.md`: the **Script** step below. Write no voice line before the script passes.
+6. `LIB/TECHNIQUE.md` §2–§8 as you build (picture, timeline, voice, music, mix, subtitles, review loop);
    §9 for 3D, §10 for characters. `LIB/core/README.md` for tool flags, when you need them.
 
 Report each stage with `job step` before you start it, using exactly these names:
-`Treatment`, `Look`, `Voice`, `Music`, `Picture`, `Mix`, `Render`, `Self-check` (no Storyboard online).
+`Treatment`, `Script`, `Look`, `Voice`, `Music`, `Picture`, `Mix`, `Render`, `Self-check` (no Storyboard online).
+
+## The Script step (every film with narration)
+
+`STUDIO` = the studio folder in your instructions. Lines starting with `>` in SCRIPT.md are notes, not narration.
+
+1. Write `films/<name>/SCRIPT.md`: `Title:`, `Target: <seconds>s`, `Language:` lines, then paragraphs `[P01] …`,
+   `[P02] …`. Short sentences (at most 25 words), a hook in the first 30 seconds (a question, a number or a twist),
+   no greeting, numbers written the way they are read ("four forty-five", not "4:45"), few brackets or dashes.
+2. Write `films/<name>/SOURCES.md`: one line per fact or number, `- [Pnn] "quote": source name, year, link`.
+   Find facts with WebSearch (at most 5 searches) and open every link you cite with
+   `sh STUDIO/bin/studio web fetch <url> --film <name>`. An invented detail of a story: `- [Pnn] "quote": fiction`.
+   No facts at all: the single line `no factual claims`.
+3. `sh STUDIO/bin/studio script check <name>` until it exits 0. Then `sh STUDIO/bin/studio script review <name>`:
+   - exit 0: the script passed; go on.
+   - exit 1: change **only** the paragraphs the editor marked P1 or P2 (others must stay word for word), then run
+     `script review` again.
+   - exit 3: the script did not pass after 2 fix rounds. Stop: `job fail <id> "<the last score and problems>" --by studio`.
+4. A film with no narration at all (music and picture only): `sh STUDIO/bin/studio script skip <name> --reason "no narration"`.
+5. The voice lines (`lines.json`) are exactly the passed script's sentences, in order. When the voice is done and
+   placed, write `films/<name>/narration.json`; `cuts` are the seconds where the picture cuts (from your timeline):
+   `{"words_file": "voices/words.json", "durations_file": "voices/dur.json", "lines_file": "lines.json",
+     "lines": [{"id": "l01", "para": "P01", "at": 0.6}, …], "cuts": [0, 4.2, …]}`
+   (`words.json` and `dur.json` are what the library's `tts.py` and `asr_check.py` write; `lines_file` is the
+   `lines.json` you gave `tts.py`; `at` is the second the line starts in the final film). `qc` checks that the
+   voice lines say exactly the passed script.
+
+A changed version of a finished film ("Request changes"): copy the old film's SCRIPT.md, SOURCES.md, checks.json
+and `.check/` with the rest. Only when the note changes the narration, change the script as asked and run
+`script check --customer-round` and `script review --customer-round`; otherwise keep script and voice as they are.
+
+If the customer asked to review the treatment, send that review only after the script passed:
+`review request <id> --kind treatment --film <name> --summary <file>` adds the script and its scores. When they ask
+for changes, change the script as asked, then `script check --customer-round` and `script review --customer-round`.
 
 ## Spend less (every token you read is paid again on every later turn)
 
@@ -45,6 +79,7 @@ Report each stage with `job step` before you start it, using exactly these names
 ## Finishing
 
 - Self-check against DIRECTOR.md §11 with one contact sheet and the loudness check, then
-  `job done <id> --film <name>`. The studio checks loudness (−14 ± 1 LUFS, true peak ≤ −1 dB) and reading time
-  again before delivery.
+  `sh STUDIO/bin/studio qc <name>` (narration rhythm, cuts, stills over 6 s, characters with no font): fix what it
+  reports and run it again. Then `job done <id> --film <name>`. The studio checks loudness (−14 ± 1 LUFS, true peak ≤ −1 dB), reading time, `qc` and
+  the script's review again before delivery; a failure there gives you one round to fix it.
 - If the film cannot be made, `job fail` as your instructions say.

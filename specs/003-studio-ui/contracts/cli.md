@@ -30,6 +30,8 @@ Mã việc sai hoặc không có → mã 1.
 | `review decide <id> --value approve\|revise\|accept_anyway\|stop [--note "…"] --source chat` | ghi quyết định từ khung chat | mã 0 · 4 nếu đã có quyết định · 2 nếu thiếu góp ý hay giá trị không hợp lệ |
 | `review status <id>` | JSON yêu cầu và quyết định | mã 0 |
 
+`review request … --kind treatment --film <phim>` (specs/010 FR-019): thêm `SCRIPT.md` và bảng điểm của phim vào sau phần tóm tắt.
+
 ## Chế độ online (specs/007)
 Khi có `STUDIO_MODE=online` và `STUDIO_JOB=<mã việc>` (tức là đang chạy trong container việc), các lệnh `job` và `review` không ghi `.studio/`. Thay vào đó, chúng gọi bộ chuyển tiếp ở `$STUDIO_PROXY/internal/…` bằng `ANTHROPIC_API_KEY` của việc (contracts/runner.md của 007).
 
@@ -44,3 +46,16 @@ Khi có `STUDIO_MODE=online` và `STUDIO_JOB=<mã việc>` (tức là đang ch�
 | `review status <id>` | Đọc qua bộ chuyển tiếp |
 
 Lệnh `admin create <email>` cũng chỉ dùng ở chế độ online. Lệnh này tạo tài khoản quản trị duy nhất; nếu đã có thì báo lỗi, mã 1.
+
+## Kịch bản và đo phim (specs/010)
+Chạy giống nhau ở local và trong container; chi tiết, điểm và ngưỡng ở `specs/010-script-review-qc/contracts/cli.md`. Chỉ cần Python 3, không cần cài giao diện.
+
+| Lệnh | Việc làm | Mã |
+|---|---|---|
+| `script check <phim> [--json] [--customer-round]` | máy chấm `SCRIPT.md` và `SOURCES.md`, không gọi Claude | 0 đạt (≥ 7, mọi điều kiện cứng) · 1 chưa đạt · 2 không đọc được |
+| `script review <phim> [--json] [--customer-round]` | biên tập độc lập (`claude -p` riêng), tối đa 2 vòng sửa | 0 đạt (≥ 8, không P1) · 1 còn vòng sửa · 3 hết vòng · 2 không chạy được |
+| `script status <phim> [--json]` | kết luận và điểm cuối; báo nếu `SCRIPT.md` đổi sau khi đạt | 0 pass hoặc skipped · 1 pending · 3 failed |
+| `script skip <phim> --reason "…"` | phim không có lời đọc | 0 · 1 nếu phim có lời đọc |
+| `web fetch <url> [--film F]` | mở một trang (online: qua bộ chuyển tiếp, tối đa 60 trang mỗi việc), ghi vào `.check/opened.json` | 0 · 1 bị chặn hoặc lỗi |
+| `qc <phim> [--json]` | đo phim xong: nhịp lời, cắt cảnh, hình đứng im, ký tự thiếu phông | 0 đạt · 1 có lỗi · 2 không đo được |
+| `config editor-model <inherit\|opus\|sonnet\|haiku>` | model của biên tập ở local (`.studio/config.json`); online: Settings → General | 0 |
