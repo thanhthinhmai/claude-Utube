@@ -227,6 +227,12 @@ def main() -> int:
         rc = learn(inp, stage)
         result("waiting" if rc == 10 else "ended")
         return rc
+    if inp.get("kind") == "topics":              # specs/013: the real topic picker, through the proxy
+        sys.path.insert(0, str(REPO / "tools"))
+        from filmcheck import topics
+        r = topics.run_job(WORK)
+        result("ended")
+        return 0 if r else 1
     idea = inp.get("idea", "")
     resumed = (WORK / ".resume.json").exists()
     key = os.environ.get("CLAUDE_CODE_OAUTH_TOKEN", "")

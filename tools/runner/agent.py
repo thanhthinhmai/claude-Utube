@@ -172,7 +172,25 @@ async def run() -> int:
     return 1 if error else 0
 
 
+def run_topics() -> int:
+    """A `topics` job (specs/013 R6): the topic picker, not Claude Code; numbers and fit go through the proxy."""
+    sys.path.insert(0, str(STUDIO / "tools"))
+    from filmcheck import topics
+    try:
+        r = topics.run_job(WORK)
+    except Exception as e:     # noqa: BLE001 - reported to the worker
+        write_result({"status": "error", "session": None, "error": f"{type(e).__name__}: {str(e)[:300]}"})
+        return 1
+    write_result({"status": "ended", "session": None, "topics": len(r["topics"]), "units": r["units"]})
+    return 0
+
+
 def main() -> int:
+    try:
+        if json.loads((WORK / ".input.json").read_text(encoding="utf-8")).get("kind") == "topics":
+            return run_topics()
+    except (OSError, ValueError):
+        pass
     try:
         return asyncio.run(run())
     except Exception as e:     # noqa: BLE001 - reported to the worker, which fails the job as the studio's fault

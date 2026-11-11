@@ -26,7 +26,9 @@ SETTINGS_DEFAULT = {
     "concurrency": 2,
     "review_timeout_days": 7,
     "model": "claude-opus-5-5",
-    "editor_model": "inherit",            # specs/010 FR-007b: inherit | opus | sonnet | haiku
+    "editor_model": "inherit",
+    "youtube_daily_units": 9000,          # specs/013: the studio's YouTube units a day (YouTube gives 10000)
+    "topics_per_day": 40,                 # specs/013: topics one person may score a day (0 = off)            # specs/010 FR-007b: inherit | opus | sonnet | haiku
     # USD per million tokens: input, output, cache write, cache read
     "price_table": {
         "claude-opus-5-5": {"in": 4.0, "out": 20.0, "cache_write": 5.0, "cache_read": 0.2},

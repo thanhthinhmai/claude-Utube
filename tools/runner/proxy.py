@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "studio"))
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from filmcheck import webfetch  # noqa: E402
+from filmcheck import topics as yt_topics, webfetch  # noqa: E402
 from studio import claude_plan, db, jobs, quotas, reviews, store  # noqa: E402
 from studio.store import StudioError  # noqa: E402
 
@@ -187,6 +187,14 @@ def strip_oauth_beta(value: str) -> str:
 class StepIn(BaseModel):
     text: str = Field(max_length=120)
     progress: Optional[dict] = None
+
+
+class YouTubeIn(BaseModel):
+    endpoint: str = Field(max_length=20)
+    params: dict = Field(default_factory=dict)
+
+
+YT_LOCK = __import__("threading").Lock()           # one YouTube call at a time: the day's units stay right
 
 
 class LogIn(BaseModel):
@@ -421,6 +429,36 @@ def create_app() -> FastAPI:
             return JSONResponse({"error": {"code": e.code, "message": e.message}}, status_code=e.http)
         log.info("job %s web fetch %s: %s", job["id"], host, r["status"])
         return r
+
+    @app.post("/internal/youtube")
+    async def youtube(body: YouTubeIn, request: Request):
+        """YouTube numbers for a `topics` job (specs/013 R5): the key, the day's units and a 24-hour cache stay here."""
+        job, _ = job_of(request)
+        if job.get("kind") != "topics":
+            raise Denied(403, "permission_error", "only a topics job may call YouTube")
+        if body.endpoint not in yt_topics.ENDPOINTS:
+            raise Denied(400, "invalid_request_error", "unknown YouTube endpoint")
+        key = yt_topics.read_online_key(db.data_dir())
+        if not key:
+            return JSONResponse({"error": {"code": "youtube_not_ready", "message": "the studio has no YouTube key"}},
+                                status_code=503)
+        limit = quotas.settings().get("youtube_daily_units", 9000)
+
+        def call():
+            with YT_LOCK:
+                f = yt_topics.Fetcher.local(key, yt_topics.online_usage(db.data_dir(), limit), yt_topics.online_cache(db.data_dir()))
+                out = f.get(body.endpoint, body.params)
+                return out, f.units
+        try:
+            out, units = await asyncio.to_thread(call)
+        except yt_topics.QuotaError as e:
+            log.info("job %s youtube %s: quota", job["id"], body.endpoint)
+            return JSONResponse({"error": {"code": "youtube_quota", "message": str(e)}}, status_code=429)
+        except yt_topics.TopicError as e:
+            log.info("job %s youtube %s: error", job["id"], body.endpoint)
+            return JSONResponse({"error": {"code": "youtube_error", "message": yt_topics.redact(str(e), key)}}, status_code=502)
+        log.info("job %s youtube %s: %s units%s", job["id"], body.endpoint, units, " (cache)" if not units else "")
+        return {**out, "_cached": units == 0, "_units": units}
 
     @app.get("/internal/reviews/{rid}")
     def review_status(rid: str, request: Request):
