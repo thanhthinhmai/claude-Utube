@@ -44,6 +44,21 @@ class Thumbs(unittest.TestCase):
         self.assertEqual(publish.image_size(d / "publish" / "thumbnail-2.png"), (720, 1280))
         self.assertEqual(publish.check(d)["problems"], [])
 
+    def test_big_picture_is_saved_as_jpeg(self):                 # FR-002, T032
+        d = samples.make_publish_film(self.root, "big")
+        old = publish.THUMB_BYTES
+        publish.THUMB_BYTES = 20_000           # every PNG of the sample is bigger than this
+        try:
+            publish.build(d, LIB)
+            files = publish.thumb_files(d)
+            self.assertEqual(files, ["thumbnail-1.jpg", "thumbnail-2.jpg", "thumbnail-3.jpg"])
+            self.assertFalse((d / "publish" / "thumbnail-1.png").exists())
+            self.assertEqual(publish.image_size(d / "publish" / "thumbnail-1.jpg"), (1280, 720))
+            publish.THUMB_BYTES = old
+            self.assertNotIn("thumb_size", [p.split(":")[0] for p in publish.check(d)["problems"]])
+        finally:
+            publish.THUMB_BYTES = old
+
     def test_white_on_white_fails_contrast(self):
         d = samples.make_publish_film(self.root, "pale")
         (d / "index.html").write_text((d / "index.html").read_text().replace("hsl(${(t * 7) % 360},60%,30%)", "#ffffff"))

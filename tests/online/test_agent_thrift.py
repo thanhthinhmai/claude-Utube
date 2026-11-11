@@ -22,6 +22,16 @@ class Thrift(unittest.TestCase):
         self.assertIn("tools/runner/JOB.md", rules)
         self.assertIn("Do not read the studio's CLAUDE.md", rules)
 
+    def test_publish_is_made_again_after_changes(self):            # specs/011 T015, T031, FR-001, FR-015
+        import inspect
+        import agent
+        import worker
+        self.assertIn("`Publish`", (REPO / "tools" / "runner" / "JOB.md").read_text())
+        self.assertIn("studio publish", inspect.getsource(worker.Worker.finished))       # the QC fix round
+        p = agent.revise_prompt({"revise_of": "old", "film": "new", "style": "s", "seconds": 30, "note": "n"})
+        self.assertIn("publish", p)
+        self.assertIn("Publish", agent.rules())
+
     def test_agent_stats_from_a_transcript(self):
         import tempfile
         from pathlib import Path

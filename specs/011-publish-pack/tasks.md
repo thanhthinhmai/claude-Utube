@@ -243,3 +243,8 @@ T017 CLAUDE.md + skill-integration.md   ‖  T014 JOB.md
 | SC-004 ≤ 5% token, ≤ 3 phút | | **chưa đo**: cần bài chạy thật (quickstart mục 3), tốn tiền, chờ người dùng đồng ý |
 | SC-005 đạt trong ≤ 1 vòng sửa; dán vào YouTube không phải sửa | | **chưa đo**: như SC-004, cộng bước kiểm bằng tay trên YouTube Studio |
 | SC-006 phụ đề khớp 100%, lệch ≤ 0,3 giây | | `test_subtitles_match_script_and_timing` |
+
+## Phase 7: Convergence
+
+- [X] T031 Add a test in tests/online/test_agent_thrift.py that the QC fix-round message (tools/runner/worker.py) and the revise prompt (tools/runner/agent.py) both tell the agent to run `studio publish` again per T015 / FR-001 (missing)
+- [X] T032 Add a test in tests/filmcheck/test_thumbs.py that a thumbnail over the size limit is saved as `thumbnail-n.jpg` and still passes `thumb_size` per FR-002 (partial)
