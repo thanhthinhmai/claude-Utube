@@ -414,3 +414,9 @@ select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; b
 #publish .pub-title { font-weight: 600; margin: 4px 0 8px; overflow-wrap: anywhere; }
 #publish .pub-desc { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; font-size: 13px; }
 @media (max-width: 600px) { #publish .pub-grid { grid-template-columns: 1fr; } }
+
+/* channels and lessons (specs/012) */
+.table-wrap { max-width: 100%; overflow-x: auto; }
+table.lessons td, table.lessons th { padding: 6px 10px; text-align: left; vertical-align: top; }
+table.lessons tr.l-retired { opacity: .55; }
+table.lessons tr.l-draft td:nth-child(2) { color: var(--warn, #b26b00); font-weight: 600; }

@@ -215,6 +215,116 @@ function qualityHtml(qa) {
     ${qa.film === "not_checked" ? `<p class="muted">The film could not be measured.</p>` : ""}</div>`;
 }
 
+// ---------- channels and lessons (specs/012) ----------
+const lines = (/** @type {string} */ v) => v.split("\n").map((x) => x.trim()).filter(Boolean);
+/** @param {any[]} ls @param {string} base @param {boolean} canEdit */
+function lessonsTable(ls, base, canEdit) {
+  if (!ls.length) return `<p class="muted">No lessons yet.</p>`;
+  return `<div class="table-wrap"><table class="qa lessons"><tr><th>#</th><th>State</th><th>What went wrong</th><th>How to stop it</th><th>Checked by</th><th></th></tr>
+    ${ls.map((x) => `<tr class="l-${esc(x.status)}"><td>${x.n}</td><td>${esc(x.status)}</td><td>${esc(x.what)}<br><small class="muted">${esc(x.why)}</small></td>
+      <td>${esc(x.stop)}</td><td>${x.rule ? `<code>${esc(x.rule)}</code>${x.rule_valid === false ? " (cannot be read)" : ""}` : "—"}</td>
+      <td class="row">${x.status === "draft" && canEdit ? `<button data-act="approve" data-n="${x.n}">Approve</button><button data-act="edit" data-n="${x.n}">Edit</button>` : ""}
+        ${x.status !== "retired" ? `<button data-act="retire" data-n="${x.n}">Retire</button>` : ""}</td></tr>`).join("")}</table></div>`;
+}
+const LESSON_FORM = `<details class="panel"><summary><strong>Add a lesson</strong></summary><div class="form" id="lesson-form">
+  <label>What went wrong<input id="l-what" maxlength="400"></label><label>Why it was not caught<input id="l-why" maxlength="400"></label>
+  <label>How to stop it next time<input id="l-stop" maxlength="400"></label>
+  <label>Machine rule <span class="hint">Optional: phrase:&lt;words never to use&gt;, max_sentence_words:N or max_title_chars:N</span><input id="l-rule" maxlength="120"></label>
+  <div><button class="primary" id="l-add">Add the lesson</button></div><p id="l-msg" class="muted" role="status"></p></div></details>`;
+/** @param {string} base API path of the lesson list @param {() => void} again */
+function wireLessons(base, again) {
+  $app.querySelectorAll("table.lessons button").forEach((el) => {
+    const b = /** @type {HTMLButtonElement} */ (el);
+    b.onclick = async () => {
+      try {
+        if (b.dataset.act === "edit") {
+          const what = prompt("What went wrong", ""), stop = prompt("How to stop it next time", "");
+          if (what === null || stop === null) return;
+          await send("PUT", `${base}/${b.dataset.n}`, { ...(what ? { what } : {}), ...(stop ? { stop } : {}) });
+        } else await post(`${base}/${b.dataset.n}/${b.dataset.act}`);
+        again();
+      } catch (e) { alert(e.message); }
+    };
+  });
+  const add = document.getElementById("l-add");
+  if (add) add.onclick = async () => {
+    const msg = document.getElementById("l-msg");
+    try {
+      const rule = field("l-rule").value.trim();
+      await post(base, { what: field("l-what").value.trim(), why: field("l-why").value.trim(), stop: field("l-stop").value.trim(), ...(rule ? { rule } : {}) });
+      again();
+    } catch (e) { msg.className = "fail"; msg.textContent = e.message; }
+  };
+}
+
+async function pageChannels() {
+  const [{ channels }, lib, mine] = await Promise.all([get("/channels"), get("/library"), get("/styles")]);
+  const styles = [...mine.styles.map((/** @type {any} */ s) => [s.slug, `${s.en || s.slug} (yours)`]), ...(lib.styles || []).map((/** @type {any} */ s) => [s.slug, s.en])];
+  $app.innerHTML = `${head("Make", "Channels", "Your own YouTube channels: what you decided for each one, and the lessons the studio must not forget.")}
+    ${channels.length ? `<div class="table-wrap"><table class="qa"><tr><th>Channel</th><th>Language</th><th>Length</th><th>Style</th><th>Lessons</th></tr>
+      ${channels.map((/** @type {any} */ c) => `<tr><td><a href="#/channels/${esc(c.slug)}">${esc(c.name)}</a></td><td>${esc(c.language)}</td><td>${c.seconds} s</td>
+        <td>${esc(c.style)}</td><td>${c.lessons_active}${c.lessons_draft ? ` · ${c.lessons_draft} to approve` : ""}</td></tr>`).join("")}</table></div>` : `<p class="muted">No channels yet.</p>`}
+    <form class="form panel"><p class="section-title">New channel</p>
+      <label>Name<input id="c-name" maxlength="80" required></label>
+      <label>Short id <span class="hint">Lowercase letters, digits and dashes, e.g. science-for-kids</span><input id="c-slug" maxlength="40" pattern="[a-z0-9-]+" required></label>
+      <label>Language <span class="hint">A code such as en or vi</span><input id="c-language" maxlength="3" value="en" required></label>
+      <label>Length in seconds<input id="c-seconds" type="number" min="5" max="900" value="45" required></label>
+      <label>Style<select id="c-style">${styles.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select></label>
+      <div><button class="primary" type="submit">Create the channel</button></div></form><p id="msg" class="muted" role="status"></p>`;
+  onSubmit(async () => {
+    const c = await post("/channels", { name: field("c-name").value.trim(), slug: field("c-slug").value.trim(), language: field("c-language").value.trim(),
+      seconds: Number(field("c-seconds").value), style: /** @type {HTMLSelectElement} */ (document.getElementById("c-style")).value });
+    location.hash = `#/channels/${c.slug}`;
+    return "";
+  });
+}
+
+async function pageChannel(slug) {
+  const c = await get(`/channels/${encodeURIComponent(slug)}`);
+  const base = `/channels/${encodeURIComponent(slug)}/lessons`;
+  const t = (/** @type {string} */ k, /** @type {string} */ label, /** @type {string} */ hint = "") =>
+    `<label>${label}${hint ? ` <span class="hint">${hint}</span>` : ""}<input id="p-${k}" value="${esc(c[k] ?? "")}"></label>`;
+  const a = (/** @type {string} */ k, /** @type {string} */ label, /** @type {string} */ hint) =>
+    `<label>${label} <span class="hint">${hint}</span><textarea id="p-${k}">${esc(Array.isArray(c[k]) ? c[k].join("\n") : c[k] || "")}</textarea></label>`;
+  $app.innerHTML = `${back("#/channels", "Channels")}${head("Channel", esc(c.name), `<a class="button primary" href="#/new?channel=${esc(c.slug)}">New film for this channel</a>`)}
+    <form class="form panel" id="profile"><p class="section-title">Profile</p>
+      ${t("name", "Name")}${t("niche", "Niche")}${t("audience", "Audience")}${t("language", "Language")}${t("seconds", "Length in seconds")}
+      ${t("style", "Style")}${t("voice", "Voice", "A voice of the library, e.g. af_bella")}${t("speed", "Speed", "0.5 to 2")}
+      ${a("title_rules", "Title rules", "In your own words")}${t("title_max", "Longest title", "20–100 characters, or empty")}
+      ${a("thumbnail_rules", "Thumbnail rules", "In your own words")}
+      ${a("hashtags", "Hashtags always used", "One per line, like #science; at most 5")}${a("banned", "Words never used", "One per line")}
+      <div><button class="primary" type="submit">Save the profile</button></div></form><p id="msg" class="muted" role="status"></p>
+    <div class="panel"><p class="section-title">Decisions</p>
+      ${(c.decisions || []).length ? `<ul>${c.decisions.map((/** @type {any} */ d) => `<li>${esc(d.date)}: ${esc(d.text)}</li>`).join("")}</ul>` : `<p class="muted">None yet.</p>`}
+      <div class="row"><input id="d-text" maxlength="300" placeholder="Something you decided for this channel"><button id="d-add">Add</button></div></div>
+    <div class="panel"><p class="section-title">Lessons</p>${lessonsTable(c.lessons || [], base, true)}</div>${LESSON_FORM}`;
+  const again = () => pageChannel(slug);
+  onSubmit(async () => {
+    const num = (/** @type {string} */ k) => field(`p-${k}`).value.trim() === "" ? null : Number(field(`p-${k}`).value);
+    await send("PUT", `/channels/${encodeURIComponent(slug)}`, {
+      name: field("p-name").value.trim(), niche: field("p-niche").value.trim(), audience: field("p-audience").value.trim(),
+      language: field("p-language").value.trim(), seconds: num("seconds"), style: field("p-style").value.trim(),
+      voice: field("p-voice").value.trim() || null, speed: num("speed") ?? 1, title_rules: field("p-title_rules").value.trim(),
+      title_max: num("title_max"), thumbnail_rules: field("p-thumbnail_rules").value.trim(),
+      hashtags: lines(field("p-hashtags").value), banned: lines(field("p-banned").value) });
+    return "Saved.";
+  });
+  /** @type {HTMLButtonElement} */ (document.getElementById("d-add")).onclick = async () => {
+    try { await post(`/channels/${encodeURIComponent(slug)}/decisions`, { text: field("d-text").value.trim() }); again(); }
+    catch (e) { alert(e.message); }
+  };
+  wireLessons(base, again);
+}
+
+/** @param {string} top */
+async function settingsLessons(top) {
+  const { lessons } = await get("/lessons/shared");
+  $app.innerHTML = `${top}<div class="panel"><p class="section-title">Shared lessons</p>
+    <p class="muted">Lessons for every channel of every member. Members do not see them unless one stops their film.</p>
+    ${lessonsTable(lessons, "/lessons/shared", false)}</div>${LESSON_FORM}`;
+  wireLessons("/lessons/shared", () => settingsLessons(top));
+}
+
 const ANGLE = { curiosity: "Curiosity", number: "Number", question: "Question" };
 /** The Publish block of a finished film job (specs/011 contracts/api.md). @param {string} film @param {any} sum */
 async function fillPublish(film, sum) {
@@ -226,7 +336,9 @@ async function fillPublish(film, sum) {
   catch { box.innerHTML = `<p class="section-title">Publish</p><p class="muted">${sum.cut ? `The publish step was stopped: ${esc(sum.cut)}` : "No publish pack for this film."}</p>`; return; }
   const check = p.check.cut ? `The publish step was stopped: ${esc(p.check.cut)}`
     : p.check.pass ? "Publish check: pass" : `Publish check: ${p.check.problems.length} problem${p.check.problems.length === 1 ? "" : "s"}`;
+  const blocked = (sum.blocked_by_lesson || []).map((/** @type {number} */ n) => `#${n}`).join(", ");
   box.innerHTML = `<p class="section-title">Publish</p>
+    ${blocked ? `<p class="error">⚠ Do not publish yet: repeats lesson ${blocked}.</p>` : ""}
     <div class="pub-grid">${p.titles.map((/** @type {any} */ t, /** @type {number} */ i) => `<div class="pub-card">
       ${t.thumbnail ? `<img loading="lazy" src="${base}/${encodeURIComponent(t.thumbnail)}" alt="Thumbnail ${i + 1}">` : `<div class="pub-none muted">No picture</div>`}
       <p class="muted">${esc(ANGLE[t.angle] || t.angle)}${t.thumb_text ? ` · on the picture: “${esc(t.thumb_text)}”` : ""}</p>
@@ -282,6 +394,7 @@ async function pageJob(id) {
       <a class="button" href="#/films/${esc(j.links.film)}">Watch it</a></p>
       <details class="panel" id="changes"><summary><strong>Request changes</strong> <span class="muted">· makes a new version and keeps this one</span></summary>
         <textarea id="change-note" maxlength="2000" placeholder="What should be different? For example: a slower ending, warmer colours."></textarea>
+        ${j.input && j.input.channel ? `<label class="check"><input id="change-lesson" type="checkbox"> <span>Save this as a lesson for ${esc(j.input.channel)} (you approve it on the channel page)</span></label>` : ""}
         <div class="row" style="margin-top:8px"><button class="primary" id="send-changes">Request changes (uses 1 film credit)</button></div>
         <p id="changes-msg" class="muted" role="status"></p></details>` : ""}
     ${j.status === "waiting_resume" ? `<p class="notice">You decided, but the Claude session is no longer waiting. Open Claude Code again and say “continue job ${esc(j.name)}”.</p>` : ""}
@@ -290,6 +403,7 @@ async function pageJob(id) {
     <div class="panel"><p class="section-title">Current step</p><p style="font-size:16px;font-weight:600">${esc(j.step)}</p>
       ${pct !== null ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ""}</div>
     ${qualityHtml(j.qa)}
+    ${j.lesson_draft ? `<p class="notice">A draft lesson (#${j.lesson_draft.n}) is waiting on the <a href="#/channels/${esc(j.lesson_draft.scope)}">channel page</a>: approve it there.</p>` : ""}
     ${j.status === "done" && j.links.film && j.qa && j.qa.publish ? `<div class="panel" id="publish"><p class="section-title">Publish</p><p class="muted">Loading…</p></div>` : ""}
     ${revs ? `<h2>Reviews</h2><ul class="reviews">${revs}</ul>` : ""}
     <h2>Log</h2><pre class="log">${j.log.map((l) => `${new Date(l.t).toLocaleTimeString("en-GB")}  ${esc(l.line)}`).join("\n") || "No lines yet."}</pre>
@@ -318,7 +432,8 @@ async function pageJob(id) {
     if (note.length < 3) { msg.className = "fail"; msg.textContent = "Say what should change (at least 3 characters)."; return; }
     sendChanges.disabled = true;
     try {
-      const nj = await post("/jobs", { kind: "film", revise_of: j.links.film, note });
+      const les = /** @type {HTMLInputElement | null} */ (document.getElementById("change-lesson"));
+      const nj = await post("/jobs", { kind: "film", revise_of: j.links.film, note, ...(les && les.checked ? { lesson: true } : {}) });
       await loadMe(); location.hash = `#/jobs/${nj.id}`;
     } catch (e) { msg.className = "fail"; msg.textContent = e.message; sendChanges.disabled = false; }
   };
@@ -678,7 +793,7 @@ async function pageReset(token) {
 
 async function pageNew() {
   const params = new URLSearchParams(location.hash.split("?")[1] || "");
-  const [lib, mine] = await Promise.all([get("/library"), get("/styles")]);
+  const [lib, mine, chs] = await Promise.all([get("/library"), get("/styles"), get("/channels").catch(() => ({ channels: [] }))]);
   const q = ME.quota.films, left = Math.max(0, q.limit - q.used), max = ME.limits?.film_max_seconds || 60;
   const want = params.get("style") || "";
   const opt = (slug, name, img) => `<label><input type="radio" name="style" value="${esc(slug)}" ${slug === want ? "checked" : ""} required>
@@ -689,6 +804,9 @@ async function pageNew() {
     ${!ME.verified ? `<p class="notice">Confirm your email first: open the link we sent to ${esc(ME.email)}.</p>` : ""}
     ${left === 0 ? `<p class="notice">You have used all your films for this month. They come back on ${when(ME.quota.resets_at)}.</p>` : ""}
     <form class="form panel">
+      ${chs.channels.length ? `<label>Channel <span class="hint">One of <a href="#/channels">your channels</a>: its style, length, language, rules and lessons are used.</span>
+        <select id="f-channel"><option value="">No channel</option>${chs.channels.map((/** @type {any} */ c) =>
+          `<option value="${esc(c.slug)}" ${params.get("channel") === c.slug ? "selected" : ""}>${esc(c.name)} (${esc(c.language)})</option>`).join("")}</select></label>` : ""}
       <label>Style <span class="hint">Pick the look of the film. <a href="#/library">See the whole library</a>.</span></label>
       <div class="pick" role="radiogroup" aria-label="Style">${cards}</div>
       <label>Your idea <span class="hint">What happens in the film, who is in it, the mood. Up to 2000 characters.</span>
@@ -699,11 +817,20 @@ async function pageNew() {
       <div><button class="primary" type="submit" ${left === 0 || !ME.verified ? "disabled" : ""}>Make the film (uses 1 credit)</button></div>
     </form><p id="msg" class="muted" role="status"></p>`;
   $app.querySelector("input[name=style]:checked")?.closest("label")?.scrollIntoView({ block: "nearest" });
+  const chSel = /** @type {HTMLSelectElement | null} */ (document.getElementById("f-channel"));
+  const fillFromChannel = () => {             // the channel's profile fills the form; the customer may still change it
+    const c = chs.channels.find((/** @type {any} */ x) => x.slug === chSel?.value);
+    if (!c) return;
+    const r = /** @type {HTMLInputElement | null} */ ($app.querySelector(`input[name=style][value="${CSS.escape(c.style)}"]`));
+    if (r) { r.checked = true; r.closest("label")?.scrollIntoView({ block: "nearest" }); }
+    field("seconds").value = String(Math.min(c.seconds, max));
+  };
+  if (chSel) { chSel.onchange = fillFromChannel; if (chSel.value) fillFromChannel(); }
   onSubmit(async () => {
     const style = /** @type {HTMLInputElement | null} */ ($app.querySelector("input[name=style]:checked"));
     if (!style) throw new Error("Pick a style first.");
     const j = await post("/jobs", { kind: "film", style: style.value, idea: field("idea").value.trim(),
-      seconds: Number(field("seconds").value), review_treatment: field("treat").checked });
+      seconds: Number(field("seconds").value), review_treatment: field("treat").checked, ...(chSel && chSel.value ? { channel: chSel.value } : {}) });
     await loadMe();
     location.hash = `#/jobs/${j.id}`;
     return "";
@@ -790,7 +917,7 @@ const SETTING = [
   ["review_timeout_days", "Stop a job after waiting (days)", "int"], ["model", "Claude model", "text"],
   ["editor_model", "Script editor model", "choice", [["inherit", "Same as jobs"], ["opus", "Opus"], ["sonnet", "Sonnet"], ["haiku", "Haiku"]]],
 ];
-const SETTINGS_TABS = [["general", "General"], ["users", "Users"], ["usage", "Usage"], ["worker", "Worker"], ["tokens", "API tokens"]];
+const SETTINGS_TABS = [["general", "General"], ["users", "Users"], ["usage", "Usage"], ["worker", "Worker"], ["tokens", "API tokens"], ["lessons", "Shared lessons"]];
 const ROLE = { admin: "Owner", customer: "Member" };
 const usd = (v) => `$${Number(v || 0).toFixed(2)}`;
 async function pageSettings(tab = "general") {
@@ -806,6 +933,7 @@ async function pageSettings(tab = "general") {
     return tokensSection(document.getElementById("tokens"), "admin");
   }
   if (tab === "usage") return settingsUsage(top);
+  if (tab === "lessons") return settingsLessons(top);
   const st = await get("/admin/settings");
   const input = ([k, label, t, choices]) => t === "choice"
     ? `<label>${label}<select id="s-${k}">${/** @type {string[][]} */ (choices).map(([v, l]) => `<option value="${v}"${st[k] === v ? " selected" : ""}>${l}</option>`).join("")}</select></label>`
@@ -1319,8 +1447,9 @@ const routes = [
   [/^#\/sets$/, pageSets, "sets"], [/^#\/sets\/([^/?]+)$/, pageSet, "sets"],
   [/^#\/library(\?.*)?$/, pageLibrary, "library"], [/^#\/library\/([^/?]+)$/, pageLibStyle, "library"],
   [/^#\/styles$/, pageStyles, "styles"], [/^#\/styles\/([^/?]+)$/, pageStyle, "styles"],
-  [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"], [/^#\/(?:admin|settings)(?:\/(general|users|usage|worker|tokens))?(\?.*)?$/, pageSettings, "settings"], [/^#\/admin\/claude$/, pageClaude, "ai"],
+  [/^#\/new(\?.*)?$/, pageNew, "new"], [/^#\/learn$/, pageLearn, "learn"], [/^#\/(?:admin|settings)(?:\/(general|users|usage|worker|tokens|lessons))?(\?.*)?$/, pageSettings, "settings"], [/^#\/admin\/claude$/, pageClaude, "ai"],
   [/^#\/account$/, pageAccount, "account"],
+  [/^#\/channels$/, pageChannels, "channels"], [/^#\/channels\/([^/?]+)$/, pageChannel, "channels"],
 ];
 /** pages open without logging in (online mode) */
 const PUBLIC = [

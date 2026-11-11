@@ -467,6 +467,9 @@ def write_publish_md(d: Path, pack: dict, notes: list, problems: list) -> None:
     desc = (d / "publish" / "description.md")
     rows += ["", "## Description (copy all)", "", "```text", desc.read_text(encoding="utf-8").rstrip() if desc.is_file() else "",
              "```"]
+    repeated = sorted({int(n) for p in problems if p.startswith("lesson_rule") for n in re.findall(r"lesson #(\d+)", p)})
+    if repeated:
+        rows[1:1] = ["", "⚠ Do not publish yet: repeats lesson " + ", ".join(f"#{n}" for n in repeated)]
     if notes:
         rows += ["", "## Missing", "", *[f"- {n}" for n in notes]]
     if problems:
@@ -706,6 +709,37 @@ def check(d: Path, pack: dict = None) -> dict:
                     m["numbers_unsourced"].append(shown_n)
         for n in m["numbers_unsourced"]:
             problems.append(f"number_unsourced: \"{n}\" is not in SCRIPT.md or SOURCES.md")
+
+    # the channel's rules and lessons (specs/012)
+    from filmcheck import channels
+    snap = channels.snapshot(d)
+    m["lessons_repeated"] = []
+    if snap:
+        rules = snap["rules"]
+        have = {t.lower() for t in tags}
+        missing = [t for t in rules.get("hashtags") or [] if t.lower() not in have]
+        if missing:
+            problems.append(f"channel_hashtags: the channel always uses {' '.join(missing)}")
+        shown_texts = [t["text"] for t in pack["titles"]] + [t["thumb"]["text"] for t in pack["titles"]] + hook \
+            + [pack["summary"]] + [c["title"] for c in pack.get("chapters") or []]
+        banned = sorted({w for txt in shown_texts for w, _ in channels.find_banned(txt, rules.get("banned") or [])})
+        if banned:
+            problems.append("channel_banned: never-use words of the channel: " + ", ".join(f'"{w}"' for w in banned))
+        most = rules.get("title_max")
+        for t in pack["titles"]:
+            if most and len(t["text"]) > most:
+                problems.append(f"channel_title_max: \"{t['text'][:40]}…\" has {len(t['text'])} characters; the channel allows {most}")
+        for n, scope, phrase in channels.lesson_rules(snap, "phrase"):
+            if any(channels.find_banned(txt, [phrase]) for txt in shown_texts):
+                m["lessons_repeated"].append(n)
+                problems.append(f"lesson_rule: repeats lesson {channels.lesson_label(n, scope)}: \"{phrase}\"")
+        for n, scope, most in channels.lesson_rules(snap, "max_title_chars"):
+            for t in pack["titles"]:
+                if len(t["text"]) > most:
+                    m["lessons_repeated"].append(n)
+                    problems.append(f"lesson_rule: repeats lesson {channels.lesson_label(n, scope)}: a title of "
+                                    f"{len(t['text'])} characters (at most {most})")
+        m["lessons_repeated"] = sorted(set(m["lessons_repeated"]))
 
     # language
     sc = script_or_none(d)

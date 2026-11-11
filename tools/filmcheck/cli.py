@@ -318,6 +318,141 @@ def cmd_publish(a) -> int:
     return 0 if r["pass"] else 1
 
 
+# ---------- channels and lessons (specs/012) ----------
+def root() -> Path:
+    return Path(os.environ.get("STUDIO_ROOT") or HERE.parents[1])
+
+
+def lib_dir() -> Path:
+    return Path(os.environ.get("STUDIO_LIB") or HERE.parents[1] / "lib" / "lemo-opuscar")
+
+
+def channel_cmd(fn):
+    def run(a):
+        from filmcheck import channels
+        try:
+            return fn(a, channels) or 0
+        except channels.ChannelError as e:
+            print(f"✗ {e}", file=sys.stderr)
+            return 2
+    return run
+
+
+@channel_cmd
+def cmd_channel_list(a, channels):
+    rows = channels.list_channels(root())
+    out(a, {"channels": rows}, [f"  {c['slug']:<20} {c.get('name', '')} · {c.get('language')} · {c.get('style')} · "
+                                f"{c['lessons_active']} lessons" for c in rows] or ["  no channels yet: sh bin/studio channel new …"])
+
+
+@channel_cmd
+def cmd_channel_new(a, channels):
+    ch = {"slug": a.slug, "name": a.name, "language": a.language, "seconds": a.seconds, "style": a.style,
+          "voice": a.voice, "speed": a.speed}
+    ch = channels.save(root(), ch, lib_dir(), new=True)
+    print(f"✓ channel {ch['slug']}: channels/{ch['slug']}/CHANNEL.md")
+
+
+@channel_cmd
+def cmd_channel_show(a, channels):
+    ch = channels.load(root(), a.slug)
+    errs = channels.validate(channels.normal(ch), root(), lib_dir())
+    out(a, {**ch, "problems": errs}, [channels.channel_md(channels.normal(ch)).rstrip()] + [f"  ✗ {e}" for e in errs])
+    return 1 if errs else 0
+
+
+LIST_FIELDS = ("hashtags", "banned")
+INT_FIELDS = ("seconds", "title_max")
+
+
+@channel_cmd
+def cmd_channel_set(a, channels):
+    ch = channels.load(root(), a.slug)
+    f, vals = a.field, a.values
+    if f in LIST_FIELDS:
+        cur = list(ch.get(f) or [])
+        if a.add:
+            cur += [v for v in a.add if v not in cur]
+        elif a.remove:
+            cur = [v for v in cur if v not in a.remove]
+        else:
+            cur = vals
+        ch[f] = cur
+    elif f in INT_FIELDS:
+        ch[f] = None if vals in ([], [""], ["none"]) else int(vals[0])
+    elif f == "speed":
+        ch[f] = float(vals[0])
+    elif f in ("name", "niche", "audience", "language", "style", "voice", "title_rules", "thumbnail_rules"):
+        ch[f] = " ".join(vals)
+    else:
+        raise channels.ChannelError(f"unknown field {f}")
+    channels.save(root(), ch, lib_dir())
+    print(f"✓ {a.slug}: {f} saved")
+
+
+@channel_cmd
+def cmd_channel_decide(a, channels):
+    channels.decide(root(), a.slug, a.text, lib_dir())
+    print(f"✓ {a.slug}: decision added")
+
+
+@channel_cmd
+def cmd_channel_attach(a, channels):
+    over = {k: getattr(a, k) for k in ("style", "seconds", "language", "voice", "speed") if getattr(a, k) is not None}
+    r = channels.attach(root(), film_dir(a.film) if not a.new else Path(root()) / "films" / a.film, a.slug,
+                        lib=lib_dir(), **over)
+    if r["warning"]:
+        print(f"! {r['warning']}")
+    print(f"✓ films/{a.film}: channel {a.slug} attached; read films/{a.film}/CHANNEL_BRIEF.md before the treatment")
+
+
+def scope_path(channels, scope):
+    if scope != "shared":
+        channels.load(root(), scope)               # the channel must exist
+    return channels.lessons_file(root(), scope)
+
+
+@channel_cmd
+def cmd_lesson_list(a, channels):
+    rows = [x for x in channels.load_lessons(scope_path(channels, a.scope))["lessons"] if a.all or x["status"] != "retired"]
+    out(a, {"lessons": rows}, [f"  #{x['n']} {x['status']:<8} {x['what']} → {x['stop']}" + (f"  [{x['rule']}"
+                               + ("" if x.get("rule_valid", True) else ", invalid") + "]" if x.get("rule") else "")
+                               for x in rows] or ["  no lessons"])
+
+
+def _add(a, channels, status):
+    x = channels.add_lesson(scope_path(channels, a.scope), what=a.what, why=a.why, stop=a.stop, film=a.film,
+                            rule=a.rule, status=status, title=a.scope)
+    if x.get("rule") and not x["rule_valid"]:
+        print(f"! the rule \"{x['rule']}\" cannot be read, so it will not be checked (use phrase:…, "
+              "max_sentence_words:N or max_title_chars:N)")
+    print(f"✓ lesson #{x['n']} ({status}) for {a.scope}: {x['what']} → {x['stop']}")
+    if status == "draft":
+        print(f"  approve it with: sh bin/studio lesson approve {a.scope} {x['n']}")
+
+
+@channel_cmd
+def cmd_lesson_draft(a, channels):
+    _add(a, channels, "draft")
+
+
+@channel_cmd
+def cmd_lesson_add(a, channels):
+    _add(a, channels, "active")
+
+
+@channel_cmd
+def cmd_lesson_approve(a, channels):
+    x = channels.approve(scope_path(channels, a.scope), a.n, a.scope)
+    print(f"✓ lesson #{x['n']} is active")
+
+
+@channel_cmd
+def cmd_lesson_retire(a, channels):
+    x = channels.retire(scope_path(channels, a.scope), a.n, a.scope)
+    print(f"✓ lesson #{x['n']} retired")
+
+
 # ---------- config ----------
 def cmd_editor_model(a) -> int:
     editor.set_editor_model(a.value)
@@ -360,6 +495,58 @@ def parser() -> argparse.ArgumentParser:
     pb.add_argument("--no-draw", action="store_true", help="make the text files only; keep the thumbnails as they are")
     pb.add_argument("--json", action="store_true")
 
+    ch = sub.add_parser("channel", help="the profiles of your own channels (specs/012)").add_subparsers(dest="cmd", required=True)
+    s = ch.add_parser("list")
+    s.add_argument("--json", action="store_true")
+    s = ch.add_parser("new")
+    s.add_argument("slug")
+    s.add_argument("--name", required=True)
+    s.add_argument("--language", required=True)
+    s.add_argument("--seconds", type=int, required=True)
+    s.add_argument("--style", required=True)
+    s.add_argument("--voice")
+    s.add_argument("--speed", type=float, default=1.0)
+    s = ch.add_parser("show")
+    s.add_argument("slug")
+    s.add_argument("--json", action="store_true")
+    s = ch.add_parser("set")
+    s.add_argument("slug")
+    s.add_argument("field")
+    s.add_argument("values", nargs="*")
+    g = s.add_mutually_exclusive_group()
+    g.add_argument("--add", nargs="+", metavar="VALUE", help="add to hashtags or banned")
+    g.add_argument("--remove", nargs="+", metavar="VALUE", help="remove from hashtags or banned")
+    s = ch.add_parser("decide")
+    s.add_argument("slug")
+    s.add_argument("text")
+    s = ch.add_parser("attach")
+    s.add_argument("film")
+    s.add_argument("slug")
+    s.add_argument("--style")
+    s.add_argument("--seconds", type=int)
+    s.add_argument("--language")
+    s.add_argument("--voice")
+    s.add_argument("--speed", type=float)
+    s.add_argument("--new", action="store_true", help="the film folder does not exist yet")
+
+    ls = sub.add_parser("lesson", help="lessons of a channel, or 'shared' (specs/012)").add_subparsers(dest="cmd", required=True)
+    s = ls.add_parser("list")
+    s.add_argument("scope")
+    s.add_argument("--all", action="store_true")
+    s.add_argument("--json", action="store_true")
+    for name in ("draft", "add"):
+        s = ls.add_parser(name)
+        s.add_argument("scope")
+        s.add_argument("--what", required=True)
+        s.add_argument("--why", required=True)
+        s.add_argument("--stop", required=True)
+        s.add_argument("--film")
+        s.add_argument("--rule")
+    for name in ("approve", "retire"):
+        s = ls.add_parser(name)
+        s.add_argument("scope")
+        s.add_argument("n", type=int)
+
     c = sub.add_parser("config", help="local settings").add_subparsers(dest="cmd", required=True)
     s = c.add_parser("editor-model")
     s.add_argument("value", choices=list(editor.MODELS))
@@ -368,7 +555,12 @@ def parser() -> argparse.ArgumentParser:
 
 COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("script", "status"): cmd_status,
             ("script", "skip"): cmd_skip, ("web", "fetch"): cmd_fetch, ("config", "editor-model"): cmd_editor_model,
-            ("qc", "qc"): cmd_qc, ("publish", "publish"): cmd_publish}
+            ("qc", "qc"): cmd_qc, ("publish", "publish"): cmd_publish,
+            ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
+            ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
+            ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach,
+            ("lesson", "list"): cmd_lesson_list, ("lesson", "draft"): cmd_lesson_draft, ("lesson", "add"): cmd_lesson_add,
+            ("lesson", "approve"): cmd_lesson_approve, ("lesson", "retire"): cmd_lesson_retire}
 
 
 def main(argv=None) -> int:

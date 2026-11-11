@@ -22,6 +22,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "studio"))
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent))           # tools/: filmcheck (channels, specs/012)
 
 from studio import accounts, claude_plan, db, jobs, mail, quotas, reviews, store  # noqa: E402
 
@@ -345,7 +346,8 @@ def publish_summary(runner, work: Path, film: str, cut=None):
         titles = []
     files = sorted(f.name for f in (d / "publish").iterdir() if f.is_file() and f.name not in ("pack.json", "thumbs.json"))
     return {"pass": bool(r.get("pass")) and not cut, "cut": cut, "applicable": r.get("applicable", {}),
-            "problems": r.get("problems", []), "titles": titles, "files": files}
+            "problems": r.get("problems", []), "titles": titles, "files": files,
+            "blocked_by_lesson": (r.get("measures") or {}).get("lessons_repeated", [])}
 
 
 def has_narration(d: Path) -> bool:
@@ -510,6 +512,11 @@ class Worker:
             old = inp.get("revise_of")
             if old and (acct / "films" / old).is_dir() and not (work / "films" / old).exists():
                 shutil.copytree(acct / "films" / old, work / "films" / old)     # the film to change, kept as it is
+            if inp.get("channel") and not (work / "films" / inp["film"] / "channel.json").exists():
+                from filmcheck import channels           # the channel's snapshot for this film (specs/012 R2)
+                from studio import resources
+                channels.attach(acct, work / "films" / inp["film"], inp["channel"],
+                                shared_path=db.data_dir() / "shared" / "lessons.json", lib=resources.lib_dir())
             return {}, None
         ref = acct / "references" / inp["set"]
         ref.mkdir(parents=True, exist_ok=True)
@@ -611,6 +618,7 @@ class Worker:
                                      else f"{len(pub['problems'])} problems" + (" (stopped)" if cut else ""))))))
             dest = store.account_dir(j["owner"]) / "films" / film
             shutil.copytree(work / "films" / film, dest, dirs_exist_ok=True)
+            self.save_lesson_draft(j, work / "films" / film)
             j = jobs.finish(job_id, "done", links={"film": film})
         else:
             slug = rep.get("style")
@@ -632,6 +640,24 @@ class Worker:
         self.notify(j, "job_done")
         shutil.rmtree(work, ignore_errors=True)
         log.info("job %s done", job_id)
+
+    def save_lesson_draft(self, j: dict, film_dir: Path) -> None:
+        """A changed film asked to become a lesson: the agent's LESSON_DRAFT.json goes to the channel as a draft
+        the customer approves (specs/012 FR-013, R5)."""
+        inp = j.get("input") or {}
+        if not (inp.get("lesson") and inp.get("channel")):
+            return
+        from filmcheck import channels
+        try:
+            d = json.loads((film_dir / "LESSON_DRAFT.json").read_text(encoding="utf-8"))
+            x = channels.add_lesson(channels.lessons_file(store.account_dir(j["owner"]), inp["channel"]),
+                                    what=str(d.get("what") or ""), why=str(d.get("why") or ""), stop=str(d.get("stop") or ""),
+                                    film=inp.get("revise_of"), rule=d.get("rule"), status="draft", title=inp["channel"])
+        except (OSError, ValueError, AttributeError, channels.ChannelError) as e:
+            jobs.log(j["id"], f"No draft lesson was saved: {str(e)[:120]}")
+            return
+        jobs.update(j["id"], lambda y: (y.__setitem__("lesson_draft", {"scope": inp["channel"], "n": x["n"]}),
+                                        y["log"].append(jobs._line(f"Draft lesson #{x['n']} saved for {inp['channel']}"))))
 
     def check_runs(self) -> None:
         now = time.time()

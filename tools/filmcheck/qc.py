@@ -321,6 +321,20 @@ def measure(d: Path, lib=None) -> dict:
     for s in stills:
         problems.append(f"the picture stands still from {s['from']:.1f} s to "
                         + (f"{s['to']:.1f} s" if s["to"] is not None else "the end") + f"; at most {limit:g} s")
+    from filmcheck import channels               # the channel's voice and speed (specs/012 FR-006a)
+    snap = channels.snapshot(d)
+    if snap and nar and snap["rules"].get("voice") and not snap["rules"].get("voice_override"):
+        want_v, want_s = snap["rules"]["voice"], float(snap["rules"].get("speed") or 1.0)
+        try:
+            rows = json.loads((d / nar["lines_file"]).read_text(encoding="utf-8")) if nar.get("lines_file") else []
+        except (OSError, ValueError):
+            rows = []
+        bad = [r.get("id") for r in rows if isinstance(r, dict) and ((r.get("voice") or channels.DEFAULT_VOICE) != want_v
+                                                                     or abs(float(r.get("speed") or 1.0) - want_s) > 0.01)]
+        measures["channel_voice_bad"] = bad
+        if bad:
+            problems.append(f"channel_voice: lines {', '.join(map(str, bad[:5]))} do not use the channel's voice "
+                            f"{want_v} at speed {want_s:g}")
     texts, on_screen = film_texts(d, lib)
     glyphs, fonts_ok = missing_glyphs(d, texts)
     measures["missing_glyphs"] = glyphs

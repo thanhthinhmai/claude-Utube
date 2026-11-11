@@ -13,6 +13,7 @@
 #   sh bin/studio script check|review|status|skip <phim>  chấm kịch bản (specs/010); web fetch <url>: mở một trang
 #   sh bin/studio qc <phim> [--json]    đo phim xong; config editor-model <inherit|opus|sonnet|haiku>
 #   sh bin/studio publish <phim> [--check-only] [--json]   gói đăng YouTube từ publish/pack.json (specs/011)
+#   sh bin/studio channel list|new|show|set|decide|attach … · lesson list|draft|add|approve|retire …  kênh và bài học (specs/012)
 #   sh bin/studio help
 # Mã thoát: 0 = sẵn sàng / xong · 1 = chưa sẵn sàng / thất bại · 2 = sai cách dùng hoặc library.lock sai.
 set -eu
@@ -33,7 +34,7 @@ SPARSE_BASE="$SPARSE
 !/styles/*/poster.jpg"
 
 usage() {
-  sed -n '2,15s/^# \{0,1\}//p' "$0"
+  sed -n '2,16s/^# \{0,1\}//p' "$0"
 }
 
 die2() { echo "✗ $*" >&2; exit 2; }
@@ -432,7 +433,7 @@ case ${1:-} in
   deps) shift; cmd_deps "$@" ;;
   learn) shift; cmd_learn "$@" ;;
   ui | job | review | admin) cmd_studio "$@" ;;
-  script | web | qc | publish | config) cmd_filmcheck "$@" ;;
+  script | web | qc | publish | channel | lesson | config) cmd_filmcheck "$@" ;;
   help | -h | --help) usage ;;
   '') usage >&2; exit 2 ;;
   *) echo "✗ lệnh lạ: $1" >&2; usage >&2; exit 2 ;;
