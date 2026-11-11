@@ -129,6 +129,7 @@
 
 - [X] T025 Chạy quickstart mục 2 ở local trên một phim có sẵn trong `films/` (attach, `script check` nếu có kịch bản, `publish` với gói có sẵn). Ghi kết quả vào cuối `specs/012-channel-profile/quickstart.md`. Xoá kênh thử khỏi `channels/` trước khi commit.
 - [ ] T026 Chạy đủ 5 bộ test. Đối chiếu từng FR và SC với code và test; ghi bảng vào cuối `specs/012-channel-profile/tasks.md`. SC-004 cần bài chạy thật, nên **hỏi người dùng trước khi chạy**.
+  - 2026-11-11: bảng đối chiếu đã ghi. Người dùng chọn gộp trước; bài chạy thật (SC-004) sẽ làm chung với 011 T030 ở lần làm phim online kế tiếp.
 
 ## Dependencies & Execution Order
 
