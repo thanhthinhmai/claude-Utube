@@ -1,7 +1,7 @@
 #!/bin/sh
 # Build the macOS core (Apple chip) for the desktop app (specs/016 research R2):
 #   sh desktop/core-build/build-mac.sh <version> [out-dir]
-# Runs on an arm64 Mac (GitHub's macos-14). Every download is pinned with its SHA-256. No venv here: the app makes
+# Runs on an arm64 Mac (GitHub's macos-latest, arm64). Every download is pinned with its SHA-256. No venv here: the app makes
 # tools/.venv and lib/lemo-opuscar/.venv with --system-site-packages when it installs the core.
 set -eu
 ver=${1:?usage: build-mac.sh <version> [out-dir]}

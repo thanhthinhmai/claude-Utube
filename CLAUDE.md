@@ -13,7 +13,7 @@ Mỗi yêu cầu đi đúng **một** luồng:
 
 ### Chạy app trên máy (specs/014, nền cho app desktop)
 - `sh bin/studio app start` chạy cả xưởng (giao diện, proxy, worker) trên máy này, không cần Docker, rồi in `URL: http://127.0.0.1:<cổng>`. Dữ liệu nằm ở `~/.local/share/claude-utube` (đổi bằng `--data`), không ghi vào thư mục dự án. Lần đầu mở: tạo chủ xưởng, rồi đăng nhập tài khoản Claude của chính người dùng ở AI accounts.
-- `app status` · `app stop` (còn việc đang chạy thì từ chối, `--force` để dừng) · `app import` (chép `films/`, `my-styles/`, `channels/` của dự án vào app).
+- `app status` · `app stop` (còn việc đang chạy thì từ chối, `--force` để dừng) · `app models` (tải mô hình Whisper) · `app import` (chép `films/`, `my-styles/`, `channels/` của dự án vào app).
 - Khi app đang chạy, việc của luồng làm phim bằng chat (`job …`, `review …`) ghi vào sổ việc của app: xem và duyệt trên app; phim xong được chép (hard link) vào kho của chủ xưởng.
 
 ### App desktop (specs/015)
@@ -21,6 +21,12 @@ Mỗi yêu cầu đi đúng **một** luồng:
 - Chạy khi phát triển: `cd desktop && npm ci && npx electron .`. Terminal của VS Code đặt sẵn `ELECTRON_RUN_AS_NODE=1`, nên phải chạy `env -u ELECTRON_RUN_AS_NODE npx electron .`. Chạy thử không cần phần lõi thật: `CU_CONFIG_DIR=$(mktemp -d) CU_CORE_CMD='["node","test/fake-core.mjs"]' npx electron . --smoke`.
 - GitHub Actions `.github/workflows/desktop.yml` chạy smoke trên Windows và macOS khi đẩy nhánh `NNN-desktop-*` hoặc bấm chạy tay (tốn phút chạy, macOS tốn gấp 10 lần).
 - Bật WSL chỉ khi người dùng bấm "Turn on WSL" và đồng ý quyền quản trị (hiến pháp 2.2.0).
+
+### Bộ cài (specs/016)
+- Bộ cài chứa sẵn phần lõi: Windows là bản Linux `ClaudeUtube` (`deploy/core.Dockerfile`, `desktop/core-build/build-linux.sh`, cài bằng `wsl --import`); macOS là thư mục có Python, Node, FFmpeg riêng (`build-mac.sh`, giải nén vào `~/Library/Application Support/ClaudeUtube-core/<bản>`). Màn hình thiết lập cài phần lõi rồi tải mô hình (`fetch.sh voice`, `sh bin/studio app models`).
+- Phát hành: gắn tag `desktop-vX.Y.Z` (hoặc bấm chạy tay `desktop-release`) → GitHub Release riêng tư có `.exe`, `.dmg`, `SHA256SUMS`. Mỗi lần chạy tốn khoảng 1 giờ phút chạy, phần lớn là macOS (tính gấp 10). Hướng dẫn cài cho người dùng: `desktop/INSTALL.md`.
+- Phần lõi đóng gói có tệp `.core-version` (bỏ qua kiểm git của thư viện) và, trên macOS, `env.sh` (PATH tới Node, FFmpeg đi kèm). Thêm gói Python hay npm thì `desktop/core-build/credits-check.py` báo phải ghi vào `CREDITS`.
+- Sandbox Bash của agent bật khi có `bwrap` và `socat` (bản Linux của app có sẵn) hoặc trên macOS (`STUDIO_AGENT_SANDBOX=1`).
 
 ### Luồng làm phim
 1. Chạy `sh bin/studio status`. Nếu chưa sẵn sàng thì chạy `sh bin/studio setup` và báo người dùng công cụ còn thiếu (xưởng không tự cài phần mềm hệ thống).

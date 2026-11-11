@@ -43,7 +43,7 @@ jobs:
           compression-level: 0
 
   core-mac:
-    runs-on: macos-14
+    runs-on: macos-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
@@ -68,3 +68,86 @@ jobs:
           path: dist/core/mac/
           retention-days: 3
           compression-level: 0
+
+  installers:
+    needs: [core-linux, core-mac]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, core: linux, flag: --win }
+          - { os: macos-latest, core: mac, flag: --mac }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: version
+        run: v="${VERSION#desktop-v}"; echo "VERSION=$v" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          name: core-${{ matrix.core }}
+          path: dist/core/${{ matrix.core }}
+      - run: npm ci
+      - name: build the installer
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npm pkg set version="$VERSION"
+          npx electron-builder ${{ matrix.flag }} --publish never
+          ls -la ../dist/installers
+      - name: the packed app checks the real studio package (install commands skipped)
+        env:
+          CU_CORE_CMD: '["node","test/fake-core.mjs"]'
+          CU_FAKE_INSTALL: "1"
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then exe="../dist/installers/win-unpacked/claude-Utube.exe"
+          else exe="../dist/installers/mac-arm64/claude-Utube.app/Contents/MacOS/claude-Utube"; fi
+          export CU_CONFIG_DIR="$RUNNER_TEMP/cu-config"
+          "$exe" --smoke 2>&1 | tee packed.log
+          for line in "install ok" "window ok" "quit ok"; do grep -q "smoke: $line" packed.log || { echo "missing: smoke: $line"; exit 1; }; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.core }}
+          path: |
+            dist/installers/*.exe
+            dist/installers/*.dmg
+          retention-days: 3
+          compression-level: 0
+
+  release:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/desktop-v')
+    needs: [installers]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: version
+        run: echo "VERSION=${VERSION#desktop-v}" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+      - name: collect the files and their SHA-256
+        run: |
+          mkdir out
+          cp files/installer-linux/*.exe files/installer-mac/*.dmg out/
+          cp files/core-linux/core-manifest.json out/core-manifest-linux-x64.json
+          cp files/core-mac/core-manifest.json out/core-manifest-darwin-arm64.json
+          (cd out && sha256sum * > SHA256SUMS && cat SHA256SUMS)
+      - uses: softprops/action-gh-release@e598afbe1493e6b1bafb1f389cabb956eab91231 # v3.0.3
+        with:
+          tag_name: desktop-v${{ env.VERSION }}
+          name: claude-Utube desktop ${{ env.VERSION }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ contains(env.VERSION, '-') }}
+          files: out/*
+          body: |
+            Installers of the claude-Utube desktop app (specs/016). Windows 10/11 64-bit (WSL 2) and macOS 14+ on an Apple chip.
+            Check a download with SHA256SUMS. The installers are not signed: Windows asks "More info → Run anyway";
+            macOS asks you to allow it in System Settings → Privacy & Security.
