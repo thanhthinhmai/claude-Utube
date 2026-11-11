@@ -31,3 +31,23 @@ Kết quả cần thấy:
 2. Trang một kênh → Topics: dán 3 đề, chọn "Suggest", bấm Score.
 3. Việc `topics` xong: bảng điểm và hàng đợi hiện ra.
 4. Bấm "Make a film" trên đề đầu hàng đợi: form giao phim có sẵn kênh và ý tưởng.
+
+## Kết quả chạy với khoá thật (2026-11-11)
+
+Kênh thử `kenh-thu` (tiếng Anh, khoa học đời thường), 5 đề, tổng 1881 đơn vị YouTube trong ngày (1 đơn vị thử khoá).
+
+- **Lần 1** (cách lấy số liệu cũ, 3 đề, 642 đơn vị): phát hiện lỗi thiết kế. Lượt tìm theo ngày đăng chỉ thấy 30 ngày gần nhất (`n60 = 0`, `r` khoảng 90); trung vị lượt xem 13–51 nên độ nóng bị trần 5; cạnh tranh đếm cả kênh không ai xem. Đã sửa (research.md, "Sửa sau bài chạy thật").
+- **Lần 2** (cách mới, chấm lại 3 đề, 613 đơn vị, khoảng 204 mỗi đề nhờ một phần số liệu tạm):
+  - why honey never spoils: HOLD 33 (demand 5, heat 8, competition 1, fit 9)
+  - why do cats purr: HOLD 34 (5, 10, 1, 8)
+  - how noise cancelling headphones work: HOLD 38 (8, 10, 1, 9)
+
+  Cả ba là đề rất phổ biến: 72–77 kênh có video đáng kể trong 90 ngày, nên cạnh tranh ≤ 3 → HOLD.
+- **Đề ngách** (2 đề, 625 đơn vị, khoảng 313 mỗi đề):
+  - why does honey crystallize: **GO 34** (5, 6, 4, fit 9), 27 kênh cạnh tranh
+  - how do bees make wax: HOLD 34 (7, 8, 2, 7)
+- **Giới hạn thấy được:**
+  - Bộ lọc "cùng đề" theo từ khoá vẫn để lọt video lạc đề có cùng từ (đề "how do bees make wax" có video bằng chứng là "bees wax squishies", 10,7 triệu lượt xem, làm điểm nhu cầu cao hơn thật).
+  - Với kênh tiếng Anh, `regionCode=US` vẫn trả một số video tiếng khác (video bằng chứng của đề "cats purr" là video tiếng Tamil).
+  - Mục "hợp kênh" do Claude chấm 7–9, hợp lý với ngách của kênh.
+- Khoá không có trong đầu ra, `topics.json` hay `TOPICS.md` (đã tìm bằng `grep`).
