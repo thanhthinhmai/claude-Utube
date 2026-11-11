@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Share with my team</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<style>
+  :root { --bg: #f7f7fb; --panel: #fff; --fg: #20223a; --muted: #6b6f85; --line: #e3e4ee; --accent: #4b55d6; --ok: #1b7f3b; --bad: #b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17182a; --panel: #212238; --fg: #ecedf5; --muted: #a3a6bd; --line: #33354f; --accent: #8c94ff; --ok: #6fd28f; --bad: #ff8a80; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  main { padding: 20px 18px 30px; } h1 { font-size: 20px; margin: 0 0 6px; } h2 { font-size: 15px; margin: 18px 0 6px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+  .muted { color: var(--muted); } .bad { color: var(--bad); } .ok { color: var(--ok); }
+  .code { font: 700 26px/1.3 ui-monospace, monospace; letter-spacing: .08em; }
+  .addr { font: 600 15px/1.6 ui-monospace, monospace; }
+  button { padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border: 0; }
+  ul { list-style: none; padding: 0; margin: 0; } li { padding: 6px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 8px; }
+  li:first-child { border-top: 0; } [hidden] { display: none !important; }
+  label.switch { display: flex; gap: 10px; align-items: center; font-weight: 600; }
+</style></head>
+<body><main>
+  <h1>Share with my team</h1>
+  <p class="muted">Team members install claude-Utube, choose <b>Connect to a studio</b>, and sign in with the account you made for
+    them in Settings → Users. Films run and stay on this computer.</p>
+  <p class="muted"><b>Only for your own team.</b> They use this studio's Claude accounts; a Claude Pro or Max plan is for personal
+    use, so share it only inside your team. The first time, your firewall may ask to let claude-Utube accept connections.</p>
+  <div class="panel"><label class="switch"><input type="checkbox" id="on"> Share this studio on the network</label>
+    <p id="err" class="bad" hidden></p></div>
+  <section id="live" hidden>
+    <h2>Addresses</h2>
+    <div class="panel"><div id="addrs"></div><p class="muted" id="noaddr" hidden>No network address found. Connect this computer to a network.</p></div>
+    <h2>Add a computer</h2>
+    <div class="panel"><p class="muted">Press the button, then give the address and the code to the team member. The code works once, for 10 minutes.</p>
+      <button class="primary" id="add">Add a computer</button>
+      <div id="pair" hidden><p class="code" id="code"></p><p class="muted" id="left"></p></div></div>
+    <h2>Computers</h2>
+    <div class="panel"><ul id="clients"></ul><p class="muted" id="none">No computer yet.</p></div>
+  </section>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  let st = null;
+  async function render() {
+    st = await share.state();
+    $("on").checked = st.enabled; $("live").hidden = !st.enabled;
+    $("err").hidden = !st.error; $("err").textContent = st.error || "";
+    $("addrs").innerHTML = st.addresses.map((a) => `<div><span class="addr">${esc(a.address)}</span> <span class="muted">${a.kind === "tailscale" ? "Tailscale" : "this network"}</span></div>`).join("");
+    $("noaddr").hidden = st.addresses.length > 0;
+    $("pair").hidden = !st.pairing; if (st.pairing) $("code").textContent = st.pairing.code;
+    $("clients").innerHTML = st.clients.map((c) => `<li><span>${esc(c.name)} <span class="muted">· last seen ${c.lastSeen ? new Date(c.lastSeen * 1000).toLocaleString() : "—"}</span>
+      ${c.removed ? '<span class="bad">removed</span>' : ""}</span><button data-id="${c.id}">${c.removed ? "Forget" : "Remove"}</button></li>`).join("");
+    $("none").hidden = st.clients.length > 0;
+  }
+  setInterval(() => {
+    if (!st || !st.pairing) return;
+    const s = Math.max(0, Math.round((st.pairing.until - Date.now()) / 1000));
+    $("left").textContent = s ? `Works for ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")} more` : "Expired";
+    if (!s) render();
+  }, 1000);
+  $("on").onchange = async () => { $("on").disabled = true; await share.toggle($("on").checked); $("on").disabled = false; render(); };
+  $("add").onclick = async () => { await share.add(); render(); };
+  $("clients").onclick = async (e) => { const b = e.target.closest("button"); if (b) { await share.remove(b.dataset.id); render(); } };
+  share.onChange(render);
+  render();
+</script></body></html>

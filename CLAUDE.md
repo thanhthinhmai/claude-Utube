@@ -41,6 +41,16 @@ Mỗi yêu cầu đi đúng **một** luồng:
 - Bản build chỉ có license khi có biến repo `LICENSE_SERVER_URL` và khoá công khai trong `desktop/license-public-key.txt`. Khoá riêng chỉ nằm ở secret `LICENSE_SIGNING_KEY` và `.env` của VPS, **không bao giờ** vào repo hay vào chat.
 - Test dùng khoá thử ở `desktop/test/vectors/` và máy chủ license giả `desktop/test/fake-license.mjs`.
 
+### Chế độ Client (specs/018)
+- Một bộ cài, hai chế độ: **Host** (chạy cả xưởng) hoặc **Client** (`mode: "client"`: chỉ cửa sổ app, không có phần lõi, không cần license).
+- Host bật "Share with my team…" trên khay:
+  - `desktop/share.js` mở cổng HTTPS (mặc định 47860) trước phần lõi; phần lõi vẫn chỉ nghe ở `127.0.0.1`;
+  - chứng chỉ do `sh bin/studio app cert` tạo;
+  - "Add a computer" cho mã ghép đôi dùng một lần, có hạn 10 phút.
+- **Ghép đôi**: hai bên chứng minh cùng biết mã bằng HMAC gắn với dấu vân tay chứng chỉ, nên mã không đi qua mạng. Client lưu dấu vân tay, ghim nó (`setCertificateVerifyProc`) và gửi `X-CU-Client` trong mọi yêu cầu.
+- **Cập nhật của Client** đi qua Host (`/__cu/update`, bằng lease của Host); Client kiểm chữ ký như 017.
+- **Test**: `desktop/test/share.test.js`, Host giả `desktop/test/fake-host.mjs`, chứng chỉ thử ở `desktop/test/vectors/share-cert.json`.
+
 ### Luồng làm phim
 1. Chạy `sh bin/studio status`. Nếu chưa sẵn sàng thì chạy `sh bin/studio setup` và báo người dùng công cụ còn thiếu (xưởng không tự cài phần mềm hệ thống).
 2. Đọc `lib/lemo-opuscar/AGENTS.md` và làm theo, **ở chế độ skill** của thư viện, với các điểm thay thế sau:
