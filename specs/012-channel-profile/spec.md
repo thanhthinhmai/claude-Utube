@@ -125,6 +125,7 @@ Khi người dùng thấy lỗi ở một phim đã giao, một bài học đư�
 - **FR-006**: Máy chấm kịch bản (010) MUST thêm cho phim thuộc kênh:
   - điều kiện cứng `channel_language`: ngôn ngữ của kịch bản bằng ngôn ngữ của kênh;
   - điều kiện cứng `banned_word`: không có từ cấm của kênh, báo kèm số đoạn và câu.
+- **FR-006a**: Máy đo phim (`qc`, 010) MUST kiểm cho phim thuộc kênh rằng mọi dòng giọng đọc dùng đúng giọng và tốc độ của kênh, trừ khi người dùng chọn giọng khác riêng cho phim đó.
 - **FR-007**: Biên tập độc lập (010) MUST nhận hồ sơ kênh và các bài học không có luật máy, như một phần của "yêu cầu của phim".
 - **FR-008**: Máy kiểm gói đăng (011) MUST thêm cho phim thuộc kênh: đủ hashtag bắt buộc; không có từ cấm trong tiêu đề, mô tả và chữ trên thumbnail; tiêu đề không vượt độ dài tối đa của kênh khi kênh đặt giới hạn này.
 
