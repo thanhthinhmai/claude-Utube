@@ -25,14 +25,15 @@ jobs:
           node-version: 22
       - run: npm ci
       - run: node --test test/*.test.js
-      - name: smoke run (fake core)
+      - name: smoke run (fake core; sharing with the team, specs/018)
         shell: bash
         env:
           CU_CORE_CMD: '["node","test/fake-core.mjs"]'
+          CU_SMOKE_SHARE: "1"
         run: |
           export CU_CONFIG_DIR="$RUNNER_TEMP/cu-config"
           npx electron . --smoke 2>&1 | tee smoke.log
-          for line in "setup ok" "window ok" "external ok" "second instance ok" "hide ok" "stopped ok" "quit cancel ok" "quit ok"; do
+          for line in "setup ok" "window ok" "share pair ok" "external ok" "second instance ok" "hide ok" "stopped ok" "quit cancel ok" "quit ok"; do
             grep -q "smoke: $line" smoke.log || { echo "missing: smoke: $line"; exit 1; }
           done
           ! grep -q "smoke: fail" smoke.log
@@ -51,6 +52,20 @@ jobs:
           npx electron . --smoke --smoke-license 2>&1 | tee license.log
           for line in "license ok" "window ok" "locked ok" "quit ok"; do grep -q "smoke: $line" license.log || { echo "missing: smoke: $line"; exit 1; }; done
           ! grep -q "smoke: fail" license.log
+      - name: smoke run of the Client mode (fake Host, specs/018)
+        shell: bash
+        run: |
+          rel="$RUNNER_TEMP/client-release"; mkdir -p "$rel"; printf 'x' > "$rel/claude-Utube-Setup-9.9.9.exe"; printf 'x' > "$rel/claude-Utube-9.9.9-arm64.dmg"
+          node test/sign-release.mjs "$rel" 9.9.9
+          node test/fake-license.mjs 8921 "$rel" > fake-license-client.log 2>&1 &
+          sleep 1
+          node test/fake-host.mjs 47871 47872 "$RUNNER_TEMP/pair.txt" http://127.0.0.1:8921 > fake-host.log 2>&1 &
+          sleep 2
+          export CU_CONFIG_DIR="$RUNNER_TEMP/cu-config-client" CU_SMOKE_PAIR="$(cat "$RUNNER_TEMP/pair.txt")" CU_SMOKE_CONTROL=http://127.0.0.1:47872
+          export CU_SMOKE_UPDATE=1 CU_LICENSE_SERVER=http://127.0.0.1:8921 CU_LICENSE_PUBLIC_KEY=$(node -p "require('./test/vectors/vectors.json').public")
+          npx electron . --smoke --smoke-client 2>&1 | tee client.log
+          for line in "pair ok" "window ok" "update ready ok" "offline ok" "quit ok"; do grep -q "smoke: $line" client.log || { echo "missing: smoke: $line"; cat fake-host.log; exit 1; }; done
+          ! grep -q "smoke: fail" client.log
       - name: smoke run of the install screen (fake studio package, specs/016)
         shell: bash
         env:
@@ -93,13 +108,26 @@ jobs:
           # the key is kept from the run above (Keychain on macOS), so no "license ok" here
           for line in "update ready ok" "quit ok"; do grep -q "smoke: $line" update.log || { echo "missing: smoke: $line"; exit 1; }; done
           ! grep -q "smoke: fail" packed.log update.log
+          if [ "$RUNNER_OS" = Windows ]; then
+            inst="$LOCALAPPDATA/Programs/claude-Utube/claude-Utube.exe"
+            for i in $(seq 1 60); do
+              [ -f "$inst" ] && break
+              powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { \$_.Name -match 'claude|Setup|Un_' } | ForEach-Object { '{0} {1} {2}' -f \$_.ProcessId, \$_.Name, \$_.CommandLine }" | head -8
+              echo "--- $i"; sleep 3
+            done
+            [ -f "$inst" ] || { echo "the silent install did not put the app in $inst"; exit 1; }
+            sleep 10
+          fi
       - name: the downloaded installer installs the app silently and starts it (Windows, specs/017 R6)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $exe = Join-Path $env:LOCALAPPDATA "Programs\claude-Utube\claude-Utube.exe"
           for ($i = 0; $i -lt 90 -and -not (Test-Path $exe); $i++) { Start-Sleep 2 }
-          if (-not (Test-Path $exe)) { Write-Error "the silent install did not put the app in $exe"; exit 1 }
+          if (-not (Test-Path $exe)) {
+            Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'claude|Setup|powershell' } | Format-Table ProcessId,Name,CommandLine -AutoSize | Out-String -Width 400
+            Write-Error "the silent install did not put the app in $exe"; exit 1
+          }
           for ($i = 0; $i -lt 30 -and -not (Get-Process claude-Utube -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }); $i++) { Start-Sleep 2 }
           $running = Get-Process claude-Utube -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe }
           if (-not $running) { Write-Error "the installed app was not started again"; exit 1 }

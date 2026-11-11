@@ -4,7 +4,7 @@
 // on macOS on this machine, on Windows inside WSL2. All decisions live in core.js; this file does the windows.
 "use strict";
 
-const { app, BrowserWindow, Tray, Menu, dialog, shell, ipcMain, Notification, nativeImage, safeStorage } = require("electron");
+const { app, BrowserWindow, Tray, Menu, dialog, shell, ipcMain, Notification, nativeImage, safeStorage, session } = require("electron");
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -12,10 +12,13 @@ const path = require("node:path");
 const core = require("./core.js");
 const lic = require("./license.js");
 const upd = require("./updates.js");
+const share = require("./share.js");
 
 const SMOKE = process.argv.includes("--smoke");
 const LICENSE_SMOKE = process.argv.includes("--smoke-license");
 const UPDATE_SMOKE = process.argv.includes("--smoke-update");
+const CLIENT_SMOKE = process.argv.includes("--smoke-client");
+const isClient = () => !!(cfg && /** @type {any} */ (cfg).mode === "client");
 const SECOND = process.argv.includes("--smoke-second");
 if (process.env.CU_CONFIG_DIR) app.setPath("userData", process.env.CU_CONFIG_DIR);   // tests: own config and own lock
 const CONFIG_DIR = app.getPath("userData");
@@ -112,9 +115,18 @@ async function startCore() {
   step("Opening…");
   appUrl = url;
   openMain(url);
+  if (cfg && /** @type {any} */ (cfg).share && /** @type {any} */ (cfg).share.enabled) startSharing();   // specs/018
 }
 
 // ---------- the main window ----------
+/** The studio's own pages: the local core (Host) or the paired Host (Client). @param {string} u */
+function isOwnUrl(u) {
+  if (isClient()) {
+    try { return new URL(u).protocol === "https:" && new URL(u).host === new URL(appUrl).host; } catch { return false; }
+  }
+  return core.isAppUrl(u, core.portOf(appUrl));
+}
+
 /** @param {string} url */
 function openMain(url) {
   const port = core.portOf(url);
@@ -123,11 +135,11 @@ function openMain(url) {
       icon: path.join(ASSETS, "icon.png"), autoHideMenuBar: true,
       webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, preload: path.join(__dirname, "preload.js") } });
     win.webContents.setWindowOpenHandler(({ url: u }) => {
-      if (!core.isAppUrl(u, core.portOf(appUrl))) openOutside(u);
+      if (!isOwnUrl(u)) openOutside(u);
       return { action: "deny" };
     });
     win.webContents.on("will-navigate", (e, u) => {
-      if (!core.isAppUrl(u, core.portOf(appUrl)) && !u.startsWith("file:")) {
+      if (!isOwnUrl(u) && !u.startsWith("file:")) {
         e.preventDefault();
         openOutside(u);
       }
@@ -147,7 +159,7 @@ function openMain(url) {
   });
   buildTray();
   watchCore();
-  if (SMOKE) win.webContents.once("did-finish-load", () => (UPDATE_SMOKE ? smokeUpdate() : LICENSE_SMOKE ? smokeLicense() : smokeMain(port)));
+  if (SMOKE) win.webContents.once("did-finish-load", () => (CLIENT_SMOKE ? smokeClient() : UPDATE_SMOKE ? smokeUpdate() : LICENSE_SMOKE ? smokeLicense() : smokeMain(port)));
 }
 
 /** @param {string} u */
@@ -175,6 +187,7 @@ function watchCore() {
 
 async function checkCore() {
   if (quitting || !win || win.isDestroyed()) return;
+  if (isClient()) return checkHost();
   const s = await coreStatus();
   if (!s.running && !win.webContents.getURL().startsWith("file:")) {
     win.loadFile(path.join(__dirname, "stopped.html"));      // FR-014
@@ -201,13 +214,15 @@ function setTrayMenu() {
     ...(pending && PLATFORM === "win32" ? [{ label: `Restart to update (${pending.version})`, click: () => app.quit() },
       { type: /** @type {const} */ ("separator") }] : []),
     { label: "Open the studio", click: showMain },
-    { label: "Open in the browser", click: () => appUrl && shell.openExternal(appUrl) },
-    { type: "separator" },
-    { label: "Data folder", click: () => openFolder("data") },
-    { label: "Log folder", click: () => openFolder("logs") },
+    ...(isClient() ? [] : [
+      { label: "Open in the browser", click: () => appUrl && shell.openExternal(appUrl) },
+      { label: "Share with my team…", click: showShare },
+      { type: /** @type {const} */ ("separator") },
+      { label: "Data folder", click: () => openFolder("data") },
+      { label: "Log folder", click: () => openFolder("logs") }]),
     { label: "Change setup…", click: changeSetup },
-    ...(LIC ? [{ label: "License…", click: () => showLicense("info") },
-      { label: "Check for updates", click: () => checkUpdates(true) }] : []),
+    ...(LIC && !isClient() ? [{ label: "License…", click: () => showLicense("info") }] : []),
+    ...(LIC ? [{ label: "Check for updates", click: () => checkUpdates(true) }] : []),
     { type: "separator" },
     { label: "Quit", click: () => app.quit() },
   ]));
@@ -233,16 +248,21 @@ app.on("before-quit", async (e) => {
   if (quitting) return;
   e.preventDefault();
   if (!cfg) { quitting = true; app.exit(0); return; }
-  const ok = await stopCore("Quit");
+  const ok = isClient() ? true : await stopCore("Quit");
   if (!ok) { if (SMOKE) smoke("quit cancel ok"); return; }
   quitting = true;
   if (monitor) clearInterval(monitor);
+  if (gateway) await gateway.stop().catch(() => {});
   const pending = PLATFORM === "win32" ? pendingUpdate() : null;
   if (pending) {                           // the per-user installer replaces the app, then starts it again (R6)
     const cmd = upd.installCommand(pending.file);
-    spawn(cmd.file, cmd.args, { detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {}).unref();
+    try {                                  // a broken file must never keep the app from quitting
+      spawn(cmd.file, cmd.args, { detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {}).unref();
+      smoke("installer started");
+    } catch (e) {
+      smoke(`installer failed to start: ${e}`);
+    }
     saveLicState({ pendingUpdate: null });
-    smoke("installer started");
   }
   smoke("quit ok");
   app.exit(0);
@@ -428,6 +448,17 @@ async function submitKey(typed) {
   return { ok: true };
 }
 
+/** A Host needs a good license before its core starts (017). False: the license window is shown. */
+async function ensureLicense() {
+  if (!LIC || isClient()) return true;
+  if (!deviceId) deviceId = await machineDeviceId();
+  const key = await readKey();
+  if (key) await renew(key);
+  if (licenseProblem()) { showLicense("needed"); return false; }
+  scheduleRenew();
+  return true;
+}
+
 /** Licensed: go on with setup or start the core. */
 async function afterLicense() {
   const m = cfg && cfg.coreKind === "packaged" ? core.readManifest(PACKAGED_DIR) : null;
@@ -447,17 +478,27 @@ function pendingUpdate() {
 }
 
 /** @param {boolean} manual */
-async function checkUpdates(manual) {
-  if (!LIC || locked || checking) return;
+/** Where updates come from: the license server (Host) or the paired Host (Client, specs/018 R5). */
+function updateSource() {
+  if (!LIC) return null;
+  if (isClient()) {
+    const h = /** @type {any} */ (cfg).host;
+    return h ? { base: `https://${h.address}/__cu/update`, headers: { "x-cu-client": share.clientHeader(h) }, fetch: share.pinnedFetch(h.fingerprint) } : null;
+  }
   const lease = licState().lease;
-  if (!lease) return;
+  return lease && !locked ? { base: `${LIC.server}/api/license/releases`, headers: { "x-cu-lease": lease }, fetch } : null;
+}
+
+async function checkUpdates(manual) {
+  const src = updateSource();
+  if (!LIC || !src || checking) return;
   checking = true;
   const say = (/** @type {string} */ m) => { if (manual && !SMOKE) dialog.showMessageBox({ type: "info", message: m }); };
   try {
-    const h = { "x-cu-lease": lease };
-    const get = (/** @type {string} */ name) => fetch(`${LIC.server}/api/license/releases/${encodeURIComponent(name)}`,
+    const h = src.headers;
+    const get = (/** @type {string} */ name) => src.fetch(`${src.base}/${encodeURIComponent(name)}`,
       { headers: h, signal: AbortSignal.timeout(60_000) }).then(async (r) => { if (r.status !== 200) throw new Error(`answer ${r.status}`); return Buffer.from(await r.arrayBuffer()); });
-    const list = await fetch(`${LIC.server}/api/license/releases`, { headers: h, signal: AbortSignal.timeout(30_000) });
+    const list = await src.fetch(src.base, { headers: h, signal: AbortSignal.timeout(30_000) });
     if (list.status !== 200) { say("No update could be found right now."); return; }
     const info = await list.json();
     if (!upd.newer(info.version, app.getVersion())) { say(`claude-Utube ${app.getVersion()} is the newest version.`); return; }
@@ -465,8 +506,8 @@ async function checkUpdates(manual) {
     if (!rel || !upd.newer(rel.version, app.getVersion())) throw new Error("the release list is not signed by the studio owner");
     const asset = upd.pickAsset(rel, PLATFORM);
     if (!asset) return;
-    const file = await upd.downloadTo(`${LIC.server}/api/license/releases/${encodeURIComponent(asset.name)}`, h,
-      path.join(UPDATES, asset.name), asset);
+    const file = await upd.downloadTo(`${src.base}/${encodeURIComponent(asset.name)}`, h,
+      path.join(UPDATES, asset.name), asset, src.fetch);
     upd.cleanDir(UPDATES, file);
     saveLicState({ pendingUpdate: { version: rel.version, file } });
     setTrayMenu();
@@ -494,6 +535,157 @@ function scheduleUpdates() {
   setTimeout(() => { checkUpdates(false); setInterval(() => checkUpdates(false), every); }, SMOKE ? 600_000 : upd.FIRST_CHECK_MS);
 }
 
+// ---------- sharing with the team (specs/018, Host) ----------
+let gateway = /** @type {{port: number, stop: () => Promise<void>, fingerprint: string}|null} */ (null);
+const pairing = new share.Pairing();
+let shareError = /** @type {string|null} */ (null);
+let shareWin = /** @type {BrowserWindow|null} */ (null);
+
+function shareState() {
+  const c = /** @type {any} */ (cfg);
+  if (!c.share) c.share = { enabled: false, port: share.DEFAULT_PORT, hostId: require("node:crypto").randomUUID(), clients: [] };
+  return c.share;
+}
+function saveShare() { if (cfg) core.saveConfig(CONFIG_DIR, cfg); pushShare(); }
+function pushShare() { if (shareWin && !shareWin.isDestroyed()) shareWin.webContents.send("share:changed"); }
+
+/** The gateway's certificate, made once by the core (`app cert`) and kept here. */
+async function shareCert() {
+  const f = path.join(CONFIG_DIR, "share-cert.json");
+  const have = readJson(f);
+  if (have && have.cert && have.key) return have;
+  const r = await coreRun(["cert"], 60_000);
+  const c = JSON.parse(r.out.trim().split("\n").filter((l) => l.startsWith("{")).pop() || "null");
+  if (!c || !c.cert) throw new Error("the studio did not make a certificate: " + (r.err || r.out).slice(-300));
+  fs.writeFileSync(f, JSON.stringify(c), { mode: 0o600 });
+  return c;
+}
+
+async function startSharing() {
+  if (gateway || isClient()) return;
+  const st = shareState();
+  try {
+    const c = await shareCert();
+    gateway = await share.startGateway({ cert: c.cert, key: c.key, port: st.port, corePort: () => core.portOf(appUrl), state: st,
+      pairing, onChange: saveShare,
+      update: () => (LIC && licState().lease && !locked ? { server: LIC.server, lease: licState().lease } : null) });
+    shareError = null;
+    smoke(`share ok ${gateway.port}`);
+  } catch (e) {
+    shareError = /** @type {any} */ (e).code === "EADDRINUSE" ? `Port ${st.port} is busy on this computer.` : String(/** @type {any} */ (e).message || e);
+    st.enabled = false;
+  }
+  saveShare();
+}
+
+async function stopSharing() {
+  pairing.close();
+  if (gateway) { await gateway.stop().catch(() => {}); gateway = null; }
+  saveShare();
+}
+
+function showShare() {
+  if (shareWin && !shareWin.isDestroyed()) { shareWin.show(); return; }
+  shareWin = new BrowserWindow({ width: 620, height: 640, title: "Share with my team", icon: path.join(ASSETS, "icon.png"),
+    autoHideMenuBar: true, show: !SMOKE, webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true } });
+  shareWin.loadFile(path.join(__dirname, "share.html"));
+  shareWin.on("closed", () => { shareWin = null; });
+}
+
+ipcMain.handle("share:state", () => {
+  const st = shareState();
+  return { enabled: !!gateway, port: st.port, error: shareError, fingerprint: gateway ? gateway.fingerprint : null,
+    addresses: gateway ? share.addresses(os.networkInterfaces(), gateway.port) : [],
+    pairing: pairing.active() && pairing.cur ? { code: pairing.cur.code, until: pairing.cur.until } : null,
+    clients: st.clients.filter((/** @type {any} */ c) => !c.forgotten).map((/** @type {any} */ c) => ({ id: c.id, name: c.name,
+      firstSeen: c.firstSeen, lastSeen: c.lastSeen, removed: !!c.removed })) };
+});
+ipcMain.handle("share:toggle", async (_e, on) => {
+  shareState().enabled = !!on;
+  if (on) await startSharing(); else await stopSharing();
+  return { ok: !!gateway === !!on, error: shareError };
+});
+ipcMain.handle("share:add", () => { if (!gateway) return null; const p = pairing.open(); pushShare(); return p; });
+ipcMain.handle("share:remove", (_e, id) => {
+  const st = shareState();
+  const c = st.clients.find((/** @type {any} */ x) => x.id === id);
+  if (c && c.removed) st.clients = st.clients.filter((/** @type {any} */ x) => x.id !== id);
+  else if (c) c.removed = nowS();
+  saveShare();
+  return true;
+});
+
+// ---------- Client mode (specs/018) ----------
+function pinHost() {
+  const h = /** @type {any} */ (cfg).host;
+  const target = share.parseAddress(h.address);
+  if (!target) return;
+  session.defaultSession.setCertificateVerifyProc((req, cb) => {
+    if (req.hostname !== target.host) return cb(-3);                       // other sites: Chromium's own checks
+    let fp = "";
+    try { fp = share.fingerprintOf(req.certificate.data); } catch { /* refused below */ }
+    cb(fp === h.fingerprint ? 0 : -2);
+  });
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: [`https://${h.address}/*`] }, (d, cb) => {
+    d.requestHeaders["X-CU-Client"] = share.clientHeader(h);
+    cb({ requestHeaders: d.requestHeaders });
+  });
+}
+
+function startClient() {
+  const h = /** @type {any} */ (cfg).host;
+  pinHost();
+  appUrl = `https://${h.address}/`;
+  if (splash && !splash.isDestroyed()) splash.destroy();
+  splash = null;
+  openMain(appUrl);
+  if (win) win.webContents.on("did-fail-load", (_e, code, _d, url, isMain) => { if (isMain && code !== -3) showOffline(); });
+}
+
+let offlineShown = false;
+async function showOffline() {
+  if (!win || win.isDestroyed()) return;
+  const why = await share.probeHost(/** @type {any} */ (cfg).host);
+  if (why === "ok" && !win.webContents.getURL().startsWith("file:")) return;
+  offlineShown = true;
+  win.loadFile(path.join(__dirname, "offline.html"), { query: { why, address: /** @type {any} */ (cfg).host.address } });
+  if (SMOKE) win.webContents.once("did-finish-load", () => smoke("offline ok"));
+}
+
+async function checkHost() {
+  if (!win || win.isDestroyed()) return;
+  const onPage = !win.webContents.getURL().startsWith("file:");
+  const why = await share.probeHost(/** @type {any} */ (cfg).host);
+  if (why !== "ok" && onPage) showOffline();
+  if (why === "ok" && !onPage && offlineShown) { offlineShown = false; win.loadURL(appUrl); }
+}
+
+ipcMain.handle("client:setup", () => { changeSetup(); return true; });
+ipcMain.handle("client:retry", async () => { if (win && !win.isDestroyed()) win.loadURL(appUrl); return true; });
+
+/** Pair from the setup screen and save the Client config. @param {{address: string, code: string, name: string}} d */
+async function pairClient(d) {
+  try {
+    const h = await share.pairWithHost(d.address, d.code, d.name || os.hostname());
+    const old = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || {});
+    const c = /** @type {any} */ ({ platform: PLATFORM, mode: "client", host: h, distro: null, studio: "", data: "", home: null,
+      setupAt: new Date().toISOString(), trayNoticeShown: !!old.trayNoticeShown });
+    for (const k of ["installId", "pendingUpdate", "share"]) if (old[k] !== undefined) c[k] = old[k];   // a former Host keeps its sharing list
+    cfg = c;
+    core.saveConfig(CONFIG_DIR, c);
+    smoke("pair ok");
+    if (setupWin && !setupWin.isDestroyed()) setupWin.destroy();
+    setupWin = null;
+    startClient();
+    scheduleUpdates();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: share.describe(String(/** @type {any} */ (e).message || e)) };
+  }
+}
+ipcMain.handle("setup:pair", (_e, d) => pairClient(d));
+ipcMain.handle("setup:hostname", () => os.hostname());
+
 // ---------- setup (US2) ----------
 function showSetup() {
   setupWin = new BrowserWindow({ width: 760, height: 720, title: "Set up claude-Utube", icon: path.join(ASSETS, "icon.png"),
@@ -504,7 +696,8 @@ function showSetup() {
 }
 
 async function changeSetup() {
-  if (!(await stopCore("Stop the studio"))) return;
+  if (!isClient() && !(await stopCore("Stop the studio"))) return;
+  if (gateway) { await gateway.stop().catch(() => {}); gateway = null; }
   if (win && !win.isDestroyed()) { quitting = true; win.destroy(); quitting = false; win = null; }
   if (monitor) clearInterval(monitor);
   showSetup();
@@ -576,7 +769,7 @@ async function finishSetup(draft) {
   core.saveConfig(CONFIG_DIR, c);
   if (setupWin && !setupWin.isDestroyed()) setupWin.destroy();
   setupWin = null;
-  startCore();
+  if (await ensureLicense()) startCore();
   return { ok: true };
 }
 
@@ -689,6 +882,22 @@ ipcMain.handle("core:openLogs", () => openFolder("logs"));
 ipcMain.handle("core:quit", () => app.quit());
 
 // ---------- smoke run (GitHub Actions; specs/015 R4) ----------
+/** specs/018 T009: the Client shows the fake Host's page over the pinned HTTPS; the Host stops; the Client says so. */
+async function smokeClient() {
+  if (win && win.getTitle() !== "fake core") return smokeFail(`window title is ${win && win.getTitle()}`);
+  smoke("window ok");
+  if (process.env.CU_SMOKE_UPDATE === "1") {
+    await checkUpdates(true);
+    if (!pendingUpdate()) return smokeFail("no update ready through the Host");
+  }
+  if (process.env.CU_SMOKE_CONTROL) await fetch(`${process.env.CU_SMOKE_CONTROL}/stop`, { method: "POST" }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 500));
+  await checkHost();
+  await new Promise((r) => setTimeout(r, 1500));
+  if (!offlineShown) return smokeFail("the offline page did not show");
+  app.quit();
+}
+
 /** specs/017 T020: the fake license server offers a newer release; it downloads, checks, and (Windows) installs on quit. */
 async function smokeUpdate() {
   smoke("window ok");
@@ -715,6 +924,11 @@ async function smokeLicense() {
 
 function smokeSetup() {
   smoke("setup ok");
+  if (process.env.CU_SMOKE_PAIR) {                       // specs/018: pair with the fake Host
+    const [address, code] = process.env.CU_SMOKE_PAIR.split("|");
+    pairClient({ address, code, name: "smoke" }).then((r) => { if (!r.ok) smokeFail(`pair: ${r.error}`); });
+    return;
+  }
   if (PACKAGED_DIR) return;                              // setup.html starts the install itself (smoke-install)
   finishSetup({ distro: null, studio: process.cwd(), data: path.join(CONFIG_DIR, "data") });
 }
@@ -724,6 +938,20 @@ async function smokeMain(port) {
   if (!win) return;
   if (win.getTitle() !== "fake core") return smokeFail(`window title is ${win.getTitle()}`);
   smoke(`window ok ${port}`);
+  if (process.env.CU_SMOKE_SHARE === "1") {             // specs/018: share, pair a computer, open the page through the gateway
+    shareState().port = 0;
+    shareState().enabled = true;
+    await startSharing();
+    if (!gateway) return smokeFail(`sharing did not start: ${shareError}`);
+    const { code } = pairing.open();
+    const p = await share.pairWithHost(`127.0.0.1:${gateway.port}`, code, "smoke client").catch((e) => smokeFail(`pair: ${e}`));
+    if (!p) return;
+    const r = await share.pinnedFetch(p.fingerprint)(`https://127.0.0.1:${gateway.port}/`, { headers: { "x-cu-client": share.clientHeader(p) } });
+    if (!/fake core/.test(await r.text())) return smokeFail("the gateway did not pass the core's page on");
+    if (shareState().clients.length !== 1) return smokeFail("the paired computer was not saved");
+    await stopSharing();
+    smoke("share pair ok");
+  }
   await win.webContents.executeJavaScript("document.getElementById('out').click()");
   await new Promise((r) => setTimeout(r, 500));
   const second = spawn(process.execPath, [__dirname, "--smoke-second"], { env: process.env, stdio: "ignore" });
@@ -763,14 +991,13 @@ if (!app.requestSingleInstanceLock()) {
       cfg = { platform: PLATFORM, distro: null, studio: process.cwd(), data: path.join(CONFIG_DIR, "data"), home: null };
       core.saveConfig(CONFIG_DIR, cfg);
     }
-    if (LIC) {
-      deviceId = await machineDeviceId();
-      const key = await readKey();
-      if (key) await renew(key);
-      if (licenseProblem()) return showLicense("needed");
-      scheduleRenew();
+    if (isClient() && /** @type {any} */ (cfg).host) {           // specs/018: no core, no license here
+      startClient();
+      scheduleUpdates();
+      return;
     }
+    if (!cfg) return showSetup();                    // first run: choose Host or Client first (a Client needs no license)
     scheduleUpdates();
-    afterLicense();
+    if (await ensureLicense()) afterLicense();
   });
 }

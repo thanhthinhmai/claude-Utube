@@ -9,6 +9,8 @@ if (location.protocol === "file:") {
     enableWsl: () => ipcRenderer.invoke("setup:enableWsl"),
     finish: (draft) => ipcRenderer.invoke("setup:finish", draft),
     packaged: () => ipcRenderer.invoke("setup:packaged"),
+    pair: (d) => ipcRenderer.invoke("setup:pair", d),
+    hostname: () => ipcRenderer.invoke("setup:hostname"),
     installCore: (opts) => ipcRenderer.invoke("setup:installCore", opts),
     onProgress: (fn) => ipcRenderer.on("setup:progress", (_e, msg) => fn(msg)),
   });
@@ -17,6 +19,14 @@ if (location.protocol === "file:") {
     submit: (key) => ipcRenderer.invoke("license:submit", key),
     onMode: (fn) => ipcRenderer.on("license:mode", (_e, mode) => fn(mode)),
   });
+  contextBridge.exposeInMainWorld("share", {
+    state: () => ipcRenderer.invoke("share:state"),
+    toggle: (on) => ipcRenderer.invoke("share:toggle", on),
+    add: () => ipcRenderer.invoke("share:add"),
+    remove: (id) => ipcRenderer.invoke("share:remove", id),
+    onChange: (fn) => ipcRenderer.on("share:changed", () => fn()),
+  });
+  contextBridge.exposeInMainWorld("client", { retry: () => ipcRenderer.invoke("client:retry"), setup: () => ipcRenderer.invoke("client:setup") });
   contextBridge.exposeInMainWorld("core", {
     restart: () => ipcRenderer.invoke("core:restart"),
     retry: () => ipcRenderer.invoke("core:retry"),

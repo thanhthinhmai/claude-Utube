@@ -34,6 +34,27 @@
   <h1>Set up claude-Utube</h1>
   <p class="lead">The studio runs on this computer with your own Claude account. This takes a minute; you only do it once.</p>
 
+  <div class="panel" id="modes">
+    <label class="choice"><input type="radio" name="mode" value="host" checked> Run the studio on this computer
+      <span class="hint">· films are made here, with your Claude account</span></label>
+    <label class="choice"><input type="radio" name="mode" value="client"> Connect to a studio
+      <span class="hint">· your team's studio runs on another computer</span></label>
+  </div>
+
+  <div id="client" hidden>
+    <div class="panel">
+      <label for="caddr">Studio address <span class="hint">The owner sees it in the tray menu → Share with my team</span></label>
+      <input id="caddr" spellcheck="false" placeholder="192.168.1.20:47860">
+      <label for="ccode">Pairing code <span class="hint">Works once, for 10 minutes</span></label>
+      <input id="ccode" spellcheck="false" placeholder="ABCDE-FGHJK" autocomplete="off">
+      <label for="cname">This computer's name <span class="hint">So the owner knows which computer it is</span></label>
+      <input id="cname" maxlength="80">
+      <div class="row"><button class="primary" id="connect">Connect</button></div>
+      <p id="cmsg" role="status"></p>
+    </div>
+  </div>
+
+  <div id="hostside">
   <div id="pkg" hidden>
     <div class="panel">
       <label class="choice"><input type="radio" name="kind" value="packaged" checked> Install the studio <span class="hint">(recommended) · <span id="pkg-size"></span></span></label>
@@ -62,6 +83,7 @@
 
   <div class="row"><button id="again">Check again</button><button class="primary" id="start" disabled>Start</button></div>
   <p id="msg" role="status"></p>
+  </div>
   </div>
 </main>
 <script>
@@ -99,6 +121,19 @@
     const r = await setup.finish({ distro: $("distro").value || null, studio: $("studio").value.trim(), data: $("data").value.trim(), home: draft.home });
     if (!r.ok) { $("msg").textContent = r.error; $("start").disabled = false; }
   };
+  // ---------- Host or Client (specs/018) ----------
+  setup.hostname().then((n) => { if (!$("cname").value) $("cname").value = n; });
+  document.querySelectorAll('input[name="mode"]').forEach((x) => { x.onchange = () => {
+    const client = document.querySelector('input[name="mode"]:checked').value === "client";
+    $("client").hidden = !client; $("hostside").hidden = client;
+  }; });
+  $("connect").onclick = async () => {
+    $("connect").disabled = true; $("cmsg").className = ""; $("cmsg").textContent = "Connecting…";
+    const r = await setup.pair({ address: $("caddr").value, code: $("ccode").value, name: $("cname").value });
+    $("connect").disabled = false;
+    if (!r.ok) { $("cmsg").className = "bad"; $("cmsg").textContent = r.error; }
+  };
+
   // ---------- the packaged core (specs/016 T015) ----------
   let pkg = null, failedAt = null;
   const STEP_NAMES = { verify: "Check the package", space: "Check free space", unpack: "Unpack", install: "Install the studio",

@@ -56,6 +56,9 @@ if (cmd === "serve") {                              // the background web server
   }
   fs.rmSync(stateFile, { force: true });
   console.log("✓ the studio stopped");
+} else if (cmd === "cert") {                       // specs/018: the TEST certificate
+  const v = JSON.parse(fs.readFileSync(new URL("./vectors/share-cert.json", import.meta.url), "utf8"));
+  console.log(JSON.stringify(v.host));
 } else if (cmd === "check") {
   console.log(JSON.stringify({ ok: true, missing: [], data_default: data }));
 } else {
