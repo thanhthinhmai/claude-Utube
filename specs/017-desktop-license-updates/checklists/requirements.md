@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,4 +31,4 @@
 
 ## Notes
 
-- 3 câu [NEEDS CLARIFICATION] chờ người dùng: thời gian dùng khi mất mạng (FR-005), nơi quản lý key (FR-012), bản 0.2.0 có cho dùng tạm không cần key (Edge Cases).
+- Đã trả lời 3 câu (2026-11-11): 7 ngày; trang quản lý trên máy chủ license; cần key từ 0.2.0.

@@ -8,6 +8,14 @@
 
 **Input**: User description: "017 first": license key và tự cập nhật cho app desktop (015, 016), theo cách của neb-creative-tool.
 
+## Clarifications
+
+### Session 2026-11-11
+
+- Q: Mất mạng thì app dùng tiếp được bao lâu? → A: 7 ngày (FR-005).
+- Q: Chủ xưởng quản lý key ở đâu? → A: một trang web nhỏ trên chính máy chủ license, đăng nhập bằng mật khẩu chủ xưởng (FR-012).
+- Q: Bản 0.2.0 có cho dùng tạm không cần key? → A: không; cần key ngay từ 0.2.0 (Edge Cases).
+
 ## Bối cảnh
 
 Lộ trình app desktop (2026-11-11), hướng A: mỗi người ngoài cài app, chạy xưởng trên máy mình bằng tài khoản Claude và khoá YouTube của chính họ.
@@ -39,7 +47,7 @@ Chủ xưởng tạo một key cho một người, đặt số máy được dù
 1. **Given** một key còn hạn, còn chỗ, **When** người dùng nhập key lần đầu, **Then** app mở xưởng, và trang quản lý key hiện máy đó (tên máy, hệ điều hành, phiên bản app, lần thấy gần nhất).
 2. **Given** một key sai, **When** người dùng nhập, **Then** app báo "key không đúng", không mở xưởng. Nhập sai quá 10 lần trong 10 phút từ một địa chỉ thì máy chủ tạm từ chối.
 3. **Given** một key đã dùng hết số máy, **When** nhập ở máy mới, **Then** app báo hết số máy và nhắc liên hệ chủ xưởng. Chủ xưởng gỡ một máy cũ thì máy mới nhập lại được.
-4. **Given** app đã kích hoạt, **When** máy mất mạng, **Then** app vẫn chạy tới hết thời gian dùng khi mất mạng (FR-005), rồi khoá.
+4. **Given** app đã kích hoạt, **When** máy mất mạng, **Then** app vẫn chạy thêm 7 ngày kể từ lần gia hạn cuối (FR-005), rồi khoá.
 5. **Given** key được tạo, **When** chủ xưởng đóng trang, **Then** key không bao giờ hiện lại. Máy chủ chỉ giữ mã băm và 4 ký tự cuối.
 
 ---
@@ -85,7 +93,7 @@ Chủ xưởng gắn tag phát hành bản mới. App của người dùng có k
 - **Cài lại Windows hay cài lại bản Linux của app**: mã máy lấy từ phía Windows hoặc macOS, không lấy từ bản Linux, nên cài lại phần lõi không tốn thêm một máy.
 - **Đang làm phim thì bị khoá**: phim đang dựng được làm xong (tối đa 6 giờ). Người dùng xem được phim đó sau khi mở khoá lại.
 - **Tải bản mới bị ngắt**: lần sau tải tiếp hoặc tải lại; tệp chưa xong không bao giờ được cài.
-- **Bản 0.1.0 đã phát (chưa có license)**: không tự cập nhật được, vì 0.1.0 chưa có phần cập nhật. Người dùng phải tự cài bản 0.2.0 một lần; sau đó mới cần key. [NEEDS CLARIFICATION: bản 0.2.0 có cho dùng tạm không cần key một thời gian không?]
+- **Bản 0.1.0 đã phát (chưa có license)**: không tự cập nhật được, vì 0.1.0 chưa có phần cập nhật. Người dùng phải tự cài bản 0.2.0 một lần, và 0.2.0 cần key ngay (không có thời gian dùng tạm). Chủ xưởng gửi key cùng tệp cài 0.2.0.
 - **Bản phát triển hoặc build không có địa chỉ máy chủ license**: không có license, không có cập nhật (như hiện nay).
 - **Chủ xưởng mất khoá ký**: mọi app đã cài không kiểm được giấy phép mới; phải phát hành bản mới. Hướng dẫn triển khai nhắc sao lưu khoá ký.
 
@@ -100,7 +108,7 @@ Chủ xưởng gắn tag phát hành bản mới. App của người dùng có k
 - **FR-004**: Nhập sai key MUST bị giới hạn: tối đa 10 lần mỗi 10 phút cho mỗi địa chỉ. Khoá ký riêng và mã quản trị chỉ nằm trên máy chủ license, không vào repo.
 
 **App desktop**
-- **FR-005**: App MUST hỏi key khi chưa có giấy phép hợp lệ. Có mạng thì gia hạn mỗi khoảng 15 phút. Mất mạng thì dùng tiếp tới khi giấy phép hết hạn: thời gian dùng khi mất mạng là [NEEDS CLARIFICATION: bao lâu? neb dùng 3 ngày].
+- **FR-005**: App MUST hỏi key khi chưa có giấy phép hợp lệ. Có mạng thì gia hạn mỗi khoảng 15 phút. Mất mạng thì dùng tiếp tới khi giấy phép hết hạn: thời gian dùng khi mất mạng là **7 ngày**.
 - **FR-006**: App MUST kiểm giấy phép trên máy: chữ ký đúng, đúng máy này, chưa hết hạn, đồng hồ không bị lùi (giữ mốc giờ lớn nhất từng thấy, cho phép lệch 10 phút).
 - **FR-007**: Mã máy MUST lấy từ hệ điều hành chính (Windows hoặc macOS), băm lại trước khi gửi, và không đổi khi cài lại phần lõi.
 - **FR-008**: Khi khoá, app MUST:
@@ -118,7 +126,7 @@ Chủ xưởng gắn tag phát hành bản mới. App của người dùng có k
   - key: tạo, sửa nhãn, ghi chú, số máy và ngày hết hạn; thu hồi, bật lại, xoá;
   - máy: xem từng máy của key (tên, hệ điều hành, phiên bản, địa chỉ, lần đầu và lần cuối thấy); gỡ máy, cho phép lại.
 
-  Nơi quản lý: [NEEDS CLARIFICATION: trang quản lý nằm trên chính máy chủ license, hay trong app của chủ xưởng (Settings → Licenses)?]. Mã quản trị không bao giờ tới trình duyệt.
+  Nơi quản lý: một trang web nhỏ trên chính máy chủ license, đăng nhập bằng mật khẩu của chủ xưởng (lưu dạng băm; phiên đăng nhập bằng cookie an toàn; nhập sai mật khẩu bị giới hạn như FR-004). Không có mã quản trị nào tới trình duyệt.
 
 **Cập nhật**
 - **FR-013**: Máy chủ license MUST chuyển tiếp các tệp của bản phát hành mới nhất (riêng tư) cho app có giấy phép còn tốt **ngay lúc đó** (key và máy vẫn hợp lệ). Chỉ các tên tệp trong danh sách cho phép mới được chuyển tiếp. Mã truy cập GitHub chỉ nằm trên máy chủ.
