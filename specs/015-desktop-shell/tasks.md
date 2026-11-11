@@ -129,7 +129,7 @@
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [X] T015 [P] Trong `CLAUDE.md`, thêm mục "App desktop (specs/015)": cách chạy khi phát triển (`cd desktop && npm install && npx electron .`), Windows dùng bản Linux WSL có studio, GitHub Actions `desktop.yml`. Thêm `desktop/` vào mục Cấu trúc.
-- [ ] T016 Chạy đủ 5 bộ test. Đẩy nhánh để GitHub Actions chạy trên Windows và macOS, rồi ghi kết quả (đạt hay không, thời gian, phút đã dùng) vào cuối `specs/015-desktop-shell/quickstart.md`. Đối chiếu FR và SC, ghi bảng vào cuối `specs/015-desktop-shell/tasks.md`. Bài chạy bằng tay trên máy Windows và Mac thật (quickstart mục 3–4) cần người dùng làm.
+- [X] T016 Chạy đủ 5 bộ test. Đẩy nhánh để GitHub Actions chạy trên Windows và macOS, rồi ghi kết quả (đạt hay không, thời gian, phút đã dùng) vào cuối `specs/015-desktop-shell/quickstart.md`. Đối chiếu FR và SC, ghi bảng vào cuối `specs/015-desktop-shell/tasks.md`. Bài chạy bằng tay trên máy Windows và Mac thật (quickstart mục 3–4) cần người dùng làm.
 
 ## Dependencies & Execution Order
 
@@ -143,3 +143,27 @@
 2. **US2**: thiết lập lần đầu và bật WSL.
 3. **US3**: icon khay, thoát an toàn, theo dõi phần lõi.
 4. Polish: tài liệu, kết quả GitHub Actions, bài chạy bằng tay của người dùng.
+
+## Đối chiếu sau implement (T016)
+
+| Yêu cầu | Code | Kiểm chứng |
+|---|---|---|
+| FR-001 một phiên duy nhất | `requestSingleInstanceLock`, `second-instance` | smoke "second instance ok" (Windows, macOS, Linux) |
+| FR-002 cửa sổ chờ, thời hạn 60 giây, lỗi có nút | `splash.html`, `startCore` | smoke (đường đạt); đường lỗi kiểm bằng tay |
+| FR-003 chỉ trang của xưởng trong cửa sổ | `isAppUrl`, `setWindowOpenHandler`, `will-navigate` | test logic; smoke "external ok" |
+| FR-004 dùng lại phần lõi đang chạy | `app start` của 014 báo đang chạy kèm địa chỉ | 014 `test_twice_and_busy_port`; phần lõi giả cũng làm vậy |
+| FR-005 Windows: phần lõi trong WSL2 | `coreCommand` (`wsl.exe -d … --cd …`) | test logic; WSL thật kiểm bằng tay (quickstart mục 3) |
+| FR-006 macOS: chạy thẳng | `coreCommand` (`/bin/sh …`, PATH có Homebrew) | test logic; smoke trên macOS dùng phần lõi giả; phần lõi thật kiểm bằng tay (mục 4) |
+| FR-007 chung mọi thứ trừ cách gọi | `core.js` | cấu trúc code |
+| FR-008 thiết lập lần đầu | `setup.html`, `setup:check`, `finishSetup` | smoke "setup ok" |
+| FR-009 Bật WSL có hỏi | `enableWslCommand` (`-Verb RunAs`), hộp xác nhận | test logic; bằng tay trên Windows |
+| FR-010 tạo chủ xưởng bằng trang có sẵn | mở giao diện của xưởng sau khi thiết lập | 014 |
+| FR-011 icon khay đủ mục | `buildTray`, `trayTemplate` | bằng tay |
+| FR-012 đóng thì ẩn, báo một lần | `close` → `hide`, `trayNotice` | smoke "hide ok" |
+| FR-013 thoát có hỏi, tắt sạch | `quitPlan`, `stopCore` | test logic (SC-004); smoke "quit cancel ok", "quit ok"; không còn tiến trình (Actions) |
+| FR-014 theo dõi phần lõi | `checkCore`, `stopped.html` | smoke "stopped ok" |
+| FR-015 test logic không cần Windows hay macOS | `desktop/test/core.test.js` | 10/10, nằm trong `tests/ui/run.sh` |
+| FR-016 GitHub Actions trên Windows và macOS | `.github/workflows/desktop.yml` | run 43013146326 đạt cả hai |
+| SC-001 < 30 giây | | smoke từ lúc mở tới khi có cửa sổ: vài giây (phần lõi giả); phần lõi thật khởi động khoảng 2 giây (014) |
+| SC-003 không còn tiến trình | | bước kiểm trên Actions (Windows, macOS) |
+| SC-005 thiết lập < 10 phút | | cần người dùng thử |

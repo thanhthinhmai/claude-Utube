@@ -35,3 +35,12 @@ cd ~/claude-Utube/desktop && npm install && npx electron .
 ```
 
 Kiểm cùng các mục như mục 3. Icon trên thanh menu phải đổi màu theo nền sáng hay tối.
+
+## Kết quả (2026-11-11)
+
+- **Máy phát triển** (WSL2 có WSLg): `env -u ELECTRON_RUN_AS_NODE CU_CONFIG_DIR=… CU_CORE_CMD='["node","desktop/test/fake-core.mjs"]' desktop/node_modules/.bin/electron desktop --smoke` → đủ 8 dòng (setup, window, external, second instance, hide, stopped, quit cancel, quit), không còn tiến trình `fake-core`.
+- **GitHub Actions**:
+  - Lần 1 (run 43012971076): macOS đạt. Windows trượt ở test logic, vì `path.join` dựng lệnh macOS bằng `\` khi chạy trên Windows; đã sửa bằng `path.posix.join`.
+  - Lần 2 (run 43013146326): **Windows và macOS đều đạt** đủ 8 dòng smoke, và không còn tiến trình `fake-core`. Mỗi máy chạy khoảng 35–46 giây.
+  - Cảnh báo phụ: `actions/checkout@v4` và `setup-node@v4` dùng Node 20, sắp bị bỏ. Nâng lên v5 khi làm 016.
+- **Chưa làm** (cần người dùng): mục 3 (Windows với WSL thật) và mục 4 (Mac với phần lõi thật).
