@@ -2,11 +2,12 @@
 
 Lệnh chạy được ở local và trong container (`STUDIO_MODE=online`). Thông báo in ra bằng tiếng Anh, ngắn. Với `--json`, lệnh in đúng một đối tượng JSON, giống `checks.json["publish"]` (data-model.md).
 
-## `sh bin/studio publish <film> [--check-only] [--json]`
+## `sh bin/studio publish <film> [--check-only | --no-draw] [--json]`
 
 - **Không có `--check-only`:** đọc `publish/pack.json`, viết lại cả bộ tệp của gói (thumbnail, `thumbs.json`, `titles.md`, `description.md`, `subtitles.srt`, `PUBLISH.md`), rồi kiểm.
 - **Có `--check-only`:** chỉ kiểm các tệp đang có, không render. Worker dùng chế độ này. Mục thumbnail lấy số đo từ `thumbs.json` và đo lại dung lượng và cỡ ảnh.
 - Kết quả được ghi vào `checks.json["publish"]` và phần "Publish" của `CHECKS.md` (giữ nguyên mục `script`, `film`). Lệnh không gọi Claude và không dùng mạng.
+- `--no-draw`: viết lại các tệp chữ (tiêu đề, mô tả, phụ đề, `PUBLISH.md`) nhưng giữ thumbnail và `thumbs.json` như đang có, rồi kiểm. Dùng cho test và agent giả của test online.
 - `<film>` là tên trong `films/` hoặc đường dẫn thư mục phim, như các lệnh của 010.
 
 | Mã thoát | Nghĩa |

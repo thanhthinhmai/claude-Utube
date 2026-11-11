@@ -52,8 +52,11 @@ def load_narration(d: Path):
             "lines_file": n.get("lines_file")}
 
 
-def _norm(text: str) -> list:
+def norm_words(text: str) -> list:
     return re.sub(r"[^\w\s]", " ", text.lower().replace("’", "'").replace("'", "")).split()
+
+
+_norm = norm_words      # the old name, kept for 010 code
 
 
 def voice_matches_script(d: Path, nar: dict):

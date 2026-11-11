@@ -20,6 +20,9 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 | `GET /films/{name}/video` | `video/mp4`, hỗ trợ `Range` (206) | `404` |
 | `GET /films/{name}/poster` | `image/jpeg` | `404` |
 | `GET /films/{name}/subtitles.vtt` | WebVTT (chuyển từ `.srt`) | `404` |
+| `GET /films/{name}/publish` | gói đăng: `{titles, description, subtitles, files, check}` (specs/011) | `404` |
+| `GET /films/{name}/publish/{file}` | một tệp của gói: `thumbnail-[123].(png\|jpg)`, `subtitles.srt`, `titles.md`, `description.md`, `PUBLISH.md` (011) | `404` |
+| `GET /films/{name}/publish.zip` | `application/zip`, cả gói (011) | `404` |
 | `GET /sets` | `{sets: [{set, videos, measured, media_removed}]}` | |
 | `GET /sets/{set}` | `summary`, `videos[]` (không có `origin`, `title`, `channel`) | `404` |
 | `GET /sets/{set}/sheets` | `{sheets: [file]}` hoặc `{removed: true}` | |

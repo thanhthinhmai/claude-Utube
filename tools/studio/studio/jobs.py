@@ -106,6 +106,24 @@ def step(job_id: str, text: str, progress: dict = None) -> dict:
     return update(job_id, f)
 
 
+def publish_cut(job_id: str, reason: str) -> bool:
+    """A film job stopped during its Publish step keeps its film (specs/011 R7): note why, change nothing else.
+    True when the job was in that step."""
+    got = []
+
+    def f(j):
+        if j.get("kind") == "film" and j["status"] not in FINAL and j.get("step") == "Publish":
+            if not j.get("publish_cut"):
+                j["publish_cut"] = reason
+                j["log"].append(_line("Publish step stopped: " + reason))
+            got.append(True)
+    try:
+        update(job_id, f)
+    except StudioError:
+        return False
+    return bool(got)
+
+
 def log(job_id: str, *lines: str) -> dict:
     return update(job_id, lambda j: j["log"].extend(_line(x) for x in lines if x is not None))
 

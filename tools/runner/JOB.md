@@ -27,7 +27,7 @@ Read in this order, and only these, when you reach them:
    §9 for 3D, §10 for characters. `LIB/core/README.md` for tool flags, when you need them.
 
 Report each stage with `job step` before you start it, using exactly these names:
-`Treatment`, `Script`, `Look`, `Voice`, `Music`, `Picture`, `Mix`, `Render`, `Self-check` (no Storyboard online).
+`Treatment`, `Script`, `Look`, `Voice`, `Music`, `Picture`, `Mix`, `Render`, `Self-check`, `Publish` (no Storyboard online).
 
 ## The Script step (every film with narration)
 
@@ -76,10 +76,42 @@ for changes, change the script as asked, then `script check --customer-round` an
   plus a re-render is the most expensive loop.
 - Do not explore: no `ls -R`, no reading files "to see what is there".
 
+## The Publish step (every film, after the self-check)
+
+The studio makes the customer's YouTube pack (thumbnails, titles, description, chapters, subtitles) from one small
+file you write. It costs little: write it in one `Write`, run one command, fix at most once.
+
+1. `job step <id> Publish`.
+2. Write `films/<name>/publish/pack.json`. Pick the 3 thumbnail times from the self-check contact sheet you already
+   looked at: strong, clear frames, at least 1 s apart. Do not render or look at new pictures for this.
+   ```json
+   {"language": "<the film's language, as in SCRIPT.md>",
+    "titles": [
+     {"angle": "curiosity", "text": "<title>", "thumb": {"t": <seconds>, "text": "<2–6 words>", "position": "bottom"}},
+     {"angle": "number",    "text": "<title with a number or a benefit>", "thumb": {"t": <seconds>, "text": "…"}},
+     {"angle": "question",  "text": "<title that asks>", "thumb": {"t": <seconds>, "text": "…", "position": "top"}}],
+    "hook": ["<line 1>", "<line 2>"],
+    "summary": "<2–3 sentences>",
+    "chapters": [{"from": "P01", "title": "<≤ 40 characters>"}, {"from": "P03", "title": "…"}, …],
+    "hashtags": ["#…", "#…", "#…"]}
+   ```
+   - Titles: at most 100 characters, and the first 60 must make sense alone (put a `:` or `?` before 60 if longer).
+   - The text on each thumbnail adds to its own title; it never repeats the title's words.
+     Put it (`position`) where that frame has no text of its own (a clock, a caption), so the two do not overlap.
+   - The 2 hook lines together: at most 150 characters. 3–5 hashtags.
+   - Chapters: the first is the first paragraph; at least 3, each at least 10 s long (paragraph times are in
+     narration.json). A film too short for that: `"chapters": []`.
+   - Numbers only as they appear in SCRIPT.md or SOURCES.md. No `<` or `>`. No channel, creator or brand names.
+   - Optional per thumbnail: `color`, `plate` (a colour behind the text, or `null`), `plate_opacity`, `font` (one of
+     the film's fonts). The defaults (white text on a dark plate, the film's font) are usually right.
+3. `sh STUDIO/bin/studio publish <name>`: exit 0 is done. Exit 1 lists problems: fix `pack.json` once and run it
+   again. Then go on to `job done` whatever the result; the pack never stops the film from being delivered.
+
 ## Finishing
 
 - Self-check against DIRECTOR.md §11 with one contact sheet and the loudness check, then
   `sh STUDIO/bin/studio qc <name>` (narration rhythm, cuts, stills over 6 s, characters with no font): fix what it
-  reports and run it again. Then `job done <id> --film <name>`. The studio checks loudness (−14 ± 1 LUFS, true peak ≤ −1 dB), reading time, `qc` and
-  the script's review again before delivery; a failure there gives you one round to fix it.
+  reports and run it again. Then the Publish step, then `job done <id> --film <name>`. The studio checks loudness (−14 ± 1 LUFS, true peak ≤ −1 dB), reading time, `qc` and
+  the script's review again before delivery; a failure there gives you one round to fix it. After that fix and the
+  new render, run `studio publish <name>` again before `job done`: the thumbnails come from the render.
 - If the film cannot be made, `job fail` as your instructions say.

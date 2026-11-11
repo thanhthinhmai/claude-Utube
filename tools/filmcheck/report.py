@@ -18,10 +18,21 @@ THRESHOLDS = {   # what CHECKS.md shows next to each measure (contracts/cli.md)
 }
 
 
+THRESHOLDS_PUBLISH = {   # the publish pack's measures in CHECKS.md (specs/011 contracts/cli.md)
+    "title_lengths": "≤ 100 characters; a break in the first 60",
+    "hook_chars": "≤ 150 characters in 2 lines",
+    "description_chars": "≤ 5000 characters",
+    "hashtags": "3–5 tags",
+    "numbers_unsourced": "every number is in SCRIPT.md or SOURCES.md",
+    "subtitles_match": "the subtitles say the passed script",
+    "subtitle_cues_bad": "≤ 2 lines of ≤ 42, 1–7 s each",
+}
+
+
 def empty() -> dict:
     return {"narration": None,
             "script": {"verdict": "pending", "skip_reason": None, "machine": [], "editor": [], "fix_rounds": 0},
-            "film": None}
+            "film": None, "publish": None}
 
 
 def load(film_dir: Path) -> dict:
@@ -102,4 +113,24 @@ def markdown(data: dict) -> str:
         out.append("")
         if f.get("problems"):
             out += ["Problems:", "", *[f"- {p}" for p in f["problems"]], ""]
+    p = data.get("publish")
+    if p:
+        out += [f"**Publish:** {'pass' if p.get('pass') else 'fail'}", ""]
+        if p.get("cut"):
+            out += [f"The publish step was stopped: {p['cut']}", ""]
+        m = p.get("measures") or {}
+        out += ["| Measure | Value | Rule |", "|---|---|---|"]
+        for t in m.get("thumbs") or []:
+            out.append(f"| {t.get('file')} | {t.get('w')}×{t.get('h')}, {t.get('bytes')} B, text "
+                       f"{_fmt(t.get('text_height_ratio'))}, contrast {_fmt(t.get('contrast'))} | "
+                       f"right size, < 2 MB, text ≥ 0.08 of the height, contrast ≥ 4.5 |")
+        for k, rule in THRESHOLDS_PUBLISH.items():
+            if k in m and m[k] is not None:
+                out.append(f"| {k} | {_fmt(m[k])} | {rule} |")
+        for k, ok in (p.get("applicable") or {}).items():
+            if not ok:
+                out.append(f"| {k} | not applicable | |")
+        out.append("")
+        if p.get("problems"):
+            out += ["Problems:", "", *[f"- {x}" for x in p["problems"]], ""]
     return "\n".join(out).rstrip() + "\n"

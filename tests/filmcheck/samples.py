@@ -165,3 +165,113 @@ def _render(mp4: Path, cuts, duration, still_shot):
     cmd = ["ffmpeg", "-v", "error", "-y", *inputs, "-filter_complex", graph, "-map", "[v]", "-map", f"{n}:a",
            "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-shortest", str(mp4)]
     subprocess.run(cmd, check=True)
+
+
+# ---------- publish packs (specs/011) ----------
+PUB_PARAS = [
+    ("P01", ["Archaeologists found honey in an Egyptian tomb.", "It was 3,000 years old, and it was still good to eat.",
+             "Ten thousand jars of food had turned to dust around it."]),
+    ("P02", ["So what makes honey so stubborn?", "The answer starts with water, or rather the lack of it.",
+             "Honey is mostly sugar and very little else."]),
+    ("P03", ["Germs need water to live.", "Honey pulls water out of anything that lands in it, like a sponge.",
+             "A germ that falls in simply dries out."]),
+    ("P04", ["Then there is acid.", "Honey is about as sour as orange juice, which most germs cannot stand.",
+             "And bees add one more trick of their own."]),
+    ("P05", ["An enzyme from the bees makes a little hydrogen peroxide.", "So every jar carries its own cleaner.",
+             "Seal it well, and it may outlast us all."]),
+]
+PUB_SOURCES = ('- [P01] "3,000 years old": Smithsonian Magazine, 2013, https://example.org/honey\n'
+               '- [P04] "as sour as orange juice": National Honey Board, 2020, https://example.org/acid\n'
+               '- [P05] "hydrogen peroxide": National Honey Board, 2020, https://example.org/acid\n')
+PUB_PAGE = """<!doctype html><html><body style="margin:0;background:#000">
+<div id="bg" style="position:fixed;inset:0"></div>
+<div id="t" style="position:fixed;left:10%;top:10%;font:700 60px sans-serif;color:#fff">Honey</div>
+<script>
+window.DUR = DURATION;
+window.render = (t) => { document.getElementById('bg').style.background = `hsl(${(t * 7) % 360},60%,30%)`; };
+window.TEXTS = (t) => [{id: 't', text: 'Honey', x0: 100, y0: 60, x1: 400, y1: 140}];
+render(0); window.READY = true;
+</script></body></html>
+"""
+
+
+def pub_pack() -> dict:
+    return {"language": "en",
+            "titles": [{"angle": "curiosity", "text": "Why Honey From a Tomb Was Still Good to Eat",
+                        "thumb": {"t": 5, "text": "Still sweet"}},
+                       {"angle": "number", "text": "3,000 Years Old and Still Fine: The Secret of Honey",
+                        "thumb": {"t": 20, "text": "Bees did this", "position": "top"}},
+                       {"angle": "question", "text": "Can Honey Really Last Forever?",
+                        "thumb": {"t": 35, "text": "Forever food?", "color": "#ffd23f", "plate": "#1a1a1a",
+                                  "plate_opacity": 0.75}}],
+            "hook": ["Archaeologists found honey in an Egyptian tomb.", "It was still good to eat."],
+            "summary": "A short look at why honey resists germs: little water, a lot of acid, and an enzyme from bees.",
+            "chapters": [{"from": "P01", "title": "The tomb"}, {"from": "P03", "title": "Too dry for germs"},
+                         {"from": "P05", "title": "The bees' secret"}],
+            "hashtags": ["#honey", "#science", "#food"]}
+
+
+def make_publish_film(root: Path, name: str = "honey", *, narration=True, script=True, vertical=False, seconds=50.0,
+                      pack=True, lines_file=True) -> Path:
+    """A film for the publish pack: page, mp4, SCRIPT.md, SOURCES.md, voice files and pack.json (contracts/files.md).
+    Paragraphs last about seconds/5 each, so chapters P01, P03, P05 are each at least 10 s at 50 s."""
+    d = Path(root) / "films" / name
+    (d / "voices").mkdir(parents=True, exist_ok=True)
+    w, h = (1080, 1920) if vertical else (1920, 1080)
+    lead, tail, para_gap, word_gap = 0.5, 1.2, 0.6, 0.05
+    n_words = sum(len(s.split()) for _, ss in PUB_PARAS for s in ss)
+    step = (seconds - lead - tail - para_gap * (len(PUB_PARAS) - 1)) / n_words
+    words, durs, rows, lines, t, k = {}, {}, [], [], lead, 0
+    for pi, (para, sents) in enumerate(PUB_PARAS):
+        if pi:
+            t += para_gap
+        for s in sents:
+            k += 1
+            lid = f"l{k:02d}"
+            ws, x = [], 0.0
+            for tok in s.split():
+                ws.append([tok, round(x, 3), round(x + step - word_gap, 3)])
+                x += step
+            words[lid], durs[lid] = ws, ws[-1][2]
+            rows.append({"id": lid, "text": s})
+            lines.append({"id": lid, "para": para, "at": round(t, 3)})
+            t += x
+    duration = round(t - word_gap + tail, 3)
+    if narration:
+        (d / "voices" / "words.json").write_text(json.dumps(words), encoding="utf-8")
+        (d / "voices" / "dur.json").write_text(json.dumps(durs), encoding="utf-8")
+        (d / "lines.json").write_text(json.dumps(rows), encoding="utf-8")
+        narr = {"words_file": "voices/words.json", "durations_file": "voices/dur.json", "lines": lines, "cuts": [0.0]}
+        if lines_file:
+            narr["lines_file"] = "lines.json"
+        (d / "narration.json").write_text(json.dumps(narr), encoding="utf-8")
+    if script:
+        body = "\n".join(f"[{p}] {' '.join(ss)}" for p, ss in PUB_PARAS)
+        (d / "SCRIPT.md").write_text(f"Title: Honey Never Spoils\nTarget: {int(seconds)}s\nLanguage: en\n\n{body}\n",
+                                     encoding="utf-8")
+        (d / "SOURCES.md").write_text(PUB_SOURCES, encoding="utf-8")
+    (d / "index.html").write_text(PUB_PAGE.replace("DURATION", str(duration)), encoding="utf-8")
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", f"color=c=0x334455:s={w}x{h}:r=2:d={duration}",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", str(d / f"{name}.mp4")], check=True)
+    if pack:
+        (d / "publish").mkdir(exist_ok=True)
+        (d / "publish" / "pack.json").write_text(json.dumps(pub_pack(), indent=1), encoding="utf-8")
+    return d
+
+
+def fake_thumbs(d: Path, rows=None, size=None) -> None:
+    """Three plain thumbnails and a thumbs.json that passes, without a browser (contracts/files.md)."""
+    pub = Path(d) / "publish"
+    pub.mkdir(exist_ok=True)
+    w, h = size or (1280, 720)
+    out = []
+    for i in (1, 2, 3):
+        f = pub / f"thumbnail-{i}.png"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", f"color=c=0x2255{i}0:s={w}x{h}",
+                        "-frames:v", "1", str(f)], check=True)
+        out.append({"file": f.name, "t": [5, 20, 35][i - 1], "w": w, "h": h, "bytes": f.stat().st_size, "text": "x",
+                    "font": "sans-serif", "font_loaded": True, "text_height_ratio": 0.12, "contrast": 8.0,
+                    "bg_luma": [0.05, 0.2], "missing_glyphs": []})
+    for i, r in enumerate(rows or []):
+        out[i].update(r)
+    (pub / "thumbs.json").write_text(json.dumps(out), encoding="utf-8")

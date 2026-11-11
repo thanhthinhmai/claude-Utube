@@ -120,3 +120,11 @@ Trong `worker.finished()`: nếu việc là phim, có `publish_cut` và chưa c�
   - Copy dùng `navigator.clipboard.writeText`; nếu không được thì chọn sẵn chữ.
   - `STAGES` thêm `Publish` sau `Self-check`.
 - Không thêm công cụ MCP. Ai cần thì gọi REST với cùng mã (009), vì chưa có ai cần (II, YAGNI).
+
+## Kết quả kiểm T001 (2026-11-11)
+
+Thử trên 2 phim có sẵn (`banh-mi-dem`, `rap-anh-sao`; 1920×1080, 20 giây), t = 10 giây:
+- (a) Chèn `#studio-thumb` cố định rồi gọi `render(t)`: không có lỗi trang, và chữ nằm trên hình. **Đạt.**
+- (b) Ảnh chụp không có lớp chữ so với khung 10 giây của mp4: trung bình màu lệch 0,5% và 0,8%, sai khác từng điểm ảnh 0,4% và 0,6%. **Đạt** (≤ 3%).
+- (c) PNG thu về 1280×720 nặng 430 KB và 604 KB, xa ngưỡng 2 MB.
+- Phát hiện thêm: họ phông tính được của `body` là `"Times New Roman"`, vì phim chỉ đặt phông cho từng phần tử. Thứ tự chọn phông mặc định của R2 đổi thành: `font` trong `pack.json` → phông của phần tử chữ lớn nhất trong `TEXTS(t)` → phông `@font-face` đầu tiên đã nạp (`document.fonts`, trạng thái `loaded`) → `body`.
