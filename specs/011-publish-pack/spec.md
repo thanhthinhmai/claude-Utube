@@ -118,6 +118,7 @@ Trước khi giao, một máy kiểm gói đăng đo mọi thứ đo được: �
 - **FR-009**: Máy kiểm MUST đo và báo đạt hoặc trượt cho từng mục:
   - đủ file theo FR-001 đến FR-007 (phim không lời thì không đòi phụ đề và chương);
   - cỡ ảnh, dung lượng thumbnail, số từ của dòng chữ trên thumbnail, và chữ trên ảnh không lặp chữ của tiêu đề đi cặp (FR-002);
+  - chữ trên thumbnail không che chữ có sẵn của phim ở khung hình đó (đồng hồ, chú thích, phụ đề vẽ trong hình): không phần chữ nào của phim bị che quá 10% diện tích hộp chữ. Phim không khai báo được chữ trên màn hình thì mục này ghi "không kiểm được" thay cho trượt (bổ sung 2026-11-11);
   - chữ trên thumbnail đọc được khi thu nhỏ còn 320×180: chiều cao chữ ít nhất 8% chiều cao ảnh, độ tương phản với nền ít nhất 4,5:1, và không có ký tự thiếu phông;
   - độ dài tiêu đề và 60 ký tự đầu của mỗi tiêu đề (FR-003);
   - độ dài 2 dòng mở đầu, độ dài toàn bộ mô tả và số hashtag (FR-004);

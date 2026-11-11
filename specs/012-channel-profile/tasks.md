@@ -171,3 +171,7 @@
 | SC-002 bắt 100% vi phạm | | `Rules.*`, `Lessons.*` |
 | SC-004 ≤ 6000 ký tự, ≤ 2% token | | 6000 ký tự: `test_brief_is_short`. 2% token: **chưa đo**, cần bài chạy thật, chờ người dùng |
 | SC-006 phim không gắn kênh như cũ | | `Rules.test_no_snapshot_no_change`; test của 010 và 011 không bị sửa |
+
+## Phase 7: Bổ sung (2026-11-11, người dùng yêu cầu)
+
+- [X] T027 Viết test trình duyệt `tests/online/browser_lesson.cjs` (gọi từ `tests/online/test_channels_api.py`): trên trang một việc phim đã xong thuộc kênh, ô "Save this as a lesson" hiện ra; đánh dấu ô rồi gửi Request changes thì việc mới có `input.lesson = true`; trang của việc phim không có kênh thì không có ô này per US3/AC5, FR-017

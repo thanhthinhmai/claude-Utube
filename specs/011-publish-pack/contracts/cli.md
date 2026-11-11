@@ -30,6 +30,7 @@ Lệnh chạy được ở local và trong container (`STUDIO_MODE=online`). Th�
 | `thumb_glyphs` | chữ trên ảnh có ký tự thiếu phông |
 | `thumb_font` | phông của chữ trên ảnh không nạp được trong trang (`font_loaded: false`), nên trình duyệt đã dùng phông khác |
 | `thumb_repeats_title` | chữ trên ảnh trùng nguyên tiêu đề đi cặp hoặc chung chuỗi ≥ 3 từ liền nhau (≥ 6 ký tự với CJK); so sau khi chuẩn hoá chữ thường, bỏ dấu câu |
+| `thumb_covers_text` | chữ trên ảnh che hơn 10% diện tích hộp của một chữ có sẵn của phim ở khung đó (`window.TEXTS(t)`); phim không có `TEXTS` thì không kiểm (`texts_checked: false`) |
 | `thumb_same_time` | 2 thumbnail cách nhau < 1 giây |
 | `thumb_not_rendered` | không render được (kèm lý do); ở `--check-only` là thiếu `thumbs.json` |
 | `title_count` | không đúng 3 tiêu đề, hoặc sai bộ hướng |

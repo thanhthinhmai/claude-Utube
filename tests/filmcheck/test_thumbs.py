@@ -59,6 +59,18 @@ class Thumbs(unittest.TestCase):
         finally:
             publish.THUMB_BYTES = old
 
+    def test_text_over_the_films_text_fails(self):                # specs/011 T034, thumb_covers_text
+        d = samples.make_publish_film(self.root, "cover")
+        pk = json.loads((d / "publish" / "pack.json").read_text())
+        pk["titles"][1]["thumb"]["position"] = "top"            # the page's "Honey" sits at the top, in the middle
+        (d / "publish" / "pack.json").write_text(json.dumps(pk))
+        publish.build(d, LIB)
+        rows = json.loads((d / "publish" / "thumbs.json").read_text())
+        self.assertTrue(rows[1]["texts_checked"])
+        self.assertTrue(any(c["text"] == "Honey" for c in rows[1]["covers"]), rows[1]["covers"])
+        self.assertEqual([p.split(":")[0] for p in publish.check(d)["problems"]], ["thumb_covers_text"])
+        self.assertEqual(rows[0]["covers"], [])                 # bottom: clear of the film's text
+
     def test_white_on_white_fails_contrast(self):
         d = samples.make_publish_film(self.root, "pale")
         (d / "index.html").write_text((d / "index.html").read_text().replace("hsl(${(t * 7) % 360},60%,30%)", "#ffffff"))
