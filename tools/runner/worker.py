@@ -102,8 +102,10 @@ class LocalRunner:
         env = {**base, **env, "STUDIO_WORK": str(work), "HOME": str(work / ".home"),
                "STUDIO_HOME_DIR": str(self.studio)}            # what /studio is in a container: this checkout
         with open(work / ".agent.log", "ab") as out:       # the child keeps its own copy of the file
-            return subprocess.Popen(self.cmd, cwd=work, env=env, stdout=out, stderr=subprocess.STDOUT,
-                                    start_new_session=True)
+            p = subprocess.Popen(self.cmd, cwd=work, env=env, stdout=out, stderr=subprocess.STDOUT,
+                                 start_new_session=True)
+        (work / ".pid").write_text(str(p.pid))             # its process group: the studio host ends it (specs/014)
+        return p
 
     def poll(self, handle):
         return handle.poll()

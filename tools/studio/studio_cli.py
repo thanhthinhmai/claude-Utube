@@ -11,6 +11,21 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+PROJECT = Path(os.environ.get("STUDIO_ROOT") or Path(__file__).resolve().parents[2])
+
+
+def _host_for_chat():
+    """The studio host running for this project (specs/014 R7): the chat flow's jobs and reviews go to its job book.
+    Only for `job` and `review` outside a job container."""
+    if os.environ.get("STUDIO_MODE") or len(sys.argv) < 2 or sys.argv[1] not in ("job", "review"):
+        return None
+    from studio import host
+    return host.running_pointer(PROJECT)
+
+
+HOST = _host_for_chat()
+if HOST:
+    os.environ.update(STUDIO_MODE="online", STUDIO_DATA=HOST["data"])
 
 from studio import jobs, launcher, reviews  # noqa: E402
 from studio.store import StudioError  # noqa: E402
@@ -33,6 +48,8 @@ def out(*lines):
 
 def ui_url(path: str = "/"):
     """URL of the running UI, starting it if needed; None (with a warning) if it cannot start."""
+    if HOST:                                     # the app on this machine (specs/014)
+        return f"http://127.0.0.1:{HOST['web']}{path}"
     try:
         return launcher.url(launcher.ensure()["port"], path)
     except StudioError as e:
@@ -60,7 +77,12 @@ def cmd_ui(a):
 # ---------- job ----------
 def cmd_job(a):
     if a.action == "start":
-        j = jobs.create(a.kind, a.name, {"set": a.set, "film": a.film})
+        if HOST:                                 # into the host's job book, as the owner (specs/014 FR-017)
+            from studio import host
+            j = jobs.create(a.kind, a.name, {"set": a.set, "film": a.film}, owner=host.owner_id(Path(HOST["data"])) or "local",
+                            extra={"source": "chat"})
+        else:
+            j = jobs.create(a.kind, a.name, {"set": a.set, "film": a.film})
         out(j["id"])
         u = ui_url(f"/#/jobs/{j['id']}")
         if u:
@@ -76,6 +98,8 @@ def cmd_job(a):
         return job_run(a)
     if a.action == "done":
         jobs.finish(a.id, "done", links={"style": a.style, "film": a.film})
+        if HOST and a.film:
+            link_film(a.film)
         return 0
     if a.action == "fail":
         jobs.finish(a.id, "failed", error=a.text)
@@ -87,6 +111,27 @@ def cmd_job(a):
         out(json.dumps(reviews.job_view(jobs.load(a.id)), ensure_ascii=False, indent=1))
         return 0
     return 2
+
+
+def link_film(film: str) -> None:
+    """The app shows a film made in the chat flow: a copy in the owner's films/, made of hard links where it can (no
+    extra space). Not a symbolic link: the studio refuses paths that lead outside a person's folder."""
+    from studio import host
+    owner = host.owner_id(Path(HOST["data"]))
+    src = PROJECT / "films" / film
+    if not owner or not src.is_dir():
+        return
+    dest = Path(HOST["data"]) / "accounts" / owner / "films" / film
+    if not dest.exists() and not dest.is_symlink():
+        import shutil
+
+        def link_or_copy(a, b):
+            try:
+                os.link(a, b)
+            except OSError:
+                shutil.copy2(a, b)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(src, dest, copy_function=link_or_copy, symlinks=True)
 
 
 def job_run(a, remote: bool = False) -> int:
@@ -234,6 +279,33 @@ def remote_review(a) -> int:
     raise StudioError("invalid", f"review {a.action} không dùng trong container", 422)
 
 
+# ---------- the studio on this machine (specs/014) ----------
+def cmd_app(a):
+    from studio import host
+    try:
+        if a.action == "start":
+            return host.start(a.data, a.web_port, a.proxy_port, a.foreground, out=out)
+        if a.action == "status":
+            s = host.status(a.data)
+            if a.json:
+                out(json.dumps(s, ensure_ascii=False))
+            elif s["running"]:
+                out(f"✓ running · {s['url']} · jobs running {s['jobs_running']}, queued {s['jobs_queued']}",
+                    "  parts: " + ", ".join(f"{p} {'up' if ok else 'down'}" for p, ok in s["parts"].items()),
+                    f"  data {s['data']} · logs {s['logs']}", f"URL: {s['url']}")
+            else:
+                out(f"✗ not running · data {s['data']}. Start: sh bin/studio app start")
+            return 0 if s["running"] else 1
+        if a.action == "stop":
+            return host.stop(a.data, a.force, out=out)
+        if a.action == "import":
+            return host.import_project(a.data, Path(a.source).resolve() if a.source else PROJECT, out=out)
+    except host.HostError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return e.code
+    return 2
+
+
 # ---------- admin (online mode, specs/007) ----------
 def cmd_admin(a):
     from studio import accounts, store
@@ -316,6 +388,24 @@ def main(argv=None) -> int:
     s.add_argument("--note"); s.add_argument("--source", default="chat", choices=sorted(reviews.SOURCES))
     s = rs.add_parser("status"); s.add_argument("id")
     r.set_defaults(fn=cmd_review)
+
+    ap = sub.add_parser("app", help="cả xưởng trên máy này, không cần Docker (specs/014)")
+    aps = ap.add_subparsers(dest="action", required=True)
+    s = aps.add_parser("start")
+    s.add_argument("--data")
+    s.add_argument("--web-port", type=int)
+    s.add_argument("--proxy-port", type=int)
+    s.add_argument("--foreground", action="store_true")
+    s = aps.add_parser("status")
+    s.add_argument("--data")
+    s.add_argument("--json", action="store_true")
+    s = aps.add_parser("stop")
+    s.add_argument("--data")
+    s.add_argument("--force", action="store_true")
+    s = aps.add_parser("import")
+    s.add_argument("--data")
+    s.add_argument("--from", dest="source")
+    ap.set_defaults(fn=cmd_app)
 
     ad = sub.add_parser("admin", help="tài khoản quản trị (chế độ online)")
     ads = ad.add_subparsers(dest="action", required=True)

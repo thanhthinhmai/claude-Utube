@@ -221,7 +221,25 @@ def _upgrade_to_2(con: sqlite3.Connection) -> None:
         raise RuntimeError("schema upgrade broke a foreign key")
 
 
+def _backup_before_upgrade(con: sqlite3.Connection) -> None:
+    """A copy of an older database in <data>/backup/ before its schema is upgraded (specs/014 R3, FR-006)."""
+    if not con.execute("SELECT 1 FROM sqlite_master WHERE name = 'meta'").fetchone():
+        return
+    row = con.execute("SELECT value FROM meta WHERE key = 'schema'").fetchone()
+    old = int(row[0]) if row else None
+    if old is None or old >= SCHEMA_VERSION:
+        return
+    d = data_dir() / "backup"
+    d.mkdir(exist_ok=True)
+    dest = sqlite3.connect(d / f"studio-{old}-{time.strftime('%Y%m%d-%H%M%S')}.db")
+    try:
+        con.backup(dest)
+    finally:
+        dest.close()
+
+
 def _migrate(con: sqlite3.Connection) -> None:
+    _backup_before_upgrade(con)
     con.execute("PRAGMA foreign_keys = OFF")          # only takes effect outside a transaction
     con.execute("BEGIN IMMEDIATE")
     try:

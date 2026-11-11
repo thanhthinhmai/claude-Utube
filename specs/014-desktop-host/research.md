@@ -77,3 +77,13 @@ Việc `queued` vẫn giữ trong hàng đợi và chạy khi mở lại.
 - có Claude Code (đi kèm SDK, hoặc `claude` trên PATH).
 
 Thiếu thứ gì thì in từng dòng `✗ <tên>: sh bin/studio deps …`, rồi thoát 2.
+
+## Kết quả kiểm T001 (2026-11-11)
+
+- Máy này (WSL2 Ubuntu) không có `bwrap` (bubblewrap). Theo tài liệu trong `claude_agent_sdk.types.SandboxSettings`, sandbox Bash của Claude Code trên Linux cần bubblewrap (và socat cho mạng). Xưởng không tự cài phần mềm hệ thống, nên không kiểm được sandbox trên máy này.
+- **Quyết định**, thay cho phần Bash của R5:
+  - 014 không bật `sandbox`, vì không kiểm được thì không đoán (hiến pháp II);
+  - lớp `can_use_tool` (chặn `Write`, `Edit`, `NotebookEdit` ra ngoài thư mục việc) vẫn làm và có test;
+  - `app start` in cảnh báo một dòng: "the agent's Bash is not isolated on this machine (no sandbox); it runs with your user's rights";
+  - sandbox Bash dời sang 016, khi đóng gói và kiểm được trên macOS (seatbelt có sẵn) và trên Linux có bubblewrap.
+- Không bật sandbox thì không có biến `STUDIO_AGENT_SANDBOX`.
