@@ -14,6 +14,7 @@
 #   sh bin/studio qc <phim> [--json]    đo phim xong; config editor-model <inherit|opus|sonnet|haiku>
 #   sh bin/studio publish <phim> [--check-only] [--json]   gói đăng YouTube từ publish/pack.json (specs/011)
 #   sh bin/studio channel list|new|show|set|decide|attach … · lesson list|draft|add|approve|retire …  kênh và bài học (specs/012)
+#   sh bin/studio app start|status|stop|import [--data D]   cả xưởng trên máy này, không cần Docker (specs/014)
 #   sh bin/studio topics score|queue|take|made|type|fit|refs|recheck|usage <kênh> … · config youtube-key  chọn đề (specs/013)
 #   sh bin/studio help
 # Mã thoát: 0 = sẵn sàng / xong · 1 = chưa sẵn sàng / thất bại · 2 = sai cách dùng hoặc library.lock sai.
@@ -35,7 +36,7 @@ SPARSE_BASE="$SPARSE
 !/styles/*/poster.jpg"
 
 usage() {
-  sed -n '2,17s/^# \{0,1\}//p' "$0"
+  sed -n '2,18s/^# \{0,1\}//p' "$0"
 }
 
 die2() { echo "✗ $*" >&2; exit 2; }
@@ -433,7 +434,7 @@ case ${1:-} in
   status) shift; cmd_status "$@" ;;
   deps) shift; cmd_deps "$@" ;;
   learn) shift; cmd_learn "$@" ;;
-  ui | job | review | admin) cmd_studio "$@" ;;
+  ui | job | review | admin | app) cmd_studio "$@" ;;
   script | web | qc | publish | channel | lesson | topics | config) cmd_filmcheck "$@" ;;
   help | -h | --help) usage ;;
   '') usage >&2; exit 2 ;;

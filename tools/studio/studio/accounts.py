@@ -85,7 +85,11 @@ def setup(email: str, password: str, ip: str = "") -> dict:
                         "locked_at = NULL WHERE id = ?", (store.now_iso(), row["id"]))
         return {"id": row["id"], "email": clean}
     try:
-        return signup(clean, password, True, role="admin", verified=True)
+        a = signup(clean, password, True, role="admin", verified=True)
+        if os.environ.get("STUDIO_OWNER_UNLIMITED") == "1":    # the studio on one machine: the owner pays (specs/014 R4)
+            with db.tx() as con:
+                con.execute("UPDATE accounts SET quota_films = 1000, quota_learns = 1000 WHERE id = ?", (a["id"],))
+        return a
     except StudioError as e:
         if e.code == "admin_exists":          # someone else finished a moment earlier
             raise StudioError("already_set_up", "xưởng đã có tài khoản quản trị", 409)

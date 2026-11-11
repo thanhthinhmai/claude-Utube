@@ -133,12 +133,39 @@ def prompt_for(inp: dict) -> str:
     raise SystemExit(f"unknown job kind {inp.get('kind')!r}")
 
 
+WRITE_TOOLS = ("Write", "Edit", "NotebookEdit", "MultiEdit")
+
+
+def write_allowed(tool: str, tool_input: dict) -> tuple:
+    """(allowed, reason): file tools may write only inside the job folder (specs/014 R5). Without a container this is
+    what keeps an agent out of the studio's code and the user's files; in a container it changes nothing."""
+    if tool not in WRITE_TOOLS:
+        return True, ""
+    raw = (tool_input or {}).get("file_path") or (tool_input or {}).get("notebook_path") or ""
+    if not raw:
+        return True, ""
+    p = Path(raw) if os.path.isabs(raw) else WORK / raw
+    try:
+        inside = p.resolve().is_relative_to(WORK.resolve())
+    except OSError:
+        inside = False
+    return (True, "") if inside else (False, f"only the job folder ({WORK}) can be written; {raw} is outside it")
+
+
+async def guard_writes(input_data, tool_use_id, context):
+    ok, why = write_allowed(input_data.get("tool_name", ""), input_data.get("tool_input") or {})
+    if ok:
+        return {}
+    return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                                   "permissionDecisionReason": why}}
+
+
 def write_result(data: dict) -> None:
     (WORK / ".result.json").write_text(json.dumps(data, ensure_ascii=False))
 
 
 async def run() -> int:
-    from claude_agent_sdk import ClaudeAgentOptions, ResultMessage, query
+    from claude_agent_sdk import ClaudeAgentOptions, HookMatcher, ResultMessage, query
 
     inp = json.loads((WORK / ".input.json").read_text())
     resume = None
@@ -153,6 +180,7 @@ async def run() -> int:
         allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Skill", "WebSearch"],
         disallowed_tools=["WebFetch"],          # pages open through the proxy: `studio web fetch` (specs/010 R4)
         permission_mode="acceptEdits",
+        hooks={"PreToolUse": [HookMatcher(matcher="|".join(WRITE_TOOLS), hooks=[guard_writes])]},
         model=inp.get("model") or os.environ.get("STUDIO_MODEL"),
         max_turns=MAX_TURNS,
         max_buffer_size=MAX_BUFFER,
