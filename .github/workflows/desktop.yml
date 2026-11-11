@@ -112,7 +112,15 @@ jobs:
             # wait here: the runner ends a step's child processes when the step ends, and the installer starts 3 s late
             inst="$LOCALAPPDATA/Programs/claude-Utube/claude-Utube.exe"
             for i in $(seq 1 90); do [ -f "$inst" ] && break; sleep 2; done
-            [ -f "$inst" ] || { echo "the silent install did not put the app in $inst"; exit 1; }
+            if [ ! -f "$inst" ]; then
+              echo "the silent install did not put the app in $inst"
+              echo "--- updates folder:"; ls -la "$CU_CONFIG_DIR/updates" || true
+              echo "--- config:"; cat "$CU_CONFIG_DIR/config.json" || true
+              dl=$(ls "$CU_CONFIG_DIR"/updates/*.exe 2>/dev/null | head -1)
+              echo "--- running the downloaded installer by hand: $dl"
+              [ -n "$dl" ] && "$dl" /S --updated; echo "exit $?"; sleep 5; ls "$LOCALAPPDATA/Programs" || true
+              exit 1
+            fi
             sleep 10
           fi
       - name: the downloaded installer installs the app silently and starts it (Windows, specs/017 R6)
