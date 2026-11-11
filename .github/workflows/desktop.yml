@@ -108,6 +108,13 @@ jobs:
           # the key is kept from the run above (Keychain on macOS), so no "license ok" here
           for line in "update ready ok" "quit ok"; do grep -q "smoke: $line" update.log || { echo "missing: smoke: $line"; exit 1; }; done
           ! grep -q "smoke: fail" packed.log update.log
+          if [ "$RUNNER_OS" = Windows ]; then
+            # wait here: the runner ends a step's child processes when the step ends, and the installer starts 3 s late
+            inst="$LOCALAPPDATA/Programs/claude-Utube/claude-Utube.exe"
+            for i in $(seq 1 90); do [ -f "$inst" ] && break; sleep 2; done
+            [ -f "$inst" ] || { echo "the silent install did not put the app in $inst"; exit 1; }
+            sleep 10
+          fi
       - name: the downloaded installer installs the app silently and starts it (Windows, specs/017 R6)
         if: runner.os == 'Windows'
         shell: pwsh
