@@ -1,0 +1,51 @@
+# Installers of the desktop app (specs/016 research R4). The studio core is built separately
+# (desktop/core-build/) into ../dist/core/<os>/ and shipped as extraResources/core/.
+appId: com.claudeutube.desktop
+productName: claude-Utube
+copyright: claude-Utube
+asar: false
+directories:
+  output: ../dist/installers
+  buildResources: assets
+files:
+  - main.js
+  - core.js
+  - preload.js
+  - "*.html"
+  - assets/*.png
+  - package.json
+  - "!test${/*}"
+  - "!core-build${/*}"
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: assets/icon.png
+  extraResources:
+    - from: ../dist/core/linux
+      to: core
+      filter: ["*.tar.gz", "core-manifest.json"]
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  createStartMenuShortcut: true
+  shortcutName: claude-Utube
+  artifactName: claude-Utube-Setup-${version}.${ext}
+  include: installer.nsh
+mac:
+  target:
+    - target: dmg
+      arch: [arm64]
+  icon: assets/icon.png
+  category: public.app-category.video
+  identity: null
+  extendInfo:
+    NSLocalNetworkUsageDescription: claude-Utube opens the studio that runs on this Mac (127.0.0.1).
+  extraResources:
+    - from: ../dist/core/mac
+      to: core
+      filter: ["*.tar.gz", "core-manifest.json"]
+dmg:
+  artifactName: claude-Utube-${version}-arm64.${ext}
+publish: null

@@ -7,9 +7,13 @@
   "scripts": {
     "start": "electron .",
     "smoke": "electron . --smoke",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "pack:win": "electron-builder --win --publish never",
+    "pack:mac": "electron-builder --mac --publish never"
   },
   "devDependencies": {
-    "electron": "33.2.1"
-  }
+    "electron": "33.2.1",
+    "electron-builder": "25.1.8"
+  },
+  "author": "claude-Utube"
 }

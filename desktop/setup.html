@@ -24,11 +24,28 @@
   #msg { margin-top: 10px; min-height: 20px; }
   .hint { color: var(--muted); font-size: 13px; font-weight: 400; }
   [hidden] { display: none !important; }
+  label.choice { display: flex; gap: 8px; align-items: baseline; font-weight: 600; margin: 4px 0; }
+  label.choice input { width: auto; }
+  ol.steps { margin: 12px 0 0; padding-left: 22px; } ol.steps li { padding: 3px 0; color: var(--muted); }
+  ol.steps li.now { color: var(--fg); font-weight: 600; } ol.steps li.done { color: var(--ok); } ol.steps li.err { color: var(--bad); }
+  #existing.packaged-mode { margin-top: 16px; }
 </style></head>
 <body><main>
   <h1>Set up claude-Utube</h1>
   <p class="lead">The studio runs on this computer with your own Claude account. This takes a minute; you only do it once.</p>
 
+  <div id="pkg" hidden>
+    <div class="panel">
+      <label class="choice"><input type="radio" name="kind" value="packaged" checked> Install the studio <span class="hint">(recommended) · <span id="pkg-size"></span></span></label>
+      <label class="choice"><input type="radio" name="kind" value="existing"> Use a studio I already have <span class="hint">(for developers)</span></label>
+      <p id="reinstall" class="hint" hidden>A different version of the studio is installed. Installing replaces it and keeps your films, channels and accounts.</p>
+      <ol class="steps" id="steps"></ol>
+      <div class="row"><button class="primary" id="install">Install</button><button id="retry" hidden>Try again</button></div>
+      <p id="pmsg" role="status"></p>
+    </div>
+  </div>
+
+  <div id="existing">
   <div class="panel"><ul class="checks" id="checks"><li><span>…</span><span>Checking this computer…</span></li></ul>
     <div class="row" id="wsl-row" hidden><button class="primary" id="wsl">Turn on WSL</button>
       <span class="hint">Windows asks for administrator rights, then you restart the computer.</span></div></div>
@@ -45,6 +62,7 @@
 
   <div class="row"><button id="again">Check again</button><button class="primary" id="start" disabled>Start</button></div>
   <p id="msg" role="status"></p>
+  </div>
 </main>
 <script>
   const $ = (id) => document.getElementById(id);
@@ -81,5 +99,40 @@
     const r = await setup.finish({ distro: $("distro").value || null, studio: $("studio").value.trim(), data: $("data").value.trim(), home: draft.home });
     if (!r.ok) { $("msg").textContent = r.error; $("start").disabled = false; }
   };
-  check();
+  // ---------- the packaged core (specs/016 T015) ----------
+  let pkg = null, failedAt = null;
+  const STEP_NAMES = { verify: "Check the package", space: "Check free space", unpack: "Unpack", install: "Install the studio",
+    voice: "Download the voice model", models: "Download the speech check models", check: "Check the studio" };
+  setup.onProgress((m) => {
+    const li = document.querySelector(`#steps li[data-id="${m.step}"]`);
+    if (!li) return;
+    document.querySelectorAll("#steps li.now").forEach((x) => { x.classList.remove("now"); x.classList.add("done"); });
+    if (m.error) { li.className = "err"; $("pmsg").textContent = m.error; failedAt = m.step; }
+    else { li.className = "now"; $("pmsg").textContent = m.text; }
+  });
+  async function install(from) {
+    $("install").disabled = true; $("retry").hidden = true;
+    const r = await setup.installCore(from ? { from } : {});
+    if (!r.ok) { $("retry").hidden = false; $("install").disabled = false; failedAt = r.step; }
+  }
+  $("install").onclick = () => install(null);
+  $("retry").onclick = () => install(failedAt);
+  function showKind() {
+    const packaged = document.querySelector('input[name="kind"]:checked').value === "packaged";
+    $("steps").hidden = $("install").parentElement.hidden = !packaged;
+    $("existing").hidden = packaged;
+    if (!packaged && !draft) check();
+  }
+  document.querySelectorAll('input[name="kind"]').forEach((x) => { x.onchange = showKind; });
+  (async () => {
+    pkg = await setup.packaged();
+    if (!pkg.available) { check(); return; }
+    $("pkg").hidden = false;
+    $("existing").classList.add("packaged-mode");
+    $("pkg-size").textContent = `${(pkg.manifest.unpacked_bytes / 1024 ** 3).toFixed(1)} GB on the disk, plus about 0.5 GB of models`;
+    $("reinstall").hidden = !pkg.reinstall;
+    $("steps").innerHTML = pkg.steps.map((id) => `<li data-id="${id}">${esc(STEP_NAMES[id])}</li>`).join("");
+    showKind();
+    if (pkg.smoke) install(null);
+  })();
 </script></body></html>

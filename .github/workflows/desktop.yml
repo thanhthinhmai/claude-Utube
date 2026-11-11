@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: node --test test/core.test.js
+      - run: node --test test/*.test.js
       - name: smoke run (fake core)
         shell: bash
         env:
@@ -36,6 +36,33 @@ jobs:
             grep -q "smoke: $line" smoke.log || { echo "missing: smoke: $line"; exit 1; }
           done
           ! grep -q "smoke: fail" smoke.log
+      - name: smoke run of the install screen (fake studio package, specs/016)
+        shell: bash
+        env:
+          CU_CORE_CMD: '["node","test/fake-core.mjs"]'
+          CU_FAKE_INSTALL: "1"
+        run: |
+          node test/fake-package.mjs "$RUNNER_TEMP/pkg"
+          export CU_CONFIG_DIR="$RUNNER_TEMP/cu-config-install" CU_PACKAGED_DIR="$RUNNER_TEMP/pkg"
+          npx electron . --smoke 2>&1 | tee install.log
+          for line in "install ok" "window ok" "quit ok"; do grep -q "smoke: $line" install.log || { echo "missing: smoke: $line"; exit 1; }; done
+          ! grep -q "smoke: fail" install.log
+      - name: build the installer (fake studio package) and run the packed app
+        shell: bash
+        env:
+          CU_CORE_CMD: '["node","test/fake-core.mjs"]'
+          CU_FAKE_INSTALL: "1"
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          if [ "$RUNNER_OS" = Windows ]; then os=linux; flag=--win; else os=mac; flag=--mac; fi
+          node test/fake-package.mjs "../dist/core/$os"
+          npx electron-builder $flag --publish never
+          ls -la ../dist/installers
+          if [ "$RUNNER_OS" = Windows ]; then exe="../dist/installers/win-unpacked/claude-Utube.exe"; ls ../dist/installers/*.exe
+          else exe="../dist/installers/mac-arm64/claude-Utube.app/Contents/MacOS/claude-Utube"; ls ../dist/installers/*.dmg; fi
+          export CU_CONFIG_DIR="$RUNNER_TEMP/cu-config-packed"
+          "$exe" --smoke 2>&1 | tee packed.log
+          for line in "install ok" "window ok" "quit ok"; do grep -q "smoke: $line" packed.log || { echo "missing: smoke: $line"; exit 1; }; done
       - name: no fake core left (Windows)
         if: runner.os == 'Windows'
         shell: pwsh

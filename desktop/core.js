@@ -11,7 +11,9 @@ const STATUS_EVERY_MS = 10_000;
 const READY_TIMEOUT_MS = 60_000;
 
 /** @typedef {{platform: string, distro: string|null, studio: string, data: string, home: string|null,
- *   setupAt?: string, trayNoticeShown?: boolean}} Config */
+ *   setupAt?: string, trayNoticeShown?: boolean, coreKind?: "packaged"|"existing", coreVersion?: string|null,
+ *   modelsReady?: boolean}} Config */
+/** @typedef {{version: string, os: string, file: string, sha256: string, bytes: number, unpacked_bytes: number}} Manifest */
 
 // ---------- config ----------
 /** @param {string} dir @returns {Config|null} */
@@ -181,6 +183,113 @@ function portOf(url) {
   try { return Number(new URL(url).port); } catch { return 0; }
 }
 
-module.exports = { MIN_FREE_GB, STATUS_EVERY_MS, READY_TIMEOUT_MS, loadConfig, saveConfig, configUsable, expandHome,
+// ---------- the packaged core (specs/016 contracts/release.md) ----------
+const DISTRO = "ClaudeUtube";
+const GB = 1024 ** 3;
+
+/** The core-manifest.json shipped next to the core file, or null. @param {string|null} dir @returns {Manifest|null} */
+function readManifest(dir) {
+  if (!dir) return null;
+  try {
+    const m = JSON.parse(fs.readFileSync(path.join(dir, "core-manifest.json"), "utf8"));
+    const ok = typeof m.version === "string" && /^[\w.+-]+$/.test(m.version) && typeof m.file === "string"
+      && !/[\\/]/.test(m.file) && /^[0-9a-f]{64}$/.test(m.sha256) && Number.isFinite(m.bytes) && Number.isFinite(m.unpacked_bytes);
+    return ok ? m : null;
+  } catch {
+    return null;
+  }
+}
+
+/** SHA-256 of a file, read as a stream. @param {string} file @returns {Promise<string>} */
+function sha256File(file) {
+  const crypto = require("node:crypto");
+  return new Promise((resolve, reject) => {
+    const h = crypto.createHash("sha256");
+    fs.createReadStream(file).on("error", reject).on("data", (c) => h.update(c)).on("end", () => resolve(h.digest("hex")));
+  });
+}
+
+/** Bytes the install needs on the disk: Windows keeps the .tar while importing it. @param {Manifest} m @param {string} platform */
+function spaceNeeded(m, platform) {
+  return (platform === "win32" ? m.unpacked_bytes * 2 : m.unpacked_bytes) + GB;
+}
+
+/** Where the macOS core lives: outside the data folder and outside the app bundle. @param {string} home @param {string} ver */
+function macCoreDir(home, ver) {
+  return path.posix.join(home, "Library", "Application Support", "ClaudeUtube-core", ver);
+}
+
+/** The config of a packaged core (data-model.md). @param {string} platform @param {Manifest} m @param {string} home */
+function packagedConfig(platform, m, home) {
+  const base = { platform, coreKind: /** @type {"packaged"} */ ("packaged"), coreVersion: m.version, modelsReady: false };
+  if (platform === "win32") {
+    return { ...base, distro: DISTRO, studio: "/home/studio/claude-Utube", data: "/home/studio/.local/share/claude-utube", home: "/home/studio" };
+  }
+  return { ...base, distro: null, studio: macCoreDir(home, m.version), data: path.posix.join(home, "Library", "Application Support", "ClaudeUtube"), home };
+}
+
+/** Is the app's own Linux there? @param {Buffer|string} wslList */
+function hasOwnDistro(wslList) {
+  return parseWslList(wslList).some((d) => d.name === DISTRO);
+}
+
+/** "C:\\Users\\an\\x" → "/mnt/c/Users/an/x" (for commands inside WSL). @param {string} p */
+function wslPath(p) {
+  const m = /^([A-Za-z]):[\\/](.*)$/.exec(p);
+  return m ? `/mnt/${m[1].toLowerCase()}/${m[2].replace(/\\/g, "/")}` : p.replace(/\\/g, "/");
+}
+
+/** A different core version is installed: reinstall it, keeping the data (FR-012). @param {string|null} installed @param {Manifest} m */
+function needsReinstall(installed, m) {
+  return !!installed && installed.trim() !== m.version;
+}
+
+/** The steps of installing the packaged core, in order (contracts/release.md). Each step is {id, text, run: [cmd…]};
+ *  "verify", "space" and "unpack" are done by main.js itself. Retrying starts again at the failed step.
+ *  @param {string} platform @param {{manifest: Manifest, coreFile: string, tmpDir: string, wslDir?: string,
+ *   reinstall?: boolean, distroThere?: boolean, home: string}} ctx */
+function installSteps(platform, ctx) {
+  const m = ctx.manifest;
+  const cfg = packagedConfig(platform, m, ctx.home);
+  const inCore = (/** @type {string} */ sh) => shellCommand(cfg, `cd "${cfg.studio}" && ${sh}`);
+  /** @type {{id: string, text: string, run: {file: string, args: string[]}[]}[]} */
+  const steps = [{ id: "verify", text: "Checking the studio package…", run: [] },
+    { id: "space", text: "Checking free space…", run: [] }];
+  if (platform === "win32") {
+    const tar = path.win32.join(ctx.tmpDir, "core.tar");
+    const backup = wslPath(path.win32.join(ctx.tmpDir, "data-backup.tgz"));
+    const install = [];
+    if (ctx.reinstall) {
+      install.push(inCore("sh bin/studio app stop --force --data " + JSON.stringify(cfg.data) + " || true"));
+      install.push(shellCommand(cfg, `mkdir -p "${cfg.data}" && tar -czf "${backup}" -C "${cfg.data}" .`));
+    }
+    if (ctx.distroThere) install.push({ file: "wsl.exe", args: ["--unregister", DISTRO] });
+    install.push({ file: "wsl.exe", args: ["--import", DISTRO, String(ctx.wslDir), tar, "--version", "2"] });
+    if (ctx.reinstall) install.push(shellCommand(cfg, `mkdir -p "${cfg.data}" && tar -xzf "${backup}" -C "${cfg.data}" && rm -f "${backup}"`));
+    steps.push({ id: "unpack", text: "Unpacking the studio…", run: [] },
+      { id: "install", text: "Installing the studio's Linux (a few minutes)…", run: install });
+  } else {
+    const dir = cfg.studio;
+    const venv = (/** @type {string} */ v) => ({ file: path.posix.join(dir, "python", "bin", "python3"),
+      args: ["-m", "venv", "--system-site-packages", path.posix.join(dir, v)] });
+    steps.push({ id: "install", text: "Installing the studio (a minute)…", run: [
+      { file: "/bin/mkdir", args: ["-p", dir] },
+      { file: "/usr/bin/tar", args: ["-xzf", ctx.coreFile, "-C", dir] },
+      { file: "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", dir] },
+      venv("tools/.venv"), venv("lib/lemo-opuscar/.venv")] });
+  }
+  steps.push({ id: "voice", text: "Downloading the voice model (about 350 MB)…", run: [inCore("sh lib/lemo-opuscar/tools/fetch.sh voice")] },
+    { id: "models", text: "Downloading the speech check models…", run: [inCore("sh bin/studio app models")] },
+    { id: "check", text: "Checking the studio…", run: [] });
+  return steps;
+}
+
+/** The library's espeak data path must stay under 160 bytes (R2). @param {string} studio */
+function espeakPathOk(studio) {
+  return Buffer.byteLength(path.posix.join(studio, "python/lib/python3.12/site-packages/espeakng_loader/espeak-ng-data")) < 160;
+}
+
+module.exports = { DISTRO, readManifest, sha256File, spaceNeeded, macCoreDir, packagedConfig, hasOwnDistro, wslPath,
+  needsReinstall, installSteps, espeakPathOk, MIN_FREE_GB, STATUS_EVERY_MS, READY_TIMEOUT_MS, loadConfig, saveConfig, configUsable, expandHome,
   coreCommand, shellCommand, parseUrl, parseStatus, parseWslList, wsl2Distros, wslStatusChecks, enableWslCommand,
   machineChecks, parseDf, isAppUrl, quitPlan, portOf };
