@@ -306,6 +306,9 @@ def main() -> int:
             return 0
         sample = old
         (d / "NOTE.txt").write_text(inp.get("note", ""))
+        if inp.get("lesson"):                      # specs/012: the note becomes a draft lesson for the channel
+            (d / "LESSON_DRAFT.json").write_text(json.dumps({"what": inp.get("note", "")[:400], "why": "No rule caught it",
+                                                             "stop": "Check this before delivery", "rule": None}))
         src = old.parent
         if (src / "SCRIPT.md").exists():          # as the revise prompt says: the script and its review come along
             import shutil

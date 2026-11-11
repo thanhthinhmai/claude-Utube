@@ -41,3 +41,11 @@ Mở giao diện online, vào Channels:
 ## 4. Bài chạy thật (tốn tiền, hỏi người dùng trước)
 
 Làm một phim online cho một kênh. Đo phần token thêm của `CHANNEL_BRIEF.md` (SC-004): số ký tự ÷ 4 × số lượt của agent, so với tổng token của việc. Mức cho phép ≤ 2%.
+
+## Kết quả T025 (2026-11-11)
+
+Chạy mục 2 ở local trên phim có sẵn `banh-mi-dem` (tiếng Việt, đã có gói đăng của 011), với một kênh tạm `thu-nghiem`:
+- `channel new`, 2 lần `set`, `lesson add` có `phrase:vì sao`, rồi `channel attach banh-mi-dem thu-nghiem`: tổng 0,26 giây. `CHANNEL_BRIEF.md` dài 377 ký tự.
+- `publish banh-mi-dem --check-only`: mã 1, đúng 3 lỗi: `channel_hashtags` (thiếu `#banhmidem`), `channel_banned` (chữ trên ảnh "Bí mật của lò") và `lesson_rule #1` (tiêu đề "Vì sao anh ấy…").
+- Phim này chưa có `SCRIPT.md` nên không chạy được `script check`; luật kênh của `script check` đã được test tự động trên phim mẫu.
+- Sau khi thử: đã xoá bản chụp khỏi phim và xoá kênh tạm. `publish --check-only` đạt lại như trước.

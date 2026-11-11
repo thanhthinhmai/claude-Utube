@@ -96,24 +96,24 @@
 
 ### Tests for User Story 3
 
-- [ ] T020 [P] [US3] Trong `tests/online/test_channels_api.py`, viết test:
+- [X] T020 [P] [US3] Trong `tests/online/test_channels_api.py`, viết test:
   - mọi đường của contracts/api.md, gồm lỗi `422`, `409 exists`, `409 limit` và `409 not_draft`;
   - người khác nhận 404 trên mọi đường kênh; người không phải admin nhận 403 trên `/lessons/shared` (SC-005);
   - việc phim có `channel` → `films/<phim>/channel.json` được chép về kho của người dùng; phong cách lấy từ hồ sơ khi không gửi;
   - sửa phim với `lesson: true` → kênh có một bài học `draft` và `job.lesson_draft`;
   - bài học chung của admin vào bản chụp của phim người khác.
-- [ ] T021 [P] [US3] Viết `tests/online/browser_channels.cjs` (gọi từ `test_channels_api.py`, bỏ qua khi không có trình duyệt): tạo kênh trên `#/channels`; thêm một bài học; trong form giao phim, chọn kênh thì ô phong cách và độ dài đổi theo; màn hình 360 px không có thanh cuộn ngang; không có `pageerror`.
+- [X] T021 [P] [US3] Viết `tests/online/browser_channels.cjs` (gọi từ `test_channels_api.py`, bỏ qua khi không có trình duyệt): tạo kênh trên `#/channels`; thêm một bài học; trong form giao phim, chọn kênh thì ô phong cách và độ dài đổi theo; màn hình 360 px không có thanh cuộn ngang; không có `pageerror`.
 
 ### Implementation for User Story 3
 
-- [ ] T022 [US3] Trong `tools/studio/studio/api_online.py`, viết các đường API của contracts/api.md, dùng `channels.py` với gốc `store.root()` của người đang đăng nhập và bài học chung ở `db.data_dir() / "shared" / "lessons.json"`. `POST /jobs` nhận `channel` (điền `style` và `seconds` từ hồ sơ; `seconds` của kênh vượt `film_max_seconds` thì dùng giới hạn và ghi một dòng log; 404 khi không có kênh; 422 khi phong cách không còn); việc sửa phim nhận `lesson` (422 khi phim gốc không có kênh). Thêm `tools/` vào `sys.path` như `proxy.py`. Cập nhật danh sách đường được ghi lại nếu có test kiểm việc này.
-- [ ] T023 [US3] Trong `tools/runner/worker.py`:
+- [X] T022 [US3] Trong `tools/studio/studio/api_online.py`, viết các đường API của contracts/api.md, dùng `channels.py` với gốc `store.root()` của người đang đăng nhập và bài học chung ở `db.data_dir() / "shared" / "lessons.json"`. `POST /jobs` nhận `channel` (điền `style` và `seconds` từ hồ sơ; `seconds` của kênh vượt `film_max_seconds` thì dùng giới hạn và ghi một dòng log; 404 khi không có kênh; 422 khi phong cách không còn); việc sửa phim nhận `lesson` (422 khi phim gốc không có kênh). Thêm `tools/` vào `sys.path` như `proxy.py`. Cập nhật danh sách đường được ghi lại nếu có test kiểm việc này.
+- [X] T023 [US3] Trong `tools/runner/worker.py`:
   - `prepare()`: việc phim có `input.channel` (hoặc việc sửa phim có kênh của phim cũ) thì gọi `channels.attach(...)` vào `work/films/<phim>/`;
   - `finished()`: việc sửa phim có `input.lesson` và `films/<phim>/LESSON_DRAFT.json` hợp lệ thì gọi `add_lesson(..., status="draft")` vào kênh, ghi `job.lesson_draft` và một dòng log;
   - `publish_summary`: thêm `blocked_by_lesson`.
 
   Trong `tools/runner/agent.py`, lời nhắc của việc sửa phim có `lesson` dặn agent viết `LESSON_DRAFT.json` (contracts/files.md). Trong `tests/online/fake_agent.py`, viết `LESSON_DRAFT.json` khi được dặn.
-- [ ] T024 [US3] Trong `tools/studio/studio/web/app.js` và `style.css`, làm theo contracts/api.md:
+- [X] T024 [US3] Trong `tools/studio/studio/web/app.js` và `style.css`, làm theo contracts/api.md:
   - route `#/channels` và `#/channels/<slug>` (form hồ sơ, quyết định, bảng bài học với Approve, Edit, Retire, form thêm bài học);
   - Settings → Shared lessons (admin);
   - link "Channels" trên thanh trên ở chế độ online;
@@ -127,7 +127,7 @@
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T025 Chạy quickstart mục 2 ở local trên một phim có sẵn trong `films/` (attach, `script check` nếu có kịch bản, `publish` với gói có sẵn). Ghi kết quả vào cuối `specs/012-channel-profile/quickstart.md`. Xoá kênh thử khỏi `channels/` trước khi commit.
+- [X] T025 Chạy quickstart mục 2 ở local trên một phim có sẵn trong `films/` (attach, `script check` nếu có kịch bản, `publish` với gói có sẵn). Ghi kết quả vào cuối `specs/012-channel-profile/quickstart.md`. Xoá kênh thử khỏi `channels/` trước khi commit.
 - [ ] T026 Chạy đủ 5 bộ test. Đối chiếu từng FR và SC với code và test; ghi bảng vào cuối `specs/012-channel-profile/tasks.md`. SC-004 cần bài chạy thật, nên **hỏi người dùng trước khi chạy**.
 
 ## Dependencies & Execution Order
@@ -142,3 +142,31 @@
 2. **US2**: bài học và luật máy.
 3. **US3**: online.
 4. Polish: chạy thật ở local; bài chạy online chỉ làm khi người dùng đồng ý.
+
+## Đối chiếu sau implement (T026)
+
+| Yêu cầu | Code | Kiểm chứng |
+|---|---|---|
+| FR-001 hồ sơ kênh đủ trường | `channels.save`, `normal`; lệnh `channel new|set|show`; API `POST/PUT /channels` | `Store.test_save_and_read_back`, `Store.test_cli`, `test_profile_and_lessons` |
+| FR-002 kiểm khi lưu | `channels.validate` | `Store.test_bad_profiles_are_refused`; API 422 cho hashtag cấm, phong cách lạ |
+| FR-003 phim gắn kênh, giá trị riêng thắng | `channel attach`, `make_job` điền từ hồ sơ | `Snapshot.test_film_values_win`, `test_film_for_a_channel` (SC-001: chỉ kênh và ý tưởng) |
+| FR-004 thêm quyết định | `channel decide`, `POST /decisions`, trang kênh | `Store.test_cli`, `test_profile_and_lessons` |
+| FR-005 đọc hồ sơ và bài học trước Treatment, ≤ 6000 ký tự | `CHANNEL_BRIEF.md`; CLAUDE.md 2a; JOB.md; agent.py | `Snapshot.test_brief_is_short`, `test_channel_films_read_the_brief` |
+| FR-006 luật kênh trong `script check` | script.py `channel_language`, `banned_word` | `Rules.test_channel_language`, `test_banned_word` |
+| FR-006a giọng của kênh | qc.py `channel_voice` | `Rules.test_channel_voice` (có cả trường hợp giọng riêng của phim) |
+| FR-007 biên tập đọc hồ sơ | editor.py | `Rules.test_editor_reads_the_brief` |
+| FR-008 luật kênh trong `publish` | publish.py `channel_hashtags`, `channel_banned`, `channel_title_max` | `Rules.test_channel_hashtags`, `test_channel_banned`, `test_channel_title_max`; T025 |
+| FR-009 bài học kênh và chung, đủ trường | `add_lesson`, `lessons.json`, `LESSONS.md` | `Lessons.test_numbers_and_states` |
+| FR-010 3 loại luật máy; luật sai là `invalid` | `parse_rule` | `Lessons.test_numbers_and_states`, `Snapshot.test_only_active_valid_rules` |
+| FR-011 vi phạm có số bài học, là lỗi nặng; gói ghi "Do not publish" | script.py, publish.py `lesson_rule`; `blocked_by_lesson`; khối Publish | `Lessons.test_channel_lesson_blocks_only_its_channel`, `test_shared_lesson_blocks_every_channel`, `test_publish_lesson_rule_and_warning` (SC-003) |
+| FR-012 biên tập ghi P1 khi lặp bài học | lời nhắc của biên tập | `test_editor_reads_the_brief` (chỉ kiểm lời nhắc; việc biên tập thật cho P1 cần bài chạy thật) |
+| FR-013 nháp rồi duyệt | `lesson draft/approve`; `LESSON_DRAFT.json`; worker `save_lesson_draft` | `Lessons.test_lesson_cli`, `test_film_for_a_channel` (nháp sau khi sửa phim rồi duyệt) |
+| FR-014 không xoá, chỉ bỏ | `retire`; không có lệnh xoá | `Lessons.test_draft_and_retired_do_not_block` |
+| FR-015 local, vào git | `channels/` không bị `.gitignore`; `channels/README.md` | xem `git status` |
+| FR-016 online theo người; bài học chung của admin | `store.root()`; `/lessons/shared` cần admin | `test_others_cannot_see_or_change` (SC-005) |
+| FR-017 trang Channels, chọn kênh khi giao phim | app.js `pageChannels`, `pageChannel`, `f-channel` | `test_pages_in_a_browser` |
+| FR-018 lỗi kênh và bài học trên trang việc và CHECKS.md | `problems` có mã và `#n`; khối Publish | `test_film_for_a_channel`; `report.markdown` in mọi lỗi |
+| FR-019 giới hạn | giọng chỉ theo dạng tên của thư viện; không có phần đăng hay phân tích kênh khác | `Store.test_bad_profiles_are_refused` (giọng là tệp clone bị từ chối) |
+| SC-002 bắt 100% vi phạm | | `Rules.*`, `Lessons.*` |
+| SC-004 ≤ 6000 ký tự, ≤ 2% token | | 6000 ký tự: `test_brief_is_short`. 2% token: **chưa đo**, cần bài chạy thật, chờ người dùng |
+| SC-006 phim không gắn kênh như cũ | | `Rules.test_no_snapshot_no_change`; test của 010 và 011 không bị sửa |

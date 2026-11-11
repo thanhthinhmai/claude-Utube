@@ -63,7 +63,13 @@ def revise_prompt(inp: dict) -> str:
             f"note changes the narration, change only what it asks, then run `script check --customer-round` and "
             f"`script review --customer-round` until it passes, and make the voice again (JOB.md, Script step). If it "
             f"does not, keep the script and the voice as they are.\n"
-            f"- Do not copy the old `publish/` folder: make the publish pack again for the new film (JOB.md, Publish step) "
+            + (f"- The film belongs to the channel `{inp['channel']}`: read {WORK}/films/{inp['film']}/CHANNEL_BRIEF.md first and "
+               f"follow it; do not copy the old film's channel.json or CHANNEL_BRIEF.md over it.\n" if inp.get("channel") else "")
+            + (f"- The customer wants this mistake remembered for their channel. Before `job done`, write "
+               f"{WORK}/films/{inp['film']}/LESSON_DRAFT.json: {{\"what\": what went wrong, \"why\": why it was not caught, "
+               f"\"stop\": how to stop it next time, \"rule\": null or \"phrase:<words never to use>\"}} (each at most 400 "
+               f"characters, in plain words). The customer approves it later.\n" if inp.get("lesson") else "")
+            + f"- Do not copy the old `publish/` folder: make the publish pack again for the new film (JOB.md, Publish step) "
             f"before `job done`.\n"
             f"- Style: `{inp['style']}`. Length: about {inp['seconds']} seconds unless the note asks otherwise.\n"
             f"- The original idea:\n<idea>\n{inp.get('idea') or ''}\n</idea>\n"

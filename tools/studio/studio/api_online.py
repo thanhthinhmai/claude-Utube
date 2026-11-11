@@ -17,6 +17,10 @@ from .store import StudioError
 
 router = APIRouter(prefix="/api/v1")
 
+import sys as _sys  # noqa: E402
+_sys.path.insert(0, str(Path(__file__).resolve().parents[2]))     # tools/: filmcheck (channels, specs/012)
+from filmcheck import channels  # noqa: E402
+
 
 class SignupIn(BaseModel):
     email: str = Field(max_length=254)
@@ -175,6 +179,8 @@ class JobIn(BaseModel):
     count: Optional[int] = Field(default=None, ge=1, le=100)
     rights_confirmed: bool = False
     uploads: Optional[List[str]] = Field(default=None, max_length=20)
+    # film for one of the customer's channels (specs/012); for a learn job `channel` is the YouTube URL instead
+    lesson: bool = False
 
 
 # what the customer ticks before a YouTube fetch (constitution 2.1.0, "Bản quyền và nội dung")
@@ -242,9 +248,19 @@ def make_job(body: JobIn, a) -> dict:
         return post_learn(body, a)
     if body.revise_of:
         return post_revision(body, a)
+    s = quotas.settings()
+    slug, note = None, None
+    if body.channel:                                    # the channel's profile fills what the customer left out
+        slug = body.channel
+        ch = channel_or_404(slug)
+        body = body.model_copy(update={"style": body.style or ch["style"], "seconds": body.seconds or ch["seconds"]})
+        if body.seconds > s["film_max_seconds"] and not body.model_fields_set & {"seconds"}:
+            note = f"The channel's length ({body.seconds} s) is over the studio's limit; using {s['film_max_seconds']} s."
+            body = body.model_copy(update={"seconds": s["film_max_seconds"]})
+        if not style_exists(body.style):
+            raise StudioError("invalid", f"phong cách \"{body.style}\" của kênh không còn; hãy sửa kênh", 422)
     if not (body.style and body.idea and body.seconds):
         raise StudioError("invalid", "việc làm phim cần style, idea và seconds", 422)
-    s = quotas.settings()
     if not resources.NAME.match(body.style or "") or not style_exists(body.style):
         raise StudioError("style_not_found", f"không có phong cách \"{body.style}\"", 404)
     if body.seconds > s["film_max_seconds"]:
@@ -256,9 +272,13 @@ def make_job(body: JobIn, a) -> dict:
         e.extra = {"reason": reason}
         raise e
     name = film_name(body.idea)
-    j = quotas.reserve(a, "film", body.idea[:80], {"film": name, "style": body.style},
-                       {"kind": "film", "style": body.style, "idea": body.idea, "seconds": body.seconds,
-                        "review_treatment": body.review_treatment, "film": name})
+    inp = {"kind": "film", "style": body.style, "idea": body.idea, "seconds": body.seconds,
+           "review_treatment": body.review_treatment, "film": name}
+    if slug:
+        inp["channel"] = slug
+    j = quotas.reserve(a, "film", body.idea[:80], {"film": name, "style": body.style}, inp)
+    if note:
+        j = jobs.log(j["id"], note)
     return view(j, a)
 
 
@@ -289,10 +309,155 @@ def post_revision(body: JobIn, a) -> dict:
             (j.get("input") or {}).get("film") == f"{base}-r{n}" for j in jobs.all_jobs(a["id"])):
         n += 1
     name, prev = f"{base}-r{n}", first["input"]
-    j = quotas.reserve(a, "film", f"Changes to {old}"[:80], {"film": name, "style": prev["style"]},
-                       {"kind": "film", "style": prev["style"], "idea": prev.get("idea"), "seconds": prev.get("seconds"),
-                        "review_treatment": False, "film": name, "revise_of": old, "note": note})
+    if body.lesson and not prev.get("channel"):
+        raise StudioError("invalid", "phim này không thuộc kênh nào, nên không ghi được bài học", 422)
+    inp = {"kind": "film", "style": prev["style"], "idea": prev.get("idea"), "seconds": prev.get("seconds"),
+           "review_treatment": False, "film": name, "revise_of": old, "note": note}
+    if prev.get("channel"):
+        inp["channel"] = prev["channel"]
+        inp["lesson"] = bool(body.lesson)
+    j = quotas.reserve(a, "film", f"Changes to {old}"[:80], {"film": name, "style": prev["style"]}, inp)
     return view(j, a)
+
+
+# ---------- channels and lessons (specs/012 contracts/api.md) ----------
+CHANNEL_HTTP = {"invalid": 422, "exists": 409, "limit": 409, "not_found": 404, "not_draft": 409}
+
+
+def channel_error(e) -> StudioError:
+    return StudioError(e.code, str(e), CHANNEL_HTTP.get(e.code, 422))
+
+
+def shared_lessons_path() -> Path:
+    return db.data_dir() / "shared" / "lessons.json"
+
+
+def channel_or_404(slug: str) -> dict:
+    try:
+        return channels.load(store.root(), slug)
+    except channels.ChannelError as e:
+        raise channel_error(channels.ChannelError(f"không có kênh \"{slug}\"", "not_found")) from e
+
+
+class ChannelIn(BaseModel):
+    slug: Optional[str] = Field(default=None, max_length=40)
+    name: Optional[str] = Field(default=None, max_length=80)
+    niche: Optional[str] = Field(default=None, max_length=500)
+    audience: Optional[str] = Field(default=None, max_length=500)
+    language: Optional[str] = Field(default=None, max_length=3)
+    seconds: Optional[int] = None
+    style: Optional[str] = Field(default=None, max_length=60)
+    voice: Optional[str] = Field(default=None, max_length=80)
+    speed: Optional[float] = None
+    title_rules: Optional[str] = Field(default=None, max_length=1500)
+    thumbnail_rules: Optional[str] = Field(default=None, max_length=1500)
+    title_max: Optional[int] = None
+    hashtags: Optional[List[str]] = Field(default=None, max_length=5)
+    banned: Optional[List[str]] = Field(default=None, max_length=50)
+
+
+class DecisionIn(BaseModel):
+    text: str = Field(min_length=1, max_length=300)
+
+
+class LessonIn(BaseModel):
+    what: Optional[str] = Field(default=None, max_length=400)
+    why: Optional[str] = Field(default=None, max_length=400)
+    stop: Optional[str] = Field(default=None, max_length=400)
+    film: Optional[str] = Field(default=None, max_length=60)
+    rule: Optional[str] = Field(default=None, max_length=120)
+
+
+def _ch(fn):
+    try:
+        return fn()
+    except channels.ChannelError as e:
+        raise channel_error(e) from None
+
+
+@router.get("/channels")
+def list_channels(request: Request):
+    me(request)
+    return {"channels": [{k: c.get(k) for k in ("slug", "name", "language", "seconds", "style", "lessons_active",
+                                                 "lessons_draft")} for c in channels.list_channels(store.root())]}
+
+
+@router.post("/channels", status_code=201)
+def new_channel(body: ChannelIn, request: Request):
+    me(request)
+    data = {k: v for k, v in body.model_dump().items() if v is not None}
+    return _ch(lambda: channels.save(store.root(), data, resources.lib_dir(), new=True))
+
+
+@router.get("/channels/{slug}")
+def get_channel(slug: str, request: Request):
+    me(request)
+    ch = channel_or_404(slug)
+    return {**ch, "lessons": channels.load_lessons(channels.lessons_file(store.root(), slug))["lessons"]}
+
+
+@router.put("/channels/{slug}")
+def put_channel(slug: str, body: ChannelIn, request: Request):
+    me(request)
+    ch = channel_or_404(slug)
+    ch.update({k: v for k, v in body.model_dump(exclude_unset=True).items() if k != "slug"})
+    return _ch(lambda: channels.save(store.root(), ch, resources.lib_dir()))
+
+
+@router.post("/channels/{slug}/decisions", status_code=201)
+def add_decision(slug: str, body: DecisionIn, request: Request):
+    me(request)
+    channel_or_404(slug)
+    return _ch(lambda: channels.decide(store.root(), slug, body.text, resources.lib_dir()))
+
+
+@router.post("/channels/{slug}/lessons", status_code=201)
+def add_channel_lesson(slug: str, body: LessonIn, request: Request):
+    me(request)
+    channel_or_404(slug)
+    return _ch(lambda: channels.add_lesson(channels.lessons_file(store.root(), slug), what=body.what or "", why=body.why or "",
+                                           stop=body.stop or "", film=body.film, rule=body.rule, status="active"))
+
+
+@router.put("/channels/{slug}/lessons/{n}")
+def edit_channel_lesson(slug: str, n: int, body: LessonIn, request: Request):
+    me(request)
+    channel_or_404(slug)
+    return _ch(lambda: channels.edit_draft(channels.lessons_file(store.root(), slug), n,
+                                           **body.model_dump(exclude_unset=True, exclude={"film"})))
+
+
+@router.post("/channels/{slug}/lessons/{n}/approve")
+def approve_channel_lesson(slug: str, n: int, request: Request):
+    me(request)
+    channel_or_404(slug)
+    return _ch(lambda: channels.approve(channels.lessons_file(store.root(), slug), n))
+
+
+@router.post("/channels/{slug}/lessons/{n}/retire")
+def retire_channel_lesson(slug: str, n: int, request: Request):
+    me(request)
+    channel_or_404(slug)
+    return _ch(lambda: channels.retire(channels.lessons_file(store.root(), slug), n))
+
+
+@router.get("/lessons/shared")
+def list_shared_lessons(request: Request):
+    admin(request)
+    return channels.load_lessons(shared_lessons_path())
+
+
+@router.post("/lessons/shared", status_code=201)
+def add_shared_lesson(body: LessonIn, request: Request):
+    admin(request)
+    return _ch(lambda: channels.add_lesson(shared_lessons_path(), what=body.what or "", why=body.why or "",
+                                           stop=body.stop or "", rule=body.rule, status="active", title="shared"))
+
+
+@router.post("/lessons/shared/{n}/retire")
+def retire_shared_lesson(n: int, request: Request):
+    admin(request)
+    return _ch(lambda: channels.retire(shared_lessons_path(), n, "shared"))
 
 
 def queue_positions() -> dict:
