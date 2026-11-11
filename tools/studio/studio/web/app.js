@@ -7,7 +7,7 @@ const STATUS = {
   queued: "In queue", running: "Running", waiting_review: "Needs review", waiting_resume: "Waiting to resume", done: "Done",
   failed: "Failed", stopped: "Stopped", inactive: "Inactive",
 };
-const KIND = { learn: "Learn a style", film: "Make a film" };
+const KIND = { learn: "Learn a style", film: "Make a film", topics: "Score topics" };
 const REVIEW = { "style-1": "Review 1: style draft", "style-2": "Review 2: proof frame", question: "Question from the studio",
   treatment: "Treatment review" };
 // Online mode (specs/007): the same page serves many customers; MODE comes from GET /health
@@ -297,8 +297,10 @@ async function pageChannel(slug) {
     <div class="panel"><p class="section-title">Decisions</p>
       ${(c.decisions || []).length ? `<ul>${c.decisions.map((/** @type {any} */ d) => `<li>${esc(d.date)}: ${esc(d.text)}</li>`).join("")}</ul>` : `<p class="muted">None yet.</p>`}
       <div class="row"><input id="d-text" maxlength="300" placeholder="Something you decided for this channel"><button id="d-add">Add</button></div></div>
-    <div class="panel"><p class="section-title">Lessons</p>${lessonsTable(c.lessons || [], base, true)}</div>${LESSON_FORM}`;
+    <div class="panel"><p class="section-title">Lessons</p>${lessonsTable(c.lessons || [], base, true)}</div>${LESSON_FORM}
+    <div class="panel" id="topics"><p class="section-title">Topics</p><p class="muted">Loading…</p></div>`;
   const again = () => pageChannel(slug);
+  fillTopics(slug);
   onSubmit(async () => {
     const num = (/** @type {string} */ k) => field(`p-${k}`).value.trim() === "" ? null : Number(field(`p-${k}`).value);
     await send("PUT", `/channels/${encodeURIComponent(slug)}`, {
@@ -314,6 +316,70 @@ async function pageChannel(slug) {
     catch (e) { alert(e.message); }
   };
   wireLessons(base, again);
+}
+
+// ---------- topics of a channel (specs/013) ----------
+const VERDICT_CLASS = { PRIORITY: "pass", GO: "pass", HOLD: "muted", DROP: "fail" };
+/** @param {string} slug */
+async function fillTopics(slug) {
+  const box = document.getElementById("topics");
+  if (!box) return;
+  const base = `/channels/${encodeURIComponent(slug)}`;
+  const [d, refs] = await Promise.all([get(`${base}/topics`), get(`${base}/references`)]);
+  const byN = Object.fromEntries(d.topics.map((/** @type {any} */ t) => [t.n, t]));
+  const row = (/** @type {any} */ t) => {
+    const s = t.scores || {}, v = (t.evidence || {}).top_video;
+    const url = v && /^https:\/\/www\.youtube\.com\/watch\?v=[\w-]+$/.test(v.url) ? v.url : "";
+    return `<tr><td>${t.n}</td><td class="${VERDICT_CLASS[t.verdict] || ""}">${esc(t.verdict)}${d.stale.includes(t.n) ? " (stale)" : ""}</td>
+      <td>${esc(t.text)}${t.source === "suggested" ? ' <small class="muted">suggested</small>' : ""}${t.note ? `<br><small class="muted">${esc(t.note)}</small>` : ""}</td>
+      <td>${t.total}</td><td>${s.demand}</td><td>${s.heat}</td><td>${s.competition}</td><td>${s.overlap}</td>
+      <td><input class="t-fit" data-n="${t.n}" type="number" min="0" max="10" value="${s.fit ?? ""}" aria-label="Fit"></td>
+      <td><select class="t-type" data-n="${t.n}" aria-label="Type">${["explainer", "comparison", "list", "true story", "q&a", "other"].map((k) =>
+        `<option${k === t.type ? " selected" : ""}>${k}</option>`).join("")}</select></td>
+      <td>${url ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${esc(v.title.slice(0, 50))}</a><br><small class="muted">${num(v.views, 0)} views · ${v.age_days} d</small>` : "—"}</td></tr>`;
+  };
+  const queued = d.queue.map((/** @type {number} */ n) => byN[n]);
+  const others = d.topics.filter((/** @type {any} */ t) => !d.queue.includes(t.n));
+  box.innerHTML = `<p class="section-title">Topics</p>
+    <p class="muted">Score ideas with YouTube numbers: demand, heat, competition, overlap with your films, and fit. ${d.usage.today} of ${d.usage.limit} topics scored today.</p>
+    <div class="form"><label>Topics <span class="hint">One per line, up to 20</span><textarea id="t-new" placeholder="why honey never spoils"></textarea></label>
+      <label class="check"><input id="t-suggest" type="checkbox"> <span>Suggest up to 10 more for this channel</span></label>
+      <div class="row"><button class="primary" id="t-score">Score</button></div><p id="t-msg" class="muted" role="status"></p></div>
+    ${queued.length ? `<p class="section-title" style="margin-top:12px">Queue</p>
+      <p class="row"><a class="button primary" id="t-make" href="#/new?channel=${esc(slug)}&topic=${queued[0].n}">Make a film from #${queued[0].n}</a>
+        <button id="t-recheck">Check the queue again</button></p>` : ""}
+    ${d.topics.length ? `<div class="table-wrap"><table class="qa topics"><tr><th>#</th><th>Verdict</th><th>Topic</th><th>Total</th><th>Demand</th><th>Heat</th>
+      <th>Competition</th><th>Overlap</th><th>Fit</th><th>Type</th><th>Strongest video</th></tr>${[...queued, ...others].map(row).join("")}</table></div>` : ""}
+    <details><summary class="muted">Reference channels (${refs.channels.length})</summary>
+      <div class="form"><label>Channel ids <span class="hint">One per line, like UC…; topics they posted in the last 30 days are not taken</span>
+        <textarea id="t-refs">${esc(refs.channels.map((/** @type {any} */ r) => r.id).join("\n"))}</textarea></label>
+        <div><button id="t-refs-save">Save</button></div></div></details>`;
+  /** @type {HTMLButtonElement} */ (document.getElementById("t-score")).onclick = async () => {
+    const msg = document.getElementById("t-msg");
+    try {
+      const j = await post(`${base}/topics/score`, { topics: lines(field("t-new").value), suggest: field("t-suggest").checked });
+      msg.className = "muted"; msg.innerHTML = `Scoring… <a href="#/jobs/${esc(j.id)}">follow the job</a>; this page updates when it is done.`;
+    } catch (e) { msg.className = "fail"; msg.textContent = e.message; }
+  };
+  const recheck = document.getElementById("t-recheck");
+  if (recheck) recheck.onclick = async () => {        // FR-010: numbers change fast; YouTube's cache keeps a same-day recheck free
+    const msg = document.getElementById("t-msg");
+    try {
+      const j = await post(`${base}/topics/score`, { topics: queued.slice(0, 20).map((/** @type {any} */ t) => t.text) });
+      msg.className = "muted"; msg.innerHTML = `Checking again… <a href="#/jobs/${esc(j.id)}">follow the job</a>.`;
+    } catch (e) { msg.className = "fail"; msg.textContent = e.message; }
+  };
+  box.querySelectorAll(".t-type").forEach((el) => { /** @type {HTMLSelectElement} */ (el).onchange = async () => {
+    const s = /** @type {HTMLSelectElement} */ (el);
+    try { await post(`${base}/topics/${s.dataset.n}/type`, { type: s.value }); } catch (e) { alert(e.message); }
+  }; });
+  box.querySelectorAll(".t-fit").forEach((el) => { /** @type {HTMLInputElement} */ (el).onchange = async () => {
+    const i = /** @type {HTMLInputElement} */ (el);
+    try { await post(`${base}/topics/${i.dataset.n}/fit`, { score: Number(i.value) }); fillTopics(slug); } catch (e) { alert(e.message); }
+  }; });
+  /** @type {HTMLButtonElement} */ (document.getElementById("t-refs-save")).onclick = async () => {
+    try { await send("PUT", `${base}/references`, { channels: lines(field("t-refs").value) }); fillTopics(slug); } catch (e) { alert(e.message); }
+  };
 }
 
 /** @param {string} top */
@@ -794,6 +860,10 @@ async function pageReset(token) {
 async function pageNew() {
   const params = new URLSearchParams(location.hash.split("?")[1] || "");
   const [lib, mine, chs] = await Promise.all([get("/library"), get("/styles"), get("/channels").catch(() => ({ channels: [] }))]);
+  const topicN = Number(params.get("topic") || 0);
+  const topic = topicN && params.get("channel")
+    ? (await get(`/channels/${encodeURIComponent(params.get("channel") || "")}/topics`).catch(() => ({ topics: [] }))).topics.find((/** @type {any} */ t) => t.n === topicN)
+    : null;
   const q = ME.quota.films, left = Math.max(0, q.limit - q.used), max = ME.limits?.film_max_seconds || 60;
   const want = params.get("style") || "";
   const opt = (slug, name, img) => `<label><input type="radio" name="style" value="${esc(slug)}" ${slug === want ? "checked" : ""} required>
@@ -810,7 +880,8 @@ async function pageNew() {
       <label>Style <span class="hint">Pick the look of the film. <a href="#/library">See the whole library</a>.</span></label>
       <div class="pick" role="radiogroup" aria-label="Style">${cards}</div>
       <label>Your idea <span class="hint">What happens in the film, who is in it, the mood. Up to 2000 characters.</span>
-        <textarea id="idea" minlength="3" maxlength="2000" required placeholder="A late-night bánh mì stall in Saigon, told by the old man who runs it."></textarea></label>
+        <textarea id="idea" minlength="3" maxlength="2000" required placeholder="A late-night bánh mì stall in Saigon, told by the old man who runs it.">${topic ? esc(topic.text) : ""}</textarea></label>
+      ${topic ? `<p class="muted">From topic #${topic.n} (${esc(topic.verdict)} ${topic.total}/50).</p>` : ""}
       <label>Length in seconds <span class="hint">Up to ${max} seconds.</span>
         <input id="seconds" type="number" min="5" max="${max}" value="${Math.min(30, max)}" required></label>
       <label class="check"><input id="treat" type="checkbox"> <span>Let me review the treatment (the written plan) before the picture is made</span></label>
@@ -830,7 +901,8 @@ async function pageNew() {
     const style = /** @type {HTMLInputElement | null} */ ($app.querySelector("input[name=style]:checked"));
     if (!style) throw new Error("Pick a style first.");
     const j = await post("/jobs", { kind: "film", style: style.value, idea: field("idea").value.trim(),
-      seconds: Number(field("seconds").value), review_treatment: field("treat").checked, ...(chSel && chSel.value ? { channel: chSel.value } : {}) });
+      seconds: Number(field("seconds").value), review_treatment: field("treat").checked, ...(chSel && chSel.value ? { channel: chSel.value } : {}),
+      ...(topic && chSel && chSel.value === params.get("channel") ? { topic: topic.n } : {}) });
     await loadMe();
     location.hash = `#/jobs/${j.id}`;
     return "";
@@ -909,6 +981,7 @@ function uploadFile(file, bar) {
 
 // ---------- Settings, owner only (specs/007 US3; tabs and Users after neb-creative-tool, specs/008) ----------
 const SETTING = [
+  ["youtube_daily_units", "YouTube units a day (YouTube gives 10000)", "int"], ["topics_per_day", "Topics per member a day", "int"],
   ["quota_films_default", "Films per month (default)", "int"],
   ["quota_learns_default", "Learns per month (default)", "int"], ["film_max_seconds", "Longest film (seconds)", "int"],
   ["learn_max_videos", "Videos per learn", "int"], ["upload_max_mb", "Upload size (MB)", "int"],
@@ -938,9 +1011,22 @@ async function pageSettings(tab = "general") {
   const input = ([k, label, t, choices]) => t === "choice"
     ? `<label>${label}<select id="s-${k}">${/** @type {string[][]} */ (choices).map(([v, l]) => `<option value="${v}"${st[k] === v ? " selected" : ""}>${l}</option>`).join("")}</select></label>`
     : `<label>${label}<input id="s-${k}" type="${t === "text" ? "text" : "number"}" ${t === "num" ? 'step="0.01"' : ""} value="${esc(st[k])}"></label>`;
-  $app.innerHTML = `${top}<section class="panel card-pad"><h2>Studio</h2><p class="muted">Limits for every member, and how many films run at once.</p>
+  const ytKey = `<section class="panel card-pad" id="yt-key"><h2>YouTube key</h2>
+    <p class="muted">For scoring topics with YouTube numbers (specs/013). The key is kept on the server and never shown again.
+      ${st.youtube_key_set ? `<strong>Key set (…${esc(st.youtube_key_last4)})</strong>` : "<strong>No key yet.</strong>"}
+      Units used today: ${st.youtube_units_today ?? 0} of ${st.youtube_daily_units}.</p>
+    <div class="row"><input id="yt-key-input" type="password" autocomplete="off" placeholder="Paste a YouTube Data API key"><button id="yt-key-save">Save key</button>
+      ${st.youtube_key_set ? `<button class="danger" id="yt-key-del">Remove</button>` : ""}</div><p id="yt-msg" class="muted" role="status"></p></section>`;
+  $app.innerHTML = `${top}${ytKey}<section class="panel card-pad"><h2>Studio</h2><p class="muted">Limits for every member, and how many films run at once.</p>
     <form class="form" id="settings"><div class="admin-grid">${SETTING.map(input).join("")}</div>
       <div><button class="primary" type="submit">Save settings</button></div></form><p id="msg" class="muted" role="status"></p></section>`;
+  /** @type {HTMLButtonElement} */ (document.getElementById("yt-key-save")).onclick = async () => {
+    const msg = document.getElementById("yt-msg");
+    try { await send("PUT", "/admin/youtube-key", { key: field("yt-key-input").value.trim() }); pageSettings("general"); }
+    catch (e) { msg.className = "fail"; msg.textContent = e.message; }
+  };
+  const ytDel = document.getElementById("yt-key-del");
+  if (ytDel) ytDel.onclick = async () => { if (confirm("Remove the YouTube key?")) { await send("DELETE", "/admin/youtube-key"); pageSettings("general"); } };
   onSubmit(async () => {
     const data = {};
     for (const [k, , t] of SETTING) {

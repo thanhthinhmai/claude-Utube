@@ -25,6 +25,8 @@ RANGES = {
     "review_timeout_days": (int, 1, 90),
     "model": (str, None, None),
     "editor_model": (str, None, None),
+    "youtube_daily_units": (int, 100, 10000),
+    "topics_per_day": (int, 0, 500),
 }
 
 

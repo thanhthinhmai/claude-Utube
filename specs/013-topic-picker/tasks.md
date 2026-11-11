@@ -87,8 +87,8 @@
 
 ### Tests for User Story 3
 
-- [ ] T015 [P] [US3] Trong `tests/online/helpers.py` `fake_upstream`, thêm YouTube giả (`/youtube/v3/{search,videos,channels,playlistItems}`, trả số liệu của `youtube_samples`, ghi lại khoá nhận được) và đặt `STUDIO_YOUTUBE_URL` cho proxy trong test.
-- [ ] T016 [P] [US3] Viết `tests/online/test_topics_api.py`:
+- [X] T015 [P] [US3] Trong `tests/online/helpers.py` `fake_upstream`, thêm YouTube giả (`/youtube/v3/{search,videos,channels,playlistItems}`, trả số liệu của `youtube_samples`, ghi lại khoá nhận được) và đặt `STUDIO_YOUTUBE_URL` cho proxy trong test.
+- [X] T016 [P] [US3] Viết `tests/online/test_topics_api.py`:
   - `PUT /admin/youtube-key` (người không phải admin nhận 403; chỉ trả `last4`);
   - chấm 3 đề → việc `topics` không trừ lượt phim → kết quả nằm trong `topics.json` của người đó;
   - chấm lại trong 24 giờ không tăng `youtube_units_today`;
@@ -102,14 +102,14 @@
 
 ### Implementation for User Story 3
 
-- [ ] T017 [US3] Trong `tools/runner/proxy.py`, viết `POST /internal/youtube` theo contracts/api.md: chỉ việc `topics`; 4 endpoint; `Usage` và `Cache` dưới `$STUDIO_DATA/youtube/`; khoá ở `$STUDIO_DATA/secrets/youtube.key`; `redact`; log chỉ ghi endpoint, đơn vị và có dùng số liệu tạm hay không.
-- [ ] T018 [US3] Trong `tools/studio/studio/quotas.py`, thêm cài đặt `youtube_daily_units` (9000; 100–10000) và `topics_per_day` (40; 0–500). Trong `tools/studio/studio/api_online.py`, viết:
+- [X] T017 [US3] Trong `tools/runner/proxy.py`, viết `POST /internal/youtube` theo contracts/api.md: chỉ việc `topics`; 4 endpoint; `Usage` và `Cache` dưới `$STUDIO_DATA/youtube/`; khoá ở `$STUDIO_DATA/secrets/youtube.key`; `redact`; log chỉ ghi endpoint, đơn vị và có dùng số liệu tạm hay không.
+- [X] T018 [US3] Trong `tools/studio/studio/quotas.py`, thêm cài đặt `youtube_daily_units` (9000; 100–10000) và `topics_per_day` (40; 0–500). Trong `tools/studio/studio/api_online.py`, viết:
   - `PUT/DELETE /admin/youtube-key` (thử khoá qua YouTube, ghi tệp quyền 600);
   - `GET /admin/settings` thêm `youtube_key_set`, `youtube_key_last4`, `youtube_units_today`;
   - các đường `/channels/{slug}/topics…` và `/references` của contracts/api.md (việc `topics` qua `jobs.build`, `charged: false`; đếm đề trong ngày từ các việc `topics` của người đó);
   - `POST /jobs` nhận `topic`.
-- [ ] T019 [US3] Trong `tools/runner/agent.py`, `kind == "topics"` thì gọi `topics.run_job(work)` (Fetcher qua proxy, `topics_fit` qua proxy với mã của việc), ghi `topics-result.json`, rồi thoát. Trong `tools/runner/worker.py`, việc `topics` kết thúc thì gộp kết quả vào `channels/<slug>/topics.json` của chủ việc và gọi `jobs.finish(done)`, không cần `job done`, không qua QC. `prepare()` của việc `topics` ghi `made` và `references` vào `.input.json`. Việc phim có `input.topic` thì đề chuyển sang `made` khi việc xong. Trong `tests/online/fake_agent.py`, việc `topics` gọi cùng `topics.run_job`.
-- [ ] T020 [US3] Trong `tools/studio/studio/web/app.js` và `style.css`, làm theo contracts/api.md:
+- [X] T019 [US3] Trong `tools/runner/agent.py`, `kind == "topics"` thì gọi `topics.run_job(work)` (Fetcher qua proxy, `topics_fit` qua proxy với mã của việc), ghi `topics-result.json`, rồi thoát. Trong `tools/runner/worker.py`, việc `topics` kết thúc thì gộp kết quả vào `channels/<slug>/topics.json` của chủ việc và gọi `jobs.finish(done)`, không cần `job done`, không qua QC. `prepare()` của việc `topics` ghi `made` và `references` vào `.input.json`. Việc phim có `input.topic` thì đề chuyển sang `made` khi việc xong. Trong `tests/online/fake_agent.py`, việc `topics` gọi cùng `topics.run_job`.
+- [X] T020 [US3] Trong `tools/studio/studio/web/app.js` và `style.css`, làm theo contracts/api.md:
   - mục Topics trên trang kênh (ô đề, ô chọn Suggest, nút Score, bảng điểm có kiểu đề và điểm "hợp kênh" sửa được, video bằng chứng, nhãn stale, hàng đợi, nút "Make a film");
   - mục Reference channels;
   - `#/new?channel=&topic=` điền sẵn ý tưởng và gửi `topic`;
@@ -121,7 +121,8 @@
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T021 Chạy đủ 5 bộ test. Đối chiếu FR và SC với code và test; ghi bảng vào cuối `specs/013-topic-picker/tasks.md`. Quickstart mục 2 (khoá thật) cần người dùng tự đặt khoá trong terminal của họ, nên **hỏi người dùng trước khi chạy**.
+- [X] T021 Chạy đủ 5 bộ test. Đối chiếu FR và SC với code và test; ghi bảng vào cuối `specs/013-topic-picker/tasks.md`. Quickstart mục 2 (khoá thật) cần người dùng tự đặt khoá trong terminal của họ, nên **hỏi người dùng trước khi chạy**.
+  - 2026-11-11: bảng đối chiếu đã ghi; 5 bộ test đạt. Bài chạy với khoá thật chờ người dùng tự đặt khoá.
 
 ## Dependencies & Execution Order
 
@@ -135,3 +136,32 @@
 2. **US2**: hàng đợi và luật lấy đề.
 3. **US3**: online.
 4. Polish: bài chạy với khoá thật chỉ làm khi người dùng đã tự đặt khoá.
+
+## Phase 7: Convergence
+
+- [X] T022 Thêm nút "Check the queue again" vào mục Topics của trang kênh (`tools/studio/studio/web/app.js`): chấm lại tối đa 20 đề trong hàng đợi qua `POST /channels/{slug}/topics/score` per FR-010 (partial: ở bản online chưa có cách chấm lại cả hàng đợi)
+
+## Đối chiếu sau implement (T021)
+
+| Yêu cầu | Code | Kiểm chứng |
+|---|---|---|
+| FR-001 tối đa 20 đề, 3–120 ký tự | `score_batch`, `ScoreIn` | test_topics `Scores.test_cli`; API 422 |
+| FR-001a gợi ý tối đa 10 đề | `topics_fit` (`suggested`), `--suggest`, ô Suggest | `Scores.test_cli` (có đề `suggested`), `test_score_queue_and_film` |
+| FR-002 5 mục theo ngôn ngữ và vùng của kênh | `fetch_topic`, `score_*`, `topics_fit` | `Scores.test_tables_at_their_edges`, `test_sample_topics_match_the_hand_checks` |
+| FR-003 GO, HOLD, DROP, PRIORITY | `verdict`, `cooling` | 4 đề mẫu, mỗi đề một kết luận (SC-001) |
+| FR-004 bằng chứng và số liệu thô | `score_raw`, `raw` | đường dẫn video, `closest_film` (`test_overlap_names_the_film`) |
+| FR-005 lặp lại được; không cần mạng | `score_raw` chỉ dùng `raw` | chấm lại từ `raw` cho cùng kết quả |
+| FR-006 thứ tự hàng đợi | `queue` | `Queue.test_order` |
+| FR-007 kiểu đề, luật 2 phim gần nhất | `guess_type`, Claude, `take` | `Queue.test_take_skips_the_last_two_types_and_stale`; API sửa kiểu |
+| FR-008 kênh mẫu, không vào git | `references.json` trong `.gitignore`, `reference_hit` | `Scores.test_reference_channel_blocks`, `test_references` |
+| FR-009 lấy đề → đang làm → đã làm | `take`, `mark_made`, `POST /jobs topic`, worker `topic_made`, `publish` local | `Queue.test_publish_marks_the_topic_made`, `test_score_queue_and_film` |
+| FR-010 đề cũ, chấm lại | `stale`, `topics recheck`, nút Check again | `Queue.test_stale_needs_permission` |
+| FR-011 khoá kín | `redact`, `save_key`/`save_online_key` quyền 600, `last4` | `Secret.test_the_key_never_shows`, `test_key_only_for_the_owner`, `test_proxy_refuses_film_jobs_and_hides_the_key` (SC-004) |
+| FR-012 hạn mức, ≤ 400 đơn vị mỗi đề | `Usage`, `PRICE` | `Plumbing.test_usage_by_day_and_limit`, `test_quota_stops_and_keeps`, đơn vị mỗi đề (SC-002) |
+| FR-013 số liệu tạm 24 giờ | `Cache` (local và proxy) | lần chấm lại tốn 0 đơn vị (local và online) |
+| FR-014 lệnh local, TOPICS.md | cli `topics …` | `Scores.test_cli`, `Queue.test_refs_and_cli_take` |
+| FR-015 mục Topics online | app.js `fillTopics` | `test_page_in_a_browser` |
+| FR-016 theo người, giới hạn đề mỗi ngày | `channel_or_404`, `topics_today` | `test_others_get_404` (SC-006), `test_limit_per_day` |
+| FR-017 không tải video | chỉ 4 endpoint số liệu, proxy chặn endpoint khác | đọc lại code |
+| SC-001 … SC-006 | | đều có test tự động, như trên |
+| Bài chạy với khoá thật | | **chưa chạy**: người dùng cần tự đặt khoá (`config youtube-key`) trong terminal của họ |

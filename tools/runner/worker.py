@@ -512,7 +512,7 @@ class Worker:
             old = inp.get("revise_of")
             if old and (acct / "films" / old).is_dir() and not (work / "films" / old).exists():
                 shutil.copytree(acct / "films" / old, work / "films" / old)     # the film to change, kept as it is
-            if inp.get("channel") and not (work / "films" / inp["film"] / "channel.json").exists():
+            if j["kind"] == "film" and inp.get("channel") and not (work / "films" / inp["film"] / "channel.json").exists():
                 from filmcheck import channels           # the channel's snapshot for this film (specs/012 R2)
                 from studio import resources
                 channels.attach(acct, work / "films" / inp["film"], inp["channel"],
@@ -578,6 +578,9 @@ class Worker:
                 return
             self.notify(j, "review_needed")
             return
+        if j["kind"] == "topics":                  # specs/013 R6: merge the scores into the channel, no QC
+            self.finish_topics(j, work, result)
+            return
         rep = j.get("reported") or {}
         cut = j.get("publish_cut") if j["kind"] == "film" else None
         if cut and not rep.get("done"):            # stopped during Publish: the film is delivered (specs/011 R7)
@@ -619,6 +622,7 @@ class Worker:
             dest = store.account_dir(j["owner"]) / "films" / film
             shutil.copytree(work / "films" / film, dest, dirs_exist_ok=True)
             self.save_lesson_draft(j, work / "films" / film)
+            self.topic_made(j, film)
             j = jobs.finish(job_id, "done", links={"film": film})
         else:
             slug = rep.get("style")
@@ -640,6 +644,41 @@ class Worker:
         self.notify(j, "job_done")
         shutil.rmtree(work, ignore_errors=True)
         log.info("job %s done", job_id)
+
+    def finish_topics(self, j: dict, work: Path, result: dict) -> None:
+        from filmcheck import topics
+        inp = j.get("input") or {}
+        got = store.read_json(work / "topics-result.json")
+        if not got:
+            self.failed(j["id"], result.get("error") or "The topics could not be scored.")
+            return
+        acct = store.account_dir(j["owner"])
+        data = topics.load(acct, inp["channel"])
+        by_n = {t["n"]: t for t in data["topics"]}
+        for t in got["topics"]:                       # the job scored a copy: its numbers win for those topics
+            by_n[t["n"]] = t
+        data["topics"] = list(by_n.values())
+        topics.save(acct, inp["channel"], data, (inp.get("channel_profile") or {}).get("name"))
+        note = f"{len(got['topics'])} topics scored · {got.get('units', 0)} YouTube units"
+        if got.get("stopped"):
+            note += " · stopped: the studio's YouTube units for today are used up"
+        jobs.update(j["id"], lambda x: x["log"].append(jobs._line(note)))
+        jobs.finish(j["id"], "done", links={})
+        shutil.rmtree(work, ignore_errors=True)
+
+    def topic_made(self, j: dict, film: str) -> None:
+        """A film made from a queued topic: the topic is made (specs/013 FR-009)."""
+        inp = j.get("input") or {}
+        if not (inp.get("channel") and inp.get("topic")):
+            return
+        from filmcheck import topics
+        acct = store.account_dir(j["owner"])
+        data = topics.load(acct, inp["channel"])
+        try:
+            topics.mark_made(data, inp["topic"], film)
+            topics.save(acct, inp["channel"], data)
+        except topics.TopicError:
+            pass
 
     def save_lesson_draft(self, j: dict, film_dir: Path) -> None:
         """A changed film asked to become a lesson: the agent's LESSON_DRAFT.json goes to the channel as a draft

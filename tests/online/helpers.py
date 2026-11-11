@@ -216,6 +216,19 @@ def fake_upstream():
                              "content": [{"type": "text", "text": "ok"}], "stop_reason": "end_turn", "usage": FAKE_USAGE},
                             headers=plan_headers)
     app.state.seen = seen
+    app.state.yt_keys, app.state.yt_calls = [], []
+
+    @app.get("/youtube/v3/{endpoint}")
+    def youtube(endpoint: str, request: Request):
+        """A fake YouTube Data API with the hand-checked numbers of tests/filmcheck/youtube_samples.py (specs/013)."""
+        sys.path.insert(0, str(REPO / "tests" / "filmcheck"))
+        import youtube_samples
+        params = dict(request.query_params)
+        app.state.yt_calls.append(endpoint)
+        if params.get("id") == "dQw4w9WgXcQ" and params.get("key", "").startswith("AIzaBAD"):
+            return JSONResponse({"error": {"code": 400, "message": "API key not valid"}}, status_code=400)
+        return youtube_samples.answer(endpoint, params, app.state.yt_keys)
+
     return app
 
 
@@ -231,9 +244,11 @@ class Studio(OnlineProject):
                                                          "ANTHROPIC_API_KEY", "ANTHROPIC_UPSTREAM", "STUDIO_CLAUDE_BIN")})
         self.upstream_app = fake_upstream()
         self.upstream = Server(self.upstream_app)
+        self.old["STUDIO_YOUTUBE_URL"] = os.environ.get("STUDIO_YOUTUBE_URL")
         os.environ.update(RUNNER="local", STUDIO_MODERATION="fake", ANTHROPIC_API_KEY=REAL_KEY,
                           ANTHROPIC_UPSTREAM=self.upstream.url, STUDIO_CLAUDE_BIN=str(FAKE_CLAUDE),
-                          STUDIO_AGENT_CMD=f"{sys.executable} {FAKE_AGENT}")
+                          STUDIO_AGENT_CMD=f"{sys.executable} {FAKE_AGENT}",
+                          STUDIO_YOUTUBE_URL=self.upstream.url + "/youtube/v3")
         if plan:
             os.environ.pop("ANTHROPIC_API_KEY")
         sys.path.insert(0, str(REPO / "tools" / "runner"))

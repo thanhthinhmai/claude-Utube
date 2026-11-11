@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/v1")
 
 import sys as _sys  # noqa: E402
 _sys.path.insert(0, str(Path(__file__).resolve().parents[2]))     # tools/: filmcheck (channels, specs/012)
-from filmcheck import channels  # noqa: E402
+from filmcheck import channels, topics as yt_topics  # noqa: E402
 
 
 class SignupIn(BaseModel):
@@ -181,6 +181,7 @@ class JobIn(BaseModel):
     uploads: Optional[List[str]] = Field(default=None, max_length=20)
     # film for one of the customer's channels (specs/012); for a learn job `channel` is the YouTube URL instead
     lesson: bool = False
+    topic: Optional[int] = Field(default=None, ge=1)
 
 
 # what the customer ticks before a YouTube fetch (constitution 2.1.0, "Bản quyền và nội dung")
@@ -276,7 +277,21 @@ def make_job(body: JobIn, a) -> dict:
            "review_treatment": body.review_treatment, "film": name}
     if slug:
         inp["channel"] = slug
+    if body.topic is not None:                         # a topic of the channel's queue (specs/013 FR-009)
+        if not slug:
+            raise StudioError("invalid", "đề thuộc một kênh: hãy gửi kèm kênh", 422)
+        data = yt_topics.load(store.root(), slug)
+        try:
+            t = yt_topics.find(data, body.topic)
+        except yt_topics.TopicError:
+            raise StudioError("not_found", f"không có đề #{body.topic}", 404) from None
+        if t["status"] not in ("queued", "in_progress"):
+            raise StudioError("invalid", f"đề #{body.topic} đang ở trạng thái {t['status']}", 409)
+        inp["topic"] = body.topic
     j = quotas.reserve(a, "film", body.idea[:80], {"film": name, "style": body.style}, inp)
+    if body.topic is not None:                         # only once the film is really ordered
+        t["status"], t["film"], t["taken_at"] = "in_progress", name, store.now_iso()
+        yt_topics.save(store.root(), slug, data)
     if note:
         j = jobs.log(j["id"], note)
     return view(j, a)
@@ -439,6 +454,135 @@ def retire_channel_lesson(slug: str, n: int, request: Request):
     me(request)
     channel_or_404(slug)
     return _ch(lambda: channels.retire(channels.lessons_file(store.root(), slug), n))
+
+
+# ---------- topics (specs/013 contracts/api.md) ----------
+class ScoreIn(BaseModel):
+    topics: List[str] = Field(min_length=1, max_length=yt_topics.MAX_TOPICS)
+    suggest: bool = False
+
+
+class TypeIn(BaseModel):
+    type: str = Field(max_length=20)
+
+
+class FitIn(BaseModel):
+    score: int = Field(ge=0, le=10)
+
+
+class TakeIn(BaseModel):
+    allow_stale: bool = False
+
+
+class RefsIn(BaseModel):
+    channels: List[str] = Field(max_length=yt_topics.MAX_REFS)
+
+
+def _public(t: dict) -> dict:
+    return {k: v for k, v in t.items() if k != "raw"}
+
+
+def topics_today(account_id: str) -> int:
+    """Topics this person asked to score today (UTC day), suggestions not counted."""
+    day = store.now_iso()[:10]
+    return sum(len((j.get("input") or {}).get("topics") or []) for j in jobs.all_jobs(account_id)
+               if j["kind"] == "topics" and (j.get("started_at") or "")[:10] == day)
+
+
+def _topics_or(fn):
+    try:
+        return fn()
+    except yt_topics.TopicError as e:
+        raise StudioError("invalid", str(e), 422) from None
+
+
+@router.get("/channels/{slug}/topics")
+def get_topics(slug: str, request: Request):
+    a = me(request)
+    channel_or_404(slug)
+    data = yt_topics.load(store.root(), slug)
+    return {"topics": [_public(t) for t in data["topics"]], "queue": yt_topics.queue(data),
+            "stale": [t["n"] for t in data["topics"] if yt_topics.stale(t)],
+            "usage": {"today": topics_today(a["id"]), "limit": quotas.settings().get("topics_per_day", 40)}}
+
+
+@router.post("/channels/{slug}/topics/score", status_code=201)
+def score_topics(slug: str, body: ScoreIn, request: Request):
+    a = me(request)
+    ch = channel_or_404(slug)
+    texts = [t.strip() for t in body.topics if t.strip()]
+    if not texts or any(not 3 <= len(t) <= 120 for t in texts):
+        raise StudioError("invalid", "mỗi đề có 3–120 ký tự", 422)
+    if not yt_topics.read_online_key(db.data_dir()):
+        raise StudioError("youtube_not_ready", "xưởng chưa có khoá YouTube; chủ xưởng đặt trong Settings", 503)
+    limit = quotas.settings().get("topics_per_day", 40)
+    if topics_today(a["id"]) + len(texts) > limit:
+        from datetime import datetime, timedelta, timezone
+        e = StudioError("topics_limit", f"mỗi ngày chấm tối đa {limit} đề", 429)
+        e.extra = {"retry_at": (datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+                                + timedelta(days=1)).isoformat(timespec="seconds")}
+        raise e
+    data = yt_topics.load(store.root(), slug)
+    inp = {"kind": "topics", "channel": slug, "topics": texts, "suggest": body.suggest, "channel_profile": ch,
+           "references": yt_topics.load_refs(store.root(), slug), "made": yt_topics.made_items(store.root(), slug, data),
+           "existing": data["topics"]}
+    j = jobs.build("topics", f"Topics for {ch['name']}"[:80], {}, owner=a["id"], status="queued",
+                   extra={"input": inp, "charged": False})
+    store.doc_put("job", j["id"], j)
+    return view(j, a)
+
+
+def _save_topics(slug, data):
+    ch = channel_or_404(slug)
+    yt_topics.save(store.root(), slug, data, ch.get("name"))
+
+
+@router.post("/channels/{slug}/topics/{n}/type")
+def topic_type(slug: str, n: int, body: TypeIn, request: Request):
+    me(request)
+    channel_or_404(slug)
+    data = yt_topics.load(store.root(), slug)
+    t = _topics_or(lambda: yt_topics.set_type(data, n, body.type))
+    _save_topics(slug, data)
+    return _public(t)
+
+
+@router.post("/channels/{slug}/topics/{n}/fit")
+def topic_fit(slug: str, n: int, body: FitIn, request: Request):
+    me(request)
+    channel_or_404(slug)
+    data = yt_topics.load(store.root(), slug)
+    t = _topics_or(lambda: yt_topics.set_fit(data, n, body.score, yt_topics.made_items(store.root(), slug, data)))
+    _save_topics(slug, data)
+    return _public(t)
+
+
+@router.post("/channels/{slug}/topics/take")
+def topic_take(slug: str, body: TakeIn, request: Request):
+    """The next topic to make (R4); it becomes in progress when a film is made with it."""
+    me(request)
+    channel_or_404(slug)
+    data = yt_topics.load(store.root(), slug)
+    t, skipped = yt_topics.take(json.loads(json.dumps(data)), None, body.allow_stale)    # a dry run: nothing saved
+    if not t:
+        e = StudioError("none_left", "không còn đề nào lấy được lúc này", 409)
+        e.extra = {"skipped": skipped}
+        raise e
+    return {"topic": _public(yt_topics.find(data, t["n"])), "skipped": skipped}
+
+
+@router.get("/channels/{slug}/references")
+def get_refs(slug: str, request: Request):
+    me(request)
+    channel_or_404(slug)
+    return {"channels": yt_topics.load_refs(store.root(), slug)}
+
+
+@router.put("/channels/{slug}/references")
+def put_refs(slug: str, body: RefsIn, request: Request):
+    me(request)
+    channel_or_404(slug)
+    return {"channels": _topics_or(lambda: yt_topics.save_refs(store.root(), slug, body.channels))}
 
 
 @router.get("/lessons/shared")
@@ -778,7 +922,37 @@ def account_row(con, row) -> dict:
 @router.get("/admin/settings")
 def get_settings(request: Request):
     admin(request)
-    return quotas.settings()
+    s = quotas.settings()
+    key = yt_topics.read_online_key(db.data_dir())        # specs/013: never the key itself
+    return {**s, "youtube_key_set": bool(key), "youtube_key_last4": key[-4:] if key else None,
+            "youtube_units_today": yt_topics.online_usage(db.data_dir(), s.get("youtube_daily_units", 9000)).today()}
+
+
+class YouTubeKeyIn(BaseModel):
+    key: str = Field(min_length=20, max_length=100)
+
+
+@router.put("/admin/youtube-key")
+def put_youtube_key(body: YouTubeKeyIn, request: Request):
+    """Try the key with one 1-unit call, then keep it (specs/013 FR-011). The answer never contains it."""
+    admin(request)
+    key = body.key.strip()
+    s = quotas.settings()
+    f = yt_topics.Fetcher.local(key, yt_topics.online_usage(db.data_dir(), s.get("youtube_daily_units", 9000)),
+                                yt_topics.Cache(db.data_dir() / "youtube" / "check", hours=0))
+    try:
+        f.get("videos", {"part": "id", "id": "dQw4w9WgXcQ"})
+    except (yt_topics.TopicError, yt_topics.QuotaError) as e:
+        raise StudioError("youtube_key_invalid", "khoá YouTube không dùng được: " + yt_topics.redact(str(e), key), 422) from None
+    yt_topics.save_online_key(db.data_dir(), key)
+    return {"set": True, "last4": key[-4:]}
+
+
+@router.delete("/admin/youtube-key", status_code=204)
+def delete_youtube_key(request: Request):
+    admin(request)
+    yt_topics.online_key_file(db.data_dir()).unlink(missing_ok=True)
+    return Response(status_code=204)
 
 
 @router.put("/admin/settings")

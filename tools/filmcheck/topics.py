@@ -138,6 +138,34 @@ def save_key(key: str) -> None:
         f.write(key.strip() + "\n")
 
 
+def online_key_file(data_dir: Path) -> Path:
+    return Path(data_dir) / "secrets" / "youtube.key"
+
+
+def online_usage(data_dir: Path, limit: int) -> Usage:
+    return Usage(Path(data_dir) / "youtube" / "usage.json", limit)
+
+
+def online_cache(data_dir: Path) -> Cache:
+    return Cache(Path(data_dir) / "youtube" / "cache")
+
+
+def read_online_key(data_dir: Path):
+    try:
+        return online_key_file(data_dir).read_text(encoding="utf-8").strip() or None
+    except OSError:
+        return None
+
+
+def save_online_key(data_dir: Path, key: str) -> None:
+    f = online_key_file(data_dir)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    os.chmod(f.parent, 0o700)
+    fd = os.open(f, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as out:
+        out.write(key.strip() + "\n")
+
+
 def no_template_params(params: dict) -> dict:
     """Times rounded to the hour, so a recheck within the hour hits the cache."""
     out = dict(params)

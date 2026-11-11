@@ -7,7 +7,7 @@ import time
 from . import store
 from .store import StudioError
 
-KINDS = {"learn", "film"}
+KINDS = {"learn", "film", "topics"}
 STORED = {"queued", "running", "waiting_review", "waiting_resume", "done", "failed", "stopped"}
 FINAL = {"done", "failed", "stopped"}
 INACTIVE_AFTER = 600          # s without any update while running → shown as inactive
