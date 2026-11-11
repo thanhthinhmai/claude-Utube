@@ -35,7 +35,7 @@ port=${url##*:}
 case $(uname -s) in
   Linux)
     command -v bwrap >/dev/null && command -v socat >/dev/null || fail "bwrap or socat missing"
-    bwrap --ro-bind / / --bind "$work" "$work" --dev /dev --proc /proc --tmpfs /tmp \
+    bwrap --ro-bind / / --dev /dev --proc /proc --tmpfs /tmp --bind "$work" "$work" \
       sh -c "echo ok > '$work/in' && ! (echo bad > '$HOME/smoke-out') 2>/dev/null && curl -fsS http://127.0.0.1:$port/api/v1/health >/dev/null" \
       || fail "bwrap sandbox"
     ;;
