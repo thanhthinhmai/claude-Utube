@@ -8,6 +8,14 @@
 
 **Input**: User description: "Chế độ Client của app desktop": một bộ cài, chọn **Host** (chạy cả xưởng) hoặc **Client** (chỉ cửa sổ app, nối vào Host), như neb-creative-tool.
 
+## Clarifications
+
+### Session 2026-11-11
+
+- Q: Kết nối Client–Host mã hoá thế nào? → A: Host tự tạo chứng chỉ HTTPS riêng. Lúc ghép đôi, Client ghi nhớ dấu vân tay của Host và chỉ nối vào đúng Host đó (FR-008).
+- Q: Client có cần license key riêng? → A: Không. Client dùng license của Host; Host bị khoá thì Client cũng bị khoá (FR-010).
+- Q: Client lấy bản mới từ đâu? → A: Qua Host. Host chuyển tiếp bản phát hành có chữ ký cho các Client đã ghép đôi (FR-011).
+
 ## Bối cảnh
 
 Hiện app desktop (015, 016, 017) chỉ có một chế độ: mỗi máy chạy cả xưởng của mình. Phần lõi chỉ nghe ở `127.0.0.1` (014 FR-003), nên chỉ chính máy đó dùng được.
@@ -55,7 +63,7 @@ Mật khẩu và phiên đăng nhập của thành viên đi qua mạng. Kết n
 
 **Acceptance Scenarios**:
 
-1. **Given** Client và Host đã ghép đôi, **When** Client gửi mật khẩu, **Then** dữ liệu đi qua kết nối mã hoá. [NEEDS CLARIFICATION: kết nối mã hoá thế nào?]
+1. **Given** Client và Host đã ghép đôi, **When** Client gửi mật khẩu, **Then** dữ liệu đi qua HTTPS bằng chứng chỉ riêng của Host, và Client chỉ chấp nhận đúng dấu vân tay đã ghi nhớ lúc ghép đôi.
 2. **Given** một máy khác trả lời ở địa chỉ của Host, **When** Client nối vào, **Then** Client từ chối và báo "This is not the studio you paired with".
 
 ---
@@ -70,8 +78,8 @@ Thành viên không phải tự tìm bản cài mới. App Client dùng được
 
 **Acceptance Scenarios**:
 
-1. **Given** Client mở app, **When** cần license, **Then** [NEEDS CLARIFICATION: Client có cần license key riêng không?]
-2. **Given** có bản mới, **When** Client kiểm, **Then** [NEEDS CLARIFICATION: Client lấy bản mới từ đâu?]
+1. **Given** Client mở app, **When** cần license, **Then** Client không hỏi key. Nếu Host đang bị khoá (017), Client thấy trang "claude-Utube is locked" của Host.
+2. **Given** có bản mới, **When** Client kiểm, **Then** Client lấy bản mới qua Host (Host chuyển tiếp từ máy chủ license bằng license của chính nó), kiểm chữ ký và SHA-256 như 017, rồi cài (Windows) hoặc mở `.dmg` (macOS).
 
 ---
 
@@ -105,12 +113,20 @@ Thành viên không phải tự tìm bản cài mới. App Client dùng được
 **Client**
 - **FR-006**: App Client MUST không cần WSL2, phần lõi hay mô hình. Nó chỉ có cửa sổ chính mở xưởng của Host, khay, và thiết lập kết nối.
 - **FR-007**: Client MUST nhớ Host đã ghép đôi: địa chỉ, và danh tính của Host dùng để kiểm kết nối. Lần mở sau Client nối thẳng vào. Mất kết nối thì Client hiện trang "Cannot reach the studio" với nút thử lại và nút sửa địa chỉ.
-- **FR-008**: Kết nối Client–Host MUST được mã hoá, và Client MUST chỉ nối vào đúng Host đã ghép đôi (US2). [NEEDS CLARIFICATION: cách mã hoá, xem Q1]
+- **FR-008**: Kết nối Client–Host MUST được mã hoá, và Client MUST chỉ nối vào đúng Host đã ghép đôi (US2).
+  - Host tự tạo một chứng chỉ riêng, giữ suốt đời của Host.
+  - Lúc ghép đôi, hai bên chứng minh cùng biết mã ghép đôi mà không gửi mã qua mạng, và gắn bằng chứng đó với dấu vân tay của chứng chỉ. Máy đứng giữa vì thế không giả được Host.
+  - Mã ghép đôi chỉ dùng được trong 10 phút sau khi chủ xưởng bấm "Add a computer".
 - **FR-009**: Thoát Client MUST không ảnh hưởng tới Host hay các phim đang chạy trên Host.
 
 **License và cập nhật**
-- **FR-010**: License của Client: [NEEDS CLARIFICATION: xem Q2]
-- **FR-011**: Cập nhật của Client: theo cách đã chọn ở FR-010 và Q2. Windows cài khi thoát, macOS mở `.dmg` (như 017).
+- **FR-010**: Client MUST không hỏi license key. Chế độ Client không kiểm license; Host kiểm license của chính nó (017), và khi Host bị khoá thì mọi trang qua cổng chia sẻ là trang khoá.
+- **FR-011**: Client MUST kiểm bản mới qua Host theo lịch của 017:
+  - Host chuyển tiếp danh sách và tệp của bản phát hành từ máy chủ license, bằng lease của chính Host, và chỉ cho Client đã ghép đôi;
+  - Client kiểm chữ ký `release.json` bằng khoá công khai có sẵn trong app, rồi kiểm SHA-256 của tệp;
+  - Windows cài khi thoát, macOS mở `.dmg`.
+
+  Bản build không có license (không có máy chủ license) thì Client không tự cập nhật.
 
 ### Key Entities
 

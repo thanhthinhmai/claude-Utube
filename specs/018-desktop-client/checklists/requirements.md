@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,4 +31,4 @@
 
 ## Notes
 
-- Chờ người dùng trả lời 3 câu: mã hoá kết nối (FR-008), license của Client (FR-010), nguồn cập nhật của Client (FR-011).
+- Đã trả lời 3 câu (2026-11-11): HTTPS có ghi nhớ dấu vân tay; Client không cần key; cập nhật qua Host.
