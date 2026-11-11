@@ -192,6 +192,7 @@
 
 - [X] T029 [P] Viết quickstart mục 2 trên một phim có sẵn trong `films/`: chạy `sh bin/studio publish <phim>` thật, xem 3 thumbnail. Ghi kết quả (mã thoát, lỗi còn lại nếu có, thời gian chạy) vào cuối `specs/011-publish-pack/quickstart.md`.
 - [ ] T030 Chạy đủ 5 bộ test. Đối chiếu từng FR-001 … FR-017 và SC-001 … SC-006 với code và test; ghi bảng đối chiếu vào cuối `specs/011-publish-pack/tasks.md`. SC-004 và SC-005 cần bài chạy thật (quickstart mục 3), nên **hỏi người dùng trước khi chạy**, vì tốn tiền.
+  - 2026-11-11: bảng đối chiếu đã ghi. Người dùng chọn gộp trước; bài chạy thật (SC-004, SC-005) để cho lần làm phim kế tiếp.
 
 ## Dependencies & Execution Order
 
