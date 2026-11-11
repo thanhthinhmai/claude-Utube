@@ -21,6 +21,9 @@
 set -eu
 
 ROOT=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd -P)
+# Bản đóng gói của app desktop (specs/016): PATH tới node, ffmpeg đi kèm
+# shellcheck disable=SC1091
+if [ -f "$ROOT/env.sh" ]; then . "$ROOT/env.sh"; fi
 LIB_REL=lib/lemo-opuscar
 LIB="$ROOT/$LIB_REL"
 TMP="$ROOT/lib/.lemo-opuscar.tmp"

@@ -1,0 +1,43 @@
+# Build the desktop installers and their studio cores (specs/016 R6, FR-009), check them on clean machines, and
+# publish a private GitHub Release. Runs on a desktop-vX.Y.Z tag, by hand, and on the 016 branch while it is built.
+name: desktop-release
+on:
+  push:
+    tags: ["desktop-v*"]
+    branches: ["[0-9][0-9][0-9]-desktop-installers"]
+    paths: ["deploy/core.Dockerfile", "desktop/core-build/**", ".github/workflows/desktop-release.yml"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "version, for example 0.1.0-test"
+        required: true
+
+env:
+  VERSION: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/desktop-v') && github.ref_name) || '0.0.0-dev' }}
+
+jobs:
+  core-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - name: version
+        run: echo "VERSION=${VERSION#desktop-v}" >> "$GITHUB_ENV"
+      - name: build the Linux core
+        run: sh desktop/core-build/build-linux.sh "$VERSION"
+      - name: check the exported Linux (as WSL would run it)
+        run: |
+          # GitHub's Ubuntu blocks user namespaces for unconfined programs; WSL's kernel does not
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          cat dist/core/linux/core-manifest.json
+          docker import "dist/core/linux/claude-utube-core-linux-x64-$VERSION.tar.gz" cu-core-import
+          docker run --rm --security-opt seccomp=unconfined --security-opt apparmor=unconfined \
+            -u studio -e HOME=/home/studio -e LANG=C.UTF-8 -w /home/studio/claude-Utube \
+            -v "$PWD/desktop/core-build:/smoke:ro" -v "$PWD/CREDITS:/smoke-credits:ro" \
+            cu-core-import sh -c 'sh /smoke/smoke-core.sh && python3 /smoke/credits-check.py --root . --sys / --credits /smoke-credits'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: core-linux
+          path: dist/core/linux/
+          retention-days: 3
+          compression-level: 0

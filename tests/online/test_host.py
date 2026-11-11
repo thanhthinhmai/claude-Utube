@@ -316,6 +316,54 @@ class WriteGuard(unittest.TestCase):                                            
             shutil.rmtree(tmp, ignore_errors=True)
 
 
+class Packaged(unittest.TestCase):                                                     # specs/016 T007
+    def run_cli(self, *args, env=None):
+        return subprocess.run(["sh", str(STUDIO), "app", *args], capture_output=True, text=True, timeout=60,
+                              env={**os.environ, **(env or {})})
+
+    def test_models(self):
+        r = self.run_cli("models", env={"CU_MODELS_FAKE": "1"})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(r.stdout.split(), ["✓", "base.en", "✓", "base"])
+        r = self.run_cli("models", env={"CU_MODELS_FAKE": "fail"})
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("✗ base.en: network is unreachable", r.stdout)
+
+    def test_sandbox_env(self):
+        from studio import host
+        tmp = Path(tempfile.mkdtemp(prefix="studio-sbx."))
+        try:
+            real = shutil.which
+            host.shutil.which = lambda t, *a, **k: f"/usr/bin/{t}"
+            self.assertEqual(host.part_env(tmp, REPO, 1, 2).get("STUDIO_AGENT_SANDBOX"), "1")
+            host.shutil.which = lambda t, *a, **k: None if t == "bwrap" else f"/usr/bin/{t}"
+            expect = "1" if sys.platform == "darwin" else None
+            self.assertEqual(host.part_env(tmp, REPO, 1, 2).get("STUDIO_AGENT_SANDBOX"), expect)
+        finally:
+            host.shutil.which = real
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_agent_sandbox_options(self):
+        sys.path.insert(0, str(REPO / "tools" / "runner"))
+        import agent
+        old = {k: os.environ.get(k) for k in ("STUDIO_AGENT_SANDBOX", "TMPDIR")}
+        try:
+            os.environ.pop("STUDIO_AGENT_SANDBOX", None)
+            self.assertIsNone(agent.sandbox_options())
+            os.environ.update(STUDIO_AGENT_SANDBOX="1", TMPDIR="/data/tmp")
+            o = agent.sandbox_options()
+            self.assertTrue(o["enabled"])
+            self.assertFalse(o["allowUnsandboxedCommands"])
+            self.assertEqual(o["network"]["allowedDomains"], ["127.0.0.1", "localhost"])
+            self.assertEqual(o["filesystem"]["allowWrite"], ["/data/tmp"])
+        finally:
+            for k, v in old.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+
 def _alive(pid):
     try:
         os.kill(int(pid), 0)

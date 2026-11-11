@@ -181,7 +181,16 @@ def part_env(data: Path, project: Path, web: int, proxy: int) -> dict:
                STUDIO_URL=f"http://127.0.0.1:{web}", MAIL_DIR=str(data / "mail"), TMPDIR=str(data / "tmp"),
                PYTHONUNBUFFERED="1")
     (data / "tmp").mkdir(exist_ok=True)
+    if sandbox_available():
+        env["STUDIO_AGENT_SANDBOX"] = "1"
     return env
+
+
+def sandbox_available() -> bool:
+    """The agent's Bash can run in an OS sandbox (specs/016 R5): Seatbelt on macOS, bubblewrap and socat on Linux."""
+    if sys.platform == "darwin":
+        return True
+    return bool(shutil.which("bwrap") and shutil.which("socat"))
 
 
 def _logger(data: Path, part: str) -> logging.Logger:
@@ -300,7 +309,8 @@ def start(data=None, web_port=None, proxy_port=None, foreground=False, project: 
         raise HostError("some tools are missing; the studio does not install system software")
     web = free_port(WEB_PORTS, web_port)
     proxy = free_port(PROXY_PORTS, proxy_port, avoid={web})
-    out(SANDBOX_WARNING)
+    if not sandbox_available():
+        out(SANDBOX_WARNING)
     if foreground:
         out(f"URL: http://127.0.0.1:{web}")
         return supervise(data, web, proxy, project)
@@ -360,6 +370,28 @@ def check(project: Path = PROJECT) -> dict:
     """What the desktop app shows on its setup screen (specs/015 R2)."""
     missing = check_tools(project)
     return {"ok": not missing, "missing": missing, "data_default": str(default_data_dir())}
+
+
+WHISPER_MODELS = ("base.en", "base")   # small (Chinese) downloads on first use
+
+
+def models(project: Path = PROJECT, out=print) -> int:
+    """Download the speech-check models into the HuggingFace cache (specs/016 R3). Skips what is there."""
+    py = project / "lib" / "lemo-opuscar" / ".venv" / "bin" / "python"
+    if not py.is_file() and not os.environ.get("CU_MODELS_FAKE"):
+        out("✗ the library's packages are missing: sh bin/studio deps voice")
+        return 1
+    code = 0
+    for name in WHISPER_MODELS:
+        if os.environ.get("CU_MODELS_FAKE"):
+            ok, err = os.environ["CU_MODELS_FAKE"] != "fail", "network is unreachable"
+        else:
+            r = subprocess.run([str(py), "-c", "import sys; from faster_whisper.utils import download_model; "
+                                "download_model(sys.argv[1])", name], capture_output=True, text=True)
+            ok, err = r.returncode == 0, (r.stderr.strip().splitlines() or ["unknown error"])[-1]
+        out(f"✓ {name}" if ok else f"✗ {name}: {err}")
+        code = code if ok else 1
+    return code
 
 
 def stop(data=None, force=False, out=print) -> int:

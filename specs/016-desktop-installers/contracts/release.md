@@ -24,6 +24,6 @@
 
 Lỗi ở bước nào thì hiện lỗi và nút "Try again", rồi chạy lại từ bước đó.
 
-## `sh bin/studio app models [--json]`
+## `sh bin/studio app models`
 
 Tải Whisper `base.en` và `base` vào bộ nhớ đệm HuggingFace. In một dòng cho mỗi mô hình (`✓ base.en`). Mã 0 khi xong; mã 1 khi lỗi mạng, kèm dòng lỗi. Chạy lại thì bỏ qua mô hình đã có.

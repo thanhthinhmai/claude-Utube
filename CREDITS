@@ -2,6 +2,117 @@
 
 Third-party software and assets used by the studio's own code (constitution: "Bản quyền và nội dung").
 Films record their own fonts, music and voices in films/<name>/CREDITS.
+The desktop installers (specs/016) carry the parts below. Their license texts ship inside the core:
+Python packages in each `*.dist-info/`, npm packages in `node_modules/*/`, Debian packages in
+`/usr/share/doc/<package>/copyright`. `desktop/core-build/credits-check.py` checks this list on every release.
+
+## Named parts
 
 - Electron (https://www.electronjs.org), MIT License, the desktop app window (desktop/, specs/015).
 - Desktop icons (desktop/assets/): drawn by desktop/assets/make_icons.py for this project.
+- lemo-opuscar (https://github.com/lemomo-ai/lemo-opuscar), MIT License, the film library (lib/, pinned by library.lock).
+- Python (https://www.python.org), PSF License 2.0. macOS: the python-build-standalone build
+  (https://github.com/astral-sh/python-build-standalone), with the licenses of its bundled parts in `python/share/`.
+- Node.js (https://nodejs.org), MIT License, with the licenses of its bundled parts in its LICENSE file.
+- Chromium headless shell, downloaded by Playwright (https://playwright.dev), BSD-3-Clause and the licenses listed
+  in its own LICENSE files; renders the film pages.
+- FFmpeg and FFprobe (https://ffmpeg.org), GPL-3.0, static builds. Linux: https://johnvansickle.com/ffmpeg/
+  (source: https://ffmpeg.org/releases/). macOS: the ffmpeg-static and @ffprobe-installer npm packages
+  (source: https://ffmpeg.org/releases/). The GPL text ships next to the binaries.
+- Kokoro-82M voice model (https://huggingface.co/hexgrad/Kokoro-82M), Apache-2.0; downloaded at setup
+  from the library's own release (onnx export by kokoro-onnx, MIT).
+- Whisper models through faster-whisper (Systran/faster-whisper-base, base.en, small; https://huggingface.co/Systran),
+  MIT License (OpenAI Whisper); downloaded at setup or on first use.
+- espeak-ng (https://github.com/espeak-ng/espeak-ng), GPL-3.0, bundled by espeakng-loader for phonemes.
+- Claude Code, bundled inside the claude-agent-sdk Python package, © Anthropic PBC, used under Anthropic's terms
+  (https://www.anthropic.com/legal); each user signs in with their own Claude account.
+- Debian packages of the Linux core (Windows): Ubuntu 24.04 (https://ubuntu.com) and the apt packages installed by
+  deploy/core.Dockerfile (bubblewrap, socat, fonts-noto, fonts-dejavu, git, curl and their dependencies), each under
+  the license in its `/usr/share/doc/<package>/copyright`.
+
+## Python packages
+
+- aiohappyeyeballs (PSF-2.0)
+- aiohttp (Apache-2.0 AND MIT)
+- aiosignal (Apache-2.0)
+- annotated-doc (MIT)
+- annotated-types (MIT)
+- anthropic (Apache-2.0)
+- anyio (MIT)
+- argon2-cffi (MIT)
+- argon2-cffi-bindings (MIT)
+- attrs (MIT)
+- av (BSD-3-Clause)
+- certifi (MPL-2.0)
+- cffi (MIT-0)
+- claude-agent-sdk (MIT)
+- click (BSD-3-Clause)
+- cloudpickle (BSD-3-Clause)
+- cryptography (Apache-2.0 OR BSD-3-Clause)
+- ctranslate2 (MIT)
+- dlinfo (MIT)
+- docstring_parser (MIT)
+- edge-tts (LGPL-3.0)
+- espeakng-loader (MIT; bundles espeak-ng data, GPL-3.0)
+- fastapi (MIT)
+- faster-whisper (MIT)
+- filelock (MIT)
+- flatbuffers (Apache-2.0)
+- fonttools (MIT)
+- frozenlist (Apache-2.0)
+- fsspec (BSD-3-Clause)
+- h11 (MIT)
+- hf-xet (Apache-2.0)
+- httpcore (BSD-3-Clause)
+- httpcore2 (BSD-3-Clause)
+- httpx (BSD-3-Clause)
+- httpx2 (BSD-3-Clause)
+- huggingface_hub (Apache-2.0)
+- idna (BSD-3-Clause)
+- jiter (MIT)
+- joblib (BSD-3-Clause)
+- jsonschema (MIT)
+- jsonschema-specifications (MIT)
+- kokoro-onnx (MIT)
+- Markdown (BSD-3-Clause)
+- mcp (MIT)
+- mcp-types (MIT)
+- multidict (Apache-2.0)
+- numpy (BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0)
+- onnxruntime (MIT)
+- opentelemetry-api (Apache-2.0)
+- packaging (Apache-2.0 OR BSD-2-Clause)
+- phonemizer (GPL-3.0)
+- pillow (MIT-CMU)
+- pip (MIT)
+- propcache (Apache-2.0)
+- protobuf (BSD-3-Clause)
+- pycparser (BSD-3-Clause)
+- pydantic (MIT)
+- pydantic_core (MIT)
+- pyflakes (MIT)
+- PyJWT (MIT)
+- python-multipart (Apache-2.0)
+- PyYAML (MIT)
+- referencing (MIT)
+- rpds-py (MIT)
+- scipy (BSD-3-Clause)
+- sniffio (MIT OR Apache-2.0)
+- soundfile (BSD-3-Clause)
+- soxr (LGPL-2.1-or-later)
+- sse-starlette (BSD-3-Clause)
+- starlette (BSD-3-Clause)
+- tabulate (MIT)
+- tokenizers (Apache-2.0)
+- tqdm (MPL-2.0 AND MIT)
+- truststore (MIT)
+- typing-inspection (MIT)
+- typing_extensions (PSF-2.0)
+- uvicorn (BSD-3-Clause)
+- yarl (Apache-2.0)
+- yt-dlp (Unlicense)
+
+## npm packages of the library
+
+- playwright-core (Apache-2.0)
+- three (MIT)

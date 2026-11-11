@@ -164,6 +164,17 @@ def write_result(data: dict) -> None:
     (WORK / ".result.json").write_text(json.dumps(data, ensure_ascii=False))
 
 
+def sandbox_options():
+    """Bash in an OS sandbox when the host has one (specs/016 R5): bubblewrap on Linux, Seatbelt on macOS.
+    Writes stay in the job folder and the temp folder; the network reaches only this machine (the proxy)."""
+    if os.environ.get("STUDIO_AGENT_SANDBOX") != "1":
+        return None
+    tmp = os.environ.get("TMPDIR")
+    return {"enabled": True, "autoAllowBashIfSandboxed": True, "allowUnsandboxedCommands": False,
+            "network": {"allowedDomains": ["127.0.0.1", "localhost"], "allowLocalBinding": True},
+            **({"filesystem": {"allowWrite": [tmp]}} if tmp else {})}
+
+
 async def run() -> int:
     from claude_agent_sdk import ClaudeAgentOptions, HookMatcher, ResultMessage, query
 
@@ -185,6 +196,7 @@ async def run() -> int:
         max_turns=MAX_TURNS,
         max_buffer_size=MAX_BUFFER,
         resume=(resume or {}).get("session") or None,
+        sandbox=sandbox_options(),
     )
     session, error = (resume or {}).get("session"), None
     async for m in query(prompt=prompt, options=options):

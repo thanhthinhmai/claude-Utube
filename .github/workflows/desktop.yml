@@ -4,7 +4,7 @@ name: desktop
 on:
   push:
     branches: ["[0-9][0-9][0-9]-desktop-*"]
-    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+    paths: ["desktop/**", "!desktop/core-build/**", ".github/workflows/desktop.yml"]
   workflow_dispatch:
 
 jobs:
@@ -19,8 +19,8 @@ jobs:
       run:
         working-directory: desktop
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
       - run: npm ci

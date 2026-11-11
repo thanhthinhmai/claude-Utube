@@ -237,6 +237,14 @@ check "help → mã 0" rc_is 0
 run bogus
 check "lệnh lạ → mã 2" rc_is 2
 
+echo "== env.sh của bản đóng gói (016)"
+echo 'echo envsh-loaded >&2' > "$P/env.sh"
+run help
+check "có env.sh thì nạp" has "envsh-loaded"
+rm -f "$P/env.sh"
+run help
+check "không có env.sh thì bỏ qua" sh -c '! printf "%s" "$1" | grep -q envsh-loaded' _ "$OUT"
+
 echo
 echo "PASS $PASS/$((PASS + FAIL))"
 [ "$FAIL" -eq 0 ]
