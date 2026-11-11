@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Set up claude-Utube</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<style>
+  :root { --bg: #f7f7fb; --panel: #fff; --fg: #20223a; --muted: #6b6f85; --line: #e3e4ee; --accent: #4b55d6; --ok: #1b7f3b; --bad: #b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17182a; --panel: #212238; --fg: #ecedf5; --muted: #a3a6bd; --line: #33354f; --accent: #8c94ff; --ok: #6fd28f; --bad: #ff8a80; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  main { max-width: 680px; margin: 0 auto; padding: 24px 16px 40px; }
+  h1 { font-size: 22px; margin: 0 0 4px; } h2 { font-size: 15px; margin: 22px 0 8px; }
+  p.lead { color: var(--muted); margin: 0 0 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  ul.checks { list-style: none; margin: 0; padding: 0; }
+  ul.checks li { padding: 8px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: 22px 1fr; gap: 6px; }
+  ul.checks li:first-child { border-top: 0; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); }
+  .fix { color: var(--muted); font-size: 13px; }
+  label { display: block; margin: 10px 0 4px; font-weight: 600; }
+  input, select { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  button { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); border: 0; color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  #msg { margin-top: 10px; min-height: 20px; }
+  .hint { color: var(--muted); font-size: 13px; font-weight: 400; }
+  [hidden] { display: none !important; }
+</style></head>
+<body><main>
+  <h1>Set up claude-Utube</h1>
+  <p class="lead">The studio runs on this computer with your own Claude account. This takes a minute; you only do it once.</p>
+
+  <div class="panel"><ul class="checks" id="checks"><li><span>…</span><span>Checking this computer…</span></li></ul>
+    <div class="row" id="wsl-row" hidden><button class="primary" id="wsl">Turn on WSL</button>
+      <span class="hint">Windows asks for administrator rights, then you restart the computer.</span></div></div>
+
+  <h2>Where things are</h2>
+  <div class="panel">
+    <div id="distro-box" hidden><label for="distro">Linux (WSL 2) <span class="hint">The studio's core runs in it</span></label>
+      <select id="distro"></select></div>
+    <label for="studio">Studio folder <span class="hint">The folder that holds bin/studio</span></label>
+    <input id="studio" spellcheck="false">
+    <label for="data">Data folder <span class="hint">Films, channels, accounts; at least 5 GB free</span></label>
+    <input id="data" spellcheck="false">
+  </div>
+
+  <div class="row"><button id="again">Check again</button><button class="primary" id="start" disabled>Start</button></div>
+  <p id="msg" role="status"></p>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let draft = null;
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  async function check() {
+    $("msg").textContent = "Checking…";
+    $("start").disabled = true;
+    const r = await setup.check(draft && { distro: $("distro").value || null, studio: $("studio").value.trim(), data: $("data").value.trim(), home: draft.home });
+    draft = r.draft;
+    $("checks").innerHTML = r.checks.map((c) => `<li><span class="${c.ok ? "ok" : "bad"}">${c.ok ? "✓" : "✗"}</span>
+      <span>${esc(c.detail)}${c.fix ? `<br><span class="fix">${esc(c.fix)}</span>` : ""}</span></li>`).join("") || "<li><span>✓</span><span>Ready</span></li>";
+    $("wsl-row").hidden = !r.checks.some((c) => c.id === "wsl" && !c.ok);
+    $("distro-box").hidden = r.platform !== "win32";
+    if (r.platform === "win32") {
+      const keep = $("distro").value || draft.distro;
+      $("distro").innerHTML = r.distros.map((d) => `<option${d === keep ? " selected" : ""}>${esc(d)}</option>`).join("");
+    }
+    if (!$("studio").value) $("studio").value = draft.studio;
+    if (!$("data").value) $("data").value = draft.data;
+    const ready = r.checks.length > 0 && r.checks.every((c) => c.ok);
+    $("start").disabled = !ready;
+    $("msg").textContent = ready ? "Everything is ready." : "Fix the lines marked ✗, then press Check again.";
+  }
+  $("again").onclick = check;
+  $("distro").onchange = () => { draft.home = null; check(); };
+  $("wsl").onclick = async () => {
+    const r = await setup.enableWsl();
+    $("msg").textContent = r.ok ? "WSL is on. Restart the computer, then open claude-Utube again." : "Nothing was changed.";
+  };
+  $("start").onclick = async () => {
+    $("start").disabled = true;
+    $("msg").textContent = "Starting the studio…";
+    const r = await setup.finish({ distro: $("distro").value || null, studio: $("studio").value.trim(), data: $("data").value.trim(), home: draft.home });
+    if (!r.ok) { $("msg").textContent = r.error; $("start").disabled = false; }
+  };
+  check();
+</script></body></html>

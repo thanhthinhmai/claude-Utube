@@ -58,6 +58,11 @@ Các lệnh `/speckit-plan`, `/speckit-analyze` và `/speckit-converge` đều k
 - Tài sản bên thứ ba (font, hình, nhạc, mô hình, dữ liệu) chỉ dùng loại có giấy phép rõ ràng (CC0, CC BY, OFL, MIT) và **PHẢI** ghi vào `CREDITS`.
 - Không commit secret, API key hay file media nặng vào repo.
 
+## Phần mềm hệ thống
+
+- Xưởng, khi phát triển và khi chạy bằng lệnh, **KHÔNG ĐƯỢC** tự cài phần mềm hệ thống (gói của hệ điều hành, trình điều khiển, tính năng của Windows hay macOS). Thiếu thì báo người dùng thứ còn thiếu và cách cài.
+- Ngoại lệ duy nhất là **app desktop** (specs/015 trở đi): app được bật một tính năng của hệ điều hành mà nó cần (ví dụ WSL2 trên Windows) **chỉ khi** người dùng tự bấm nút yêu cầu trong app **và** đồng ý quyền quản trị trong hộp hỏi của hệ điều hành. Trước khi bấm, app **PHẢI** nói rõ sẽ bật gì và có cần khởi động lại máy không. App không bật gì khi chưa có hai bước đồng ý đó.
+
 ## Quy trình làm việc
 
 1. Chọn mức quy trình theo `CLAUDE.md`:
@@ -73,9 +78,10 @@ Các lệnh `/speckit-plan`, `/speckit-analyze` và `/speckit-converge` đều k
 - Hiến pháp này có hiệu lực cao hơn mọi hướng dẫn khác trong dự án.
 - Muốn sửa hiến pháp thì phải ghi lý do, được người dùng duyệt và tăng số phiên bản.
 
-**Version**: 2.1.0 | **Ratified**: 2026-11-05 | **Last Amended**: 2026-11-07
+**Version**: 2.2.0 | **Ratified**: 2026-11-05 | **Last Amended**: 2026-11-11
 
 ### Lịch sử sửa đổi
+- 2.2.0: Thêm mục "Phần mềm hệ thống": xưởng không tự cài phần mềm hệ thống; ngoại lệ cho app desktop bật tính năng của hệ điều hành (WSL2) khi người dùng bấm và đồng ý quyền quản trị.
 - 2.1.0: Cho phép dịch vụ online tải video từ kênh YouTube khách nêu để học phong cách, kèm điều kiện (xác nhận quyền, giữ kín, xoá sau khi học).
 - 2.0.0: Hiến pháp riêng cho claude-Utube. Thêm nguyên tắc VI–IX và mục bản quyền, nội dung.
 - 1.1.0: Thêm 3 mức quy trình (Trực tiếp, Nhẹ, Đầy đủ) để tiết kiệm token.

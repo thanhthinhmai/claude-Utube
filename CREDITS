@@ -1,0 +1,7 @@
+# Credits
+
+Third-party software and assets used by the studio's own code (constitution: "Bản quyền và nội dung").
+Films record their own fonts, music and voices in films/<name>/CREDITS.
+
+- Electron (https://www.electronjs.org), MIT License, the desktop app window (desktop/, specs/015).
+- Desktop icons (desktop/assets/): drawn by desktop/assets/make_icons.py for this project.

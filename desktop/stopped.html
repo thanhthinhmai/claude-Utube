@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>The studio stopped</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<style>
+  :root { --bg: #f7f7fb; --fg: #20223a; --muted: #6b6f85; --accent: #4b55d6; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17182a; --fg: #ecedf5; --muted: #a3a6bd; --accent: #8c94ff; } }
+  body { margin: 0; height: 100vh; display: grid; place-items: center; font: 15px system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  .box { max-width: 420px; padding: 16px; text-align: center; }
+  p { color: var(--muted); }
+  button { margin: 4px; padding: 8px 14px; border-radius: 6px; border: 1px solid #0002; background: transparent; color: var(--fg); cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border: 0; }
+</style></head>
+<body><div class="box">
+  <h1>The studio stopped</h1>
+  <p>It may have been stopped from the command line, or it crashed. Unfinished jobs go on when it starts again.</p>
+  <button class="primary" id="go">Start it again</button><button onclick="core.openLogs()">Open the log folder</button>
+  <p id="msg" role="status"></p>
+</div>
+<script>
+  document.getElementById("go").onclick = async () => {
+    document.getElementById("msg").textContent = "Starting…";
+    const r = await core.restart();
+    if (!r.ok) document.getElementById("msg").textContent = r.error || "It did not start.";
+  };
+</script></body></html>

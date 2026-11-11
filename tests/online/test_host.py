@@ -43,7 +43,7 @@ def porcelain():
                           capture_output=True, text=True).stdout
 
 
-class Host(unittest.TestCase):
+class _Base(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         samples()
@@ -97,6 +97,8 @@ class Host(unittest.TestCase):
             time.sleep(0.3)
         self.fail(f"job {jid} did not reach {statuses}: {j.get('status')}")
 
+
+class Host(_Base):
     # ---------- US1 ----------
     def test_start_film_stop(self):
         before = porcelain()
@@ -247,6 +249,23 @@ class Host(unittest.TestCase):
             self.assertFalse((REPO / ".studio" / "jobs" / f"{jid}.json").exists())    # not in the old job book
         finally:
             shutil.rmtree(fdir, ignore_errors=True)
+
+
+class Check(_Base):                                                                     # specs/015 T003
+    def test_check_and_job_names(self):
+        r = self.app("check", "--json")
+        c = json.loads(r.stdout)
+        self.assertEqual(set(c), {"ok", "missing", "data_default"})
+        self.assertTrue(c["ok"], c)
+        r = self.app("check", "--json", env={**self.env, "PATH": "/usr/bin:/bin"})
+        if not shutil.which("ffmpeg", path="/usr/bin:/bin"):
+            self.assertFalse(json.loads(r.stdout)["ok"])
+        self.app("start")
+        w = self.owner()
+        jid = self.film(w, "A fox [slow 20]")
+        self.wait(w, jid, ("running",), 30)
+        s = json.loads(self.app("status", "--json").stdout)
+        self.assertEqual([(j["id"], j["name"]) for j in s["jobs"]], [(jid, "A fox [slow 20]")])
 
 
 class Upgrade(unittest.TestCase):                                                      # T004, FR-006
