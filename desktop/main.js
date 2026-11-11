@@ -256,9 +256,13 @@ app.on("before-quit", async (e) => {
   const pending = PLATFORM === "win32" ? pendingUpdate() : null;
   if (pending) {                           // the per-user installer replaces the app, then starts it again (R6)
     const cmd = upd.installCommand(pending.file);
-    spawn(cmd.file, cmd.args, { detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {}).unref();
+    try {                                  // a broken file must never keep the app from quitting
+      spawn(cmd.file, cmd.args, { detached: true, stdio: "ignore", windowsHide: true }).on("error", () => {}).unref();
+      smoke("installer started");
+    } catch (e) {
+      smoke(`installer failed to start: ${e}`);
+    }
     saveLicState({ pendingUpdate: null });
-    smoke("installer started");
   }
   smoke("quit ok");
   app.exit(0);

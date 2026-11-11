@@ -13,6 +13,7 @@ files:
   - preload.js
   - license.js
   - updates.js
+  - share.js
   - license-public-key.txt
   - "build-config.json"
   - "*.html"
