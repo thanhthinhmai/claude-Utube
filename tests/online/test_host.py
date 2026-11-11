@@ -366,6 +366,22 @@ class Gate(_Base):                                                              
         self.assertEqual(self.wait(w, b)["status"], "done")
 
 
+class Cert(unittest.TestCase):                                                          # specs/018 T001
+    def test_made_once_then_reused(self):
+        tmp = Path(tempfile.mkdtemp(prefix="studio-cert."))
+        try:
+            run = lambda: subprocess.run(["sh", str(STUDIO), "app", "cert", "--data", str(tmp)], capture_output=True,   # noqa: E731
+                                         text=True, timeout=60)
+            a = json.loads(run().stdout)
+            self.assertIn("BEGIN CERTIFICATE", a["cert"])
+            self.assertIn("PRIVATE KEY", a["key"])
+            self.assertRegex(a["fingerprint"], r"^[0-9a-f]{64}$")
+            self.assertEqual(json.loads(run().stdout), a)
+            self.assertEqual((tmp / "share" / "key.pem").stat().st_mode & 0o777, 0o600)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class Packaged(unittest.TestCase):                                                     # specs/016 T007
     def run_cli(self, *args, env=None):
         return subprocess.run(["sh", str(STUDIO), "app", *args], capture_output=True, text=True, timeout=60,
