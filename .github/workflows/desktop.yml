@@ -36,6 +36,21 @@ jobs:
             grep -q "smoke: $line" smoke.log || { echo "missing: smoke: $line"; exit 1; }
           done
           ! grep -q "smoke: fail" smoke.log
+      - name: smoke run of the license (fake license server, specs/017)
+        shell: bash
+        env:
+          CU_CORE_CMD: '["node","test/fake-core.mjs"]'
+          CU_SMOKE_NO_SETUP: "1"
+          CU_LICENSE_SERVER: http://127.0.0.1:8911
+          CU_SMOKE_KEY: CU-TEST-TEST-TEST-TEST
+        run: |
+          node test/fake-license.mjs 8911 > fake-license.log 2>&1 &
+          sleep 1
+          export CU_CONFIG_DIR="$RUNNER_TEMP/cu-config-license"
+          export CU_LICENSE_PUBLIC_KEY=$(node -p "require('./test/vectors/vectors.json').public")
+          npx electron . --smoke --smoke-license 2>&1 | tee license.log
+          for line in "license ok" "window ok" "locked ok" "quit ok"; do grep -q "smoke: $line" license.log || { echo "missing: smoke: $line"; exit 1; }; done
+          ! grep -q "smoke: fail" license.log
       - name: smoke run of the install screen (fake studio package, specs/016)
         shell: bash
         env:

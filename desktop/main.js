@@ -4,14 +4,16 @@
 // on macOS on this machine, on Windows inside WSL2. All decisions live in core.js; this file does the windows.
 "use strict";
 
-const { app, BrowserWindow, Tray, Menu, dialog, shell, ipcMain, Notification, nativeImage } = require("electron");
+const { app, BrowserWindow, Tray, Menu, dialog, shell, ipcMain, Notification, nativeImage, safeStorage } = require("electron");
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const core = require("./core.js");
+const lic = require("./license.js");
 
 const SMOKE = process.argv.includes("--smoke");
+const LICENSE_SMOKE = process.argv.includes("--smoke-license");
 const SECOND = process.argv.includes("--smoke-second");
 if (process.env.CU_CONFIG_DIR) app.setPath("userData", process.env.CU_CONFIG_DIR);   // tests: own config and own lock
 const CONFIG_DIR = app.getPath("userData");
@@ -97,7 +99,7 @@ async function startCore() {
   if (!splash || splash.isDestroyed()) showSplash();
   await new Promise((r) => splash && splash.webContents.once("did-finish-load", r));
   step("Starting the studio…");
-  const r = await coreRun(["start"], core.READY_TIMEOUT_MS + 5_000).catch((e) => ({ code: 1, out: "", err: String(e) }));
+  const r = await coreRun(["start", ...gateArgs()], core.READY_TIMEOUT_MS + 5_000).catch((e) => ({ code: 1, out: "", err: String(e) }));
   const url = core.parseUrl(r.out);
   if (r.code !== 0 || !url) {
     const why = (r.out + "\n" + r.err).trim().split("\n").slice(-20).join("\n");
@@ -143,7 +145,7 @@ function openMain(url) {
   });
   buildTray();
   watchCore();
-  if (SMOKE) win.webContents.once("did-finish-load", () => smokeMain(port));
+  if (SMOKE) win.webContents.once("did-finish-load", () => (LICENSE_SMOKE ? smokeLicense() : smokeMain(port)));
 }
 
 /** @param {string} u */
@@ -193,6 +195,7 @@ function buildTray() {
     { label: "Data folder", click: () => openFolder("data") },
     { label: "Log folder", click: () => openFolder("logs") },
     { label: "Change setup…", click: changeSetup },
+    ...(LIC ? [{ label: "License…", click: () => showLicense("info") }] : []),
     { type: "separator" },
     { label: "Quit", click: () => app.quit() },
   ]));
@@ -226,6 +229,192 @@ app.on("before-quit", async (e) => {
   smoke("quit ok");
   app.exit(0);
 });
+
+// ---------- license (specs/017) ----------
+const LIC = lic.licenseConfig(readJson(path.join(__dirname, "build-config.json")), process.env, app.isPackaged,
+  readText(path.join(__dirname, "license-public-key.txt")));
+const GATE = path.join(CONFIG_DIR, "gate.json");
+const KEY_FILE = path.join(CONFIG_DIR, "license.key");
+const KEYCHAIN = "claude-Utube license";
+let deviceId = "";
+let locked = false;
+let licenseWin = /** @type {BrowserWindow|null} */ (null);
+let renewTimer = /** @type {NodeJS.Timeout|null} */ (null);
+
+/** @param {string} f */
+function readJson(f) { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch { return null; } }
+/** @param {string} f */
+function readText(f) { try { return fs.readFileSync(f, "utf8"); } catch { return ""; } }
+const nowS = () => Math.floor(Date.now() / 1000);
+
+async function machineDeviceId() {
+  const cmd = lic.machineIdCommand(process.platform);
+  let raw = null;
+  if (cmd) raw = lic.parseMachineId(process.platform, (await run(cmd, 10_000)).stdout.toString("utf8"));
+  else raw = lic.parseMachineId("linux", readText("/etc/machine-id"));
+  if (!raw) {                                              // no id from the OS: one random id kept in the config
+    const c = core.loadConfig(CONFIG_DIR) || /** @type {any} */ ({});
+    if (!c.installId) { c.installId = require("node:crypto").randomUUID(); core.saveConfig(CONFIG_DIR, c); }
+    raw = c.installId;
+  }
+  return lic.deviceIdFrom(String(raw));
+}
+
+// The key: Windows encrypts it for this user (DPAPI); macOS keeps it in the Keychain; a dev build uses a plain file.
+async function readKey() {
+  if (app.isPackaged && process.platform === "darwin") {
+    const r = await run({ file: "/usr/bin/security", args: ["find-generic-password", "-s", KEYCHAIN, "-a", "key", "-w"] }, 10_000);
+    return r.code === 0 ? r.stdout.toString("utf8").trim() : "";
+  }
+  const raw = readText(KEY_FILE).trim();
+  if (!raw) return "";
+  if (app.isPackaged && safeStorage.isEncryptionAvailable()) {
+    try { return safeStorage.decryptString(Buffer.from(raw, "base64")); } catch { return ""; }
+  }
+  return raw;
+}
+
+/** @param {string} key */
+async function saveKey(key) {
+  if (app.isPackaged && process.platform === "darwin") {
+    await run({ file: "/usr/bin/security", args: ["add-generic-password", "-U", "-s", KEYCHAIN, "-a", "key", "-w", key] }, 10_000);
+    return;
+  }
+  fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  const body = app.isPackaged && safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(key).toString("base64") : key;
+  fs.writeFileSync(KEY_FILE, body, { mode: 0o600 });
+}
+
+function licState() {
+  const c = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || {});
+  return { lease: c.lease || null, clock: c.licenseClock || 0, refused: c.licenseRefused || null, label: c.licenseLabel || null,
+    expires: c.licenseExpires || null };
+}
+
+/** @param {any} patch */
+function saveLicState(patch) {
+  const c = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || cfg || { platform: PLATFORM });
+  Object.assign(c, patch);
+  core.saveConfig(CONFIG_DIR, c);
+  if (cfg) Object.assign(cfg, patch);
+  const st = licState();
+  const tmp = GATE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify(lic.gateDoc({ deviceId, lease: st.lease, clock: st.clock, refused: st.refused && st.refused.code })));
+  fs.renameSync(tmp, GATE);
+}
+
+function gateArgs() {
+  if (!LIC) return [];
+  const p = cfg && cfg.platform === "win32" && !process.env.CU_CORE_CMD ? core.wslPath(GATE) : GATE;
+  return ["--gate", p];
+}
+
+/** Why the license cannot be used now, or null. Moves the seen clock forward. */
+function licenseProblem() {
+  const st = licState();
+  if (st.refused) return st.refused.code;
+  const t = nowS();
+  const p = lic.verifyLease(LIC ? LIC.publicKey : "", st.lease);
+  const why = lic.leaseProblem(p, deviceId, t, st.clock);
+  if (!why && t > st.clock) saveLicState({ licenseClock: t });
+  return why;
+}
+
+/** Ask the server for a lease. Returns "ok", "refused" (code saved) or "offline". @param {string} key */
+async function renew(key) {
+  if (!LIC || !key) return "offline";
+  let status = 0, body = null;
+  try {
+    const r = await fetch(`${LIC.server}/api/license/lease`, { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key, deviceId, deviceName: os.hostname(), os: `${process.platform} ${os.release()}`, version: app.getVersion() }),
+      signal: AbortSignal.timeout(20_000) });
+    status = r.status;
+    body = await r.json().catch(() => null);
+  } catch { /* offline */ }
+  const kind = lic.classifyResponse(status, body);
+  if (kind === "ok") {
+    const p = lic.verifyLease(LIC.publicKey, body.lease);
+    if (!p || p.did !== deviceId) return "offline";
+    saveLicState({ lease: body.lease, licenseClock: lic.nextClock(licState().clock, nowS(), body.serverTime),
+      licenseRefused: null, licenseLabel: body.label || null, licenseExpires: body.expiresAt || null });
+  } else if (kind === "refused") {
+    saveLicState({ lease: null, licenseRefused: { code: body.code, at: nowS() } });
+  } else if (status === 429) {
+    return "rate_limited";
+  }
+  return kind;
+}
+
+function scheduleRenew() {
+  if (!LIC) return;
+  if (renewTimer) clearTimeout(renewTimer);
+  const ms = Number(!app.isPackaged && process.env.CU_LICENSE_RENEW_MS) || lic.renewDelayMs(Math.random());
+  renewTimer = setTimeout(async () => {
+    await renew(await readKey());
+    if (licenseProblem()) lock();
+    scheduleRenew();
+  }, ms);
+}
+
+/** Hide the studio, keep running jobs going (the core's gate stops new ones), ask for a key (FR-008). */
+function lock() {
+  if (locked) return;
+  locked = true;
+  saveLicState({});
+  if (win && !win.isDestroyed()) win.hide();
+  if (tray) tray.setToolTip("claude-Utube (locked)");
+  showLicense("locked");
+  smoke("locked ok");
+}
+
+/** @param {"needed"|"locked"|"info"} mode */
+function showLicense(mode) {
+  if (licenseWin && !licenseWin.isDestroyed()) {
+    licenseWin.webContents.send("license:mode", mode);
+    licenseWin.show();
+    return;
+  }
+  licenseWin = new BrowserWindow({ width: 520, height: 520, title: "claude-Utube license", icon: path.join(ASSETS, "icon.png"),
+    show: !SMOKE, autoHideMenuBar: true, resizable: false,
+    webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true } });
+  licenseWin.loadFile(path.join(__dirname, "license.html"), { query: { mode } });
+  licenseWin.on("closed", () => {
+    licenseWin = null;
+    if ((mode === "needed" || locked) && !quitting && licenseProblem()) app.quit();   // no license: nothing to show
+  });
+  if (SMOKE && mode === "needed") licenseWin.webContents.once("did-finish-load", () => submitKey(process.env.CU_SMOKE_KEY || ""));
+}
+
+ipcMain.handle("license:state", async () => {
+  const st = licState();
+  const why = licenseProblem();
+  return { label: st.label, expires: st.expires, problem: why, message: why ? lic.describe(why) : null, locked };
+});
+ipcMain.handle("license:submit", async (_e, key) => submitKey(key));
+
+/** @param {string} typed */
+async function submitKey(typed) {
+  const key = lic.normalizeKey(typed);
+  if (!key) return { ok: false, error: lic.describe("unknown") };
+  const kind = await renew(key);
+  if (kind !== "ok") return { ok: false, error: lic.describe(kind === "refused" ? licState().refused.code : kind) };
+  await saveKey(key);
+  smoke("license ok");
+  const wasLocked = locked;
+  locked = false;
+  if (tray) tray.setToolTip("claude-Utube");
+  if (licenseWin && !licenseWin.isDestroyed()) { const w = licenseWin; licenseWin = null; w.destroy(); }
+  scheduleRenew();
+  if (wasLocked && win && !win.isDestroyed()) { win.loadURL(appUrl); showMain(); }
+  else if (!win) afterLicense();
+  return { ok: true };
+}
+
+/** Licensed: go on with setup or start the core. */
+async function afterLicense() {
+  if (core.configUsable(cfg, PLATFORM, await studioThere(cfg))) startCore();
+  else showSetup();
+}
 
 // ---------- setup (US2) ----------
 function showSetup() {
@@ -300,6 +489,10 @@ async function finishSetup(draft) {
   const c = { platform: PLATFORM, distro: draft.distro || null, studio: draft.studio, data: draft.data, home: draft.home || null,
     setupAt: new Date().toISOString(), trayNoticeShown: !!(cfg && cfg.trayNoticeShown),
     coreKind: draft.coreKind || "existing", coreVersion: draft.coreVersion || null, modelsReady: !!draft.modelsReady };
+  const old = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || {});       // keep the license and update state (017)
+  for (const k of ["installId", "lease", "licenseClock", "licenseRefused", "licenseLabel", "licenseExpires", "pendingUpdate"]) {
+    if (old[k] !== undefined) /** @type {any} */ (c)[k] = old[k];
+  }
   if (!(await studioThere(c))) return { ok: false, error: `No studio at ${c.studio}` };
   cfg = c;
   core.saveConfig(CONFIG_DIR, c);
@@ -403,7 +596,7 @@ ipcMain.handle("setup:installCore", async (e, opts) => {
 
 ipcMain.handle("core:restart", async () => {
   if (win && !win.isDestroyed()) {
-    const r = await coreRun(["start"], core.READY_TIMEOUT_MS + 5_000);
+    const r = await coreRun(["start", ...gateArgs()], core.READY_TIMEOUT_MS + 5_000);
     const url = core.parseUrl(r.out);
     if (!url) return { ok: false, error: (r.out + r.err).trim().split("\n").slice(-5).join("\n") };
     appUrl = url;
@@ -418,6 +611,22 @@ ipcMain.handle("core:openLogs", () => openFolder("logs"));
 ipcMain.handle("core:quit", () => app.quit());
 
 // ---------- smoke run (GitHub Actions; specs/015 R4) ----------
+/** specs/017 T016: the fake license server turns the key off; the next renewal locks the app. */
+async function smokeLicense() {
+  smoke("window ok");
+  const gateDoc = readJson(GATE);
+  if (!gateDoc || !gateDoc.lease || gateDoc.deviceId !== deviceId) return smokeFail("no gate file for the core");
+  await fetch(`${LIC && LIC.server}/__revoke`, { method: "POST" });
+  await renew(await readKey());
+  if (licenseProblem()) lock();
+  if (!locked) return smokeFail("not locked after the key was turned off");
+  const after = readJson(GATE);
+  if (!after || after.refused !== "revoked") return smokeFail("the gate file does not say revoked");
+  if (win && win.isVisible()) return smokeFail("the studio window is still shown");
+  quitting = false;
+  app.quit();
+}
+
 function smokeSetup() {
   smoke("setup ok");
   if (PACKAGED_DIR) return;                              // setup.html starts the install itself (smoke-install)
@@ -468,7 +677,13 @@ if (!app.requestSingleInstanceLock()) {
       cfg = { platform: PLATFORM, distro: null, studio: process.cwd(), data: path.join(CONFIG_DIR, "data"), home: null };
       core.saveConfig(CONFIG_DIR, cfg);
     }
-    if (core.configUsable(cfg, PLATFORM, await studioThere(cfg))) startCore();
-    else showSetup();
+    if (LIC) {
+      deviceId = await machineDeviceId();
+      const key = await readKey();
+      if (key) await renew(key);
+      if (licenseProblem()) return showLicense("needed");
+      scheduleRenew();
+    }
+    afterLicense();
   });
 }
