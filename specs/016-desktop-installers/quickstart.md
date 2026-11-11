@@ -26,3 +26,18 @@ Trang Actions › desktop-release › Run workflow (version `0.1.0-test`), hoặ
 1. Mở `.dmg`, kéo app vào Applications, mở app (System Settings → Privacy & Security → Open Anyway).
 2. Thiết lập → Start → tạo chủ xưởng → đăng nhập Claude → làm một phim 45 giây.
 3. Bấm giờ (< 10 phút).
+
+## Kết quả tự động (2026-11-11, lượt chạy 43021819404 trên nhánh)
+
+- `core-linux`: 1,18 GB nén; smoke đạt (app, Chromium, sandbox bwrap, Kokoro, Whisper); credits-check đạt.
+- `core-mac`: 558 MB nén; smoke với PATH trống đạt (cùng các mục trên, sandbox-exec); credits-check đạt.
+- `installers`: `claude-Utube-Setup-<bản>.exe` 1,31 GB, `claude-Utube-<bản>-arm64.dmg` 683 MB; app đã đóng gói kiểm SHA-256 và giải nén gói thật.
+- `release`: `SHA256SUMS` đủ; bước tạo Release chỉ chạy khi gắn tag hoặc bấm chạy tay.
+- Cả chuỗi mất khoảng 10 phút; phút chạy quy đổi khoảng 75 phút (macOS tính gấp 10).
+
+## Còn kiểm bằng tay
+
+- SC-001: cài `.exe` trên máy Windows có WSL2 (bước `wsl --import` thật) tới trang tạo chủ xưởng, bấm giờ.
+- SC-002: cài `.dmg` trên Mac chip Apple, bấm giờ.
+- SC-003: làm một phim 45 giây trên mỗi hệ điều hành bằng tài khoản Claude thật; xem agent chạy Bash trong sandbox (log của việc không có lỗi sandbox).
+- Gỡ trên Windows: chọn No thì bản Linux `ClaudeUtube` còn; chọn Yes thì mất.
