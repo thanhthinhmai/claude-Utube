@@ -1,0 +1,42 @@
+# License server of the desktop app (specs/017): Caddy (HTTPS) in front of one Python process with SQLite.
+#   cp deploy/license/.env.example deploy/license/.env   # then fill it in
+#   docker compose -f deploy/license/compose.yaml --env-file deploy/license/.env up -d --build
+name: claude-utube-license
+
+services:
+  license:
+    build: { context: ../.., dockerfile: deploy/license/license.Dockerfile }
+    image: claude-utube-license:latest
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      LICENSE_DATA: /data
+      LICENSE_SIGNING_KEY: ${LICENSE_SIGNING_KEY:?set LICENSE_SIGNING_KEY in deploy/license/.env}
+      GITHUB_REPO: ${GITHUB_REPO:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      LICENSE_SECURE_COOKIE: "1"
+    volumes:
+      - ${LICENSE_DATA_HOST:-./data}:/data
+    tmpfs: [/tmp]
+    networks: [front]
+
+  caddy:
+    image: caddy:2.8.4-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/license/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [front]
+
+networks:
+  front: {}
+
+volumes:
+  caddy_data: {}
+  caddy_config: {}

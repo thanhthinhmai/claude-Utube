@@ -1,0 +1,27 @@
+# HTTPS for the license server (specs/017). Only its own paths are passed on; everything else is 404.
+# No `log` directive: leases and keys are never written to an access log.
+{$DOMAIN} {
+	request_body {
+		max_size 64KB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+	@app path /api/license/* /admin /admin/* /health
+	handle @app {
+		reverse_proxy license:8899 {
+			# the caller's real address, used for the wrong-key and wrong-password limits; a client cannot set it
+			header_up X-Real-IP {remote_host}
+			header_up -X-Forwarded-For
+			transport http {
+				read_timeout 30m
+				write_timeout 30m
+			}
+		}
+	}
+	handle {
+		respond 404
+	}
+}

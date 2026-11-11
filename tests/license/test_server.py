@@ -70,8 +70,8 @@ class Leases(unittest.TestCase):
 
     def test_wrong_keys_are_limited(self):                                  # SC-006
         for _ in range(10):
-            self.assertEqual(self.lease(key="CU-AAAA-AAAA-AAAA-AAAA").json()["code"], "unknown")
-        r = self.lease(key="CU-AAAA-AAAA-AAAA-AAAA")
+            self.assertEqual(self.lease(key="CU-TEST-TEST-TEST-TEST").json()["code"], "unknown")
+        r = self.lease(key="CU-TEST-TEST-TEST-TEST")
         self.assertEqual((r.status_code, r.json()["code"]), (429, "rate_limited"))
         self.assertEqual(self.lease(ip="5.6.7.8").status_code, 200)          # another address
         self.clock.t += 601

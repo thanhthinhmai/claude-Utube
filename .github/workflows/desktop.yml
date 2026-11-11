@@ -90,7 +90,8 @@ jobs:
           for line in "license ok" "install ok" "window ok" "quit ok"; do grep -q "smoke: $line" packed.log || { echo "missing: smoke: $line"; exit 1; }; done
           export CU_CONFIG_DIR="$RUNNER_TEMP/cu-config-update" CU_SMOKE_NO_SETUP=1
           "$exe" --smoke --smoke-update 2>&1 | tee update.log
-          for line in "license ok" "update ready ok" "quit ok"; do grep -q "smoke: $line" update.log || { echo "missing: smoke: $line"; exit 1; }; done
+          # the key is kept from the run above (Keychain on macOS), so no "license ok" here
+          for line in "update ready ok" "quit ok"; do grep -q "smoke: $line" update.log || { echo "missing: smoke: $line"; exit 1; }; done
           ! grep -q "smoke: fail" packed.log update.log
       - name: the downloaded installer installs the app silently and starts it (Windows, specs/017 R6)
         if: runner.os == 'Windows'
