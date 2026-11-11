@@ -6,6 +6,8 @@
 set -eu
 say() { echo "smoke: $*"; }
 fail() { echo "smoke: ✗ $*" >&2; exit 1; }
+# The packaged macOS core puts its own Node and FFmpeg first in PATH (bin/studio reads the same file)
+if [ -f env.sh ]; then ROOT=$(pwd); . ./env.sh; fi
 data=$(mktemp -d)
 work=$(mktemp -d)
 trap 'sh bin/studio app stop --force --data "$data" >/dev/null 2>&1 || true' EXIT

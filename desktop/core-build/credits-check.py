@@ -94,10 +94,11 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--root", required=True, type=Path)
     ap.add_argument("--sys", type=Path)
-    ap.add_argument("--credits", type=Path, default=Path(__file__).resolve().parents[2] / "CREDITS")
+    ap.add_argument("--credits", type=Path, help="default: CREDITS of this repo")
     ap.add_argument("--print", action="store_true", dest="show")
     a = ap.parse_args(argv)
-    r = check(a.root, a.sys, a.credits.read_text("utf-8"))
+    credits = a.credits or Path(__file__).resolve().parents[2] / "CREDITS"
+    r = check(a.root, a.sys, credits.read_text("utf-8"))
     bad = any(r.values())
     for n in r["named"]:
         print(f"✗ not named in CREDITS: {n}")
