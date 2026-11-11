@@ -18,7 +18,7 @@
 
 Với `packaged`:
 - Windows: `distro = "ClaudeUtube"`, `studio = "/home/studio/claude-Utube"`, `data = "/home/studio/.local/share/claude-utube"`.
-- macOS: `studio = "~/Library/Application Support/ClaudeUtube/core-<ver>"`, `data` = mặc định của 014.
+- macOS: `studio = "~/Library/Application Support/ClaudeUtube-core/<ver>"`, `data` = mặc định của 014.
 
 ## Phần lõi đã cài
 

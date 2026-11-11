@@ -39,19 +39,18 @@ Không dựa vào việc `wsl --import` có đọc thẳng `.tar.gz` hay không 
 
 ## R2. Phần lõi macOS
 
-**Decision**: `desktop/core-build/build-mac.sh` chạy trên máy `macos-14` (arm64) của GitHub:
+**Decision**: `desktop/core-build/build-mac.sh` chạy trên máy `macos-latest` (arm64) của GitHub:
 - **Python**: `cpython-3.12.x+<ngày>-aarch64-apple-darwin-install_only.tar.gz` của python-build-standalone (giấy phép PSF cùng các thành phần đi kèm, ghi vào `CREDITS`). `python/bin/python3 -m pip install` cài thẳng vào nó:
   - `tools/requirements-ui.txt`, `requirements-online.txt`, `requirements-learn.txt`;
   - các tệp `requirements*.txt` của thư viện (core, voice, music).
 - **Node**: `node-v22.x-darwin-arm64.tar.gz` chính thức (MIT).
-- **ffmpeg, ffprobe**: bản tĩnh arm64 từ gói npm `ffmpeg-static` 5.2.0 và `@ffprobe-installer/darwin-arm64`. Giấy phép GPL-3.0, phát lại được, kèm tệp giấy phép và đường dẫn tới mã nguồn trong `CREDITS`.
-  - **Kiểm khi implement (T001)**: chạy được trên `macos-14`; nếu nguồn này không còn bản arm64 thì dừng và hỏi.
+- **ffmpeg, ffprobe**: bản tĩnh arm64 từ bản phát hành `b6.0` của dự án ffmpeg-static trên GitHub (cùng nguồn mà gói npm `ffmpeg-static` 5.2.0 tải về), ghim SHA-256. Giấy phép GPL-3.0, phát lại được; tệp giấy phép đi kèm, đường dẫn mã nguồn trong `CREDITS`.
 - **Studio và thư viện**: như R1, kể cả `node_modules` của thư viện (`npm ci`) và Chromium của Playwright ở `ms-playwright/` trong phần lõi (`PLAYWRIGHT_BROWSERS_PATH`).
 - **Không venv lúc build**. Lúc cài, chạy `python3 -m venv --system-site-packages` cho `tools/.venv` và `lib/lemo-opuscar/.venv`, vì `bin/studio` và thư viện tìm đúng hai đường dẫn đó. Cách này tránh đường dẫn tuyệt đối của máy build.
 - **`bin/studio` trên phần lõi Mac**: thêm `<core>/node/bin` và `<core>/ffmpeg` vào đầu `PATH`, qua tệp `<core>/env.sh` được nạp khi có (sửa nhỏ trong `bin/studio`). App cũng đặt `PATH` khi gọi phần lõi.
-- **Cài trong app**: giải nén vào `~/Library/Application Support/ClaudeUtube/core-<ver>/` bằng `tar -xzf` (lệnh có sẵn của macOS), rồi tạo 2 venv. Gỡ cờ quarantine bằng `xattr -dr com.apple.quarantine` cho phần lõi đã giải nén (giống neb).
+- **Cài trong app**: giải nén vào `~/Library/Application Support/ClaudeUtube-core/<ver>/` bằng `tar -xzf` (lệnh có sẵn của macOS), rồi tạo 2 venv. Gỡ cờ quarantine bằng `xattr -dr com.apple.quarantine` cho phần lõi đã giải nén (giống neb).
 
-**Đường dẫn espeak** (giới hạn 160 byte của thư viện): `~/Library/Application Support/ClaudeUtube/core-0.1.0/python/lib/python3.12/site-packages/espeakng_loader/espeak-ng-data` dài khoảng 120 byte với tên người dùng ngắn. Màn hình thiết lập kiểm độ dài thật và báo nếu vượt.
+**Đường dẫn espeak** (giới hạn 160 byte của thư viện): `~/Library/Application Support/ClaudeUtube-core/0.1.0/python/lib/python3.12/site-packages/espeakng_loader/espeak-ng-data` dài khoảng 120 byte với tên người dùng ngắn. Màn hình thiết lập kiểm độ dài thật và báo nếu vượt.
 
 ## R3. Mô hình
 
@@ -87,7 +86,7 @@ Không dựa vào việc `wsl --import` có đọc thẳng `.tar.gz` hay không 
      - `smoke-core.sh` trong container: `app check` đạt; `app start` rồi `/api/v1/health`; tạo chủ xưởng qua API rồi `app stop`; kiểm bwrap chặn ghi;
      - `credits-check.py`;
      - lưu artifact `core-linux`.
-  2. **`core-mac`** (`macos-14`): `build-mac.sh`; `smoke-core.sh` (chạy thẳng); `credits-check.py`; artifact `core-mac`.
+  2. **`core-mac`** (`macos-latest`): `build-mac.sh`; `smoke-core.sh` (chạy thẳng); `credits-check.py`; artifact `core-mac`.
   3. **`installers`** (ma trận Windows và macOS; cần job 1 hoặc 2):
      - tải artifact phần lõi vào `dist/core/<os>`;
      - `npx electron-builder`;
@@ -104,4 +103,12 @@ Không dựa vào việc `wsl --import` có đọc thẳng `.tar.gz` hay không 
 4. `wsl --unregister ClaudeUtube`, rồi `--import` bản mới.
 5. Giải nén lại dữ liệu vào bản mới, chạy `app start` (014 tự nâng cấp cơ sở dữ liệu và sao lưu, FR-006 của 014), rồi xoá tệp sao lưu.
 
-macOS: phần lõi mới nằm ở `core-<ver>` mới, dữ liệu vốn ở ngoài phần lõi. Xoá `core-<cũ>` sau khi bản mới chạy được.
+macOS: phần lõi mới nằm ở thư mục `<ver>` mới, dữ liệu vốn ở ngoài phần lõi. Xoá `core-<cũ>` sau khi bản mới chạy được.
+
+## Kết quả T001 và các lần chạy trên GitHub Actions (2026-11-11)
+
+- **(a) Phần lõi Linux**: build bằng Docker trên `ubuntu-24.04` mất khoảng 4 phút. Tệp nén **1,18 GB** (giải nén 3,1 GB), dưới giới hạn 1,9 GB, nên giữ cả `deps learn --extra`. Rootfs đã export được `docker import` lại và chạy như WSL sẽ chạy: `app check`, `app start`, health, tạo chủ xưởng, `app stop` đều đạt. Trình duyệt Chromium mở được. Tải Kokoro, `app models`, đọc một câu bằng Kokoro và Whisper `base.en` kiểm lại đều đạt (0 lỗi). `wsl --import` thật chỉ kiểm được trên máy Windows có WSL2 (quickstart §3), vì máy Windows của GitHub không có ảo hoá lồng nhau.
+- **(b) Sandbox**: trong container (bật lại user namespace trên máy chủ GitHub), `bwrap` chặn ghi ra ngoài thư mục việc và vẫn cho gọi `127.0.0.1`. macOS: `sandbox-exec` cũng vậy. Sandbox của chính Claude Code (cần tài khoản) kiểm ở bài chạy bằng tay SC-003.
+- **(c) FFmpeg macOS**: nguồn ffmpeg-static `b6.0` có bản arm64, giấy phép phát lại được. Phần lõi macOS build trên `macos-latest` (máy `macos-14` của GitHub đã ngừng) mất khoảng 3 phút, tệp nén **558 MB** (giải nén 1,5 GB).
+- **Đổi so với plan**: phần lõi macOS nằm ở `~/Library/Application Support/ClaudeUtube-core/<ver>/`, tách khỏi thư mục dữ liệu `ClaudeUtube/` của 014. Phần lõi đóng gói có `.core-version`; `bin/studio` khi đó coi thư viện là đúng phiên bản mà không gọi `git` (máy Mac sạch không có git).
+- **Còn kiểm bằng tay**: Claude Code chạy với sandbox Bash trong WSL và macOS (SC-003); cài thật bằng `.exe` trên Windows có WSL2 và bằng `.dmg` trên Mac (SC-001, SC-002).

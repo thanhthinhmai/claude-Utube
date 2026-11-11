@@ -122,7 +122,6 @@ jobs:
           compression-level: 0
 
   release:
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/desktop-v')
     needs: [installers]
     runs-on: ubuntu-24.04
     permissions:
@@ -140,7 +139,9 @@ jobs:
           cp files/core-linux/core-manifest.json out/core-manifest-linux-x64.json
           cp files/core-mac/core-manifest.json out/core-manifest-darwin-arm64.json
           (cd out && sha256sum * > SHA256SUMS && cat SHA256SUMS)
-      - uses: softprops/action-gh-release@e598afbe1493e6b1bafb1f389cabb956eab91231 # v3.0.3
+      - name: publish (tags and runs by hand only; a branch push stops after the check above)
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/desktop-v')
+        uses: softprops/action-gh-release@e598afbe1493e6b1bafb1f389cabb956eab91231 # v3.0.3
         with:
           tag_name: desktop-v${{ env.VERSION }}
           name: claude-Utube desktop ${{ env.VERSION }}

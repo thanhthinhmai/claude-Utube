@@ -12,8 +12,8 @@ Hai hệ điều hành dùng cùng một cách: **bộ cài chứa một tệp p
   - **Build**: phần lõi là một bản Linux build bằng Docker trên GitHub Actions từ `deploy/core.Dockerfile`: Ubuntu 24.04, gói apt, Node 22, bubblewrap và socat, người dùng `studio` mặc định, studio ở `/home/studio/claude-Utube`, thư viện ở đúng commit của lock, các venv, Chromium của Playwright. Không có mô hình. Lệnh `docker export` cùng gzip cho ra `claude-utube-core-linux-x64-<ver>.tar.gz`.
   - **Cài**: màn hình thiết lập giải nén tệp ra một `.tar` tạm, chạy `wsl --import ClaudeUtube <thư mục> <tar> --version 2`, rồi xoá tệp tạm.
 - **macOS** (R2):
-  - **Build**: phần lõi build trên máy `macos-14` của GitHub. Python lấy từ python-build-standalone (CPython 3.12, aarch64), và mọi gói Python được cài thẳng vào Python đó (không venv). Thêm Node 22 bản chính thức cho darwin-arm64, ffmpeg và ffprobe bản tĩnh cho arm64, studio, thư viện và Chromium của Playwright. Đóng thành `claude-utube-core-darwin-arm64-<ver>.tar.gz`.
-  - **Cài**: màn hình thiết lập giải nén vào `~/Library/Application Support/ClaudeUtube/core-<ver>/`, rồi tạo `tools/.venv` và `lib/lemo-opuscar/.venv` bằng `python -m venv --system-site-packages` (rất nhanh). Phần lõi nằm ở chỗ ghi được, ngoài gói app, nên tải mô hình vào được và chữ ký ad-hoc của app không bị hỏng.
+  - **Build**: phần lõi build trên máy `macos-latest` của GitHub. Python lấy từ python-build-standalone (CPython 3.12, aarch64), và mọi gói Python được cài thẳng vào Python đó (không venv). Thêm Node 22 bản chính thức cho darwin-arm64, ffmpeg và ffprobe bản tĩnh cho arm64, studio, thư viện và Chromium của Playwright. Đóng thành `claude-utube-core-darwin-arm64-<ver>.tar.gz`.
+  - **Cài**: màn hình thiết lập giải nén vào `~/Library/Application Support/ClaudeUtube-core/<ver>/`, rồi tạo `tools/.venv` và `lib/lemo-opuscar/.venv` bằng `python -m venv --system-site-packages` (rất nhanh). Phần lõi nằm ở chỗ ghi được, ngoài gói app, nên tải mô hình vào được và chữ ký ad-hoc của app không bị hỏng.
 - **Mô hình** (R3): sau khi cài phần lõi, màn hình thiết lập chạy trong phần lõi:
   - `sh lib/lemo-opuscar/tools/fetch.sh voice` (Kokoro; thư viện tự kiểm SHA-256);
   - một lệnh mới `sh bin/studio app models` để tải Whisper `base.en` và `base` vào bộ nhớ đệm của faster-whisper. Bản `small` được tải khi cần, ở lần đầu làm phim tiếng Trung.
@@ -44,7 +44,7 @@ Chi tiết: [research.md](research.md) · [data-model.md](data-model.md) · [con
 
 **Storage**:
 - Windows: bản Linux `ClaudeUtube` ở `%LOCALAPPDATA%\ClaudeUtube\wsl\` (tệp vhdx). Dữ liệu của xưởng nằm trong bản Linux (`/home/studio/.local/share/claude-utube`) để chạy nhanh; khi cài lại phần lõi thì dữ liệu được sao ra ngoài rồi trả về (R7).
-- macOS: `~/Library/Application Support/ClaudeUtube/core-<ver>/` và thư mục dữ liệu của 014.
+- macOS: `~/Library/Application Support/ClaudeUtube-core/<ver>/` và thư mục dữ liệu của 014.
 
 **Testing**:
 - Test logic Node (`desktop/test`) cho bước cài: dựng lệnh, so phiên bản, kiểm SHA-256, tải tiếp.

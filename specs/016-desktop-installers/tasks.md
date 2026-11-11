@@ -4,7 +4,7 @@
 
 ## Phase 1: Setup và kiểm trước (chặn mọi phase sau)
 
-- [ ] T001 Kiểm 3 điều chưa thử của plan (ghi kết quả vào research.md, mục "Kết quả T001"): (a) build `deploy/core.Dockerfile` trên máy này, đo tar.gz sau `docker export | gzip -6` (≤ 1,9 GB) và chạy `app start` → `/api/v1/health` → `app stop` trong container; (b) trong container, `bwrap` chặn ghi ngoài thư mục việc nhưng vẫn cho `curl http://127.0.0.1:<cổng>`; (c) nguồn ffmpeg tĩnh arm64 cho macOS có tồn tại và có giấy phép phát lại (chạy thật trên `macos-14` ở T019). Khác plan thì dừng và hỏi
+- [ ] T001 Kiểm 3 điều chưa thử của plan (ghi kết quả vào research.md, mục "Kết quả T001"): (a) build `deploy/core.Dockerfile` trên máy này, đo tar.gz sau `docker export | gzip -6` (≤ 1,9 GB) và chạy `app start` → `/api/v1/health` → `app stop` trong container; (b) trong container, `bwrap` chặn ghi ngoài thư mục việc nhưng vẫn cho `curl http://127.0.0.1:<cổng>`; (c) nguồn ffmpeg tĩnh arm64 cho macOS có tồn tại và có giấy phép phát lại (chạy thật trên `macos-latest` ở T019). Khác plan thì dừng và hỏi
 - [ ] T002 [P] `desktop/package.json`: thêm devDependency `electron-builder` 25.1.8 (ghim), scripts `pack:win`, `pack:mac`; `npm install` cập nhật `package-lock.json`
 - [ ] T003 [P] `.gitignore`: thêm `dist/`, `desktop/dist/`
 
@@ -36,10 +36,10 @@
 
 **Mục tiêu**: một `.dmg` chip Apple; thiết lập giải nén phần lõi, tạo venv, tải mô hình.
 
-**Kiểm độc lập**: build Mac core + `.dmg` trên `macos-14`; smoke-core đạt; quickstart §4 bằng tay.
+**Kiểm độc lập**: build Mac core + `.dmg` trên `macos-latest`; smoke-core đạt; quickstart §4 bằng tay.
 
 - [ ] T018 [US2] `desktop/core-build/build-mac.sh` theo R2 (python-build-standalone, pip, Node, ffmpeg và ffprobe tĩnh, studio, thư viện, `npm ci`, Chromium, `env.sh`, `.core-version`, tar.gz, SHA-256, manifest) trong `dist/core/mac/`
-- [ ] T019 [US2] Chạy thử build-mac.sh trên `macos-14` qua `workflow_dispatch` (một lần, kiểm T001c và espeak ≤ 160 byte)
+- [ ] T019 [US2] Chạy thử build-mac.sh trên `macos-latest` qua `workflow_dispatch` (một lần, kiểm T001c và espeak ≤ 160 byte)
 - [ ] T020 [US2] `desktop/core.js` và `main.js`: nhánh macOS của bước cài (`tar -xzf`, `xattr -dr com.apple.quarantine`, 2 lệnh `venv --system-site-packages`, kiểm độ dài đường dẫn espeak); test trong `desktop/test/install.test.js`
 - [ ] T021 [US2] `desktop/electron-builder.yml`: `dmg` arm64, `identity: null`, `NSLocalNetworkUsageDescription`
 
