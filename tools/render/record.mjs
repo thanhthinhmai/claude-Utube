@@ -20,7 +20,7 @@ const FPS = +(opt('--fps', '24') ?? 24);
 const [W, H] = String(opt('--size', '1920x1080')).split('x').map(Number);
 const UNTIL = opt('--until', null) != null ? +(/** @type {string} */ (opt('--until', null))) : null;
 const OUT = path.resolve(opt('--out', null) || path.join(FILM, 'out', 'video.mp4'));
-const CHUNK = +(process.env.STUDIO_RENDER_CHUNK || 10 * FPS);
+const CHUNK_MAX = +(process.env.STUDIO_RENDER_CHUNK || 10 * FPS);   // ≤ 10 s of film per chunk (FR-008)
 if (!(FPS > 0) || !(W > 0 && H > 0 && W % 2 === 0 && H % 2 === 0) || (UNTIL != null && !(UNTIL > 0))) { console.error('bad --fps, --size or --until'); process.exit(2); }
 
 const { chromium } = await import(pathToFileURL(path.join(LIB, 'node_modules', 'playwright-core', 'index.mjs')).href);
@@ -81,15 +81,19 @@ async function run() {
   const ctx0 = await openPage();
   const N = Math.ceil((UNTIL != null ? Math.min(UNTIL, ctx0.dur) : ctx0.dur) * FPS);
   const fp = fingerprint(FILM, W, H, FPS, UNTIL);
+  const memWorkers = Math.max(1, Math.floor(os.freemem() / (1.5 * 2 ** 30)));
+  const want = Math.max(1, +(opt('--workers', null) || (mode === 'gpu' ? 2 : Math.min(2, memWorkers))));
+  // short films: smaller chunks so every worker has work (SC-003); the size is part of the folder name, so a run
+  // with another size never reuses chunks that cover other frames
+  const CHUNK = Math.max(1, Math.min(CHUNK_MAX, Math.ceil(N / want)));
   const base = path.join(FILM, 'out', '.chunks');
-  CH = path.join(base, `${fp}-${mode}`);
+  CH = path.join(base, `${fp}-${mode}-s${CHUNK}`);
   fs.mkdirSync(CH, { recursive: true });
   for (const f of fs.readdirSync(CH)) if (f.endsWith('.part.mp4')) fs.rmSync(path.join(CH, f), { force: true });
   const chunks = planChunks(N, CHUNK);
   const name = (/** @type {number} */ c) => path.join(/** @type {string} */ (CH), `c_${String(c).padStart(4, '0')}.mp4`);
   const todo = chunks.filter(x => !fs.existsSync(name(x.c)));
-  const memWorkers = Math.max(1, Math.floor(os.freemem() / (1.5 * 2 ** 30)));
-  const workers = Math.max(1, Math.min(todo.length || 1, +(opt('--workers', null) || (mode === 'gpu' ? 2 : Math.min(2, memWorkers)))));
+  const workers = Math.max(1, Math.min(todo.length || 1, want));
   log(`render: ${mode} · ${ctx0.r} · ${N} frames · ${chunks.length} chunks (${chunks.length - todo.length} already done) · ${workers} workers`);
   let left = todo.length;
 

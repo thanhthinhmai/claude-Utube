@@ -34,7 +34,7 @@ test('GPU mode with a software browser: thrown away, re-recorded in software', (
   assert.match(logTxt, /GPU lost .* re-recording everything in software/);
   assert.match(logTxt, /render: software · /);
   assert.equal(frames(path.join(d, 'out/video.mp4')), 30);
-  assert.ok(!fs.readdirSync(path.join(d, 'out/.chunks')).some(x => x.endsWith('-gpu')), 'no GPU chunk kept');
+  assert.ok(!fs.readdirSync(path.join(d, 'out/.chunks')).some(x => x.includes('-gpu')), 'no GPU chunk kept');
 });
 
 test('stopped after a chunk: the next run keeps finished chunks', async () => {
@@ -84,6 +84,14 @@ test('the browser dies mid-chunk: reopened, video complete', () => {
   const r = run(d, { STUDIO_RENDER_TEST_CRASH_AT: '14' });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(fs.readFileSync(path.join(d, 'out/render.log'), 'utf8'), /chunk 1 failed .*reopening the browser/);
+  assert.equal(frames(path.join(d, 'out/video.mp4')), 30);
+});
+
+test('a short film is split so every worker has work', () => {
+  const d = film();
+  const r = spawnSync('node', [REC, d, '--fps', '10', '--size', '320x240', '--workers', '2'], { env: baseEnv({ STUDIO_RENDER_CHUNK: '100' }), encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(fs.readFileSync(path.join(d, 'out/render.log'), 'utf8'), /30 frames · 2 chunks \(0 already done\) · 2 workers/);
   assert.equal(frames(path.join(d, 'out/video.mp4')), 30);
 });
 

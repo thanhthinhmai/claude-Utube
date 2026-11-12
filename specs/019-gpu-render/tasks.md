@@ -54,7 +54,7 @@
 - [X] T015 [US1] In `bin/studio` `cmd_deps`: `deps gpu` downloads the full Chromium with the library's `node_modules/playwright-core/cli.js install chromium` (user cache only); checks it starts; if system libraries are missing prints the `sudo … install-deps chromium` command without running it
 - [X] T016 [US1] Write `tools/render/record.mjs` (`// @ts-check`) from `films/pet-swap/render_gpu.mjs` per research R6, R7 and data-model "Recording run": uses the library's `core/render/page.mjs` `openDemo` (so the browser comes from `PLAYWRIGHT_CHROME`); checks the renderer on every launch; chunks of `10 × fps` frames (`STUDIO_RENDER_CHUNK` override for tests); `--until SECONDS` records only `[0, SECONDS)` and is part of the fingerprint in `out/.chunks/<fingerprint>/`; `.part` → rename; up to 3 re-opens per chunk; GPU loss → delete the fingerprint dir, unset `PLAYWRIGHT_CHROME`, re-record in software; workers per research R5; joins with ffmpeg concat `-c copy`; verifies frame count `N = ceil(DUR × fps)`; deletes other fingerprint dirs after success; writes `out/render.log`
 - [X] T017 [US1] In `bin/studio`: `render <film> [--fps N] [--workers N] [--out FILE] [--size WxH] [--until SECONDS]` → `render_env` then `node tools/render/record.mjs …`; `help` text lists `render`, `page`, `deps gpu`, `config render`
-- [ ] T018 [US1] Run `sh tests/render/run.sh` and `sh tests/run.sh`; then quickstart §1 and §2 on the reference machine (record `pet-swap` with `sh bin/studio render pet-swap --fps 30`, time and frame count; SC-001, SC-006)
+- [X] T018 [US1] Run `sh tests/render/run.sh` and `sh tests/run.sh`; then quickstart §1 and §2 on the reference machine (record `pet-swap` with `sh bin/studio render pet-swap --fps 30`, time and frame count; SC-001, SC-006)
 
 **Checkpoint**: MVP — films record with the GPU from one studio command.
 
@@ -69,7 +69,7 @@
 - [X] T019 [P] [US2] Test in `tests/filmcheck/` (new case in the existing suite): `qc` on a fixture writes `film.measures.render` `{mode, renderer}` into `checks.json` taken from `STUDIO_RENDER_MODE` / `STUDIO_RENDER_RENDERER`
 - [X] T020 [US2] In `bin/studio`: call `render_env` before `qc` and `publish` in `cmd_filmcheck`, and add `page <still|events|readcheck> <film> [args…]` (runs `node core/render/<tool>.mjs <film dir> args…` from the library root)
 - [X] T021 [US2] In `tools/filmcheck/qc.py` (and `report.py` if it renders measures): record `measures["render"]` from the env; show it in `CHECKS.md`
-- [ ] T022 [US2] Run quickstart §3 and §5 on the reference machine: `qc pet-swap` ≤ 5 min without extra env; GPU vs software stills mean difference ≤ 8/255 (SC-002, SC-005)
+- [X] T022 [US2] Run quickstart §3 and §5 on the reference machine: `qc pet-swap` ≤ 5 min without extra env; GPU vs software stills mean difference ≤ 8/255 (SC-002, SC-005)
 
 ---
 
@@ -81,7 +81,7 @@
 
 - [X] T023 [P] [US3] Tests in `tests/render/record.test.mjs`: (a) kill the recorder after the first chunk, run again → header `(1 already done)` or more, final 30 frames, the done chunk's file is not rewritten (same mtime); (b) change `index.html` between runs → new fingerprint, nothing reused, old dir removed after success; (c) a leftover `.part` file is deleted at start; (d) a browser that dies mid-chunk (test hook `STUDIO_RENDER_TEST_CRASH_AT=<frame>` closes the browser once) → log `reopening the browser`, final 30 frames
 - [X] T024 [US3] Harden `tools/render/record.mjs` for the cases of T023 (crash hook only active when the env is set; clean `SIGINT`/`SIGTERM`: stop ffmpeg, delete `.part`, keep done chunks)
-- [ ] T025 [US3] Run quickstart §4 on the reference machine (close a window by hand; stop and resume) (SC-004)
+- [X] T025 [US3] Run quickstart §4 on the reference machine (close a window by hand; stop and resume) (SC-004)
 
 ---
 
@@ -105,9 +105,9 @@
 ## Phase 7: Polish & Cross-Cutting
 
 - [ ] T034 [P] Run all suites: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ui/run.sh`, `sh tests/learn/run.sh`, `sh tests/online/run.sh`, `sh tests/license/run.sh`
-- [ ] T035 [P] SC-003 timing check on the reference machine in software mode (`sh bin/studio config render software`): `sh bin/studio render pet-swap --fps 30 --until 30` vs the library's `node core/render/video.mjs films/pet-swap --fps 30` limited to the same 900 frames (temporary copy of the film with `window.DUR = 30`): same frame count, time within 10 %; write both times in quickstart.md "Results"
-- [ ] T036 [P] Guard checks (SC-007): `git status --porcelain lib/` empty; `grep -rnE "apt(-get)? install|brew install" tools/render bin/studio` finds nothing outside printed hints
-- [ ] T037 Update the memory note `reference-wsl-gpu-render` to point to the studio commands, and record results in `specs/019-gpu-render/quickstart.md` "Results"
+- [X] T035 [P] SC-003 timing check on the reference machine in software mode (`sh bin/studio config render software`): `sh bin/studio render pet-swap --fps 30 --until 30` vs the library's `node core/render/video.mjs films/pet-swap --fps 30` limited to the same 900 frames (temporary copy of the film with `window.DUR = 30`): same frame count, time within 10 %; write both times in quickstart.md "Results"
+- [X] T036 [P] Guard checks (SC-007): `git status --porcelain lib/` empty; `grep -rnE "apt(-get)? install|brew install" tools/render bin/studio` finds nothing outside printed hints
+- [X] T037 Update the memory note `reference-wsl-gpu-render` to point to the studio commands, and record results in `specs/019-gpu-render/quickstart.md` "Results"
 
 ---
 

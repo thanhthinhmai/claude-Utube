@@ -71,3 +71,16 @@ Covered by `tests/render/run.sh` (forces GPU mode with a software browser: the l
 git status --porcelain lib/ | wc -l       # 0
 ```
 No `apt`/`brew` call in any studio command (grep in tests/render/run.sh).
+
+## Results (2026-11-12, reference machine)
+
+| Check | Result |
+|---|---|
+| §1 status (SC-006) | GPU: `✓ dựng hình GPU · ANGLE (Microsoft Corporation, D3D12 (Intel(R) UHD Graphics 730), OpenGL 4.1)` in 1.7 s; `DISPLAY=` → `· … không có màn hình đồ hoạ`; `STUDIO_CHROMIUM=/nope` → `✗ … thiếu Chromium đầy đủ → sh bin/studio deps gpu`; config software → `· … do cấu hình`. **Pass** |
+| §2 `render pet-swap --fps 30` (SC-001) | 17,153 frames (ffprobe), **1,403 s (23.4 min)**, 58 chunks, 2 GPU workers. **Pass** (≤ 40 min) |
+| §3 `qc pet-swap` (SC-002) | 168.7 s, no extra env; `checks.json` `film.measures.render` = `{mode: gpu, renderer: ANGLE (… UHD Graphics 730 …)}`. **Pass** |
+| §4 interruption (SC-004) | one Chrome killed mid-chunk → `reopening the browser`; SIGTERM after 1 chunk → no `.part` left; rerun header `6 chunks (1 already done)`; 1,800 frames. **Pass** |
+| §5 GPU vs software (SC-005) | 10 frames, mean absolute difference 1.38/255 (max 2.97). **Pass** |
+| SC-003 software timing (T035, 300 frames = 10 s of pet-swap, 2 workers) | studio `render` 360 s vs library `video.mjs` 317 s and 387 s (two runs; the machine varies ±10 %): same 300 frames, studio within the spread. First studio run was 461 s because a 1-chunk film used 1 worker → fixed: chunks shrink so every worker has work. **Pass** (with the noted spread) |
+| SC-007 guards (T036) | `lib/` unchanged; no `apt`/`brew` call (only the existing printed hint in `status`). **Pass** |
+| §7 desktop app (SC-008) | not run yet (needs an installer built from this branch, see T033) |
