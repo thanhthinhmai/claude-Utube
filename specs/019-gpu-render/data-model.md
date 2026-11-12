@@ -1,0 +1,38 @@
+# Data model: 019-gpu-render
+
+## Render mode (probe result)
+
+Printed by `tools/render/probe.mjs` as one JSON line; embedded in `status --json` under `"render"` and in `app status --json`.
+
+| Field | Type | Rule |
+|---|---|---|
+| `mode` | `"gpu"` \| `"software"` | |
+| `renderer` | string \| null | the WebGL `UNMASKED_RENDERER_WEBGL` string; null when no browser was launched |
+| `reason` | string \| null | null when `mode = gpu`; one of: `forced by config`, `online mode`, `no display`, `full Chromium missing`, `the browser fell back to software`, `probe failed: <message>` |
+| `fix` | string \| null | one command or one sentence the user can act on; null when nothing to do |
+| `source` | `"auto"` \| `"config"` \| `"env"` | `env` when `STUDIO_RENDER_MODE` was already set by a parent |
+| `chrome` | string \| null | wrapper path in GPU mode on Linux; null otherwise |
+| `checked_at` | ISO-8601 | |
+
+Validation: `mode = gpu` ⇒ `renderer` does not match `/swiftshader|llvmpipe|software/i`.
+
+## Render setting
+
+`.studio/config.json` (same file as the editor model, `tools/filmcheck/editor.py`): key `"render"`, values `"auto"` (default when absent) or `"software"`.
+
+## Recording run
+
+Log file `out/render.log` (one line per event) and state in `out/.chunks/<fingerprint>/`.
+
+| Item | Rule |
+|---|---|
+| fingerprint | SHA-256 over sorted (relative path, bytes) of the film's source files + `"{w}x{h}@{fps}"`; excluded: `out/`, `stills/`, `publish/`, `.check/`, `*.mp4`, `*.log`, `checks.json`, `CHECKS.md` |
+| frame count `N` | `ceil(DUR × fps)` |
+| chunk `c` | frames `[c·300, min(N, (c+1)·300))`; file `c_NNNN.mp4`, written as `c_NNNN.mp4.part` then renamed |
+| state | `todo` (no file) → `rendering` (`.part` exists) → `done` (final file); a `.part` left by a crash is deleted at start |
+| retries | per chunk, at most 3 browser re-opens; then the run fails |
+| GPU loss | `mode = gpu` and a launch reports software ⇒ delete the fingerprint directory, set mode software, start over (logged) |
+| output | concat of `c_0000 … c_{n-1}` in order → `--out` (default `out/video.mp4`); frame count must equal `N` (checked with ffprobe) |
+| cleanup | after success, fingerprint directories other than the current one are removed; the current one is kept until the next successful run with another fingerprint |
+
+`out/render.log` first line: `render: <mode> · <renderer> · <N> frames · <chunks> chunks (<done> already done) · <workers> workers`.
