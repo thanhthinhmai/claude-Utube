@@ -18,37 +18,37 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
 
 ## Phase 1: Setup
 
-- [ ] T001 Thêm `my-styles/*/test.mp4` vào `.gitignore` (research R7), kèm một dòng chú thích.
-- [ ] T002 [P] Mở rộng `tests/online/fake_claude` để trả lời theo JSON schema của lượt gán nhãn khi prompt hệ thống có chữ `shot labeler`. Câu trả lời đọc từ file `FAKE_LABELS` (JSON `{id: [scale, angle, foreground_blur]}`); không có file thì gán `med`/`eye` cho mọi mã cảnh trong prompt. Ghi mỗi lần gọi vào `FAKE_CLAUDE_LOG`, như hiện nay.
+- [X] T001 Thêm `my-styles/*/test.mp4` vào `.gitignore` (research R7), kèm một dòng chú thích.
+- [X] T002 [P] Mở rộng `tests/online/fake_claude` để trả lời theo JSON schema của lượt gán nhãn khi prompt hệ thống có chữ `shot labeler`. Câu trả lời đọc từ file `FAKE_LABELS` (JSON `{id: [scale, angle, foreground_blur]}`); không có file thì gán `med`/`eye` cho mọi mã cảnh trong prompt. Ghi mỗi lần gọi vào `FAKE_CLAUDE_LOG`, như hiện nay.
 
 ---
 
 ## Phase 2: Foundational (chặn mọi story)
 
-- [ ] T003 Tạo `tools/filmcheck/focus.py` (chỉ thư viện chuẩn và ffmpeg; research R1):
+- [X] T003 Tạo `tools/filmcheck/focus.py` (chỉ thư viện chuẩn và ffmpeg; research R1):
   - `measure(image, subtitle_band=0.18) -> {tiles, focused_share, sharpest, sharpest_at, letterbox}`;
   - ffmpeg thu ảnh về 480 px chiều ngang, xám, xuất `rawvideo`;
   - bỏ dải đen (các hàng có độ sáng < 0,03 và độ lệch < 0,01, tính từ mép) và dải phụ đề;
   - chia 4×3 ô, tính phương sai Laplace của từng ô; ô nét khi ≥ `FOCUS_T` (hằng số, ban đầu 40; T020 chốt lại).
-- [ ] T004 [P] Tạo `tests/filmcheck/test_focus.py`, với ảnh vẽ bằng ffmpeg:
+- [X] T004 [P] Tạo `tests/filmcheck/test_focus.py`, với ảnh vẽ bằng ffmpeg:
   - ảnh nét (`testsrc2`) → `focused_share` ≥ 0,9;
   - cùng ảnh qua `gblur=sigma=8` → 0;
   - ảnh nét nửa trái, mờ nửa phải → khoảng 0,5;
   - ảnh có dải đen 12% trên dưới và một dòng chữ trắng ở dải phụ đề trên nền mờ → dải đen bị bỏ, chữ không tính là nét;
   - mỗi ảnh ≤ 0,15 s.
-- [ ] T005 Tạo `tools/filmcheck/labeler.py` theo mẫu `editor.run` (research R3):
+- [X] T005 Tạo `tools/filmcheck/labeler.py` theo mẫu `editor.run` (research R3):
   - prompt hệ thống `SYSTEM` (có chữ "shot labeler", định nghĩa cỡ cảnh và góc máy như R3; cảnh không có người thì xếp cỡ theo chủ thể được lấy nét, không rõ thì `unknown`; dặn chỉ xem các ảnh được đưa và không đoán ý đồ);
   - `SCHEMA`: `{shots: [{id, scale, angle, foreground_blur, confidence}]}` với enum như data-model;
   - lệnh: `claude -p --tools Read --allowedTools Read --json-schema … --output-format json --no-session-persistence` cùng `editor.model_args()` (Opus); môi trường online giống `editor.run`;
   - `label(sheets: [path], ids: [str], hints: {id: {focused_share, sharpest_at}}) -> {labels: {id: {...}}, model, usage}`; tối đa 4 bảng ảnh mỗi lần gọi; câu trả lời sai schema hoặc thiếu mã thì hỏi lại một lần, sai nữa thì `LabelError`;
-  - `contradicts(label, focus) -> bool`: `ecu`/`cu` mà `focused_share` ≤ 1/12 và ô nét nhất ở hàng hoặc cột ngoài cùng; hoặc `huge` mà `focused_share` ≥ 0,9.
-- [ ] T006 [P] Tạo `tests/filmcheck/test_labeler.py` (`claude` giả):
+  - `contradicts(label, focus) -> bool`: `ecu`/`cu` mà `focused_share` ≤ 1/12 (khác 0) và ô nét nhất ở hàng hoặc cột ngoài cùng. (Vế "`huge` mà nét gần hết" bị bỏ khi làm: cảnh toàn rộng nét sâu là bình thường.)
+- [X] T006 [P] Tạo `tests/filmcheck/test_labeler.py` (`claude` giả):
   - nhãn đọc đúng từ `FAKE_LABELS`;
   - prompt có đúng các đường dẫn bảng ảnh và mã cảnh, không có kịch bản hay tên phim;
   - câu trả lời sai schema 2 lần → `LabelError`;
   - có `--model claude-opus-5-5`;
   - `contradicts` có ca đúng và ca sai.
-- [ ] T007 [P] Thêm `blurred` vào `EXCEPTABLE` trong `tools/filmcheck/tiers.py`; cập nhật `specs/020-qc-before-render/contracts/checks.md` (một dòng trong bảng luật: `shots`, `blurred`, `block`, không ô nào nét, ngoại lệ được) và test trong `tests/filmcheck/test_tiers.py`.
+- [X] T007 [P] Thêm `blurred` vào `EXCEPTABLE` trong `tools/filmcheck/tiers.py`; cập nhật `specs/020-qc-before-render/contracts/checks.md` (một dòng trong bảng luật: `shots`, `blurred`, `block`, không ô nào nét, ngoại lệ được) và test trong `tests/filmcheck/test_tiers.py`.
 
 **Checkpoint**: `sh tests/filmcheck/run.sh` đạt. Commit.
 

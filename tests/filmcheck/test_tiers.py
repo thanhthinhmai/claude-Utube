@@ -50,6 +50,8 @@ class Tiers(unittest.TestCase):
             tiers.add_exception(self.d, "P01.0", "flat", "  ")             # no reason
         with self.assertRaises(tiers.TierError):
             tiers.add_exception(self.d, "P01.0", "flat", "x" * 201)
+        self.assertEqual(tiers.add_exception(self.d, "P01.0", "blurred", "a dream, out of focus on purpose")["rule"], "blurred")
+        tiers.remove_exception(self.d, "P01.0", "blurred")
         e = tiers.add_exception(self.d, "P01.0", "flat", "title card on purpose")
         self.assertEqual(tiers.load_exceptions(self.d), [e])
         self.assertTrue(tiers.remove_exception(self.d, "P01.0", "flat"))

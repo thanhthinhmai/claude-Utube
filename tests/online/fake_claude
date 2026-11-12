@@ -77,6 +77,32 @@ def editor(prompt):
     return 0
 
 
+def labeler(prompt):
+    """The shot labeler of specs/021: ids come from "- <id> " lines of the prompt. FAKE_LABELS = a JSON file
+    {id: [scale, angle, foreground_blur]}; ids not in it are med/eye. FAKE_LABELS_MODE=bad answers without shots,
+    =fail exits 1."""
+    import re
+    mode = os.environ.get("FAKE_LABELS_MODE")
+    if mode == "fail":
+        print("fake labeler: failed", file=sys.stderr)
+        return 1
+    given = {}
+    if os.environ.get("FAKE_LABELS"):
+        try:
+            given = json.load(open(os.environ["FAKE_LABELS"]))
+        except (OSError, ValueError):
+            given = {}
+    ids = re.findall(r"^- (\S+) ", prompt, re.M)
+    shots = []
+    for i in ids:
+        sc, an, fg = (given.get(i) or ["med", "eye", False])
+        shots.append({"id": i, "scale": sc, "angle": an, "foreground_blur": bool(fg), "confidence": "high"})
+    out = {"shots": "none"} if mode == "bad" else {"shots": shots}
+    print(json.dumps({"type": "result", "is_error": False, "structured_output": out,
+                      "usage": {"input_tokens": 2000, "output_tokens": 200}, "modelUsage": {"claude-opus-5-5": {}}}))
+    return 0
+
+
 def topics(prompt):
     """The channel-fit judge of specs/013: fit 7 for each topic, 2 with [fit-low]; two suggestions when asked."""
     import re
@@ -146,6 +172,8 @@ def main(argv):
         schema = argv[argv.index("--json-schema") + 1] if "--json-schema" in argv else ""
         if "checked_sources" in schema:
             return editor(sys.stdin.read())
+        if "foreground_blur" in schema:
+            return labeler(sys.stdin.read())
         if '"suggested"' in schema:
             return topics(sys.stdin.read())
         print(json.dumps({"type": "result", "is_error": False, "structured_output": {"allowed": True, "reason": ""}}))
