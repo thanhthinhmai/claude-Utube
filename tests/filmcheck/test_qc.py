@@ -45,6 +45,40 @@ class Measures(unittest.TestCase):
         self.assertTrue(r["pass"])
         self.assertLessEqual(r["measures"]["silence_ratio"], 0.20)
 
+    def test_render_mode_is_recorded(self):                 # specs/019 T019
+        old = {k: os.environ.get(k) for k in ("STUDIO_RENDER_MODE", "STUDIO_RENDER_RENDERER")}
+        try:
+            os.environ["STUDIO_RENDER_MODE"] = "gpu"
+            os.environ["STUDIO_RENDER_RENDERER"] = "ANGLE (Test, D3D12 (Fake GPU), OpenGL 4.1)"
+            r = qc.measure(samples.make_film(self.root, "render-gpu"))
+            self.assertEqual(r["measures"]["render"], {"mode": "gpu", "renderer": "ANGLE (Test, D3D12 (Fake GPU), OpenGL 4.1)"})
+            del os.environ["STUDIO_RENDER_MODE"], os.environ["STUDIO_RENDER_RENDERER"]
+            r = qc.measure(samples.make_film(self.root, "render-sw"))
+            self.assertEqual(r["measures"]["render"], {"mode": "software", "renderer": None})
+        finally:
+            for k, v in old.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
+
+    def test_render_setting_round_trip(self):              # specs/019 T012
+        from filmcheck import editor
+        old = os.environ.get("STUDIO_ROOT")
+        os.environ["STUDIO_ROOT"] = tempfile.mkdtemp(dir=TMP)
+        try:
+            self.assertEqual(editor.render_setting(), "auto")
+            editor.set_render_setting("software")
+            self.assertEqual(json.loads(editor.config_path().read_text())["render"], "software")
+            self.assertEqual(editor.render_setting(), "software")
+            with self.assertRaises(ValueError):
+                editor.set_render_setting("gpu")
+        finally:
+            if old is None:
+                os.environ.pop("STUDIO_ROOT")
+            else:
+                os.environ["STUDIO_ROOT"] = old
+
     def test_each_bad_film_fails_one_measure(self):         # SC-003
         for key, (change, at) in BAD.items():
             r = qc.measure(samples.make_film(self.root, key.replace("_", "-"), **change))

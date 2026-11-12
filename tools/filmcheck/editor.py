@@ -34,6 +34,24 @@ def set_editor_model(value: str) -> None:
     p.write_text(json.dumps(data, indent=1), encoding="utf-8")
 
 
+RENDER_SETTINGS = ("auto", "software")   # specs/019: how pages are rendered (auto = GPU when the machine can)
+
+
+def set_render_setting(value: str) -> None:
+    if value not in RENDER_SETTINGS:
+        raise ValueError(f"render must be one of {', '.join(RENDER_SETTINGS)}")
+    p = config_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    data = read_config()
+    data["render"] = value
+    p.write_text(json.dumps(data, indent=1), encoding="utf-8")
+
+
+def render_setting() -> str:
+    v = read_config().get("render") or "auto"
+    return v if v in RENDER_SETTINGS else "auto"
+
+
 def editor_model() -> str:
     """STUDIO_EDITOR_MODEL (online: set by the worker from Settings), else .studio/config.json, else inherit."""
     v = os.environ.get("STUDIO_EDITOR_MODEL") or read_config().get("editor_model") or "inherit"

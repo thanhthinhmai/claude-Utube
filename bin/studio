@@ -16,6 +16,8 @@
 #   sh bin/studio channel list|new|show|set|decide|attach … · lesson list|draft|add|approve|retire …  kênh và bài học (specs/012)
 #   sh bin/studio app start|status|stop|import [--data D]   cả xưởng trên máy này, không cần Docker (specs/014)
 #   sh bin/studio topics score|queue|take|made|type|fit|refs|recheck|usage <kênh> … · config youtube-key  chọn đề (specs/013)
+#   sh bin/studio render <phim> [--fps N] [--workers N] [--out F] [--until S]  ghi video, dùng GPU nếu được, làm tiếp khi bị ngắt (specs/019)
+#   sh bin/studio page still|events|readcheck <phim> …  chạy công cụ trang của thư viện · deps gpu · config render auto|software
 #   sh bin/studio help
 # Mã thoát: 0 = sẵn sàng / xong · 1 = chưa sẵn sàng / thất bại · 2 = sai cách dùng hoặc library.lock sai.
 set -eu
@@ -39,7 +41,7 @@ SPARSE_BASE="$SPARSE
 !/styles/*/poster.jpg"
 
 usage() {
-  sed -n '2,18s/^# \{0,1\}//p' "$0"
+  sed -n '2,20s/^# \{0,1\}//p' "$0"
 }
 
 die2() { echo "✗ $*" >&2; exit 2; }
@@ -287,6 +289,45 @@ cmd_setup() {
   exit "$rc"
 }
 
+# ---------- dựng hình: GPU hay phần mềm (specs/019) ----------
+# Chạy probe một lần (trừ khi tiến trình cha đã quyết) rồi export cho các lệnh con: STUDIO_RENDER_MODE,
+# STUDIO_RENDER_RENDERER, và ở chế độ GPU trên Linux PLAYWRIGHT_CHROME=tools/render/chrome-gpu.sh (biến thư viện đọc).
+render_probe() {
+  if [ -n "${STUDIO_RENDER_PROBE:-}" ]; then sh "$STUDIO_RENDER_PROBE"; return 0; fi
+  command -v node >/dev/null 2>&1 && [ -d "$LIB/node_modules/playwright-core" ] || return 1
+  STUDIO_LIB="$LIB" node "$ROOT/tools/render/probe.mjs" 2>/dev/null
+}
+json_field() {  # json_field <json> <key>: giá trị chuỗi của JSON một tầng do probe in ra (rỗng nếu null)
+  printf '%s' "$1" | sed -n "s/.*\"$2\":\"\([^\"]*\)\".*/\1/p" | head -n 1
+}
+render_env() {
+  if [ "${STUDIO_RENDER_MODE:-}" = gpu ] || [ "${STUDIO_RENDER_MODE:-}" = software ]; then return 0; fi
+  RJ=$(render_probe) || RJ=''
+  mode=$(json_field "$RJ" mode); [ -n "$mode" ] || mode=software
+  STUDIO_RENDER_MODE=$mode; STUDIO_RENDER_RENDERER=$(json_field "$RJ" renderer); STUDIO_RENDER_REASON=$(json_field "$RJ" reason)
+  export STUDIO_RENDER_MODE STUDIO_RENDER_RENDERER STUDIO_RENDER_REASON
+  chrome=$(json_field "$RJ" chrome)
+  if [ "$mode" = gpu ] && [ -n "$chrome" ]; then PLAYWRIGHT_CHROME=$chrome; export PLAYWRIGHT_CHROME; fi
+}
+reason_vi() {
+  case $1 in
+    'forced by config') echo 'do cấu hình' ;; 'online mode') echo 'chế độ online' ;; 'no display') echo 'không có màn hình đồ hoạ' ;;
+    'full Chromium missing') echo 'thiếu Chromium đầy đủ' ;; 'the browser fell back to software') echo 'trình duyệt rơi về vẽ bằng phần mềm' ;;
+    'probe failed:'*) echo "không kiểm được (${1#probe failed: })" ;; *) echo "$1" ;;
+  esac
+}
+render_line() {  # in dòng "dựng hình" của status từ JSON của probe ($1); rỗng = chưa kiểm
+  if [ -z "$1" ]; then echo "  · dựng hình   chưa kiểm (chưa cài gói lõi của thư viện → sh bin/studio deps)"; return 0; fi
+  m=$(json_field "$1" mode); r=$(json_field "$1" renderer); why=$(json_field "$1" reason); fix=$(json_field "$1" fix)
+  if [ "$m" = gpu ]; then echo "  ✓ dựng hình   GPU · $r"; return 0; fi
+  txt="phần mềm · $(reason_vi "$why")"
+  case $why in
+    'full Chromium missing') echo "  ✗ dựng hình   $txt → $fix" ;;
+    'the browser fell back to software') echo "  ✗ dựng hình   $txt → $fix" ;;
+    *) echo "  · dựng hình   $txt" ;;
+  esac
+}
+
 cmd_status() {
   json=0
   for a in "$@"; do
@@ -303,6 +344,8 @@ cmd_status() {
   if [ -d "$LIB/node_modules" ] && [ -d "$LIB/.venv" ]; then deps=true; fi
   ready=false
   if [ "$LSTATE" = ok ] && [ "$TOOLS_BAD" -eq 0 ]; then ready=true; fi
+  RJ=''
+  if [ "$deps" = true ] || [ -n "${STUDIO_RENDER_PROBE:-}" ]; then RJ=$(render_probe) || RJ=''; fi
 
   if [ "$json" -eq 1 ]; then
     printf '{"ready":%s,"library":{"path":%s,"state":%s,"commit_expected":%s,"commit_found":%s},"tools":[' \
@@ -315,7 +358,7 @@ cmd_status() {
         sep=','
       done
     }
-    printf '],"counts":{"library_styles":%s,"library_posters":%s,"my_styles":%s,"films":%s},"deps_core":%s}\n' "$n_lib" "$n_post" "$n_my" "$n_films" "$deps"
+    printf '],"counts":{"library_styles":%s,"library_posters":%s,"my_styles":%s,"films":%s},"deps_core":%s,"render":%s}\n' "$n_lib" "$n_post" "$n_my" "$n_films" "$deps" "${RJ:-null}"
   else
     echo "Xưởng: $ROOT"
     case $LSTATE in
@@ -326,6 +369,7 @@ cmd_status() {
       foreign) echo "  ✗ thư viện   $LIB_REL không phải thư viện do xưởng quản lý" ;;
     esac
     print_tools
+    render_line "$RJ"
     echo "  Phong cách thư viện: $n_lib · poster: $n_post/$n_lib · phong cách riêng: $n_my · phim: $n_films"
     if [ "$deps" = true ]; then echo "  Gói lõi của thư viện: đã cài"; else echo "  Gói lõi của thư viện: chưa cài (cần khi làm phim) → sh bin/studio deps"; fi
     if [ "$ready" = true ]; then echo "✓ sẵn sàng"; else echo "✗ chưa sẵn sàng"; fi
@@ -384,6 +428,7 @@ cmd_studio() {
 
 # Chấm kịch bản và đo phim (specs/010): chỉ cần Python 3, không cần giao diện
 cmd_filmcheck() {
+  case ${1:-} in qc | publish) render_env ;; esac
   py=python3; [ -x "$VENV/bin/python" ] && py="$VENV/bin/python"
   STUDIO_ROOT="${STUDIO_ROOT:-$ROOT}" STUDIO_LIB="$LIB" exec "$py" "$ROOT/tools/filmcheck/cli.py" "$@"
 }
@@ -399,6 +444,7 @@ cmd_deps() {
   if [ "${1:-}" = learn ]; then shift; deps_learn "$@"; return 0; fi
   if [ "${1:-}" = ui ]; then deps_tiers ui; return 0; fi
   if [ "${1:-}" = online ]; then deps_tiers ui online; return 0; fi
+  if [ "${1:-}" = gpu ]; then deps_gpu; return 0; fi
   read_lock
   lib_state
   if [ "$LSTATE" != ok ]; then
@@ -406,6 +452,44 @@ cmd_deps() {
   fi
   # Đặt LEMO_OPUSCAR_HOME, nếu không trình cài của thư viện sẽ tải một bản khác vào ~/lemo-opuscar
   LEMO_OPUSCAR_HOME="$LIB" exec sh "$LIB/plugin/skills/lemo-opuscar/scripts/setup.sh" deps "$@"
+}
+
+# Chromium đầy đủ cho dựng hình bằng GPU (specs/019): tải vào thư mục của người dùng, không cài gói hệ thống
+deps_gpu() {
+  [ -f "$LIB/node_modules/playwright-core/cli.js" ] || { echo "✗ chưa cài gói lõi của thư viện. Chạy trước: sh bin/studio deps" >&2; exit 1; }
+  if STUDIO_LIB="$LIB" node -e "import('$ROOT/tools/render/lib.mjs').then(m => process.exit(m.findChromium() ? 0 : 1))"; then
+    echo "✓ Chromium đầy đủ đã có"
+  else
+    echo "↓ tải Chromium đầy đủ (khoảng 190 MB, vào ${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright})…"
+    (cd "$LIB" && node node_modules/playwright-core/cli.js install chromium) || { echo "✗ tải Chromium thất bại" >&2; exit 1; }
+    echo "✓ đã tải Chromium đầy đủ"
+  fi
+  if ! (cd "$LIB" && node -e "require('playwright-core').chromium.launch({headless: true}).then(b => b.close())") 2>/dev/null; then
+    echo "✗ Chromium thiếu thư viện hệ thống. Xưởng không tự cài; hãy tự chạy:" >&2
+    echo "  sudo sh -c 'cd $LIB && node node_modules/playwright-core/cli.js install-deps chromium'" >&2
+    exit 1
+  fi
+  echo "→ kiểm lại: sh bin/studio status"
+}
+
+# Ghi video (specs/019): GPU nếu được, chia phần, làm tiếp khi bị ngắt
+cmd_render() {
+  [ -n "${1:-}" ] || { echo "dùng: sh bin/studio render <phim> [--fps N] [--workers N] [--out FILE] [--size WxH] [--until S]" >&2; exit 2; }
+  [ -d "$LIB/node_modules/playwright-core" ] || { echo "✗ chưa cài gói lõi của thư viện. Chạy: sh bin/studio deps" >&2; exit 1; }
+  render_env
+  STUDIO_LIB="$LIB" exec node "$ROOT/tools/render/record.mjs" "$@"
+}
+
+# Công cụ trang của thư viện (still, events, readcheck) với cùng cách dựng hình
+cmd_page() {
+  tool=${1:-}; film=${2:-}
+  case $tool in still | events | readcheck) ;; *) echo "dùng: sh bin/studio page still|events|readcheck <phim> [đối số…]" >&2; exit 2 ;; esac
+  [ -n "$film" ] || { echo "dùng: sh bin/studio page $tool <phim> [đối số…]" >&2; exit 2; }
+  if [ -f "$ROOT/films/$film/index.html" ]; then dir="$ROOT/films/$film"; elif [ -f "$film/index.html" ]; then dir=$(CDPATH='' cd -- "$film" && pwd -P)
+  else echo "✗ không có phim \"$film\" (cần films/<tên>/index.html)" >&2; exit 2; fi
+  shift 2
+  render_env
+  cd "$LIB" && exec node "core/render/$tool.mjs" "$dir" "$@"
 }
 
 # Xưởng online trên máy chủ (specs/007): Docker Compose với deploy/.env. Không tự cài Docker.
@@ -439,6 +523,8 @@ case ${1:-} in
   status) shift; cmd_status "$@" ;;
   deps) shift; cmd_deps "$@" ;;
   learn) shift; cmd_learn "$@" ;;
+  render) shift; cmd_render "$@" ;;
+  page) shift; cmd_page "$@" ;;
   ui | job | review | admin | app) cmd_studio "$@" ;;
   script | web | qc | publish | channel | lesson | topics | config) cmd_filmcheck "$@" ;;
   help | -h | --help) usage ;;

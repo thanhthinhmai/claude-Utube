@@ -76,6 +76,9 @@ for changes, change the script as asked, then `script check --customer-round` an
 - **Look at pictures small.** Check frames as one contact sheet at most **1280 px wide** with at most 9 tiles
   (`ffmpeg … -vf "fps=…,scale=420:-1,tile=3x3"`), or a crop of the one detail you need. Never `Read` a
   full-size frame or a sheet wider than 1280 px. Look again only after a change.
+- **Record with the studio, not the library's `video.mjs`:** `sh STUDIO/bin/studio render <name> --fps <the style's rate>` (GPU when the
+  machine has one, 10-second chunks that survive a crash; run it again to resume). Page tools the same way:
+  `sh STUDIO/bin/studio page still|events|readcheck <name> …`. The log's first line says `render: gpu` or `render: software`.
 - **Render once you are sure.** Test with a few frames or a short range before the full render; a full render
   plus a re-render is the most expensive loop.
 - Do not explore: no `ls -R`, no reading files "to see what is there".

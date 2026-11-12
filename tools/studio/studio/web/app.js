@@ -1065,6 +1065,9 @@ async function settingsWorker(top) {
     <section class="panel card-pad"><div class="provider-head" style="padding:0"><div><h2>Status</h2>
       <p class="muted">Read every 5 seconds. Starting and stopping the worker stays in the terminal.</p></div>${head}</div>
       ${rows ? `<ul class="beats">${rows}</ul>` : `<p class="notice${waiting ? " warn" : ""}">No worker is running. Start it in a terminal: <code>sh bin/studio online up</code> on the server, or <code>tools/.venv/bin/python tools/runner/worker.py</code> on this machine.</p>`}
+      ${w.render ? `<p class="small" data-render="${esc(w.render.mode)}">Rendering: ${w.render.mode === "gpu"
+        ? `<strong>GPU</strong> · ${esc(w.render.renderer || "")}`
+        : `software · <span class="muted">${esc(w.render.reason || "")}</span>`}</p>` : ""}
       <div class="stats">${count(w.counts.queued, "jobs queued")}${count(w.counts.running, "jobs running")}${count(w.counts.waiting_review, "waiting for review")}${count(w.counts.waiting_claude, "waiting for a Claude account")}</div></section>
     <section class="panel card-pad"><h2>Latest jobs</h2>${w.latest.length ? `<ul class="latest">${w.latest.map(job).join("")}</ul>` : '<p class="muted">No jobs yet.</p>'}</section>`;
   workerTimer = setTimeout(() => { if (/^#\/settings\/worker/.test(location.hash)) route(); }, 5000);

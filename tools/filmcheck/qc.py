@@ -340,6 +340,9 @@ def measure(d: Path, lib=None) -> dict:
     measures["missing_glyphs"] = glyphs
     measures["texts_checked"] = on_screen
     measures["fonts_checked"] = fonts_ok
+    # specs/019: how the page was rendered for the on-screen text pass (set by `sh bin/studio qc`)
+    measures["render"] = {"mode": os.environ.get("STUDIO_RENDER_MODE") or "software",
+                          "renderer": os.environ.get("STUDIO_RENDER_RENDERER") or None}
     for g in glyphs:
         problems.append(f"{g['codepoint']} has no font and shows as a box (in \"{g['text']}\")")
     return {"pass": not problems, "narration": bool(nar), "duration": round(duration, 2), "measures": measures,

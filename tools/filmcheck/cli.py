@@ -639,6 +639,12 @@ def cmd_editor_model(a) -> int:
     return 0
 
 
+def cmd_render_setting(a) -> int:
+    editor.set_render_setting(a.value)
+    print(f"✓ render: {a.value}" + (" (GPU when the machine can)" if a.value == "auto" else " (software only)"))
+    return 0
+
+
 def not_yet(a) -> int:
     print(f"✗ not built yet: {a.cmd}", file=sys.stderr)
     return 2
@@ -768,11 +774,13 @@ def parser() -> argparse.ArgumentParser:
     c.add_parser("youtube-key", help="save your YouTube Data API key (typed in, not shown)")
     s = c.add_parser("editor-model")
     s.add_argument("value", choices=list(editor.MODELS))
+    s = c.add_parser("render", help="auto: GPU when the machine can (specs/019); software: never the GPU")
+    s.add_argument("value", choices=list(editor.RENDER_SETTINGS))
     return p
 
 
 COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("script", "status"): cmd_status,
-            ("script", "skip"): cmd_skip, ("web", "fetch"): cmd_fetch, ("config", "editor-model"): cmd_editor_model,
+            ("script", "skip"): cmd_skip, ("web", "fetch"): cmd_fetch, ("config", "editor-model"): cmd_editor_model, ("config", "render"): cmd_render_setting,
             ("qc", "qc"): cmd_qc, ("publish", "publish"): cmd_publish,
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,

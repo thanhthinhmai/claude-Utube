@@ -108,6 +108,9 @@ def markdown(data: dict) -> str:
         for k, v in (f.get("measures") or {}).items():
             if k in THRESHOLDS:
                 out.append(f"| {k} | {_fmt(v)} | {THRESHOLDS[k]} |")
+        rend = (f.get("measures") or {}).get("render")
+        if rend:
+            out.append(f"| rendering | {rend.get('mode')}{' · ' + rend['renderer'] if rend.get('renderer') else ''} | GPU when the machine can (specs/019) |")
         if (f.get("measures") or {}).get("texts_checked") is False:
             out.append("| on-screen text | not checked | the film has no window.TEXTS |")
         out.append("")

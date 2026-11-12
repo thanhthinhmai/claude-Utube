@@ -280,6 +280,20 @@ def remote_review(a) -> int:
 
 
 # ---------- the studio on this machine (specs/014) ----------
+REASON_VI = {"forced by config": "do cấu hình", "online mode": "chế độ online", "no display": "không có màn hình đồ hoạ",
+             "full Chromium missing": "thiếu Chromium đầy đủ", "the browser fell back to software": "trình duyệt rơi về vẽ bằng phần mềm"}
+
+
+def render_line(r) -> str:
+    """The `dựng hình` line (specs/019 contracts/cli.md), same wording as `sh bin/studio status`."""
+    if not r:
+        return "  · dựng hình   chưa kiểm"
+    if r.get("mode") == "gpu":
+        return f"  ✓ dựng hình   GPU · {r.get('renderer')}"
+    why = r.get("reason") or ""
+    txt = REASON_VI.get(why, why.replace("probe failed: ", "không kiểm được: "))
+    mark = "✗" if why in ("full Chromium missing", "the browser fell back to software") else "·"
+    return f"  {mark} dựng hình   phần mềm · {txt}" + (f" → {r['fix']}" if mark == "✗" and r.get("fix") else "")
 def cmd_app(a):
     from studio import host
     try:
@@ -292,7 +306,7 @@ def cmd_app(a):
             elif s["running"]:
                 out(f"✓ running · {s['url']} · jobs running {s['jobs_running']}, queued {s['jobs_queued']}",
                     "  parts: " + ", ".join(f"{p} {'up' if ok else 'down'}" for p, ok in s["parts"].items()),
-                    f"  data {s['data']} · logs {s['logs']}", f"URL: {s['url']}")
+                    render_line(s.get("render")), f"  data {s['data']} · logs {s['logs']}", f"URL: {s['url']}")
             else:
                 out(f"✗ not running · data {s['data']}. Start: sh bin/studio app start")
             return 0 if s["running"] else 1
