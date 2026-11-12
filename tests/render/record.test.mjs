@@ -95,6 +95,13 @@ test('a short film is split so every worker has work', () => {
   assert.equal(frames(path.join(d, 'out/video.mp4')), 30);
 });
 
+test('workers are capped by free RAM (FR-011)', () => {
+  const d = film();
+  const r = spawnSync('node', [REC, d, '--fps', '10', '--size', '320x240'], { env: baseEnv({ STUDIO_RENDER_TEST_FREE_GB: '2' }), encoding: 'utf8', timeout: 180000 });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(fs.readFileSync(path.join(d, 'out/render.log'), 'utf8').split('\n')[0], / · 1 workers$/);
+});
+
 test('--until records only the start of the film', () => {
   const d = film();
   const r = spawnSync('node', [...args(d), '--until', '1.5'], { env: baseEnv(), encoding: 'utf8', timeout: 180000 });

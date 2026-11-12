@@ -125,3 +125,9 @@
 ## Implementation Strategy
 
 MVP = Phases 1–3 (US1): one command records with the GPU, `status` tells the mode. Then US2 (checks), US3 (resume hardening), US4 (desktop app). Commit after each phase (constitution).
+
+## Phase 8: Convergence
+
+- [X] T038 Cap GPU-mode workers by free RAM too (same rule as software: at most free RAM ÷ 1.5 GB, at least 1, default 2) in `tools/render/record.mjs`, with a test in `tests/render/record.test.mjs` per FR-011 (partial)
+- [X] T039 Warn about the Chrome window in GPU mode on Linux: add "a Chrome window is open off-screen, do not close it" to the first line of `out/render.log` (`tools/render/record.mjs`) and to the `dựng hình` GPU line of `sh bin/studio status` (`bin/studio`), with tests in `tests/render/record.test.mjs` and `tests/run.sh` per spec Edge Cases "Cửa sổ trình duyệt hiện lên lúc ghi" (missing)
+- [X] T040 Record the real chunk folder name `out/.chunks/<fingerprint>-<mode>-s<chunk size>` in `specs/019-gpu-render/data-model.md` "Recording run" (as an addendum below the table) per plan: data model (partial)

@@ -319,7 +319,11 @@ reason_vi() {
 render_line() {  # in dòng "dựng hình" của status từ JSON của probe ($1); rỗng = chưa kiểm
   if [ -z "$1" ]; then echo "  · dựng hình   chưa kiểm (chưa cài gói lõi của thư viện → sh bin/studio deps)"; return 0; fi
   m=$(json_field "$1" mode); r=$(json_field "$1" renderer); why=$(json_field "$1" reason); fix=$(json_field "$1" fix)
-  if [ "$m" = gpu ]; then echo "  ✓ dựng hình   GPU · $r"; return 0; fi
+  if [ "$m" = gpu ]; then
+    echo "  ✓ dựng hình   GPU · $r"
+    [ -n "$(json_field "$1" chrome)" ] && echo "                 (khi dựng hình, Chrome mở một cửa sổ ngoài màn hình: đừng đóng nó)"
+    return 0
+  fi
   txt="phần mềm · $(reason_vi "$why")"
   case $why in
     'full Chromium missing') echo "  ✗ dựng hình   $txt → $fix" ;;

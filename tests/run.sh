@@ -261,6 +261,7 @@ run_probe() {  # run_probe lệnh-con…  (như run, thêm STUDIO_RENDER_PROBE)
 probe_fake '{"mode":"gpu","renderer":"ANGLE (Test, D3D12 (Fake GPU 1), OpenGL 4.1)","reason":null,"fix":null,"source":"auto","chrome":"/x/chrome-gpu.sh","checked_at":"2026-11-12T00:00:00Z"}'
 run_probe status
 check "status: dòng dựng hình GPU kèm tên GPU" has "✓ dựng hình   GPU · ANGLE (Test, D3D12 (Fake GPU 1), OpenGL 4.1)"
+check "status: GPU trên Linux dặn đừng đóng cửa sổ Chrome" has "đừng đóng nó"
 run_probe status --json
 check "status --json có render.mode = gpu" has '"render":{"mode":"gpu"'
 check "status --json vẫn là JSON hợp lệ" json_ok

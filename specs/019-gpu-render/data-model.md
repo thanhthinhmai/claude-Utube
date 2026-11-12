@@ -47,4 +47,6 @@ Log file `out/render.log` (one line per event) and state in `out/.chunks/<finger
 | output | concat of `c_0000 … c_{n-1}` in order → `--out` (default `out/video.mp4`); frame count must equal `N` (checked with ffprobe) |
 | cleanup | after success, fingerprint directories other than the current one are removed; the current one is kept until the next successful run with another fingerprint |
 
-`out/render.log` first line: `render: <mode> · <renderer> · <N> frames · <chunks> chunks (<done> already done) · <workers> workers`.
+Addendum (convergence, T040): the chunk folder is `out/.chunks/<fingerprint>-<mode>-s<chunk size>`. The mode keeps GPU and software chunks apart (FR-007); the chunk size is `min(10 × fps, ceil(N / workers))`, so short films give every worker work (SC-003), and a run with another size never reuses chunks that cover other frames.
+
+`out/render.log` first line: `render: <mode> · <renderer> · <N> frames · <chunks> chunks (<done> already done) · <workers> workers`, plus ` · a Chrome window is open off-screen, do not close it` in GPU mode on Linux.

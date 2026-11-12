@@ -82,7 +82,8 @@ async function run() {
   const N = Math.ceil((UNTIL != null ? Math.min(UNTIL, ctx0.dur) : ctx0.dur) * FPS);
   const fp = fingerprint(FILM, W, H, FPS, UNTIL);
   const memWorkers = Math.max(1, Math.floor(os.freemem() / (1.5 * 2 ** 30)));
-  const want = Math.max(1, +(opt('--workers', null) || (mode === 'gpu' ? 2 : Math.min(2, memWorkers))));
+  const memCap = +(process.env.STUDIO_RENDER_TEST_FREE_GB ? Math.max(1, Math.floor(+process.env.STUDIO_RENDER_TEST_FREE_GB / 1.5)) : memWorkers);
+  const want = Math.max(1, +(opt('--workers', null) || Math.min(2, memCap)));   // FR-011: GPU and software alike
   // short films: smaller chunks so every worker has work (SC-003); the size is part of the folder name, so a run
   // with another size never reuses chunks that cover other frames
   const CHUNK = Math.max(1, Math.min(CHUNK_MAX, Math.ceil(N / want)));
@@ -94,7 +95,8 @@ async function run() {
   const name = (/** @type {number} */ c) => path.join(/** @type {string} */ (CH), `c_${String(c).padStart(4, '0')}.mp4`);
   const todo = chunks.filter(x => !fs.existsSync(name(x.c)));
   const workers = Math.max(1, Math.min(todo.length || 1, want));
-  log(`render: ${mode} · ${ctx0.r} · ${N} frames · ${chunks.length} chunks (${chunks.length - todo.length} already done) · ${workers} workers`);
+  log(`render: ${mode} · ${ctx0.r} · ${N} frames · ${chunks.length} chunks (${chunks.length - todo.length} already done) · ${workers} workers`
+    + (mode === 'gpu' && GPU_EXE ? ' · a Chrome window is open off-screen, do not close it' : ''));
   let left = todo.length;
 
   async function renderChunk(/** @type {any} */ ctx, /** @type {{c:number,a:number,z:number}} */ x) {
