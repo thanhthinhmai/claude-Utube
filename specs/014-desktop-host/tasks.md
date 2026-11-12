@@ -102,7 +102,7 @@
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [X] T017 Chạy đủ 5 bộ test. Kiểm FR-004: bộ test online hiện có đạt mà không sửa test nào (SC-005). Đối chiếu FR và SC, ghi bảng vào cuối `specs/014-desktop-host/tasks.md`.
-- [ ] T018 Chạy quickstart mục 2 trên máy này: `app start`, tạo chủ xưởng, `app import`, mở các trang phim, kênh và đề, `app stop`. Ghi kết quả vào cuối `specs/014-desktop-host/quickstart.md`. Phần đăng nhập Claude thật và giao phim thật tốn tiền, nên **hỏi người dùng trước khi làm**.
+- [X] T018 Chạy quickstart mục 2 trên máy này: `app start`, tạo chủ xưởng, `app import`, mở các trang phim, kênh và đề, `app stop`. Ghi kết quả vào cuối `specs/014-desktop-host/quickstart.md`. Phần đăng nhập Claude thật và giao phim thật tốn tiền, nên **hỏi người dùng trước khi làm**.
 
 ## Dependencies & Execution Order
 
