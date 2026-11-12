@@ -17,7 +17,7 @@ THRESHOLDS = {   # what CHECKS.md shows next to each measure (contracts/cli.md)
     "missing_glyphs": "0 characters without a font",
     "shots_short": "every shot ≥ 1.1 s",
     "shots_long": "every shot ≤ the style's longest (6 s)",
-    "cues_short": "each subtitle ≥ max(1.8 s, its speech + 0.6 s)",
+    "cues_short": "each subtitle ≥ 1.8 s, up until its words end (+ 0.6 s before a pause)",
     "loudness_range": "inside the style's range",
     "av_sync": "sound and picture lengths within 0.1 s",
 }

@@ -15,7 +15,7 @@
 | plan | `tail` | block | > 1,5 s sau từ cuối | không |
 | plan | `shot_short` | block | cảnh < 1,1 s | không |
 | plan | `shot_long` | block | cảnh > `shot_max` (6 s) | có |
-| plan | `cue_short` | block | phụ đề < max(1,8 s, thời gian nói + 0,6 s) | không |
+| plan | `cue_short` | block | phụ đề < 1,8 s, hoặc tắt trước khi từ cuối của nó nói xong, hoặc (phụ đề cuối đoạn, trước khoảng nghỉ ≥ 0,6 s) tắt sớm hơn 0,6 s sau từ cuối | không |
 | plan | `card_read` | block | thẻ chữ hiện ngắn hơn luật đọc của thư viện | không |
 | shots | `flat` | block | màu nhiều nhất > 60% hoặc độ lệch độ sáng < 0,04 (không tính chữ, letterbox) | có |
 | shots | `dark` | block | độ sáng p50 < 0,04 | có |

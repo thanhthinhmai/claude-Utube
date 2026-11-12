@@ -14,6 +14,7 @@
 
 - Q: Phim lệch số đo của phong cách thì có chặn render không? → A: Không chặn. Lỗi nhịp (tầng 1) và lỗi khung (khung phẳng, quá tối hoặc cháy, chữ thiếu phông, chữ đè phụ đề ở tầng 2) chặn render; lệch phong cách chỉ cảnh báo, và render được khi người làm phim ghi một dòng lý do (FR-009, FR-013).
 - Q: Phim dưới 30 s dùng ngưỡng nào? → A: Cùng ngưỡng nhịp như phim dài; chỉ bỏ so số lần cắt mỗi phút với phong cách (`qc` hiện nay không có ngưỡng riêng cho phim ngắn).
+- Q: Luật phụ đề "≥ max(1,8 s, thời gian nói + 0,6 s)" báo 96/188 phụ đề của `pet-swap`, vì lời đọc liền mạch không chừa 0,6 s. Giữ không? → A: Đổi: phụ đề ≥ 1,8 s và không tắt trước khi lời của nó nói xong; chỉ phụ đề cuối đoạn (trước khoảng nghỉ ≥ 0,6 s) phải hiện thêm 0,6 s sau từ cuối.
 - Q: Luật nhịp mới (độ dài cảnh, thời gian hiện phụ đề) có áp cho `qc` sau ghép tiếng của phim cũ không? → A: Có. Một bộ luật cho mọi phim (FR-010); phim cũ chạy `qc` lại có thể bị báo thêm lỗi.
 
 ## Bối cảnh
@@ -174,7 +175,7 @@ Sau khi ghép tiếng, bước kiểm cuối chỉ còn âm lượng, đỉnh ti
   - khoảng nghỉ ≥ 0,8 s chỉ nằm giữa hai đoạn;
   - đuôi phim ≤ 1,5 s.
   
-  Ngoài ra PHẢI áp dụng: cảnh dài từ 1,1 s đến mức tối đa của phong cách (mặc định 6 s); mỗi phụ đề hiện ≥ max(1,8 s, thời gian nói + 0,6 s); mỗi thẻ chữ hiện đủ thời gian đọc theo luật đọc của thư viện.
+  Ngoài ra PHẢI áp dụng: cảnh dài từ 1,1 s đến mức tối đa của phong cách (mặc định 6 s); mỗi phụ đề hiện ≥ 1,8 s và không tắt trước khi lời của nó nói xong; phụ đề cuối đoạn (đứng trước một khoảng nghỉ ≥ 0,6 s) còn hiện thêm ≥ 0,6 s sau từ cuối; mỗi thẻ chữ hiện đủ thời gian đọc theo luật đọc của thư viện.
 - **FR-007**: Mỗi lỗi PHẢI có mã cảnh (hoặc mã dòng hay phụ đề), thời điểm, luật, số đo, ngưỡng. Lỗi cắt cảnh PHẢI kèm mốc sớm nhất hợp lệ để cắt.
 - **FR-008**: Kiểm kế hoạch PHẢI xong trong 10 giây với phim 10 phút.
 - **FR-009**: Lệnh ghi video PHẢI từ chối chạy khi kiểm kế hoạch, hoặc các luật khung của kiểm hình theo cảnh (FR-012), chưa đạt cho đúng nguồn phim hiện tại. Lệch phong cách (FR-013) không chặn. Có một cờ bỏ qua rõ ràng; khi dùng cờ đó, nhật ký và kết quả kiểm PHẢI ghi lại.

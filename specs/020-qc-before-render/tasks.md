@@ -44,7 +44,7 @@ description: "Tasks for 020 — QC per shot before render"
 - [X] T006 Trong `tools/filmcheck/rhythm.py`, thêm các luật mới:
   - `shot_short` (< 1,1 s);
   - `shot_long` (> `style.shot_max`, mặc định 6 s);
-  - `cue_short` (< max(1,8 s, thời gian nói trong phụ đề + 0,6 s));
+  - `cue_short` (< 1,8 s; tắt trước khi từ cuối của nó nói xong; phụ đề cuối đoạn, trước khoảng nghỉ ≥ 0,6 s, tắt sớm hơn 0,6 s sau từ cuối — đổi ngày 2026-11-12, xem Clarifications);
   - `card_read` (đầu vào là danh sách `{id, at, need, got}`).
   
   Phim < 30 s: không có thay đổi ngưỡng nào (research R3).

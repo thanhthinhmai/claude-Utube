@@ -101,6 +101,11 @@ class Rules(unittest.TestCase):
         self.assertEqual(len(cue), 1)
         self.assertEqual(cue[0]["ref"], "cue 1")
         self.assertAlmostEqual(cue[0]["limit"], 2.1)
+        # continuous speech: a cue that lasts as long as its words is fine; one that ends before them is not
+        words = [(0.0, 1.0, "P01"), (1.05, 2.0, "P01"), (2.05, 3.9, "P01"), (3.95, 5.0, "P01")]
+        cues = [[0.0, 2.05, "first two"], [2.05, 3.5, "ends early"], [3.5, 5.6, "last"]]
+        _, iss = rhythm.measure([], words, 6.0, cues=cues)
+        self.assertEqual([(i["ref"], i["limit"]) for i in iss if i["rule"] == "cue_short"], [("cue 2", 1.85)])
         cards = [{"id": "c", "at": 1.0, "need": 2.4, "got": 1.9, "text": "THE RULES"},
                  {"id": "d", "at": 3.0, "need": 2.0, "got": 3.0, "text": "OK"}]
         _, iss = rhythm.measure([], [], 5.0, cards=cards, shots=self._shots(2.5, 2.5)[0])

@@ -197,14 +197,24 @@ def measure(sents, words, dur, *, shots=None, cuts=None, cues=None, cards=None, 
         if L > shot_max + 1e-6:
             m["shots_long"].append({"shot": s["id"], "length": L})
             issues.append(_issue("shot_long", s["id"], s["t0"], L, shot_max, fix=f"split the shot (≤ {shot_max:g} s)"))
-    # subtitles: on screen ≥ max(1.8 s, the speech they carry + 0.6 s)
+    # subtitles (FR-006 as clarified 2026-11-12): ≥ 1.8 s; up until the cue's last word ends; a cue before a pause
+    # (≥ 0.6 s to the next word) stays ≥ 0.6 s after its last word
     m["cues_short"] = []
     for i, (a, b, text) in enumerate(cues or [], 1):
-        need = max(CUE_MIN, speech_in(words, a, b) + CUE_PAD) if words else CUE_MIN
+        mine = [(s, e) for s, e, _ in words if a - EPS <= s < b - EPS]
+        need, why = CUE_MIN, ""
+        if mine:
+            last = max(e for _, e in mine)
+            nxt = [s for s, _, _ in words if s >= last - 1e-6 and s > max(s0 for s0, _ in mine) + 1e-6]
+            gap = (min(nxt) - last) if nxt else float("inf")
+            end_need = last + (CUE_PAD if gap >= CUE_PAD - 1e-6 else 0.0)
+            if end_need - a > need:
+                need, why = end_need - a, ("its words end" if gap < CUE_PAD else "a pause follows")
         if b - a < need - 1e-6:
             m["cues_short"].append({"cue": i, "at": round(a, 2), "length": round(b - a, 2), "need": round(need, 2)})
-            issues.append(_issue("cue_short", f"cue {i}", a, round(b - a, 2), round(need, 2), text=str(text)[:30],
-                                 fix="merge it with a neighbouring subtitle"))
+            fix = "merge it with a neighbouring subtitle" if not why else (
+                "keep it until its words end" if why == "its words end" else "keep it 0.6 s past its last word")
+            issues.append(_issue("cue_short", f"cue {i}", a, round(b - a, 2), round(need, 2), text=str(text)[:30], fix=fix))
     # text cards: the library's reading rule (need/got come from it)
     m["cards_short"] = []
     for k in cards or []:
