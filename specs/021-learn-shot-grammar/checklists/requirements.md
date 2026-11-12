@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain (2: FR-002 cách gán nhãn, FR-011 mức của "khung mờ")
+- [x] No [NEEDS CLARIFICATION] markers remain (FR-002 → B, FR-011 → chặn; phim mẫu thêm thành US4, 2026-11-13)
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
