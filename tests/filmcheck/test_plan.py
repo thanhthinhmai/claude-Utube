@@ -145,6 +145,19 @@ class PlanCheck(unittest.TestCase):
         self.assertIn("qc shots plan-ok", gate.stderr)
         self.assertNotIn("qc plan", gate.stderr)
 
+    def test_sc005_a_passed_plan_has_no_rhythm_fault_after_render(self):
+        ls = lines(4)
+        cuts, dur = good_cuts(ls)
+        d = samples.make_tier_film(self.root, "sc005", shots=shots_of(cuts, dur), lines=ls, asr=asr(ls), cards=[], dur=dur)
+        self.assertEqual(self.cli("qc", "plan", "sc005").returncode, 0)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-t", str(dur), "-i", "testsrc2=s=320x180:r=24",
+                        "-f", "lavfi", "-t", str(dur), "-i", "sine=frequency=330:sample_rate=48000",
+                        "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-shortest", str(d / "sc005.mp4")], check=True)
+        r = qc.measure(d, str(LIB))
+        self.assertEqual(r["measures"]["cuts_from"], "shot list (tier 1)")
+        rhythm_words = ("cut at", "shot with the last words", "silent", "pause", "ends", "shot S", "cue")
+        self.assertEqual([p for p in r["problems"] if any(w in p for w in rhythm_words)], [], r["problems"])
+
     def test_cached_input_and_changed_source(self):
         ls = lines(3)
         cuts, dur = good_cuts(ls)

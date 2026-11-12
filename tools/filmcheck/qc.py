@@ -264,15 +264,21 @@ def measure(d: Path, lib=None) -> dict:
     duration = probe_duration(mp4)
     nar = load_narration(d)
     limit = still_limit(d)
-    stills, found_cuts = picture(mp4, limit, want_cuts=bool(nar) and not nar["cuts"])
-    measures, problems = {}, []
+    from filmcheck import stylerefs
+    style = stylerefs.load(d)
+    plan = plan_input(d)                 # specs/020: the shot list and subtitles tier 1 checked
+    shots = plan.get("shots") if plan else None
+    stills, found_cuts = picture(mp4, limit, want_cuts=bool(nar) and not nar["cuts"] and not shots)
+    measures, problems, issues = {}, [], []
     if nar:
-        cuts = nar["cuts"] if nar["cuts"] else found_cuts
-        from filmcheck import stylerefs
-        m, p, _ = narration_measures(nar, duration, cuts, texts=line_texts(d, nar), style=stylerefs.load(d))
+        cuts = [s["t0"] for s in shots[1:]] if shots else (nar["cuts"] if nar["cuts"] else found_cuts)
+        m, p, iss = narration_measures(nar, duration, cuts, texts=line_texts(d, nar), shots=shots,
+                                       cues=film_cues(d, plan), style=style)
         measures.update(m)
         problems += p
+        issues += iss
         measures["cuts"] = [round(c, 2) for c in cuts]
+        measures["cuts_from"] = "shot list (tier 1)" if shots else ("narration.json" if nar["cuts"] else "the picture")
         mismatch = voice_matches_script(d, nar)
         measures["voice_matches_script"] = mismatch is None if (d / "SCRIPT.md").is_file() else None
         if mismatch:
@@ -305,5 +311,61 @@ def measure(d: Path, lib=None) -> dict:
                           "renderer": os.environ.get("STUDIO_RENDER_RENDERER") or None}
     for g in glyphs:
         problems.append(f"{g['codepoint']} has no font and shows as a box (in \"{g['text']}\")")
+    # specs/020 tier 4: sound against picture, and the style's loudness range (a warning)
+    av = av_lengths(mp4)
+    warnings = []
+    if av:
+        measures["av_sync"] = round(abs(av[0] - av[1]), 3)
+        if measures["av_sync"] > AV_SYNC:
+            problems.append(f"the sound lasts {av[0]:.2f} s and the picture {av[1]:.2f} s; at most {AV_SYNC} s apart")
+        lra = loudness_range(mp4)
+        if lra is not None:
+            measures["loudness_range"] = lra
+            rng = style.get("loudness_range")
+            if rng and not (rng[0] <= lra <= rng[1]):
+                warnings.append(f"style: the loudness range is {lra:.1f} LU; the style's is {rng[0]:g}–{rng[1]:g} LU")
     return {"pass": not problems, "narration": bool(nar), "duration": round(duration, 2), "measures": measures,
-            "problems": problems}
+            "problems": problems, "warnings": warnings}
+
+
+AV_SYNC = 0.1
+
+
+def plan_input(d: Path):
+    """.check/plan-input.json when tier 1 read it from the current source, else None."""
+    try:
+        c = json.loads((d / ".check" / "plan-input.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    from filmcheck import tiers
+    return c if c.get("fingerprint") == tiers.fingerprint(d) else None
+
+
+def film_cues(d: Path, plan):
+    if plan and plan.get("cues") is not None:
+        return plan["cues"]
+    from filmcheck import plancheck
+    try:
+        return plancheck.film_cues(d, None)[0]
+    except plancheck.PlanError:
+        return None
+
+
+def av_lengths(mp4: Path):
+    """(sound, picture) stream lengths in seconds, or None when the file has no sound."""
+    p = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,duration", "-of", "json", str(mp4)],
+                       capture_output=True, text=True)
+    try:
+        st = json.loads(p.stdout).get("streams", [])
+        a = next(float(s["duration"]) for s in st if s.get("codec_type") == "audio")
+        v = next(float(s["duration"]) for s in st if s.get("codec_type") == "video")
+        return a, v
+    except (ValueError, StopIteration, KeyError, TypeError):
+        return None
+
+
+def loudness_range(mp4: Path):
+    p = subprocess.run(["ffmpeg", "-nostats", "-hide_banner", "-i", str(mp4), "-map", "0:a:0", "-af", "ebur128", "-f", "null", "-"],
+                       capture_output=True, text=True)
+    m = re.findall(r"LRA:\s*([\d.]+)\s*LU", p.stderr)
+    return float(m[-1]) if m else None

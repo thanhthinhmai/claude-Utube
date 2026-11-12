@@ -258,12 +258,12 @@ description: "Tasks for 020 — QC per shot before render"
 
 ### Tests
 
-- [ ] T042 [P] [US5] Thêm vào `tests/filmcheck/test_qc.py`:
+- [X] T042 [P] [US5] Thêm vào `tests/filmcheck/test_qc.py`:
   - `loudness_range` (`warn`) với `qc.json` thử `[2.4, 3.3]` trên bản mix nén mạnh;
   - `av_sync` khi tiếng dài hơn hình 0,3 s;
   - `qc` dùng mốc cắt của `.check/plan-input.json` khi có;
   - một phim đạt `qc plan` thì có 0 lỗi nhịp trong `qc` (SC-005).
-- [ ] T043 [P] [US5] Thêm vào `tests/filmcheck/test_publish.py` và `tests/filmcheck/test_thumbs.py`:
+- [X] T043 [P] [US5] Thêm vào `tests/filmcheck/test_publish.py` và `tests/filmcheck/test_thumbs.py`:
   - phụ đề gói đăng giống `CUES` của tầng 1 từng dòng (US5 AC2);
   - tầng 1 chưa đạt (có `CUES`) → lỗi `subtitles_not_passed`;
   - thumbnail của phim thử có phụ đề DOM: vùng phụ đề sai khác < 2/255 so với khung đã ẩn hết chữ (SC-008);
@@ -271,7 +271,7 @@ description: "Tasks for 020 — QC per shot before render"
 
 ### Implementation
 
-- [ ] T044 [US5] Sửa `tools/filmcheck/qc.py`:
+- [X] T044 [US5] Sửa `tools/filmcheck/qc.py`:
   - mốc cắt lấy từ `SHOTS` trong `.check/plan-input.json` khi có (không chạy `scdet`), luật từ `rhythm.measure`;
   - thêm `loudness_range`: đo bằng `ffmpeg ebur128` (LRA), so với `stylerefs` thành `warn`;
   - thêm `av_sync`: dùng `ffprobe` độ dài stream tiếng và hình, lỗi khi lệch > 0,1 s;
@@ -279,11 +279,11 @@ description: "Tasks for 020 — QC per shot before render"
   - báo cáo liệt kê cảnh báo phong cách còn mở và lý do đã chấp nhận (FR-013).
   
   Thêm ngưỡng mới vào `report.THRESHOLDS`.
-- [ ] T045 [US5] Sửa `tools/filmcheck/publish.py` (`subtitle_cues`):
+- [X] T045 [US5] Sửa `tools/filmcheck/publish.py` (`subtitle_cues`):
   - phim có `.check/plan-input.json` với `cues`: dùng đúng các dòng đó (tách 2 dòng ≤ 42 bằng `wrap`, giữ mốc) khi `tiers.plan.pass` đúng và cùng dấu vân tay; nếu không thì trả lỗi `subtitles_not_passed` ("run: sh bin/studio qc plan <phim>");
   - phim cũ không có tầng 1: giữ cách cắt hiện có, kèm ghi chú.
-- [ ] T046 [US5] Sửa `tools/filmcheck/thumbs.mjs`: trước `render(t)`, đặt `window.CLEAN = true`; sau đó thêm thẻ `<style>` có `body *{visibility:hidden} canvas,#studio-thumb,#studio-thumb *{visibility:visible}` trước khi chụp (research R9).
-- [ ] T047 [US5] Thêm `window.CLEAN` vào `films/pet-swap/main.js`: không vẽ phụ đề và thẻ khi `CLEAN`. Đây là file của phim, ngoài git, không phải `lib/`. Sửa trang làm đổi dấu vân tay, nên chạy lại `sh bin/studio qc plan pet-swap` (phải đạt) trước. Rồi chạy `sh bin/studio publish pet-swap`: 0 dòng phụ đề < 1 s, 3 thumbnail sạch, mở bằng mắt (SC-008). Ghi kết quả vào quickstart.
+- [X] T046 [US5] Sửa `tools/filmcheck/thumbs.mjs`: trước `render(t)`, đặt `window.CLEAN = true`; sau đó thêm thẻ `<style>` có `body *{visibility:hidden} canvas,#studio-thumb,#studio-thumb *{visibility:visible}` trước khi chụp (research R9).
+- [X] T047 [US5] Thêm `window.CLEAN` vào `films/pet-swap/main.js`: không vẽ phụ đề và thẻ khi `CLEAN`. Đây là file của phim, ngoài git, không phải `lib/`. Sửa trang làm đổi dấu vân tay, nên chạy lại `sh bin/studio qc plan pet-swap` (phải đạt) trước. Rồi chạy `sh bin/studio publish pet-swap`: 0 dòng phụ đề < 1 s, 3 thumbnail sạch, mở bằng mắt (SC-008). Ghi kết quả vào quickstart.
 
 **Checkpoint**: US5 xong. Commit.
 

@@ -273,12 +273,27 @@ def cmd_qc(a) -> int:
         return 2
 
     def save(x):
-        x["film"] = {"pass": r["pass"], "measures": r["measures"], "problems": r["problems"], "at": now()}
+        x["film"] = {"pass": r["pass"], "measures": r["measures"], "problems": r["problems"],
+                     "warnings": r.get("warnings", []), "at": now()}
         if x.get("narration") is None:
             x["narration"] = r["narration"]
     report.update(d, save)
+    from filmcheck import tiers
+    fin = [{"tier": "final", "ref": "film", "at": None, "rule": "qc", "severity": "block", "measure": p, "limit": "",
+            "text": "", "fix": "", "excepted": None} for p in r["problems"]]
+    fin += [{"tier": "final", "ref": "film", "at": None, "rule": "loudness_range", "severity": "warn", "measure": w,
+             "limit": "", "text": "", "fix": "", "excepted": None} for w in r.get("warnings", [])]
+    tiers.save_tier(d, "final", tiers.result("final", fin, {k: r["measures"].get(k) for k in
+                                                           ("silence_ratio", "tail_s", "av_sync", "loudness_range")},
+                                             [], 0.0, tiers.fingerprint(d)))
     m = r["measures"]
-    lines = [f"  ✗ {p}" for p in r["problems"]]
+    lines = [f"  ✗ {p}" for p in r["problems"]] + [f"  ! {w}" for w in r.get("warnings", [])]
+    shots = tiers.load_tier(d, "shots") or {}
+    open_style = [i for i in shots.get("issues", []) if i["severity"] == "warn"]
+    acc = (shots.get("style_accept") or {}).get("reason")
+    for i in open_style:                                       # FR-013: every open style warning, with its reason
+        lines.append(f"  ! style (shots): {i['rule']} {i['measure']} outside {i['limit']}"
+                     + (f" — accepted: {acc}" if acc else " — not accepted"))
     if r["narration"]:
         lines.append(f"  silence {m['silence_ratio']:.0%} · tail {m['tail_s']:.1f} s · {len(m.get('cuts', []))} cuts")
     if not m["texts_checked"]:
