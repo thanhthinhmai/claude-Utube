@@ -438,7 +438,7 @@ def cert(data=None) -> dict:
     return {"cert": pem, "key": kf.read_text(), "fingerprint": hashlib.sha256(der).hexdigest()}
 
 
-WHISPER_MODELS = ("base.en", "base")   # small (Chinese) downloads on first use
+WHISPER_MODELS = ("small.en", "small")   # the studio's models (tools/asr.json, specs/020 R1)
 
 
 def models(project: Path = PROJECT, out=print) -> int:

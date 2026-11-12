@@ -186,25 +186,25 @@ description: "Tasks for 020 — QC per shot before render"
 
 ### Tests
 
-- [ ] T029 [P] [US3] Tạo `tests/filmcheck/test_voice.py`:
+- [X] T029 [P] [US3] Tạo `tests/filmcheck/test_voice.py`:
   - phim `voice-pause`: 70 dòng wav sinh bằng ffmpeg (sine + 0,9 s lặng ở giữa `l17`) và `words.json` khớp → một `pause_in_line` ở `l17`, ≤ 30 s (SC-007);
   - dòng `"recorded": true` → lời khuyên là "check the recording";
   - `tail_mismatch` khi |từ cuối − dur| > 0,5 s;
   - `asr_mismatch` khi từ lệch lời.
-- [ ] T030 [P] [US3] Thêm vào `tests/filmcheck/test_cli.py` ca `voice asr`: dùng biến thử `STUDIO_ASR_DRY=1` để chỉ in lệnh. Kiểm `--model small.en` cho `en` và `--model small` cho `zh`, đọc từ `tools/asr.json`.
+- [X] T030 [P] [US3] Thêm vào `tests/filmcheck/test_cli.py` ca `voice asr`: dùng biến thử `STUDIO_ASR_DRY=1` để chỉ in lệnh. Kiểm `--model small.en` cho `en` và `--model small` cho `zh`, đọc từ `tools/asr.json`.
 
 ### Implementation
 
-- [ ] T031 [US3] Tạo `tools/filmcheck/voicecheck.py`:
+- [X] T031 [US3] Tạo `tools/filmcheck/voicecheck.py`:
   - đọc `lines.json`, `voices/words.json`, `voices/dur.json`, kẹp mốc như `rhythm`;
   - `pause_in_line`: khoảng ≥ 0,8 s giữa hai từ, được `ffmpeg silencedetect=n=-40dB:d=0.6` trên file wav xác nhận;
   - `asr_mismatch`: độ giống của từ (difflib) < 0,92;
   - `tail_mismatch`: lệch > 0,5 s;
   - ghi `tiers.voice` với `fingerprint(part="voice")`.
-- [ ] T032 [US3] Sửa `tools/filmcheck/cli.py`: thêm `cmd_qc_voice` (mẫu dòng theo `contracts/cli.md`) và lệnh `voice-asr <phim> [--lang]`. `voice-asr` đọc `tools/asr.json`; ngôn ngữ lấy từ `--lang`, rồi `CHANNEL_BRIEF.md`, rồi `en`. Lệnh chạy `$LIB/.venv/bin/python $LIB/core/tts/asr_check.py lines.json voices --lang L --model M` và in `model: M`.
-- [ ] T033 [US3] Sửa `bin/studio`: thêm lệnh `voice` (`voice asr <phim>`), chuyển cho `cmd_filmcheck voice-asr`. Thêm vào `usage`.
-- [ ] T034 [P] [US3] Sửa `tools/style-learn/sl/speech.py`: lấy tên mô hình mặc định từ `tools/asr.json` theo ngôn ngữ, thay cho giá trị viết cứng. Sửa `tools/studio/studio/host.py`: `WHISPER_MODELS = ("small.en", "small")`, cập nhật chú thích. Cập nhật test liên quan trong `tests/learn/` và `tests/ui/` nếu chúng kiểm tên mô hình.
-- [ ] T035 [US3] Chạy thật `sh bin/studio voice asr pet-swap` rồi `sh bin/studio qc voice pet-swap`. Chạy `qc plan pet-swap` hai lần và so `silence_ratio` và các mốc câu (SC-006). Ghi kết quả vào quickstart.
+- [X] T032 [US3] Sửa `tools/filmcheck/cli.py`: thêm `cmd_qc_voice` (mẫu dòng theo `contracts/cli.md`) và lệnh `voice-asr <phim> [--lang]`. `voice-asr` đọc `tools/asr.json`; ngôn ngữ lấy từ `--lang`, rồi `CHANNEL_BRIEF.md`, rồi `en`. Lệnh chạy `$LIB/.venv/bin/python $LIB/core/tts/asr_check.py lines.json voices --lang L --model M` và in `model: M`.
+- [X] T033 [US3] Sửa `bin/studio`: thêm lệnh `voice` (`voice asr <phim>`), chuyển cho `cmd_filmcheck voice-asr`. Thêm vào `usage`.
+- [X] T034 [P] [US3] Sửa `tools/style-learn/sl/speech.py`: lấy tên mô hình mặc định từ `tools/asr.json` theo ngôn ngữ, thay cho giá trị viết cứng. Sửa `tools/studio/studio/host.py`: `WHISPER_MODELS = ("small.en", "small")`, cập nhật chú thích. Cập nhật test liên quan trong `tests/learn/` và `tests/ui/` nếu chúng kiểm tên mô hình.
+- [X] T035 [US3] Chạy thật `sh bin/studio voice asr pet-swap` rồi `sh bin/studio qc voice pet-swap`. Chạy `qc plan pet-swap` hai lần và so `silence_ratio` và các mốc câu (SC-006). Ghi kết quả vào quickstart.
 
 **Checkpoint**: US3 xong. Commit.
 

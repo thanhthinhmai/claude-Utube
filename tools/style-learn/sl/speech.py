@@ -39,7 +39,21 @@ def decode_16k(path: Path, span=None) -> np.ndarray:
     return np.frombuffer(r.stdout, np.float32).copy()
 
 
-def transcribe(path: Path, meta: dict, segs: list, model: str = "small", lang: str = None) -> dict:
+ASR_FILE = Path(__file__).resolve().parents[2] / "asr.json"
+
+
+def model_for(lang: str = None) -> str:
+    """The studio's one recogniser model (tools/asr.json, specs/020 FR-002): per language, else the multilingual one."""
+    import json
+    try:
+        cfg = json.loads(ASR_FILE.read_text(encoding="utf-8"))
+        return cfg.get(lang) or cfg["*"] if lang else cfg["*"]
+    except (OSError, ValueError, KeyError):
+        return "small"
+
+
+def transcribe(path: Path, meta: dict, segs: list, model: str = None, lang: str = None) -> dict:
+    model = model or model_for(lang)
     try:
         from faster_whisper import WhisperModel
     except ImportError:

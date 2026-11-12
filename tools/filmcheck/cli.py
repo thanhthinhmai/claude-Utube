@@ -744,6 +744,64 @@ def cmd_qc_except(a) -> int:
     return 0
 
 
+def film_lang(d: Path, given=None) -> str:
+    if given:
+        return given
+    try:
+        lang = json.loads((d / "channel.json").read_text(encoding="utf-8")).get("rules", {}).get("language")
+        if lang:
+            return lang
+    except (OSError, ValueError, AttributeError):
+        pass
+    import re
+    for f in ("CHANNEL_BRIEF.md", "SCRIPT.md"):
+        try:
+            m = re.search(r"^\W*Language\W*:?\s*([a-z]{2})\b", (d / f).read_text(encoding="utf-8"), re.M | re.I)
+            if m:
+                return m.group(1).lower()
+        except OSError:
+            continue
+    return "en"
+
+
+def asr_model(lang: str) -> str:
+    """The studio's one recogniser model for a language (tools/asr.json, specs/020 FR-002)."""
+    cfg = json.loads((HERE.parent / "asr.json").read_text(encoding="utf-8"))
+    return cfg.get(lang) or cfg["*"]
+
+
+def cmd_voice_asr(a) -> int:
+    d = film_dir(a.film)
+    lang = film_lang(d, a.lang)
+    model = asr_model(lang)
+    lib = Path(lib_dir())
+    py = lib / ".venv" / "bin" / "python"
+    cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "asr_check.py"), str(d / "lines.json"),
+           str(d / "voices"), "--lang", lang, "--model", model]
+    print(f"model: {model} ({lang})")
+    if os.environ.get("STUDIO_ASR_DRY"):
+        print(" ".join(cmd))
+        return 0
+    import subprocess
+    return subprocess.run(cmd).returncode
+
+
+def cmd_qc_voice(a) -> int:
+    from filmcheck import voicecheck
+    d = film_dir(a.film)
+    try:
+        r = voicecheck.run(d, lib_dir(), film_lang(d))
+    except voicecheck.VoiceError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    lines = tier_lines(r, d.name)
+    n = len(r["issues"])
+    lines.append(f"{'✓' if r['pass'] else '✗'} voice: {r['measures']['lines']} lines · "
+                 + ("all pass" if r["pass"] else f"{n} problem(s)") + f" · {r['seconds']:.1f} s")
+    out(a, r, lines)
+    return 0 if r["pass"] else 1
+
+
 def cmd_render_gate(a) -> int:
     from filmcheck import tiers
     d = film_dir(a.film)
@@ -805,6 +863,12 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--reason", default="")
     s.add_argument("--list", action="store_true")
     s.add_argument("--remove", action="store_true")
+    s = sub.add_parser("qc-voice", help="tier 0: check the voice lines (specs/020)")
+    s.add_argument("film")
+    s.add_argument("--json", action="store_true")
+    s = sub.add_parser("voice-asr", help="word stamps with the studio's recogniser model (specs/020)")
+    s.add_argument("film")
+    s.add_argument("--lang", default=None)
     s = sub.add_parser("render-gate", help="may this film be rendered? (specs/020)")
     s.add_argument("film")
     s.add_argument("--skip-checks", default=None)
@@ -919,7 +983,8 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("qc", "qc"): cmd_qc, ("publish", "publish"): cmd_publish,
             ("qc-plan", "qc-plan"): cmd_qc_plan, ("render-gate", "render-gate"): cmd_render_gate,
             ("qc-shots", "qc-shots"): cmd_qc_shots, ("qc-accept-style", "qc-accept-style"): cmd_qc_accept_style,
-            ("qc-except", "qc-except"): cmd_qc_except,
+            ("qc-except", "qc-except"): cmd_qc_except, ("qc-voice", "qc-voice"): cmd_qc_voice,
+            ("voice-asr", "voice-asr"): cmd_voice_asr,
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach,
