@@ -29,7 +29,7 @@ Tính bởi `rhythm.sentences()` từ `lines.json` (lời) và `voices/words.jso
 
 ## Issue (Lỗi)
 ```json
-{"tier": "plan", "ref": "P27.2", "at": 312.48, "rule": "cut_in_sentence",
+{"tier": "plan", "ref": "P27.2", "at": 312.48, "rule": "cut_in_sentence", "severity": "block",
  "measure": 0.12, "limit": 0.4, "text": "\"The neighbours start…\"",
  "fix": "move the cut to ≥ 314.06 s", "excepted": null}
 ```

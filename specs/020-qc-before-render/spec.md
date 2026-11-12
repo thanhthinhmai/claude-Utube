@@ -194,7 +194,7 @@ Sau khi ghép tiếng, bước kiểm cuối chỉ còn âm lượng, đỉnh ti
 
 **Tầng 3: trong lúc render**
 
-- **FR-016**: Mỗi đoạn vừa ghi xong (specs/019) PHẢI được kiểm khung đen và hình đứng yên quá ngưỡng. Đoạn lỗi làm lệnh dừng, báo mã cảnh và thời điểm, giữ các đoạn đã đạt. Có cờ "ghi hết rồi báo".
+- **FR-016**: Mỗi đoạn vừa ghi xong (specs/019) PHẢI được kiểm khung đen và hình đứng yên quá ngưỡng. Đoạn lỗi làm lệnh dừng, báo mã cảnh và thời điểm, giữ các đoạn đã đạt nằm trước đoạn lỗi. Có cờ "ghi hết rồi báo".
 
 **Tầng 4 và gói đăng**
 

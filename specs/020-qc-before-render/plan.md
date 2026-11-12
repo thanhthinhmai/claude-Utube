@@ -118,6 +118,7 @@ tools/render/
 └── lib.mjs                         # sửa: bỏ qc-exceptions.json khỏi dấu vân tay
 tools/style-learn/sl/speech.py      # sửa: đọc tools/asr.json
 tools/studio/studio/host.py         # sửa: app models tải small.en, small
+tools/studio/studio/resources.py, web/app.js  # sửa: hiện checks.json → tiers trên app (edge case online)
 bin/studio                          # sửa: voice asr, cổng và cờ của render
 tools/runner/JOB.md, CLAUDE.md      # sửa: thứ tự các tầng trong luồng làm phim (FR-020)
 tests/filmcheck/                    # test_rhythm, test_plan, test_shots, test_tiers, test_voice, fixtures/tiers/

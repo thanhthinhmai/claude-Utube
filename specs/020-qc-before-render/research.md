@@ -59,7 +59,7 @@ Phim không có `CARDS`: tầng 1 chạy `readcheck.mjs` của thư viện (qua 
 ## R5. Kiểm hình theo cảnh (FR-011 – FR-014)
 
 **Quyết định**: viết `tools/filmcheck/shots.mjs`. Nó dùng cùng trình duyệt với `record.mjs` (biến `STUDIO_RENDER_MODE` và `PLAYWRIGHT_CHROME` do `render_env` đặt, nên GPU nếu có) ở 960×540. Với mỗi cảnh:
-- gọi `render((t0+t1)/2)`; cảnh có thẻ chữ thì gọi thêm ở giữa khoảng thẻ hiện;
+- gọi `render((t0+t1)/2)`; cảnh có thẻ chữ thì gọi thêm ở giữa khoảng thẻ hiện. "Lúc thẻ hiện rõ nhất" (FR-011) được hiểu là giữa khoảng thẻ hiện, vì thẻ hiện dần lên rồi mờ đi ở hai đầu khoảng; trang không cho biết độ rõ của thẻ, nên không đo trực tiếp được;
 - chụp JPEG vào `.check/shots/<id>.jpg` và đọc `window.TEXTS(t)`;
 - đo ngay trong trang bằng canvas `getImageData` (như `thumbs.mjs`), nên Python vẫn chỉ cần thư viện chuẩn.
 

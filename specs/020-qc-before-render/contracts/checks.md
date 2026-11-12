@@ -32,6 +32,8 @@
 | final | `av_sync` | block | \|tiếng − hình\| > 0,1 s | không |
 | final | các luật hiện có của 010 (stills, glyphs, channel voice, voice ↔ script) | như 010 | như 010 | như 010 |
 
+`pause_in_line` (tầng 0) và `pause_in_para` (tầng 1) có thể báo cùng một khoảng nghỉ. Tầng 1 là lưới thứ hai cho trường hợp giọng đổi sau tầng 0.
+
 `cue_short`, `shot_short`, `shot_long` là luật mới, nên `qc` sau ghép tiếng cũng áp dụng chúng (FR-010). Phim cũ đã giao trước 020 có thể bị báo thêm các lỗi này khi chạy `qc` lại.
 
 ## `checks.json`

@@ -19,7 +19,7 @@ description: "Tasks for 020 — QC per shot before render"
 
 ## Phase 1: Setup
 
-- [ ] T001 Tạo `tools/asr.json` với `{"en": "small.en", "*": "small"}`, ghi một dòng giải thích ở `tools/filmcheck/README` (nếu chưa có thì ghi trong docstring của `tools/filmcheck/rhythm.py`). Dẫn research R1.
+- [ ] T001 Tạo `tools/asr.json` với `{"en": "small.en", "*": "small"}`. Ghi lý do chọn (research R1) trong khoá `"_note"` của file đó và trong docstring của `tools/filmcheck/rhythm.py` (tạo ở T004).
 - [ ] T002 [P] Thêm `qc-exceptions.json` vào `SKIP_FILE` của `tools/render/lib.mjs`. Thêm ca test vào `tests/render/lib.test.mjs`: file đó đổi thì dấu vân tay không đổi.
 - [ ] T003 [P] Thêm hàm sinh phim thử vào `tests/filmcheck/samples.py`: `make_tier_film(root, name, *, shots, lines, words, cues=None, cards=None, script=None)`.
   - Hàm ghi `index.html` tối giản (2D canvas) xuất `window.DUR`, `SHOTS`, `CUES`, `CARDS`, `TEXTS`, `READY` theo `contracts/film-page.md`.
@@ -112,6 +112,7 @@ description: "Tasks for 020 — QC per shot before render"
   - khi có `--skip-checks` thì đặt `STUDIO_RENDER_SKIPPED_CHECKS` để `record.mjs` ghi dòng `render: checks skipped — <lý do>` vào `render.log`.
 - [ ] T019 [US1] Sửa `tools/render/record.mjs`: nếu có `STUDIO_RENDER_SKIPPED_CHECKS` thì ghi dòng đó ngay sau khi tạo `render.log`.
 - [ ] T020 [US1] Chạy thật trên `films/pet-swap`:
+  - trước khi đo, thêm `window.CARDS` (`[[t0, t1, id, text]]`, lấy từ các thẻ mà `TEXTS` đang đọc) vào `films/pet-swap/main.js` (file của phim, ngoài git), để `qc plan` không phải chạy `readcheck`. FR-008 chỉ cam kết với phim có `CARDS`; ghi thêm thời gian của đường `readcheck` để so;
   - `sh bin/studio qc plan pet-swap`: kỳ vọng 0 lỗi nhịp; ghi lại thời gian (FR-008 ≤ 10 s).
   - Thêm ca test `tests/filmcheck/test_plan.py::test_pet_swap_first_render`, bỏ qua khi không có `films/pet-swap`. Ca test dựng lại các mốc cắt của lần render đầu (mỗi cắt = đầu câu − 0,06 s, cảnh đầu đoạn bắt đầu giữa khoảng nghỉ) trên `timeline.json`, rồi kiểm ≥ 80 lỗi `cut_*` và mọi cảnh chứa câu cuối < 2,5 s đều bị báo (SC-002).
   - Kết quả ghi vào `specs/020-qc-before-render/quickstart.md` (mục Kết quả).
@@ -282,7 +283,7 @@ description: "Tasks for 020 — QC per shot before render"
   - phim có `.check/plan-input.json` với `cues`: dùng đúng các dòng đó (tách 2 dòng ≤ 42 bằng `wrap`, giữ mốc) khi `tiers.plan.pass` đúng và cùng dấu vân tay; nếu không thì trả lỗi `subtitles_not_passed` ("run: sh bin/studio qc plan <phim>");
   - phim cũ không có tầng 1: giữ cách cắt hiện có, kèm ghi chú.
 - [ ] T046 [US5] Sửa `tools/filmcheck/thumbs.mjs`: trước `render(t)`, đặt `window.CLEAN = true`; sau đó thêm thẻ `<style>` có `body *{visibility:hidden} canvas,#studio-thumb,#studio-thumb *{visibility:visible}` trước khi chụp (research R9).
-- [ ] T047 [US5] Thêm `window.CLEAN` vào `films/pet-swap/main.js`: không vẽ phụ đề và thẻ khi `CLEAN`. Đây là file của phim, ngoài git, không phải `lib/`. Chạy `sh bin/studio publish pet-swap`: 0 dòng phụ đề < 1 s, 3 thumbnail sạch, mở bằng mắt (SC-008). Ghi kết quả vào quickstart.
+- [ ] T047 [US5] Thêm `window.CLEAN` vào `films/pet-swap/main.js`: không vẽ phụ đề và thẻ khi `CLEAN`. Đây là file của phim, ngoài git, không phải `lib/`. Sửa trang làm đổi dấu vân tay, nên chạy lại `sh bin/studio qc plan pet-swap` (phải đạt) trước. Rồi chạy `sh bin/studio publish pet-swap`: 0 dòng phụ đề < 1 s, 3 thumbnail sạch, mở bằng mắt (SC-008). Ghi kết quả vào quickstart.
 
 **Checkpoint**: US5 xong. Commit.
 
@@ -297,9 +298,17 @@ description: "Tasks for 020 — QC per shot before render"
   - `--skip-checks` chỉ cho bản thử;
   - thêm lệnh vào mục Cấu trúc (FR-020).
 - [ ] T049 [P] Sửa `tools/runner/JOB.md` cùng thứ tự đó cho worker online, mỗi tầng một `job step` trong các bước sẵn có (`Voice`, `Picture`, `Render`, `Self-check`). Thay dòng "Self-check … `qc`" hiện tại.
-- [ ] T050 [P] Sửa `deploy/job.Dockerfile` và `desktop/core-build/` (nếu chúng tải trước mô hình Whisper hoặc kiểm `base.en`) cho `small.en`; `desktop/core-build/smoke-core.sh` thêm `--model small.en`. Kiểm `credits-check.py` không báo gì mới.
-- [ ] T051 Chạy đủ 5 bộ test của xưởng: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`. Thêm `sh tests/online/run.sh` nếu `JOB.md` đổi. Ghi kết quả.
-- [ ] T052 Kiểm SC-010: `git diff --stat main -- lib/` trống. Chạy kịch bản 11 của quickstart (phim qua tầng 1–3, mux, `qc` → 0 lỗi nhịp, SC-005). Đối chiếu từng SC-001 … SC-010 trong `quickstart.md`, ghi đạt, đạt một phần hoặc thất bại.
+- [ ] T050 [P] Cho worker online và phần lõi của app dùng `small.en` (FR-002):
+  - đọc `deploy/job.Dockerfile`, `deploy/core.Dockerfile`, `desktop/core-build/build-linux.sh`, `build-mac.sh`, `smoke-core.sh`; chỗ nào tải trước hoặc gọi mô hình Whisper thì đổi sang mô hình của `tools/asr.json`;
+  - `smoke-core.sh` thêm `--model small.en`;
+  - chỗ nào không cần đổi thì ghi lý do vào commit;
+  - kiểm `desktop/core-build/credits-check.py` không báo gì mới.
+- [ ] T051 [P] Hiện kết quả các tầng trên app (edge case "Chế độ online"):
+  - `tools/studio/studio/resources.py` trả thêm `checks.json → tiers` (5 tầng: đạt hay không, số lỗi, số cảnh báo, ngoại lệ, thời điểm; tối đa 20 lỗi còn mở);
+  - `tools/studio/studio/web/app.js` vẽ bảng "Checks by stage" trên trang phim và trang việc có `links.film`;
+  - thêm test vào `tests/ui/` (API trả `tiers`; trang có bảng khi phim có `tiers`, không có bảng khi chưa có).
+- [ ] T052 Chạy đủ 5 bộ test của xưởng: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`. Thêm `sh tests/online/run.sh` nếu `JOB.md` đổi. Ghi kết quả.
+- [ ] T053 Kiểm SC-010: `git diff --stat main -- lib/` trống. Chạy kịch bản 11 của quickstart (phim qua tầng 1–3, mux, `qc` → 0 lỗi nhịp, SC-005). Đối chiếu từng SC-001 … SC-010 trong `quickstart.md`, ghi đạt, đạt một phần hoặc thất bại.
 
 ---
 
@@ -320,7 +329,7 @@ description: "Tasks for 020 — QC per shot before render"
 - US2: T021 ∥ T022 ∥ T023, rồi T024 → T025 → T026.
 - US3: T029 ∥ T030 ∥ T034, rồi T031 → T032 → T033.
 - US4: T036 ∥ T037, rồi T038 → T039 → T040 → T041.
-- Polish: T048 ∥ T049 ∥ T050.
+- Polish: T048 ∥ T049 ∥ T050 ∥ T051.
 
 ## Implementation Strategy
 
