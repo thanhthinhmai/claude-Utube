@@ -390,10 +390,10 @@ class Packaged(unittest.TestCase):                                              
     def test_models(self):
         r = self.run_cli("models", env={"CU_MODELS_FAKE": "1"})
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertEqual(r.stdout.split(), ["✓", "base.en", "✓", "base"])
+        self.assertEqual(r.stdout.split(), ["✓", "small.en", "✓", "small"])
         r = self.run_cli("models", env={"CU_MODELS_FAKE": "fail"})
         self.assertEqual(r.returncode, 1)
-        self.assertIn("✗ base.en: network is unreachable", r.stdout)
+        self.assertIn("✗ small.en: network is unreachable", r.stdout)
 
     def test_sandbox_env(self):
         from studio import host

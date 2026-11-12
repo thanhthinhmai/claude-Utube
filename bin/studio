@@ -11,12 +11,12 @@
 #   sh bin/studio online up|down|logs|admin <email>  chạy xưởng online bằng Docker Compose (deploy/, xem deploy/README.md)
 #   sh bin/studio ui [open|status|stop] mở / xem / tắt giao diện; job … · review …: sổ việc và duyệt (xem specs/003)
 #   sh bin/studio script check|review|status|skip <phim>  chấm kịch bản (specs/010); web fetch <url>: mở một trang
-#   sh bin/studio qc <phim> [--json]    đo phim xong; config editor-model <inherit|opus|sonnet|haiku>
+#   sh bin/studio qc [voice|plan|shots|final] <phim> · qc except|accept-style …  kiểm theo tầng (specs/020); voice asr <phim>
 #   sh bin/studio publish <phim> [--check-only] [--json]   gói đăng YouTube từ publish/pack.json (specs/011)
 #   sh bin/studio channel list|new|show|set|decide|attach … · lesson list|draft|add|approve|retire …  kênh và bài học (specs/012)
 #   sh bin/studio app start|status|stop|import [--data D]   cả xưởng trên máy này, không cần Docker (specs/014)
 #   sh bin/studio topics score|queue|take|made|type|fit|refs|recheck|usage <kênh> … · config youtube-key  chọn đề (specs/013)
-#   sh bin/studio render <phim> [--fps N] [--workers N] [--out F] [--until S]  ghi video, dùng GPU nếu được, làm tiếp khi bị ngắt (specs/019)
+#   sh bin/studio render <phim> [--fps N] [--workers N] [--until S] [--skip-checks R] [--no-stop] [--fresh]  ghi video sau khi kiểm (019, 020)
 #   sh bin/studio page still|events|readcheck <phim> …  chạy công cụ trang của thư viện · deps gpu · config render auto|software
 #   sh bin/studio help
 # Mã thoát: 0 = sẵn sàng / xong · 1 = chưa sẵn sàng / thất bại · 2 = sai cách dùng hoặc library.lock sai.
@@ -478,10 +478,30 @@ deps_gpu() {
 
 # Ghi video (specs/019): GPU nếu được, chia phần, làm tiếp khi bị ngắt
 cmd_render() {
-  [ -n "${1:-}" ] || { echo "dùng: sh bin/studio render <phim> [--fps N] [--workers N] [--out FILE] [--size WxH] [--until S]" >&2; exit 2; }
+  [ -n "${1:-}" ] || { echo "dùng: sh bin/studio render <phim> [--fps N] [--workers N] [--out FILE] [--size WxH] [--until S] [--skip-checks \"lý do\"]" >&2; exit 2; }
   [ -d "$LIB/node_modules/playwright-core" ] || { echo "✗ chưa cài gói lõi của thư viện. Chạy: sh bin/studio deps" >&2; exit 1; }
+  # specs/020: cổng kiểm trước khi mở trình duyệt; --skip-checks "<lý do>" bỏ qua và được ghi lại
+  film=$1; shift; skip=; has_skip=0
+  for a in "$@"; do shift
+    if [ "$has_skip" = 1 ]; then skip=$a; has_skip=2; continue; fi
+    if [ "$a" = --skip-checks ]; then has_skip=1; continue; fi
+    set -- "$@" "$a"
+  done
+  [ "$has_skip" != 1 ] || { echo "✗ render: --skip-checks cần một lý do" >&2; exit 2; }
+  py=python3; [ -x "$VENV/bin/python" ] && py="$VENV/bin/python"
+  if [ "$has_skip" = 2 ]; then
+    STUDIO_ROOT="${STUDIO_ROOT:-$ROOT}" STUDIO_LIB="$LIB" "$py" "$ROOT/tools/filmcheck/cli.py" render-gate "$film" --skip-checks "$skip" || exit $?
+    STUDIO_RENDER_SKIPPED_CHECKS=$skip; export STUDIO_RENDER_SKIPPED_CHECKS
+  else
+    STUDIO_ROOT="${STUDIO_ROOT:-$ROOT}" STUDIO_LIB="$LIB" "$py" "$ROOT/tools/filmcheck/cli.py" render-gate "$film" || exit $?
+  fi
+  STUDIO_QC_LIMITS=$(STUDIO_ROOT="${STUDIO_ROOT:-$ROOT}" "$py" "$ROOT/tools/filmcheck/cli.py" qc-limits "$film" 2>/dev/null || echo '{}')
+  export STUDIO_QC_LIMITS
   render_env
-  STUDIO_LIB="$LIB" exec node "$ROOT/tools/render/record.mjs" "$@"
+  code=0
+  STUDIO_LIB="$LIB" node "$ROOT/tools/render/record.mjs" "$film" "$@" || code=$?
+  STUDIO_ROOT="${STUDIO_ROOT:-$ROOT}" "$py" "$ROOT/tools/filmcheck/cli.py" render-done "$film" || true
+  exit $code
 }
 
 # Công cụ trang của thư viện (still, events, readcheck) với cùng cách dựng hình
@@ -528,6 +548,10 @@ case ${1:-} in
   deps) shift; cmd_deps "$@" ;;
   learn) shift; cmd_learn "$@" ;;
   render) shift; cmd_render "$@" ;;
+  voice)
+    shift
+    [ "${1:-}" = asr ] && [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice asr <phim> [--lang L]" >&2; exit 2; }
+    shift; cmd_filmcheck voice-asr "$@" ;;
   page) shift; cmd_page "$@" ;;
   ui | job | review | admin | app) cmd_studio "$@" ;;
   script | web | qc | publish | channel | lesson | topics | config) cmd_filmcheck "$@" ;;

@@ -1,0 +1,21 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}</style>
+</head><body>
+<canvas id="c"></canvas>
+<script>
+// Test film for tier 3 (specs/020 T037): 24 s, three shots; S2 (8–16 s) stands still for 8 s while STILL is true.
+const STILL = true;
+const c = document.getElementById('c'); c.width = innerWidth; c.height = innerHeight;
+const g = c.getContext('2d');
+window.GL = document.createElement('canvas').getContext('webgl2');
+window.DUR = 24;
+window.SHOTS = [[0, 8, 'a', 'S1'], [8, 16, 'b', 'S2'], [16, 24, 'c', 'S3']];
+window.render = (t) => {
+  const still = STILL && t >= 8 && t < 16;
+  const k = still ? 0 : t;
+  g.fillStyle = `hsl(${t < 8 ? 200 : t < 16 ? 30 : 120},60%,40%)`; g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = '#fff'; g.fillRect(20 + (k * 37) % (c.width - 80), 40 + (k * 23) % (c.height - 100), 60, 60);
+};
+window.render(0); window.READY = true;
+</script></body></html>

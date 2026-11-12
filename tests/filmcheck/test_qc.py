@@ -152,7 +152,8 @@ class Measures(unittest.TestCase):
         srt = "1\n00:00:01,000 --> 00:00:02,000\nHello \ue000 Xin chào\n"
         r = qc.measure(samples.make_film(self.root, "glyph", srt=srt))
         self.assertEqual([g["codepoint"] for g in r["measures"]["missing_glyphs"]], ["U+E000"])
-        self.assertEqual(len(r["problems"]), 1)
+        self.assertEqual(len([p for p in r["problems"] if "has no font" in p]), 1)
+        self.assertEqual(len(r["problems"]), 2)                   # and the 1 s subtitle is too short (specs/020 cue_short)
         self.assertFalse(r["measures"]["texts_checked"])          # no window.TEXTS: only the subtitles
 
     def test_sc006_one_minute_film_under_a_minute(self):

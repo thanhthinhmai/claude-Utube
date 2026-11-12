@@ -277,8 +277,37 @@ def _cues_for_line(text: str, words: list) -> list:
     return out
 
 
+class SubtitlesNotPassed(Exception):
+    """The film has its own subtitles but they have not passed the plan check (specs/020 FR-018)."""
+
+
+def film_subtitles(d: Path):
+    """The film's own subtitles as cues, when tier 1 checked them on the current source and none is too short;
+    None for a film the plan check never ran on (made before 020). Raises SubtitlesNotPassed otherwise."""
+    from filmcheck import tiers
+    plan = tiers.load_tier(d, "plan")
+    if not plan:
+        return None
+    inp = qc.plan_input(d)
+    fresh = inp is not None and plan.get("fingerprint") == inp.get("fingerprint")
+    if not fresh or inp.get("cues") is None:
+        if fresh:
+            return None                     # tier 1 ran: the film has no subtitles of its own
+        raise SubtitlesNotPassed(f"subtitles_not_passed: the plan check is older than the film "
+                                 f"(run: sh bin/studio qc plan {d.name})")
+    bad = [i for i in plan["issues"] if i["rule"] == "cue_short" and not i.get("excepted")]
+    if bad:
+        raise SubtitlesNotPassed(f"subtitles_not_passed: {len(bad)} of the film's subtitles are too short "
+                                 f"(run: sh bin/studio qc plan {d.name})")
+    return [{"start": float(a), "end": float(b), "lines": wrap(str(t)) or [str(t)]} for a, b, t in inp["cues"]]
+
+
 def subtitle_cues(d: Path, nar=None):
-    """Cues [{start, end, lines}] from lines.json text and words.json timing, or None when the film has no voice lines."""
+    """Cues [{start, end, lines}]: the film's own passed subtitles (specs/020 FR-018), else cut from lines.json text
+    and words.json timing; None when the film has neither."""
+    own = film_subtitles(d)
+    if own is not None:
+        return own
     nar = nar if nar is not None else narration(d)
     text_of = voice_lines(d, nar)
     if not nar or not text_of:
@@ -552,7 +581,11 @@ def build(d: Path, lib, draw: bool = True) -> list:
     nar = narration(d)
     duration = qc.probe_duration(mp4_of(d))
     chs, applicable, _ = chapters(d, pack, nar, duration)
-    cues = subtitle_cues(d, nar)
+    try:
+        cues = subtitle_cues(d, nar)
+    except SubtitlesNotPassed as e:
+        cues = None
+        problems.append(str(e))
     if cues is not None:
         write_srt(cues, pub / "subtitles.srt")
     (pub / "description.md").write_text(description_text(d, pack, chs if applicable else []), encoding="utf-8")

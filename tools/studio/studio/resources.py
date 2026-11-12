@@ -84,7 +84,38 @@ def film(name: str) -> dict:
     treat = d / "TREATMENT.md"
     f["credits"] = credits.read_text(encoding="utf-8", errors="replace") if credits.is_file() else None
     f["treatment_html"] = to_html(treat.read_text(encoding="utf-8", errors="replace")) if treat.is_file() else None
+    f["tiers"] = tiers_view(d)
     return f
+
+
+TIER_ORDER = ("voice", "plan", "shots", "render", "final")
+
+
+def tiers_view(d: Path):
+    """The QC tiers of a film (specs/020 FR-021) for the app: one row per tier, ≤ 20 open problems; None before 020."""
+    import json
+    try:
+        t = json.loads((d / "checks.json").read_text(encoding="utf-8")).get("tiers") or {}
+    except (OSError, ValueError, AttributeError):
+        return None
+    if not t:
+        return None
+    rows, open_ = [], []
+    for k in TIER_ORDER:
+        r = t.get(k)
+        if not isinstance(r, dict):
+            rows.append({"tier": k, "ran": False})
+            continue
+        iss = [i for i in r.get("issues") or [] if isinstance(i, dict)]
+        blk = [i for i in iss if i.get("severity") == "block" and not i.get("excepted")]
+        wrn = [i for i in iss if i.get("severity") == "warn"]
+        rows.append({"tier": k, "ran": True, "pass": bool(r.get("pass")), "problems": len(blk), "warnings": len(wrn),
+                     "exceptions": sum(1 for i in iss if i.get("excepted")), "at": r.get("at"),
+                     "style_accepted": (r.get("style_accept") or {}).get("reason"),
+                     "skipped_checks": (r.get("skipped_checks") or {}).get("reason")})
+        open_ += [{"tier": k, "ref": i.get("ref"), "rule": i.get("rule"), "measure": i.get("measure"),
+                   "limit": i.get("limit"), "fix": i.get("fix"), "warn": i.get("severity") == "warn"} for i in blk + wrn]
+    return {"rows": rows, "open": open_[:20], "open_total": len(open_)}
 
 
 def film_file(name: str, kind: str) -> Path:

@@ -22,6 +22,7 @@ test('fingerprint is stable and ignores outputs', () => {
   fs.writeFileSync(path.join(d, 'stills', 's.jpg'), 'x');
   fs.writeFileSync(path.join(d, 'render.log'), 'x');
   fs.writeFileSync(path.join(d, 'checks.json'), '{}');
+  fs.writeFileSync(path.join(d, 'qc-exceptions.json'), '[]');   // specs/020 T002
   assert.equal(fingerprint(d, 1920, 1080, 30), a);
 });
 

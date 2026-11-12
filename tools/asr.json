@@ -1,0 +1,5 @@
+{
+ "_note": "The studio's one speech-recognition model per language (specs/020 FR-002, research R1). small.en won on pet-swap's 70 lines: 1 fake in-line pause vs 18 for base.en, 34 broken word stamps vs 108, last word 0.16 s from the file end vs 0.26 s. Change it here only; then run `sh bin/studio voice asr` again for films in progress.",
+ "en": "small.en",
+ "*": "small"
+}

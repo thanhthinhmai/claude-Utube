@@ -1,4 +1,5 @@
-// Thumbnails of a film for its publish pack (specs/011 R2, R3). Draws the film's own page at a time t, lays one
+// Thumbnails of a film for its publish pack (specs/011 R2, R3; 020 FR-019: without the film's subtitles and cards).
+// Draws the film's own page at a time t, lays one
 // line of big text over it, and measures that text: its height and its contrast against what is under it.
 // Uses the library's page helper like texts.mjs does; nothing in the library is changed.
 //   node tools/filmcheck/thumbs.mjs <film dir> <lib dir> <job.json> <out dir>
@@ -109,12 +110,30 @@ for (let n = 0; n < job.thumbs.length; n++) {
     }
     if (hit > 0) covers.push({ text: String(b.text).slice(0, 60), ratio: +Math.min(1, hit / area).toFixed(3) });
   }
+  // specs/020 FR-019: the film's subtitles and cards are not in the thumbnail. window.CLEAN asks the page not to draw
+  // them (text drawn on the canvas); any DOM element that holds text itself is hidden too. Elements without text
+  // (letterbox bars, vignettes, grain) stay, so the picture keeps the style's look.
+  await page.evaluate((t) => {
+    window.CLEAN = true;
+    window.render(t);
+    window.__studioHidden = [];
+    const thumb = document.getElementById('studio-thumb');
+    for (const el of document.body.querySelectorAll('*')) {
+      if (el === thumb || thumb.contains(el) || el instanceof HTMLCanvasElement) continue;
+      const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      if (own && getComputedStyle(el).visibility !== 'hidden') { window.__studioHidden.push([el, el.style.visibility]); el.style.visibility = 'hidden'; }
+    }
+  }, th.t);
   const under = await page.screenshot({ clip });            // the overlay is still hidden: this is the picture alone
   const bg = await page.evaluate(luma, 'data:image/png;base64,' + under.toString('base64'));
   await page.evaluate(() => { document.getElementById('studio-thumb').style.visibility = 'visible'; });
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: path.join(out, `raw-${n + 1}.png`) });
-  await page.evaluate(() => document.getElementById('studio-thumb').remove());
+  await page.evaluate(() => {
+    document.getElementById('studio-thumb').remove();
+    for (const [el, v] of window.__studioHidden || []) el.style.visibility = v;
+    window.CLEAN = false;
+  });
   const a = th.plate ? Math.max(0, Math.min(1, th.plate_opacity ?? 0.6)) : 0;
   const plate = th.plate ? relLum(th.plate) : 0;
   const text = relLum(th.color);

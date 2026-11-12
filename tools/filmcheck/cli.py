@@ -273,12 +273,27 @@ def cmd_qc(a) -> int:
         return 2
 
     def save(x):
-        x["film"] = {"pass": r["pass"], "measures": r["measures"], "problems": r["problems"], "at": now()}
+        x["film"] = {"pass": r["pass"], "measures": r["measures"], "problems": r["problems"],
+                     "warnings": r.get("warnings", []), "at": now()}
         if x.get("narration") is None:
             x["narration"] = r["narration"]
     report.update(d, save)
+    from filmcheck import tiers
+    fin = [{"tier": "final", "ref": "film", "at": None, "rule": "qc", "severity": "block", "measure": p, "limit": "",
+            "text": "", "fix": "", "excepted": None} for p in r["problems"]]
+    fin += [{"tier": "final", "ref": "film", "at": None, "rule": "loudness_range", "severity": "warn", "measure": w,
+             "limit": "", "text": "", "fix": "", "excepted": None} for w in r.get("warnings", [])]
+    tiers.save_tier(d, "final", tiers.result("final", fin, {k: r["measures"].get(k) for k in
+                                                           ("silence_ratio", "tail_s", "av_sync", "loudness_range")},
+                                             [], 0.0, tiers.fingerprint(d)))
     m = r["measures"]
-    lines = [f"  ✗ {p}" for p in r["problems"]]
+    lines = [f"  ✗ {p}" for p in r["problems"]] + [f"  ! {w}" for w in r.get("warnings", [])]
+    shots = tiers.load_tier(d, "shots") or {}
+    open_style = [i for i in shots.get("issues", []) if i["severity"] == "warn"]
+    acc = (shots.get("style_accept") or {}).get("reason")
+    for i in open_style:                                       # FR-013: every open style warning, with its reason
+        lines.append(f"  ! style (shots): {i['rule']} {i['measure']} outside {i['limit']}"
+                     + (f" — accepted: {acc}" if acc else " — not accepted"))
     if r["narration"]:
         lines.append(f"  silence {m['silence_ratio']:.0%} · tail {m['tail_s']:.1f} s · {len(m.get('cuts', []))} cuts")
     if not m["texts_checked"]:
@@ -645,6 +660,207 @@ def cmd_render_setting(a) -> int:
     return 0
 
 
+# ---------- QC tiers (specs/020) ----------
+QC_SUBS = ("voice", "plan", "shots", "except", "accept-style", "final")
+
+
+def lib_dir() -> str:
+    return os.environ.get("STUDIO_LIB") or str(HERE.parents[1] / "lib" / "lemo-opuscar")
+
+
+def tier_lines(res: dict, name: str) -> list:
+    from filmcheck import rhythm
+    lines = [f"  ! {s}" for s in res.get("skipped") or []]
+    for i in res["issues"]:
+        mark = "·" if i.get("excepted") else ("!" if i["severity"] == "warn" else "✗")
+        lines.append(f"  {mark} {rhythm.line(i)}")
+    return lines
+
+
+def cmd_qc_plan(a) -> int:
+    from filmcheck import plancheck
+    d = film_dir(a.film)
+    try:
+        r = plancheck.run(d, lib_dir())
+    except plancheck.PlanError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    blk = [i for i in r["issues"] if i["severity"] == "block" and not i.get("excepted")]
+    m = r["measures"]
+    lines = tier_lines(r, d.name)
+    summary = f"{m['shots']} shots" + (f" · silence {m['silence_ratio']:.0%}" if "silence_ratio" in m else "") \
+        + f" · {r['seconds']:.1f} s"
+    lines.append(f"{'✓' if r['pass'] else '✗'} plan: " + ("all rules pass" if r["pass"] else f"{len(blk)} problem(s)")
+                 + f" · {summary}")
+    out(a, r, lines)
+    return 0 if r["pass"] else 1
+
+
+def cmd_qc_shots(a) -> int:
+    from filmcheck import shotcheck
+    d = film_dir(a.film)
+    try:
+        r = shotcheck.run(d, lib_dir(), say=(lambda x: None) if a.json else print)
+    except shotcheck.ShotError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    blk = [i for i in r["issues"] if i["severity"] == "block" and not i.get("excepted")]
+    wrn = [i for i in r["issues"] if i["severity"] == "warn"]
+    m = r["measures"]
+    lines = tier_lines(r, d.name)
+    lines.append(f"  luma {m['luma_p50']:.2f} · saturation {m['saturation_p50']:.2f} · {m['cuts_per_min']} cuts/min"
+                 + (f" · style from {m['style_source']}" if m.get("style_source") else ""))
+    acc = (r.get("style_accept") or {}).get("reason")
+    lines.append(f"{'✓' if r['pass'] else '✗'} shots: {len(blk)} frame problem(s) · {len(wrn)} style warning(s)"
+                 + (f" (accepted: {acc})" if acc and wrn else "")
+                 + (f" · sheet {m['sheets'][0]}" if m.get("sheets") else "") + f" · {r['seconds']:.0f} s")
+    out(a, r, lines)
+    return 0 if r["pass"] else 1
+
+
+def cmd_qc_accept_style(a) -> int:
+    from filmcheck import shotcheck, tiers
+    d = film_dir(a.film)
+    try:
+        r = shotcheck.accept_style(d, a.reason)
+    except tiers.TierError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    out(a, r, [f"✓ style warnings accepted: {a.reason.strip()}"])
+    return 0
+
+
+def cmd_qc_except(a) -> int:
+    from filmcheck import tiers
+    d = film_dir(a.film)
+    if a.list or not a.shot:
+        exc = tiers.load_exceptions(d)
+        out(a, {"exceptions": exc}, [f"  {e['shot']} {e['rule']} — {e['reason']} ({e.get('at', '')})" for e in exc])
+        return 0
+    if not a.rule:
+        print("✗ usage: qc except <film> <shot> <rule> --reason \"…\" | --remove", file=sys.stderr)
+        return 2
+    try:
+        if a.remove:
+            if not tiers.remove_exception(d, a.shot, a.rule):
+                print(f"✗ no exception for {a.shot} {a.rule}", file=sys.stderr)
+                return 2
+            lines = [f"✓ removed: {a.shot} {a.rule}"]
+        else:
+            tiers.add_exception(d, a.shot, a.rule, a.reason)
+            lines = [f"✓ exception: {a.shot} {a.rule} — {a.reason.strip()}"]
+    except tiers.TierError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    t = tiers.recompute(d).get("tiers") or {}
+    lines += [f"  {k}: {'pass' if t[k]['pass'] else 'fail'}" for k in ("plan", "shots") if t.get(k)]
+    out(a, {"exceptions": tiers.load_exceptions(d), "tiers": {k: t[k] for k in ("plan", "shots") if t.get(k)}}, lines)
+    return 0
+
+
+def film_lang(d: Path, given=None) -> str:
+    if given:
+        return given
+    try:
+        lang = json.loads((d / "channel.json").read_text(encoding="utf-8")).get("rules", {}).get("language")
+        if lang:
+            return lang
+    except (OSError, ValueError, AttributeError):
+        pass
+    import re
+    for f in ("CHANNEL_BRIEF.md", "SCRIPT.md"):
+        try:
+            m = re.search(r"^\W*Language\W*:?\s*([a-z]{2})\b", (d / f).read_text(encoding="utf-8"), re.M | re.I)
+            if m:
+                return m.group(1).lower()
+        except OSError:
+            continue
+    return "en"
+
+
+def asr_model(lang: str) -> str:
+    """The studio's one recogniser model for a language (tools/asr.json, specs/020 FR-002)."""
+    cfg = json.loads((HERE.parent / "asr.json").read_text(encoding="utf-8"))
+    return cfg.get(lang) or cfg["*"]
+
+
+def cmd_voice_asr(a) -> int:
+    d = film_dir(a.film)
+    lang = film_lang(d, a.lang)
+    model = asr_model(lang)
+    lib = Path(lib_dir())
+    py = lib / ".venv" / "bin" / "python"
+    cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "asr_check.py"), str(d / "lines.json"),
+           str(d / "voices"), "--lang", lang, "--model", model]
+    print(f"model: {model} ({lang})")
+    if os.environ.get("STUDIO_ASR_DRY"):
+        print(" ".join(cmd))
+        return 0
+    import subprocess
+    return subprocess.run(cmd).returncode
+
+
+def cmd_qc_voice(a) -> int:
+    from filmcheck import voicecheck
+    d = film_dir(a.film)
+    try:
+        r = voicecheck.run(d, lib_dir(), film_lang(d))
+    except voicecheck.VoiceError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    lines = tier_lines(r, d.name)
+    n = len(r["issues"])
+    lines.append(f"{'✓' if r['pass'] else '✗'} voice: {r['measures']['lines']} lines · "
+                 + ("all pass" if r["pass"] else f"{n} problem(s)") + f" · {r['seconds']:.1f} s")
+    out(a, r, lines)
+    return 0 if r["pass"] else 1
+
+
+def cmd_qc_limits(a) -> int:
+    """JSON for tools/render/record.mjs (tier 3): the style's still limit and the film's exceptions."""
+    from filmcheck import qc, tiers
+    d = film_dir(a.film)
+    print(json.dumps({"still_max": qc.still_limit(d),
+                      "exceptions": [{"shot": e["shot"], "rule": e["rule"]} for e in tiers.load_exceptions(d)]}))
+    return 0
+
+
+def cmd_render_done(a) -> int:
+    """Save tiers.render from out/render-qc.json written by record.mjs (specs/020 FR-021)."""
+    from filmcheck import tiers
+    d = film_dir(a.film)
+    try:
+        q = json.loads((d / "out" / "render-qc.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return 0
+    issues = [{"tier": "render", "ref": f.get("shot") or f"chunk {f.get('chunk')}", "at": f.get("at"), "rule": f["rule"],
+               "severity": "block", "measure": f.get("measure"), "limit": f.get("limit"), "text": f"chunk {f.get('chunk')}",
+               "fix": "fix the shot and render again (earlier chunks are kept)", "excepted": None} for f in q.get("faults") or []]
+    old = tiers.load_tier(d, "render") or {}
+    skipped = old.get("skipped_checks") if q.get("skipped_checks") else None
+    res = tiers.result("render", issues, {"no_stop": q.get("no_stop")}, [], 0.0, tiers.fingerprint(d),
+                       stopped=q.get("stopped") and {k: q["stopped"].get(k) for k in ("first_bad", "shot", "rule", "at")},
+                       reused_chunks=q.get("reused", 0), skipped_checks=skipped)
+    tiers.save_tier(d, "render", res)
+    return 0
+
+
+def cmd_render_gate(a) -> int:
+    from filmcheck import tiers
+    d = film_dir(a.film)
+    if a.skip_checks is not None:
+        if not a.skip_checks.strip():
+            print("✗ render: --skip-checks needs a reason", file=sys.stderr)
+            return 2
+        tiers.record_skip(d, a.skip_checks.strip())
+        print(f"! render: checks skipped — {a.skip_checks.strip()}")
+        return 0
+    why = tiers.gate(d)
+    for w in why:
+        print(f"✗ render: {w}", file=sys.stderr)
+    return 1 if why else 0
+
+
 def not_yet(a) -> int:
     print(f"✗ not built yet: {a.cmd}", file=sys.stderr)
     return 2
@@ -673,6 +889,37 @@ def parser() -> argparse.ArgumentParser:
     q = sub.add_parser("qc", help="measure a finished film")
     q.add_argument("film")
     q.add_argument("--json", action="store_true")
+
+    s = sub.add_parser("qc-plan", help="tier 1: check the plan before rendering (specs/020)")
+    s.add_argument("film")
+    s.add_argument("--json", action="store_true")
+    s = sub.add_parser("qc-shots", help="tier 2: one frame per shot, frame faults and the style (specs/020)")
+    s.add_argument("film")
+    s.add_argument("--json", action="store_true")
+    s = sub.add_parser("qc-accept-style", help="accept the style warnings with a reason (specs/020)")
+    s.add_argument("film")
+    s.add_argument("--reason", default="")
+    s.add_argument("--json", action="store_true")
+    s = sub.add_parser("qc-except", help="mark one shot as an exception to one rule (specs/020)")
+    s.add_argument("film")
+    s.add_argument("shot", nargs="?")
+    s.add_argument("rule", nargs="?")
+    s.add_argument("--reason", default="")
+    s.add_argument("--list", action="store_true")
+    s.add_argument("--remove", action="store_true")
+    s.add_argument("--json", action="store_true")
+    s = sub.add_parser("qc-voice", help="tier 0: check the voice lines (specs/020)")
+    s.add_argument("film")
+    s.add_argument("--json", action="store_true")
+    s = sub.add_parser("voice-asr", help="word stamps with the studio's recogniser model (specs/020)")
+    s.add_argument("film")
+    s.add_argument("--lang", default=None)
+    for name in ("qc-limits", "render-done"):
+        s = sub.add_parser(name, help="used by sh bin/studio render (specs/020)")
+        s.add_argument("film")
+    s = sub.add_parser("render-gate", help="may this film be rendered? (specs/020)")
+    s.add_argument("film")
+    s.add_argument("--skip-checks", default=None)
 
     pb = sub.add_parser("publish", help="make and check a film's publish pack (specs/011)")
     pb.add_argument("film")
@@ -782,6 +1029,11 @@ def parser() -> argparse.ArgumentParser:
 COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("script", "status"): cmd_status,
             ("script", "skip"): cmd_skip, ("web", "fetch"): cmd_fetch, ("config", "editor-model"): cmd_editor_model, ("config", "render"): cmd_render_setting,
             ("qc", "qc"): cmd_qc, ("publish", "publish"): cmd_publish,
+            ("qc-plan", "qc-plan"): cmd_qc_plan, ("render-gate", "render-gate"): cmd_render_gate,
+            ("qc-shots", "qc-shots"): cmd_qc_shots, ("qc-accept-style", "qc-accept-style"): cmd_qc_accept_style,
+            ("qc-except", "qc-except"): cmd_qc_except, ("qc-voice", "qc-voice"): cmd_qc_voice,
+            ("voice-asr", "voice-asr"): cmd_voice_asr, ("qc-limits", "qc-limits"): cmd_qc_limits,
+            ("render-done", "render-done"): cmd_render_done,
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach,
@@ -794,8 +1046,11 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
 
 
 def main(argv=None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if len(argv) > 1 and argv[0] == "qc" and argv[1] in QC_SUBS:      # qc plan <film> → qc-plan <film>
+        argv = (["qc"] if argv[1] == "final" else [f"qc-{argv[1]}"]) + argv[2:]
     a = parser().parse_args(argv)
-    if a.group in ("qc", "publish"):
+    if "cmd" not in a or a.cmd is None:
         a.cmd = a.group
     return COMMANDS.get((a.group, a.cmd), not_yet)(a)
 

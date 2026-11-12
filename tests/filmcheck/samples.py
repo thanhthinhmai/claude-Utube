@@ -138,6 +138,10 @@ def make_film(root: Path, name: str, *, word=WORD, gap=GAP, pause_in_p01=0.0, ex
         narr["lines_file"] = "lines.json"
     (d / "narration.json").write_text(json.dumps(narr), encoding="utf-8")
     (d / "TREATMENT.md").write_text("Style: test-style\n", encoding="utf-8")
+    qcj = Path(root) / "my-styles" / "test-style" / "qc.json"     # the sample's shots run up to 9.4 s (specs/020 shot_long)
+    qcj.parent.mkdir(parents=True, exist_ok=True)
+    if not qcj.exists():
+        qcj.write_text(json.dumps({"shot_max": 10}), encoding="utf-8")
     if srt is not None:
         (d / f"{name}.srt").write_text(srt, encoding="utf-8")
     _render(d / f"{name}.mp4", cuts, duration, still_shot)
@@ -297,3 +301,105 @@ def make_lesson(root: Path, scope: str, rule=None, status="active", what="A mist
     from filmcheck import channels
     return channels.add_lesson(channels.lessons_file(root, scope), what=what, why="Nothing checked it", stop=stop,
                                rule=rule, status=status)
+
+
+# ---------- films for the QC tiers (specs/020) ----------
+TIER_PAGE = r"""<!doctype html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}
+#card{position:fixed;left:0;right:0;text-align:center;color:#f2e6c8;font:700 64px sans-serif;opacity:0}
+#sub{position:fixed;left:0;right:0;bottom:4%;text-align:center;color:#fff;font:600 40px sans-serif}</style>
+</head><body><canvas id="c"></canvas><div id="card"></div><div id="sub"></div>
+<script>
+// Test film for the QC tiers (tests/filmcheck/samples.py make_tier_film): one look per shot on a 2D canvas.
+const F = FILM_JSON;
+const c = document.getElementById('c'); c.width = innerWidth; c.height = innerHeight;
+const g = c.getContext('2d');
+window.DUR = F.dur;
+window.SHOTS = F.shots.map(s => [s.t0, s.t1, s.set || 'x', s.id]);
+if (F.cues) window.CUES = F.cues;
+if (F.cards) window.CARDS = F.cards.map(k => [k.t0, k.t1, k.id, k.text]);
+let rnd = 1;
+const R = () => (rnd = (rnd * 16807) % 2147483647) / 2147483647;
+function look(s, t) {
+  const W = c.width, H = c.height, k = s.look || 'good', moving = k !== 'still';
+  const lt = moving ? t - s.t0 : 0;
+  if (k === 'flat') { g.fillStyle = '#3a2f55'; g.fillRect(0, 0, W, H); return; }
+  if (k === 'blown') { g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.fillStyle = '#ddd'; g.fillRect(W * .4, H * .4, W * .1, H * .1); return; }
+  if (k === 'cardbg') { g.fillStyle = '#120c1c'; g.fillRect(0, 0, W, H); return; }
+  const dim = k === 'dark' ? 0.04 : (s.dim || 1);
+  rnd = 1 + Math.round(s.t0 * 1000);
+  const hue = s.hue ?? Math.round(R() * 360);
+  const grd = g.createLinearGradient(0, 0, W, H);
+  grd.addColorStop(0, `hsl(${hue},45%,${40 * dim}%)`); grd.addColorStop(1, `hsl(${(hue + 60) % 360},45%,${18 * dim}%)`);
+  g.fillStyle = grd; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 40; i++) {
+    const x = R() * W + Math.sin(lt * 2 + i) * 40, y = R() * H, w = 40 + R() * 220, h = 40 + R() * 220;
+    g.fillStyle = `hsl(${Math.round(R() * 360)},${30 + R() * 40}%,${(15 + R() * 55) * dim}%)`; g.fillRect(x, y, w, h);
+  }
+}
+window.render = (t) => {
+  if (window.CLEAN_SEEN !== undefined) window.CLEAN_SEEN = !!window.CLEAN;
+  const s = F.shots.find(s => t >= s.t0 && t < s.t1) || F.shots[F.shots.length - 1];
+  look(s, t);
+  const card = document.getElementById('card'), k = (F.cards || []).find(k => t >= k.t0 && t < k.t1);
+  card.textContent = k ? k.text : '';
+  card.style.opacity = k && !window.CLEAN ? 1 : 0;
+  card.style.top = k && k.pos === 'bottom' ? '84%' : k && k.pos === 'off' ? '97%' : '40%';
+  const cue = (F.cues || []).find(q => t >= q[0] && t < q[1]);
+  document.getElementById('sub').textContent = cue && !window.CLEAN ? cue[2] : '';
+};
+window.TEXTS = (t) => {
+  const e = document.getElementById('card');
+  if (+e.style.opacity < .5 || !e.textContent) return [];
+  const r = e.firstChild ? (() => { const rg = document.createRange(); rg.selectNodeContents(e); return rg.getBoundingClientRect(); })() : e.getBoundingClientRect();
+  return [{ id: 'card', text: e.textContent, x0: r.left, y0: r.top, x1: r.right, y1: r.bottom }];
+};
+window.render(0); window.READY = true;
+</script></body></html>
+"""
+
+
+def speak(text: str, word=0.32, gap=0.04, sent_gap=0.3):
+    """Word stamps [[word, start, end]] (relative to the line) for a line of text: sentence ends get a longer gap."""
+    out, t = [], 0.0
+    for w in text.split():
+        out.append([w, round(t, 3), round(t + word, 3)])
+        t += word + (sent_gap if w[-1] in ".?!" else gap)
+    return out
+
+
+def make_tier_film(root: Path, name: str, *, shots, lines=(), cues=None, cards=None, dur=None, style=None,
+                   asr=None, script=True, export_shots=True) -> Path:
+    """films/<name>/ for the 020 tiers. shots: [{id, t0, t1, look?, hue?, dim?}]; lines: [{id, para, at, text}]
+    (stamps from speak(), or asr[id] when given: a different transcript of the same line); cues: [[t0, t1, text]];
+    cards: [{id, t0, t1, text, pos?}]. No mp4: the page is the film."""
+    d = Path(root) / "films" / name
+    (d / "voices").mkdir(parents=True, exist_ok=True)
+    words, durs = {}, {}
+    for L in lines:
+        ws = (asr or {}).get(L["id"]) or speak(L["text"])
+        words[L["id"]] = ws
+        durs[L["id"]] = round(max(w[2] for w in ws), 3)
+    if lines:
+        (d / "voices" / "words.json").write_text(json.dumps(words), encoding="utf-8")
+        (d / "voices" / "dur.json").write_text(json.dumps(durs), encoding="utf-8")
+        (d / "lines.json").write_text(json.dumps([{"id": L["id"], "para": L["para"], "text": L["text"]} for L in lines]),
+                                      encoding="utf-8")
+        (d / "narration.json").write_text(json.dumps({
+            "words_file": "voices/words.json", "durations_file": "voices/dur.json", "lines_file": "lines.json",
+            "lines": [{"id": L["id"], "para": L["para"], "at": L["at"]} for L in lines]}), encoding="utf-8")
+        if script:
+            paras = {}
+            for L in lines:
+                paras.setdefault(L["para"], []).append(L["text"])
+            (d / "SCRIPT.md").write_text("Title: Test\nTarget: 60s\nLanguage: en\n\n"
+                                         + "\n".join(f"[{p}] {' '.join(t)}" for p, t in paras.items()) + "\n", encoding="utf-8")
+    total = dur if dur is not None else max(s["t1"] for s in shots)
+    film = {"dur": total, "shots": shots, "cues": cues, "cards": cards}
+    page = TIER_PAGE.replace("FILM_JSON", json.dumps(film))
+    if not export_shots:
+        page = page.replace("window.SHOTS = F.shots", "const NO_SHOTS = F.shots")
+    (d / "index.html").write_text(page, encoding="utf-8")
+    (d / "TREATMENT.md").write_text(f"Style: {style or 'test-style'}\n", encoding="utf-8")
+    return d

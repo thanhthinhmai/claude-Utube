@@ -111,7 +111,7 @@ def main(argv=None) -> int:
     m.set_defaults(fn=cmd_measure)
 
     t = sub.add_parser("transcribe", help="chép lời (cần deps learn --extra)")
-    t.add_argument("set"); t.add_argument("--model", default="small"); t.add_argument("--lang", default="auto")
+    t.add_argument("set"); t.add_argument("--model", default=None, help="default: the studio's model in tools/asr.json"); t.add_argument("--lang", default="auto")
     t.set_defaults(fn=cmd_transcribe)
 
     s = sub.add_parser("summary", help="tổng hợp cả bộ")
