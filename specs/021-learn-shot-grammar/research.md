@@ -73,7 +73,7 @@ Góc máy:
 - Phong cách có thêm file máy đọc được `my-styles/<slug>/shots.json` chứa các khoảng (data-model "ShotGrammarRefs"); `stylerefs.load` đọc file này.
 - Bảng "Key numbers" của `EVIDENCE.md` có thêm các hàng cách quay. Mục 6 và mục 2 (chiều sâu) của `STYLE.md` ghi con số kèm bằng chứng `sheet#ô`.
 
-**Bằng chứng nằm ở đâu**: khung của video tham chiếu **không** được chép vào phong cách. Phong cách nằm trong git, mà hiến pháp cấm commit video tham chiếu, và `save.py` hiện chặn mọi ảnh raster lấy từ video gốc. Bằng chứng là tên bảng ảnh và ô (`v03_S014`), như các luật hiện có ("v04_0077.jpg#38–41"). Bảng ảnh và nhãn ở lại trong `references/<set>/` (ngoài git) khi `clean` chỉ xoá video và âm thanh. Đây là cách hiểu giả định cuối của spec ("khung bằng chứng được giữ lại cùng phong cách"): giữ cùng **bộ** tham chiếu, không chép vào thư mục phong cách. Cần người dùng xác nhận.
+**Bằng chứng nằm ở đâu**: khung của video tham chiếu **không** được chép vào phong cách. Phong cách nằm trong git, mà hiến pháp cấm commit video tham chiếu, và `save.py` hiện chặn mọi ảnh raster lấy từ video gốc. Bằng chứng là tên bảng ảnh và ô (`v03_S014`), như các luật hiện có ("v04_0077.jpg#38–41"). Bảng ảnh và nhãn ở lại trong `references/<set>/` (ngoài git) khi `clean` chỉ xoá video và âm thanh. Đây là cách hiểu giả định cuối của spec ("khung bằng chứng được giữ lại cùng phong cách"): giữ cùng **bộ** tham chiếu, không chép vào thư mục phong cách. Người dùng đã xác nhận (2026-11-13).
 
 ## R6. Học lại một phong cách đã có (FR-008)
 

@@ -59,7 +59,7 @@ Học lại `dusk-hypothetical` bằng `save --update` (giữ nhật ký sửa),
 | Nguyên tắc | Đánh giá |
 |---|---|
 | I. Spec là nguồn sự thật | Đạt. Spec đã làm rõ 5 câu (2026-11-13) |
-| II. Không đoán | Đạt, với 1 điểm cần xác nhận: "khung bằng chứng giữ cùng phong cách" được hiểu là giữ cùng **bộ tham chiếu** ngoài git, còn phong cách chỉ ghi tham chiếu `bảng#ô` (research R5). Hai ngưỡng `FOCUS_T` và `SET_D` được chốt bằng số đo của video tham chiếu, không đoán |
+| II. Không đoán | Đạt. Người dùng đã xác nhận (2026-11-13): "khung bằng chứng giữ cùng phong cách" được hiểu là giữ cùng **bộ tham chiếu** ngoài git, còn phong cách chỉ ghi tham chiếu `bảng#ô` (research R5). Hai ngưỡng `FOCUS_T` và `SET_D` được chốt bằng số đo của video tham chiếu, không đoán |
 | III. MVP theo story | Đạt. US1 (học và đo) tự chạy và tự kiểm được trên video thử; US2–US4 lần lượt dựa vào nó |
 | IV. Đo được | Đạt. SC-001 (độ nhất quán giữa hai lượt), SC-002 (độ nét), SC-005 (phim thử có nhãn biết trước) đều có số; có xem bằng mắt bảng ảnh và phim mẫu |
 | V. Đơn giản | Một module độ nét và một lượt gán nhãn dùng chung cho hai phía. Có một điểm phức tạp, ghi ở Complexity Tracking |
