@@ -14,6 +14,7 @@
 
 - Q: Phim lệch số đo của phong cách thì có chặn render không? → A: Không chặn. Lỗi nhịp (tầng 1) và lỗi khung (khung phẳng, quá tối hoặc cháy, chữ thiếu phông, chữ đè phụ đề ở tầng 2) chặn render; lệch phong cách chỉ cảnh báo, và render được khi người làm phim ghi một dòng lý do (FR-009, FR-013).
 - Q: Phim dưới 30 s dùng ngưỡng nào? → A: Cùng ngưỡng nhịp như phim dài; chỉ bỏ so số lần cắt mỗi phút với phong cách (`qc` hiện nay không có ngưỡng riêng cho phim ngắn).
+- Q: Luật nhịp mới (độ dài cảnh, thời gian hiện phụ đề) có áp cho `qc` sau ghép tiếng của phim cũ không? → A: Có. Một bộ luật cho mọi phim (FR-010); phim cũ chạy `qc` lại có thể bị báo thêm lỗi.
 
 ## Bối cảnh
 
