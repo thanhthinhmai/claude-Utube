@@ -336,3 +336,11 @@ description: "Tasks for 020 — QC per shot before render"
 1. **MVP** = Phase 1–3: câu theo kịch bản, luật chung, `qc plan`, cổng render. Đây là phần đã gây cả hai lần render lại của `pet-swap`. Dừng và kiểm chứng SC-001, SC-002 trước khi đi tiếp.
 2. Thêm US2 (bắt góc máy hỏng, lệch màu), rồi US3, US4, US5. Mỗi story xong: chạy test và commit.
 3. Mỗi lần chạy thật trên `pet-swap` ghi số đo vào quickstart (hiến pháp IV).
+
+## Phase 9: Convergence
+
+- [ ] T054 Report a card that is never fully on screen (readcheck's `BAD … never fully visible` lines) as `card_read` in `tools/filmcheck/plancheck.py` `readcheck_cards`, and add a test of the readcheck path (a tier film without `window.CARDS`) to `tests/filmcheck/test_plan.py` per FR-006 (partial)
+- [ ] T055 Accept `--json` on `qc except` and `qc accept-style` in `tools/filmcheck/cli.py` (print the recomputed tier results) per contracts/cli.md (partial)
+- [ ] T056 Compute each shot's `para` (the paragraph of the first sentence in the shot) and store it in `.check/plan-input.json` in `tools/filmcheck/plancheck.py` per data-model "Shot" (partial)
+- [ ] T057 Remove the undocumented `flat_share` style key from `tools/filmcheck/shotcheck.py`, or add it to `stylerefs.KEYS` and to data-model "Style references" per data-model (unrequested)
+- [ ] T058 Document the extra sources for the film's style (`channel.json` `film.style`, a "style \`slug\`" mention in TREATMENT.md) and language (`channel.json` `rules.language`) in `specs/020-qc-before-render/contracts/cli.md` and research R6 per contracts/cli.md (unrequested)
