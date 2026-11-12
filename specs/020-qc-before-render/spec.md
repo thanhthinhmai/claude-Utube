@@ -8,6 +8,12 @@
 
 **Input**: User description: "QC phát hiện lỗi theo từng cảnh trước khi render, thay vì render xong mới QC rồi phải render lại. (…) Muốn: các tầng kiểm theo dữ liệu cần — tầng 0 ngay sau khi tạo giọng; tầng 1 kiểm kế hoạch không cần render, báo theo mã cảnh; tầng 2 mỗi cảnh một ảnh và kiểm phong cách, có bảng ảnh ghi mã cảnh; tầng 3 kiểm từng đoạn ngay trong lúc render và dừng sớm; tầng 4 sau khi ghép tiếng. Câu xác định theo kịch bản, không theo dấu chấm của Whisper; chặn mốc âm; một mô hình nhận dạng cho cả xưởng. Luồng làm phim không cho render khi tầng 1–2 chưa đạt. Gói đăng dùng phụ đề đã đạt của phim; thumbnail không có phụ đề. Không sửa thư viện gốc. Dựa trên specs/019."
 
+## Clarifications
+
+### Session 2026-11-12
+
+- Q: Phim lệch số đo của phong cách thì có chặn render không? → A: Không chặn. Lỗi nhịp (tầng 1) và lỗi khung (khung phẳng, quá tối hoặc cháy, chữ thiếu phông, chữ đè phụ đề ở tầng 2) chặn render; lệch phong cách chỉ cảnh báo, và render được khi người làm phim ghi một dòng lý do (FR-009, FR-013).
+
 ## Bối cảnh
 
 Hiện `qc` (specs/010) chỉ chạy khi phim đã render và ghép tiếng xong. Phim `films/pet-swap` (9 phút 32 giây, 192 cảnh, 2026-11-12) cho thấy cái giá của việc này:
@@ -56,7 +62,7 @@ Khi giọng và dòng thời gian đã xong, người làm phim (Claude trong ch
 
 ### User Story 2 - Mỗi cảnh một ảnh, kèm kiểm phong cách (Priority: P2)
 
-Sau khi kế hoạch đạt, người làm phim chạy lệnh kiểm hình theo cảnh. Xưởng chụp một ảnh ở giữa mỗi cảnh, tự đo từng ảnh, so cả phim với số đo của phong cách, và tạo một bảng ảnh có ghi mã cảnh để xem bằng mắt. Lệnh ghi video cũng từ chối chạy khi tầng này chưa đạt.
+Sau khi kế hoạch đạt, người làm phim chạy lệnh kiểm hình theo cảnh. Xưởng chụp một ảnh ở giữa mỗi cảnh, tự đo từng ảnh, so cả phim với số đo của phong cách, và tạo một bảng ảnh có ghi mã cảnh để xem bằng mắt. Lệnh ghi video cũng từ chối chạy khi lỗi khung của tầng này chưa sửa. Lệch phong cách chỉ cảnh báo: phải ghi một dòng lý do mới render được.
 
 **Why this priority**: Bắt được các góc máy hỏng và màu lệch phong cách, những thứ ở `pet-swap` phải soát bằng mắt 3 vòng hoặc không ai bắt được. Story 1 vẫn có giá trị riêng mà không cần story này.
 
@@ -69,7 +75,7 @@ Sau khi kế hoạch đạt, người làm phim chạy lệnh kiểm hình theo 
 **Acceptance Scenarios**:
 
 1. **Given** một cảnh mà khung gần như một màu (máy quay nằm trong vật thể), **When** kiểm hình, **Then** cảnh đó bị báo "khung phẳng" kèm tỉ lệ màu chiếm chỗ.
-2. **Given** một phim dùng phong cách có số đo (phong cách học từ kênh), **When** kiểm hình, **Then** độ sáng trung vị, độ bão hoà trung vị và số lần cắt mỗi phút của phim được so với khoảng của phong cách. Ngoài khoảng thì báo kèm số đo và khoảng.
+2. **Given** một phim dùng phong cách có số đo (phong cách học từ kênh), **When** kiểm hình, **Then** độ sáng trung vị, độ bão hoà trung vị và số lần cắt mỗi phút của phim được so với khoảng của phong cách. Ngoài khoảng thì cảnh báo kèm số đo và khoảng. Lệnh ghi video đòi một dòng lý do trước khi chạy.
 3. **Given** một phong cách không có số đo (phong cách của thư viện chưa đo), **When** kiểm hình, **Then** bỏ qua phần so phong cách và nói rõ là đã bỏ qua.
 4. **Given** một cảnh thẻ chữ cố ý tối và trơn (nền thẻ trong không gian trống của phong cách), **When** kiểm hình, **Then** cảnh đó không bị báo "khung phẳng", vì chữ của thẻ được tính là nội dung.
 5. **Given** kiểm xong, **When** mở thư mục kết quả, **Then** có bảng ảnh: mỗi ô ghi mã cảnh, cảnh lỗi được đánh dấu.
@@ -169,7 +175,7 @@ Sau khi ghép tiếng, bước kiểm cuối chỉ còn âm lượng, đỉnh ti
   Ngoài ra PHẢI áp dụng: cảnh dài từ 1,1 s đến mức tối đa của phong cách (mặc định 6 s); mỗi phụ đề hiện ≥ max(1,8 s, thời gian nói + 0,6 s); mỗi thẻ chữ hiện đủ thời gian đọc theo luật đọc của thư viện.
 - **FR-007**: Mỗi lỗi PHẢI có mã cảnh (hoặc mã dòng hay phụ đề), thời điểm, luật, số đo, ngưỡng. Lỗi cắt cảnh PHẢI kèm mốc sớm nhất hợp lệ để cắt.
 - **FR-008**: Kiểm kế hoạch PHẢI xong trong 10 giây với phim 10 phút.
-- **FR-009**: Lệnh ghi video PHẢI từ chối chạy khi kiểm kế hoạch (và kiểm hình theo cảnh, FR-014) chưa đạt cho đúng nguồn phim hiện tại. Có một cờ bỏ qua rõ ràng; khi dùng cờ đó, nhật ký và kết quả kiểm PHẢI ghi lại.
+- **FR-009**: Lệnh ghi video PHẢI từ chối chạy khi kiểm kế hoạch, hoặc các luật khung của kiểm hình theo cảnh (FR-012), chưa đạt cho đúng nguồn phim hiện tại. Lệch phong cách (FR-013) không chặn. Có một cờ bỏ qua rõ ràng; khi dùng cờ đó, nhật ký và kết quả kiểm PHẢI ghi lại.
 - **FR-010**: Luật nhịp của tầng 1 và của `qc` sau khi ghép tiếng PHẢI là cùng một bộ luật, để một kế hoạch đã đạt tầng 1 thì không bị `qc` báo lỗi nhịp sau đó (SC-005).
 
 **Tầng 2: mỗi cảnh một ảnh**
@@ -180,7 +186,7 @@ Sau khi ghép tiếng, bước kiểm cuối chỉ còn âm lượng, đỉnh ti
   - quá tối hoặc cháy sáng theo ngưỡng của phong cách, hoặc ngưỡng mặc định;
   - chữ thiếu phông;
   - chữ trên màn hình đè lên vùng phụ đề.
-- **FR-013**: Khi phong cách có số đo (khoảng độ sáng trung vị, độ bão hoà trung vị, số lần cắt mỗi phút, dải âm lượng), xưởng PHẢI so phim với các khoảng đó. Không có số đo thì báo "bỏ qua so phong cách".
+- **FR-013**: Khi phong cách có số đo (khoảng độ sáng trung vị, độ bão hoà trung vị, số lần cắt mỗi phút, dải âm lượng), xưởng PHẢI so phim với các khoảng đó. Ngoài khoảng là **cảnh báo**, không chặn. Lệnh ghi video chạy được khi người làm phim ghi một dòng lý do (ví dụ "cố ý tối hơn cho phim đêm"). Lý do được lưu vào kết quả kiểm, và báo cáo cuối liệt kê mọi cảnh báo phong cách còn mở. Không có số đo thì báo "bỏ qua so phong cách".
 - **FR-014**: Kiểm hình theo cảnh PHẢI tạo một bảng ảnh: mỗi ô ghi mã cảnh, cảnh lỗi được đánh dấu.
 - **FR-015**: Người làm phim PHẢI đánh dấu được một cảnh là ngoại lệ cho một luật cụ thể, kèm lý do. Ngoại lệ PHẢI hiện trong báo cáo. Không được miễn trừ cả phim bằng một lệnh.
 
