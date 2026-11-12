@@ -57,6 +57,11 @@ say "app stop ok"
 (cd lib/lemo-opuscar && node -e "require('playwright-core').chromium.launch().then(b => b.close())") || fail "chromium"
 say "chromium ok"
 
+# How pages are rendered (specs/019): software in CI (no display), GPU on a WSLg machine
+render=$(STUDIO_LIB="$PWD/lib/lemo-opuscar" node tools/render/probe.mjs) || fail "render probe"
+printf '%s' "$render" | grep -q '"mode":"' || fail "render probe output"
+say "render probe ok: $render"
+
 # SMOKE_VOICE=1: the setup's model steps (contracts/release.md 5–6), then one spoken line checked by Whisper
 if [ "${SMOKE_VOICE:-}" = 1 ]; then
   sh lib/lemo-opuscar/tools/fetch.sh voice >/dev/null || fail "fetch voice"

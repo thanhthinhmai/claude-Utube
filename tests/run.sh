@@ -252,6 +252,36 @@ rm -f "$P/.core-version"; mv "$W/libgit" "$L/.git"
 run help
 check "không có env.sh thì bỏ qua" sh -c '! printf "%s" "$1" | grep -q envsh-loaded' _ "$OUT"
 
+echo "== 019: dựng hình (GPU hay phần mềm)"
+probe_fake() { printf '#!/bin/sh\necho %s\n' "'$1'" > "$W/probe.sh"; }
+run_probe() {  # run_probe lệnh-con…  (như run, thêm STUDIO_RENDER_PROBE)
+  OUT=$(cd "$P" && env -i HOME="$W" PATH="$FAKE:$SYS" STUDIO_LIB_REPO="$U" STUDIO_LIB_COMMIT="$COMMIT" STUDIO_RENDER_PROBE="$W/probe.sh" /bin/sh "$P/bin/studio" "$@" 2>&1)
+  RC=$?
+}
+probe_fake '{"mode":"gpu","renderer":"ANGLE (Test, D3D12 (Fake GPU 1), OpenGL 4.1)","reason":null,"fix":null,"source":"auto","chrome":"/x/chrome-gpu.sh","checked_at":"2026-11-12T00:00:00Z"}'
+run_probe status
+check "status: dòng dựng hình GPU kèm tên GPU" has "✓ dựng hình   GPU · ANGLE (Test, D3D12 (Fake GPU 1), OpenGL 4.1)"
+check "status: GPU trên Linux dặn đừng đóng cửa sổ Chrome" has "đừng đóng nó"
+run_probe status --json
+check "status --json có render.mode = gpu" has '"render":{"mode":"gpu"'
+check "status --json vẫn là JSON hợp lệ" json_ok
+probe_fake '{"mode":"software","renderer":null,"reason":"full Chromium missing","fix":"sh bin/studio deps gpu","source":"auto","chrome":null,"checked_at":"2026-11-12T00:00:00Z"}'
+run_probe status
+check "status: thiếu Chromium → ✗ kèm lệnh sửa" has "✗ dựng hình   phần mềm · thiếu Chromium đầy đủ → sh bin/studio deps gpu"
+probe_fake '{"mode":"software","renderer":null,"reason":"no display","fix":"x","source":"auto","chrome":null,"checked_at":"2026-11-12T00:00:00Z"}'
+run_probe status
+check "status: không có màn hình → · không có màn hình đồ hoạ" has "· dựng hình   phần mềm · không có màn hình đồ hoạ"
+rc_before=$RC; run status
+check "status: dòng dựng hình không đổi mã thoát" [ "$RC" -eq "$rc_before" ]
+check "status: chưa cài gói lõi → chưa kiểm" has "dựng hình   chưa kiểm"
+run deps gpu
+check "deps gpu: chưa có gói lõi thì báo, mã 1" sh -c '[ "$1" -eq 1 ] && printf "%s" "$2" | grep -q "chưa cài gói lõi"' _ "$RC" "$OUT"
+check "deps gpu: không gọi apt/brew/sudo" sh -c '! printf "%s" "$1" | grep -qiE "^(apt|brew|sudo) "' _ "$OUT"
+run render
+check "render không có phim: mã 2" rc_is 2
+run page bogus x
+check "page công cụ lạ: mã 2" rc_is 2
+
 echo
 echo "PASS $PASS/$((PASS + FAIL))"
 [ "$FAIL" -eq 0 ]

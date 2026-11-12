@@ -186,6 +186,36 @@ def part_env(data: Path, project: Path, web: int, proxy: int) -> dict:
     return env
 
 
+RENDER_KEYS = ("STUDIO_RENDER_MODE", "STUDIO_RENDER_RENDERER", "STUDIO_RENDER_REASON", "PLAYWRIGHT_CHROME")
+
+
+def render_probe(env: dict, project: Path) -> dict:
+    """GPU or software for the worker's pages (specs/019): one run of tools/render/probe.mjs at start."""
+    e = {k: v for k, v in env.items() if k not in RENDER_KEYS}
+    e["STUDIO_LIB"] = str(project / "lib" / "lemo-opuscar")
+    try:
+        p = subprocess.run(["node", str(project / "tools" / "render" / "probe.mjs")], env=e, capture_output=True,
+                           text=True, timeout=60)
+        return json.loads(p.stdout.strip().splitlines()[-1])
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError) as ex:
+        return {"mode": "software", "renderer": None, "reason": f"probe failed: {ex}", "fix": None, "source": "auto",
+                "chrome": None}
+
+
+def apply_render(env: dict, r: dict) -> dict:
+    """Export the probe result to the parts' env; the worker forwards it to jobs (worker.py LocalRunner)."""
+    for k in RENDER_KEYS:
+        env.pop(k, None)
+    env["STUDIO_RENDER_MODE"] = r.get("mode") or "software"
+    if r.get("renderer"):
+        env["STUDIO_RENDER_RENDERER"] = r["renderer"]
+    if r.get("reason"):
+        env["STUDIO_RENDER_REASON"] = r["reason"]
+    if r.get("mode") == "gpu" and r.get("chrome"):
+        env["PLAYWRIGHT_CHROME"] = r["chrome"]
+    return env
+
+
 def sandbox_available() -> bool:
     """The agent's Bash can run in an OS sandbox (specs/016 R5): Seatbelt on macOS, bubblewrap and socat on Linux."""
     if sys.platform == "darwin":
@@ -219,9 +249,13 @@ def supervise(data: Path, web: int, proxy: int, project: Path = PROJECT, held=No
         raise HostError("another studio is running on this data folder", 0)
     log = _logger(data, "host")
     env = part_env(data, project, web, proxy)
+    render = render_probe(env, project)
+    apply_render(env, render)
+    log.info("render: %s · %s", render.get("mode"), render.get("renderer") or render.get("reason"))
     procs, starts, stopping = {}, {p: [] for p in PARTS}, threading.Event()
     state = {"pid": os.getpid(), "data": str(data), "project": str(project), "web": web, "proxy": proxy,
-             "started": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "children": {}, "error": None}
+             "started": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "children": {}, "error": None,
+             "render": render}
 
     def save():
         state["children"] = {p: procs[p].pid for p in procs}
@@ -345,7 +379,8 @@ def status(data=None) -> dict:
     out = {"running": up, "data": str(data), "logs": str(data / "logs")}
     if up:
         out.update(url=f"http://127.0.0.1:{st['web']}", web=st["web"], proxy=st["proxy"],
-                   parts={p: alive(pid) for p, pid in (st.get("children") or {}).items()}, started=st["started"])
+                   parts={p: alive(pid) for p, pid in (st.get("children") or {}).items()}, started=st["started"],
+                   render=st.get("render"))
         out.update(_job_counts(data))
     return out
 

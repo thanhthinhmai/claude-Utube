@@ -98,7 +98,11 @@ class LocalRunner:
             link.parent.mkdir(parents=True, exist_ok=True)
             if not link.is_symlink():
                 link.symlink_to(target, target_is_directory=True)
-        base = {k: os.environ[k] for k in ("PATH", "LANG", "LC_ALL", "TZ", "STUDIO_CLAUDE_BIN") if k in os.environ}
+        keep = ("PATH", "LANG", "LC_ALL", "TZ", "STUDIO_CLAUDE_BIN",
+                # specs/019: how pages are rendered, and what a GPU browser needs (display, WSL GPU libraries)
+                "STUDIO_RENDER_MODE", "STUDIO_RENDER_RENDERER", "STUDIO_RENDER_REASON", "PLAYWRIGHT_CHROME", "PLAYWRIGHT_BROWSERS_PATH",
+                "DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "LD_LIBRARY_PATH", "GALLIUM_DRIVER")
+        base = {k: os.environ[k] for k in keep if k in os.environ}
         env = {**base, **env, "STUDIO_WORK": str(work), "HOME": str(work / ".home"),
                "STUDIO_HOME_DIR": str(self.studio)}            # what /studio is in a container: this checkout
         with open(work / ".agent.log", "ab") as out:       # the child keeps its own copy of the file

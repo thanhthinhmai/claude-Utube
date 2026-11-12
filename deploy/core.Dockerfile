@@ -44,9 +44,13 @@ RUN sh bin/studio setup || true \
     && rm -f lib/lemo-opuscar/core/tts/*.onnx lib/lemo-opuscar/core/tts/*.bin \
     && rm -rf /home/studio/.cache/huggingface /home/studio/.cache/pip /home/studio/.cache/uv /home/studio/.npm
 
-# System libraries Chromium needs
+# The full Chromium too: on WSL2 the GPU is reachable only from a headful browser on the WSLg display (specs/019 R1, R9)
+RUN cd lib/lemo-opuscar && node node_modules/playwright-core/cli.js install chromium
+
+# System libraries Chromium needs (both builds), and Mesa's d3d12 driver for WSLg (installed at build time only)
 USER root
-RUN cd lib/lemo-opuscar && node node_modules/playwright-core/cli.js install-deps chromium-headless-shell \
+RUN cd lib/lemo-opuscar && node node_modules/playwright-core/cli.js install-deps chromium-headless-shell chromium \
+    && apt-get update && apt-get install -y --no-install-recommends libgl1-mesa-dri libegl-mesa0 \
     && rm -rf /var/lib/apt/lists/*
 
 USER studio

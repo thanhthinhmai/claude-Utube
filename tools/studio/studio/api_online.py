@@ -1188,7 +1188,10 @@ def worker_status(request: Request):
         latest.append({"id": j["id"], "status": jobs.shown_status(j), "kind": j["kind"], "name": j["name"],
                        "email": email, "step": j.get("step"), "updated_at": j.get("updated_at"),
                        "error": err_text[:300] if err_text else None})
-    return {"workers": workers, "latest": latest,
+    mode = os.environ.get("STUDIO_RENDER_MODE")      # specs/019: set by the desktop host for every part
+    render = {"mode": mode, "renderer": os.environ.get("STUDIO_RENDER_RENDERER"),
+              "reason": os.environ.get("STUDIO_RENDER_REASON")} if mode else None
+    return {"workers": workers, "latest": latest, "render": render,
             "counts": {"queued": max(0, n.get("queued", 0) - waiting_claude), "running": n.get("running", 0),
                        "waiting_review": n.get("waiting_review", 0), "waiting_claude": waiting_claude}}
 
