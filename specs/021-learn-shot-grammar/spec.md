@@ -112,7 +112,7 @@ Học xong, xưởng làm một phim mẫu ngắn theo đúng phong cách vừa 
 - **Thẻ chữ, đồ hoạ phẳng, hình chèn dữ liệu**: nhãn "chèn"; không tính vào tỉ lệ cỡ cảnh và góc máy, nhưng đếm riêng.
 - **Cảnh rất ngắn** (dưới 0,5 s, chớp sáng): không gán nhãn; đếm riêng.
 - **Video dọc và video ngang lẫn lộn**: số đo tách theo định dạng, như số đo hiện có.
-- **Cảnh có chuyển máy đổi cỡ trong cảnh** (đẩy máy mạnh): nhãn theo khung giữa cảnh; ghi thêm cỡ ở đầu và cuối cảnh nếu chúng khác nhau.
+- **Cảnh có chuyển máy trong cảnh** (đẩy máy): nhãn theo khung giữa cảnh. Phong cách này đẩy máy chậm (10–15% trong 2 s), hiếm khi đổi cỡ trong một cảnh, nên không ghi cỡ đầu và cuối cảnh (đổi ngày 2026-11-13, sau bước phân tích).
 - **Phim cố ý mờ hết một cảnh** (giấc mơ, mất ý thức): người làm phim đánh dấu ngoại lệ cho cảnh đó (specs/020 FR-015).
 - **Video tham chiếu bị chặn tải**: theo cách hiện có của style-learn (người dùng đặt file vào thư mục tham chiếu).
 

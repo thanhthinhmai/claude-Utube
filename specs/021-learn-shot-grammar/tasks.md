@@ -37,7 +37,7 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
   - ảnh có dải đen 12% trên dưới và một dòng chữ trắng ở dải phụ đề trên nền mờ → dải đen bị bỏ, chữ không tính là nét;
   - mỗi ảnh ≤ 0,15 s.
 - [ ] T005 Tạo `tools/filmcheck/labeler.py` theo mẫu `editor.run` (research R3):
-  - prompt hệ thống `SYSTEM` (có chữ "shot labeler", định nghĩa cỡ cảnh và góc máy như R3, dặn chỉ xem các ảnh được đưa và không đoán ý đồ);
+  - prompt hệ thống `SYSTEM` (có chữ "shot labeler", định nghĩa cỡ cảnh và góc máy như R3; cảnh không có người thì xếp cỡ theo chủ thể được lấy nét, không rõ thì `unknown`; dặn chỉ xem các ảnh được đưa và không đoán ý đồ);
   - `SCHEMA`: `{shots: [{id, scale, angle, foreground_blur, confidence}]}` với enum như data-model;
   - lệnh: `claude -p --tools Read --allowedTools Read --json-schema … --output-format json --no-session-persistence` cùng `editor.model_args()` (Opus); môi trường online giống `editor.run`;
   - `label(sheets: [path], ids: [str], hints: {id: {focused_share, sharpest_at}}) -> {labels: {id: {...}}, model, usage}`; tối đa 4 bảng ảnh mỗi lần gọi; câu trả lời sai schema hoặc thiếu mã thì hỏi lại một lần, sai nữa thì `LabelError`;
@@ -91,7 +91,7 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
   - lệnh `shots <set> [--only]`: gọi `sl/shots.py` cho từng video đã đo; in số cảnh và số cắt mỗi phút, ngoài 16–26 thì in `!` (contracts/cli.md); làm tiếp khi chạy lại;
   - lệnh `label <set> [--pass 2 --sample N] [--set vNN:Sxxx key=value …]`: gọi `filmcheck.labeler` (thêm `tools/` vào `sys.path`); ghi nhãn, `contradicts` thành `check: true` và in ra; `--pass 2` ghi `labels-pass2.json` và `agreement.json` (data-model "AgreementReport"; thứ tự bậc ecu < cu < med < wide < huge).
 - [ ] T012 [US1] Sửa `tools/style-learn/sl/summary.py`: tính `shot_grammar` cho mỗi video từ `shots.json` (data-model "ShotGrammar"; chỉ tính cảnh có nhãn, không `insert`/`short`/`unknown`), rồi cho cả bộ theo định dạng (trung vị và khoảng giữa các video); thêm vào `summary.md` một bảng "Shot grammar".
-- [ ] T013 [US1] Sửa `bin/studio` (lệnh `learn`) chỉ khi cần cho lệnh mới (lệnh `learn` hiện chuyển thẳng cho `learn.py`, nên có thể không cần sửa), và thêm hai lệnh vào phần trợ giúp đầu file.
+- [ ] T013 [US1] Kiểm `sh bin/studio learn shots|label <set>` chạy được qua `bin/studio` (lệnh `learn` chuyển thẳng cho `learn.py`); thêm `shots|label` vào dòng `learn <lệnh>` ở phần trợ giúp đầu `bin/studio`.
 
 **Checkpoint**: `sh tests/learn/run.sh` đạt. Commit.
 
@@ -119,7 +119,7 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
   - khi lưu, giữ `DEMO.md`, `demo/`, `test.jpg`, `test.mp4` và `demo-checks.json` đã có trong phong cách (học lại không làm mất phim mẫu).
 - [ ] T016 [US2] Sửa `tools/filmcheck/stylerefs.py`: đọc `my-styles/<slug>/shots.json` vào khoá `shot_grammar` (giữ nguyên dạng lồng), và `has_shot_grammar(refs)`. Thêm test vào `tests/filmcheck/test_stylerefs.py`.
 - [ ] T017 [US2] Sửa `tools/style-learn/learn.py`: thêm cờ `--update` cho `save`.
-- [ ] T018 [US2] Chạy thật: `sh bin/studio learn fetch dusk-hypothetical-2 --channel <kênh trong channels/dusk-hypothetical/references.json> --count 10` (người dùng xác nhận quyền dùng như lời nhắc của `fetch`), rồi `measure`, `shots`. Ghi thời gian từng bước. Kiểm số cắt mỗi phút với khoảng 16–26.
+- [ ] T018 [US2] Chạy thật: `sh bin/studio learn fetch dusk-hypothetical-2 --channel <kênh trong channels/dusk-hypothetical/references.json> --count 10` (người dùng xác nhận quyền dùng như lời nhắc của `fetch`), rồi `measure`, `shots`. Ghi thời gian từng bước. Lấy thời gian các bước của lần học `dusk-hypothetical` trước (2026-11-12) từ sổ việc `.studio/jobs` để so cho SC-003; không còn thì ghi "không có số so" và chỉ báo thời gian lần này. Kiểm số cắt mỗi phút với khoảng 16–26.
 - [ ] T019 [US2] Chạy thật: `learn label dusk-hypothetical-2`; xem các cảnh `check` trên bảng ảnh và sửa bằng `--set` nếu sai; rồi `learn label … --pass 2 --sample 40` (SC-001). Mở bằng mắt ít nhất 2 bảng ảnh có nhãn.
 - [ ] T020 [US2] Chốt hai ngưỡng trên dữ liệu thật:
   - `FOCUS_T`: giá trị lớn nhất mà ít nhất 95% khung tham chiếu có ít nhất một ô nét;
@@ -157,7 +157,8 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
   - cảnh báo `style_scale_cu`, `style_angle_eye`, `style_same_scale_run` (kèm đủ 6 mã cảnh);
   - chạy lại khi nguồn không đổi → `labels: reused` (`claude` giả không bị gọi lần hai);
   - không có `shots.json` → `skipped` có "shot grammar";
-  - `claude` giả lỗi → cảnh báo `shot_grammar_unchecked`.
+  - `claude` giả lỗi → cảnh báo `shot_grammar_unchecked`;
+  - đếm cảnh tốt bị báo nhầm (`blurred` hay cảnh báo có mã cảnh ngoài các cảnh đã cài): ≤ 1 (SC-005).
 
 ### Implementation
 
@@ -187,7 +188,7 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
 
 **Independent Test**: `sh my-styles/dusk-hypothetical/demo/build.sh` dựng lại phim 15–30 s đúng số khung; phim đạt tầng 1–4 và phần so cách quay.
 
-- [ ] T028 [US4] Làm phim mẫu `films/dusk-demo/` theo luồng làm phim của `CLAUDE.md` (Brief → Treatment → kịch bản được chấm → giọng của kênh → các tầng 0–4 của specs/020 → render → qc), câu chuyện riêng của xưởng (không giống kênh tham chiếu, không giống `pet-swap` hay `pause-time`), 15–30 s. Bảng cảnh lập theo `shots.json` của phong cách (tỉ lệ cỡ cảnh, góc máy, đổi cỡ giữa hai cảnh liền nhau, chủ thể nét).
+- [ ] T028 [US4] Làm phim mẫu `films/dusk-demo/` theo luồng làm phim của `CLAUDE.md` (Brief → Treatment → kịch bản được chấm → giọng của kênh → các tầng 0–4 của specs/020 → render → qc), câu chuyện riêng của xưởng (không giống kênh tham chiếu, không giống `pet-swap` hay `pause-time`), 15–30 s. Phim mẫu không đăng lên kênh, nên bỏ bước gói đăng (3a) và không gắn đề của hàng đợi. Bảng cảnh lập theo `shots.json` của phong cách (tỉ lệ cỡ cảnh, góc máy, đổi cỡ giữa hai cảnh liền nhau, chủ thể nét).
 - [ ] T029 [US4] Đạt `qc shots` không có cảnh báo cách quay nào ngoài khoảng, và không có `blurred` nào ngoài ngoại lệ có lý do; đạt `qc plan` và `qc` (SC-008). Xem phim bằng mắt.
 - [ ] T030 [US4] Lưu phim mẫu vào `my-styles/dusk-hypothetical/` theo bước 5 của `lib/lemo-opuscar/MY-STYLES.md`:
   - `demo/` có mã nguồn, `CREDITS` (kèm giấy phép MIT của mã chép từ thư viện) và `build.sh` (`LIB=<đường dẫn>` ở đầu, ghi ra `${OUT:-…}` ngoài `demo/`); chạy thử từ thư mục đã lưu với `OUT` tạm, rồi kiểm `demo/` không có file mới;
@@ -236,5 +237,5 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
 ## Implementation Strategy
 
 1. **MVP** = Phase 1–3: đo độ nét, gán nhãn, tách cảnh, hồ sơ cách quay trên video thử. Dừng và kiểm.
-2. US2 (học lại thật, có tải video và tốn lượt Claude): báo người dùng thời gian và số lượt trước khi chạy T018.
+2. US2 (học lại thật, có tải video và tốn lượt Claude): dừng, báo người dùng thời gian và số lượt Claude ước tính, chờ đồng ý rồi mới chạy T018. Làm như vậy trước T027 và T028.
 3. US3, rồi US4 (phim mẫu thật). Mỗi phần xong thì chạy test và commit.
