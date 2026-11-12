@@ -14,6 +14,8 @@
 
 - Q: Cỡ cảnh và góc máy được gán nhãn bằng cách nào? → A: Claude xem bảng ảnh và gán nhãn từng cảnh, mỗi nhãn kèm ô bảng ảnh làm bằng chứng; công cụ đo độ nét và kích thước vùng nét để kiểm chéo. Phim được gán nhãn cùng cách khi kiểm hình (FR-002, FR-010).
 - Q: "Khung mờ" (không vùng nào nét) chặn render hay chỉ cảnh báo? → A: Chặn, như khung phẳng hay quá tối; cảnh cố ý mờ thì đánh dấu ngoại lệ kèm lý do (FR-011).
+- Q: Khi kiểm một phim, ai gán nhãn cỡ cảnh và góc máy cho các cảnh của phim? → A: Một lượt Claude riêng, độc lập với người làm phim (như người biên tập kịch bản của specs/010), chỉ xem bảng ảnh; kết quả lưu theo nguồn phim, nguồn không đổi thì dùng lại (FR-010).
+- Q: Bộ nhãn chuẩn để đo SC-001 do ai làm? → A: Một lượt Claude thứ hai, độc lập, gán nhãn cùng 40 cảnh; SC-001 đo độ nhất quán giữa hai lượt (không đo độ đúng so với người). Độ đúng được kiểm trên phim thử có nhãn biết trước (SC-005).
 - Q: Phong cách học được có cần phim mẫu như phong cách thư viện không? → A: Có, thêm vào tính năng này: phong cách học được có `DEMO.md`, mã nguồn phim mẫu dựng lại được bằng một lệnh, và phim cùng ảnh đại diện, như phong cách thư viện và hướng dẫn "My styles" của thư viện (US4).
 
 ## Bối cảnh
@@ -135,7 +137,7 @@ Học xong, xưởng làm một phim mẫu ngắn theo đúng phong cách vừa 
 
 **Kiểm phim (story 3)**
 
-- **FR-010**: Kiểm hình theo cảnh (`qc shots`) PHẢI gán cho mỗi cảnh của phim cùng loại nhãn như FR-001, bằng cùng cách đo.
+- **FR-010**: Kiểm hình theo cảnh (`qc shots`) PHẢI gán cho mỗi cảnh của phim cùng loại nhãn như FR-001, bằng cùng cách đo. Cỡ cảnh và góc máy của phim do một lượt Claude riêng gán, độc lập với Claude đang làm phim (không thấy kịch bản hay ý định của phim, chỉ thấy bảng ảnh), như người biên tập kịch bản của specs/010. Nhãn được lưu cùng dấu vân tay nguồn phim; nguồn không đổi thì dùng lại, không gọi lại. Không gọi được lượt Claude riêng thì phần so cỡ cảnh và góc máy được báo "chưa kiểm" (độ nét vẫn kiểm), không coi là đạt.
 - **FR-011**: Mỗi cảnh không có vùng nào nét (phần khung nét dưới ngưỡng) PHẢI bị báo "khung mờ", kèm mã cảnh và số đo. Đây là lỗi khung: nó chặn render như khung phẳng hay quá tối (specs/020 FR-009); cảnh cố ý mờ thì đánh dấu ngoại lệ kèm lý do (specs/020 FR-015).
 - **FR-012**: Khi phong cách có số đo cách quay, kiểm hình PHẢI so tỉ lệ từng cỡ cảnh, từng góc máy, tỉ lệ đổi cỡ giữa hai cảnh liền nhau, chuỗi cùng cỡ dài nhất, trung vị phần khung nét và bối cảnh nhiều nhất với khoảng của phong cách. Lệch là cảnh báo (như specs/020 FR-013), kèm số đo, khoảng, và mã các cảnh liên quan.
 - **FR-013**: Phong cách không có số đo cách quay thì kiểm hình PHẢI báo "bỏ qua so cách quay".
@@ -159,7 +161,7 @@ Học xong, xưởng làm một phim mẫu ngắn theo đúng phong cách vừa 
 
 ### Measurable Outcomes
 
-- **SC-001**: Trên một bộ 40 cảnh mà người dùng đã gán nhãn bằng tay (lấy từ video tham chiếu), nhãn cỡ cảnh của xưởng trùng nhãn của người dùng ở ít nhất 80% số cảnh, và lệch không quá một bậc ở ít nhất 95%. Góc máy trùng ở ít nhất 80%.
+- **SC-001**: Trên 40 cảnh lấy từ video tham chiếu, hai lượt gán nhãn độc lập (không thấy nhãn của nhau) cho cùng cỡ cảnh ở ít nhất 80% số cảnh và lệch không quá một bậc ở ít nhất 95%; cùng góc máy ở ít nhất 80%. Đây là độ nhất quán, không phải độ đúng so với người.
 - **SC-002**: Phép đo độ nét phân biệt được: trên `pet-swap`, ít nhất 120/192 khung bị xếp "không vùng nào nét"; trên khung mẫu đã duyệt của phong cách, phần khung nét ít nhất 0,5.
 - **SC-003**: Học lại `dusk-hypothetical` (10 video, như lần học trước) xong trong không quá 1,5 lần thời gian của lần học trước.
 - **SC-004**: Sau khi học lại, phong cách có đủ các số của FR-005 kèm khung bằng chứng, và mọi dòng nhật ký sửa cũ còn nguyên.
@@ -175,3 +177,5 @@ Học xong, xưởng làm một phim mẫu ngắn theo đúng phong cách vừa 
 - Ngưỡng "nét" và "không vùng nào nét" được chốt ở bước plan, dựa trên số đo của chính video tham chiếu, rồi dùng chung cho video tham chiếu và phim.
 - Tầng kiểm của specs/020 là nơi so phim; các lệch phân bố là cảnh báo cần lý do (như specs/020), không chặn render.
 - Bảng ảnh, nhãn và vài khung bằng chứng được giữ lại cùng phong cách; video thì không.
+- Phim mẫu có lời đọc bằng giọng và tốc độ của kênh (Dusk Hypothetical: người dẫn chuyện nói liên tục), đi đủ luồng làm phim của xưởng (kịch bản được chấm, các tầng kiểm của specs/020).
+- Lượt Claude gán nhãn (khi học và khi kiểm phim) dùng Opus, như mọi lượt gọi Claude khác của xưởng.
