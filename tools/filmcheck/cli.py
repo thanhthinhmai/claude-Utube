@@ -681,6 +681,69 @@ def cmd_qc_plan(a) -> int:
     return 0 if r["pass"] else 1
 
 
+def cmd_qc_shots(a) -> int:
+    from filmcheck import shotcheck
+    d = film_dir(a.film)
+    try:
+        r = shotcheck.run(d, lib_dir(), say=(lambda x: None) if a.json else print)
+    except shotcheck.ShotError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    blk = [i for i in r["issues"] if i["severity"] == "block" and not i.get("excepted")]
+    wrn = [i for i in r["issues"] if i["severity"] == "warn"]
+    m = r["measures"]
+    lines = tier_lines(r, d.name)
+    lines.append(f"  luma {m['luma_p50']:.2f} · saturation {m['saturation_p50']:.2f} · {m['cuts_per_min']} cuts/min"
+                 + (f" · style from {m['style_source']}" if m.get("style_source") else ""))
+    acc = (r.get("style_accept") or {}).get("reason")
+    lines.append(f"{'✓' if r['pass'] else '✗'} shots: {len(blk)} frame problem(s) · {len(wrn)} style warning(s)"
+                 + (f" (accepted: {acc})" if acc and wrn else "")
+                 + (f" · sheet {m['sheets'][0]}" if m.get("sheets") else "") + f" · {r['seconds']:.0f} s")
+    out(a, r, lines)
+    return 0 if r["pass"] else 1
+
+
+def cmd_qc_accept_style(a) -> int:
+    from filmcheck import shotcheck, tiers
+    d = film_dir(a.film)
+    try:
+        shotcheck.accept_style(d, a.reason)
+    except tiers.TierError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    print(f"✓ style warnings accepted: {a.reason.strip()}")
+    return 0
+
+
+def cmd_qc_except(a) -> int:
+    from filmcheck import tiers
+    d = film_dir(a.film)
+    if a.list or not a.shot:
+        for e in tiers.load_exceptions(d):
+            print(f"  {e['shot']} {e['rule']} — {e['reason']} ({e.get('at', '')})")
+        return 0
+    if not a.rule:
+        print("✗ usage: qc except <film> <shot> <rule> --reason \"…\" | --remove", file=sys.stderr)
+        return 2
+    try:
+        if a.remove:
+            if not tiers.remove_exception(d, a.shot, a.rule):
+                print(f"✗ no exception for {a.shot} {a.rule}", file=sys.stderr)
+                return 2
+            print(f"✓ removed: {a.shot} {a.rule}")
+        else:
+            tiers.add_exception(d, a.shot, a.rule, a.reason)
+            print(f"✓ exception: {a.shot} {a.rule} — {a.reason.strip()}")
+    except tiers.TierError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    t = tiers.recompute(d).get("tiers") or {}
+    for k in ("plan", "shots"):
+        if t.get(k):
+            print(f"  {k}: {'pass' if t[k]['pass'] else 'fail'}")
+    return 0
+
+
 def cmd_render_gate(a) -> int:
     from filmcheck import tiers
     d = film_dir(a.film)
@@ -729,6 +792,19 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("qc-plan", help="tier 1: check the plan before rendering (specs/020)")
     s.add_argument("film")
     s.add_argument("--json", action="store_true")
+    s = sub.add_parser("qc-shots", help="tier 2: one frame per shot, frame faults and the style (specs/020)")
+    s.add_argument("film")
+    s.add_argument("--json", action="store_true")
+    s = sub.add_parser("qc-accept-style", help="accept the style warnings with a reason (specs/020)")
+    s.add_argument("film")
+    s.add_argument("--reason", default="")
+    s = sub.add_parser("qc-except", help="mark one shot as an exception to one rule (specs/020)")
+    s.add_argument("film")
+    s.add_argument("shot", nargs="?")
+    s.add_argument("rule", nargs="?")
+    s.add_argument("--reason", default="")
+    s.add_argument("--list", action="store_true")
+    s.add_argument("--remove", action="store_true")
     s = sub.add_parser("render-gate", help="may this film be rendered? (specs/020)")
     s.add_argument("film")
     s.add_argument("--skip-checks", default=None)
@@ -842,6 +918,8 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("script", "skip"): cmd_skip, ("web", "fetch"): cmd_fetch, ("config", "editor-model"): cmd_editor_model, ("config", "render"): cmd_render_setting,
             ("qc", "qc"): cmd_qc, ("publish", "publish"): cmd_publish,
             ("qc-plan", "qc-plan"): cmd_qc_plan, ("render-gate", "render-gate"): cmd_render_gate,
+            ("qc-shots", "qc-shots"): cmd_qc_shots, ("qc-accept-style", "qc-accept-style"): cmd_qc_accept_style,
+            ("qc-except", "qc-except"): cmd_qc_except,
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach,

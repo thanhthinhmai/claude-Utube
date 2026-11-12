@@ -251,6 +251,8 @@ def line(i: dict) -> str:
     at = f"{i['at']:.2f} s" if isinstance(i.get("at"), (int, float)) else ""
     if i["rule"] == "cut_in_sentence":
         what = f"the sentence ends {i['measure']} s later"
+    elif isinstance(i.get("limit"), str):                 # a range (style warnings)
+        what = f"{i['measure']} outside {i['limit']}"
     else:
         cmp_ = {"silence": ">", "tail": ">", "shot_long": ">", "pause_in_para": "≥", "pause_in_line": "≥",
                 "tail_mismatch": ">"}.get(i["rule"], "<")

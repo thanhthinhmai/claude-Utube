@@ -156,7 +156,18 @@ def picture(mp4: Path, still_max: float, want_cuts: bool) -> tuple:
 def style_slug(d: Path):
     t = d / "TREATMENT.md"
     if t.is_file():
-        m = re.search(r"^\s*Style:\s*`?([\w-]+)`?", t.read_text(encoding="utf-8"), re.M | re.I)
+        txt = t.read_text(encoding="utf-8")
+        m = re.search(r"^\s*Style:\s*`?([\w-]+)`?", txt, re.M | re.I)
+        if m:
+            return m.group(1)
+    try:                                         # the channel snapshot (specs/012) names the film's style
+        st = json.loads((d / "channel.json").read_text(encoding="utf-8")).get("film", {}).get("style")
+        if st:
+            return st
+    except (OSError, ValueError, AttributeError):
+        pass
+    if t.is_file():
+        m = re.search(r"\bstyle\s+`([\w-]+)`", txt, re.I)
         if m:
             return m.group(1)
     work = Path(os.environ.get("STUDIO_WORK", "/work"))

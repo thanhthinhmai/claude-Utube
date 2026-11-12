@@ -129,31 +129,31 @@ description: "Tasks for 020 — QC per shot before render"
 
 ### Tests
 
-- [ ] T021 [P] [US2] Tạo `tests/filmcheck/test_shots.py`:
+- [X] T021 [P] [US2] Tạo `tests/filmcheck/test_shots.py`:
   - phim `shots-6` (2D canvas, sinh bằng `make_tier_film`): một cảnh một màu, một cảnh quá tối, một cảnh cháy, một chữ thiếu phông (U+E000), một thẻ đè vùng phụ đề lúc có phụ đề, cả phim tối hơn khoảng `luma_p50` của một `qc.json` thử; thêm 30 cảnh tốt và 1 thẻ chữ tối trơn hợp lệ (US2 AC4);
   - kỳ vọng: đủ 6 lỗi, ≤ 1 báo nhầm, có `.check/shots/sheet-1.jpg`, thẻ chữ hợp lệ không bị `flat`.
   
   Phần chấm (`shotcheck.score`) được test thêm bằng số đo giả, không cần trình duyệt.
-- [ ] T022 [P] [US2] Tạo `tests/filmcheck/test_stylerefs.py`:
+- [X] T022 [P] [US2] Tạo `tests/filmcheck/test_stylerefs.py`:
   - đọc `my-styles/dusk-hypothetical/EVIDENCE.md` → `luma_p50 [0.198, 0.299]`, `saturation_p50 [0.319, 0.504]`, `cuts_per_min [16, 26]`, `loudness_range [2.4, 3.3]`;
   - `qc.json` ghi đè từng khoá;
   - phong cách không có số đo → `{}`, kèm "bỏ qua so phong cách".
 
 ### Implementation
 
-- [ ] T023 [P] [US2] Tạo `tools/filmcheck/stylerefs.py`: `load(film_dir) -> dict` theo research R6 và mục Style references của data-model.
+- [X] T023 [P] [US2] Tạo `tools/filmcheck/stylerefs.py`: `load(film_dir) -> dict` theo research R6 và mục Style references của data-model.
   - slug lấy từ `qc.style_slug`;
   - khoảng `a–b` đọc từ bảng "Key numbers" của `my-styles/<slug>/EVIDENCE.md` (chấp nhận `–`, `-`, `to`, dấu `−`);
   - `my-styles/<slug>/qc.json` ghi đè.
 
   Sửa `qc.still_limit` để dùng `stylerefs.load(d).get("still_max")`.
-- [ ] T024 [US2] Tạo `tools/filmcheck/shots.mjs` (`@ts-check`, chạy bằng trình duyệt của `render_env` như `record.mjs`, ở 960×540):
+- [X] T024 [US2] Tạo `tools/filmcheck/shots.mjs` (`@ts-check`, chạy bằng trình duyệt của `render_env` như `record.mjs`, ở 960×540):
   - với mỗi cảnh: `render((t0+t1)/2)`; cảnh có thẻ trong `CARDS` thì thêm ảnh ở giữa khoảng thẻ;
   - chụp `.check/shots/<id>.jpg` và đọc `TEXTS(t)`;
   - đo trong trang bằng canvas: dải letterbox (hàng có độ sáng < 0,03 và độ lệch < 0,01), tỉ lệ màu nhiều nhất sau lượng tử 4 bit (bỏ hộp chữ và letterbox), độ lệch chuẩn độ sáng, `luma_p50`, `saturation_p50`, tỉ lệ điểm > 0,98, tỉ lệ diện tích chữ;
   - vẽ bảng ảnh (6 cột, ≤ 48 ô mỗi tấm, nhãn mã cảnh, viền đỏ cho cảnh mà Python báo lỗi qua tham số `--mark`) vào `.check/shots/sheet-<n>.jpg`;
   - in JSON `{mode, renderer, frames: [...]}`.
-- [ ] T025 [US2] Tạo `tools/filmcheck/shotcheck.py`:
+- [X] T025 [US2] Tạo `tools/filmcheck/shotcheck.py`:
   - `score(frames, cues, style) -> issues` theo bảng "shots" của `contracts/checks.md`:
     - `flat`: > 0,60 hoặc độ lệch < 0,04, và không có chữ chiếm ≥ 2% khung;
     - `dark`: p50 < `dark_p50` (mặc định 0,04);
@@ -162,11 +162,11 @@ description: "Tasks for 020 — QC per shot before render"
     - `missing_glyph`: dùng `qc.missing_glyphs` trên chữ `TEXTS` và phụ đề.
   - So phong cách (`warn`): trung vị theo trọng số độ dài cảnh của `luma_p50` và `saturation_p50`, và số cắt mỗi phút (bỏ khi phim < 30 s). Không có số đo thì ghi `skipped: "style: no measurements"`.
   - `run()`: in thời gian ước tính trước (≈ 0,4 s mỗi ảnh khi GPU, 1 s khi phần mềm); gọi `shots.mjs` hai lượt (đo, rồi vẽ bảng ảnh có đánh dấu); áp ngoại lệ; `tiers.save_tier(…, "shots", …)`.
-- [ ] T026 [US2] Sửa `tools/filmcheck/cli.py`:
+- [X] T026 [US2] Sửa `tools/filmcheck/cli.py`:
   - thêm `cmd_qc_shots`, `cmd_qc_accept_style` và `cmd_qc_except` (`--list`, `--remove`) theo `contracts/cli.md`. `accept-style` ghi `tiers.shots.style_accept` và từ chối (mã 2) khi lý do rỗng hoặc không có cảnh báo. `except` tính lại `pass` của tầng `plan` và `shots` từ issues đã lưu;
   - mở rộng `render-gate`: lỗi `block` của `shots` đã sửa hoặc có ngoại lệ, cùng dấu vân tay, và mọi `warn` có `style_accept.reason`.
-- [ ] T027 [US2] Sửa `cmd_filmcheck` trong `bin/studio`: gọi `render_env` cho `qc shots` (và `qc plan`, vì nó mở trang). Hiện chỉ `qc` và `publish` có.
-- [ ] T028 [US2] Chạy thật `sh bin/studio qc shots pet-swap` với GPU:
+- [X] T027 [US2] Sửa `cmd_filmcheck` trong `bin/studio`: gọi `render_env` cho `qc shots` (và `qc plan`, vì nó mở trang). Hiện chỉ `qc` và `publish` có.
+- [X] T028 [US2] Chạy thật `sh bin/studio qc shots pet-swap` với GPU:
   - ≤ 3 phút (SC-003);
   - `style_luma` ≈ 0,13 ngoài 0,198–0,299, `style_saturation` ≈ 0,53 ngoài 0,319–0,504 (SC-004);
   - mở `sheet-1.jpg` bằng mắt;
