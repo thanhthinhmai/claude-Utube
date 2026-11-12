@@ -291,24 +291,24 @@ description: "Tasks for 020 — QC per shot before render"
 
 ## Phase 8: Polish & luồng làm phim
 
-- [ ] T048 [P] Sửa `CLAUDE.md`, luồng làm phim:
+- [X] T048 [P] Sửa `CLAUDE.md`, luồng làm phim:
   - bước 3 và mục Dựng hình theo thứ tự `voice asr` → `qc voice` → `qc plan` → `qc shots` → `render` → mux → `qc` → `publish`;
   - hợp đồng trang `SHOTS/CUES/CARDS/CLEAN`;
   - `qc except` và `accept-style`;
   - `--skip-checks` chỉ cho bản thử;
   - thêm lệnh vào mục Cấu trúc (FR-020).
-- [ ] T049 [P] Sửa `tools/runner/JOB.md` cùng thứ tự đó cho worker online, mỗi tầng một `job step` trong các bước sẵn có (`Voice`, `Picture`, `Render`, `Self-check`). Thay dòng "Self-check … `qc`" hiện tại.
-- [ ] T050 [P] Cho worker online và phần lõi của app dùng `small.en` (FR-002):
+- [X] T049 [P] Sửa `tools/runner/JOB.md` cùng thứ tự đó cho worker online, mỗi tầng một `job step` trong các bước sẵn có (`Voice`, `Picture`, `Render`, `Self-check`). Thay dòng "Self-check … `qc`" hiện tại.
+- [X] T050 [P] Cho worker online và phần lõi của app dùng `small.en` (FR-002):
   - đọc `deploy/job.Dockerfile`, `deploy/core.Dockerfile`, `desktop/core-build/build-linux.sh`, `build-mac.sh`, `smoke-core.sh`; chỗ nào tải trước hoặc gọi mô hình Whisper thì đổi sang mô hình của `tools/asr.json`;
   - `smoke-core.sh` thêm `--model small.en`;
   - chỗ nào không cần đổi thì ghi lý do vào commit;
   - kiểm `desktop/core-build/credits-check.py` không báo gì mới.
-- [ ] T051 [P] Hiện kết quả các tầng trên app (edge case "Chế độ online"):
+- [X] T051 [P] Hiện kết quả các tầng trên app (edge case "Chế độ online"):
   - `tools/studio/studio/resources.py` trả thêm `checks.json → tiers` (5 tầng: đạt hay không, số lỗi, số cảnh báo, ngoại lệ, thời điểm; tối đa 20 lỗi còn mở);
   - `tools/studio/studio/web/app.js` vẽ bảng "Checks by stage" trên trang phim và trang việc có `links.film`;
   - thêm test vào `tests/ui/` (API trả `tiers`; trang có bảng khi phim có `tiers`, không có bảng khi chưa có).
-- [ ] T052 Chạy đủ 5 bộ test của xưởng: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`. Thêm `sh tests/online/run.sh` nếu `JOB.md` đổi. Ghi kết quả.
-- [ ] T053 Kiểm SC-010: `git diff --stat main -- lib/` trống. Chạy kịch bản 11 của quickstart (phim qua tầng 1–3, mux, `qc` → 0 lỗi nhịp, SC-005). Đối chiếu từng SC-001 … SC-010 trong `quickstart.md`, ghi đạt, đạt một phần hoặc thất bại.
+- [X] T052 Chạy đủ 5 bộ test của xưởng: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`. Thêm `sh tests/online/run.sh` nếu `JOB.md` đổi. Ghi kết quả.
+- [X] T053 Kiểm SC-010: `git diff --stat main -- lib/` trống. Chạy kịch bản 11 của quickstart (phim qua tầng 1–3, mux, `qc` → 0 lỗi nhịp, SC-005). Đối chiếu từng SC-001 … SC-010 trong `quickstart.md`, ghi đạt, đạt một phần hoặc thất bại.
 
 ---
 

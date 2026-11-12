@@ -54,9 +54,27 @@ Report each stage with `job step` before you start it, using exactly these names
    placed, write `films/<name>/narration.json`; `cuts` are the seconds where the picture cuts (from your timeline):
    `{"words_file": "voices/words.json", "durations_file": "voices/dur.json", "lines_file": "lines.json",
      "lines": [{"id": "l01", "para": "P01", "at": 0.6}, …], "cuts": [0, 4.2, …]}`
-   (`words.json` and `dur.json` are what the library's `tts.py` and `asr_check.py` write; `lines_file` is the
-   `lines.json` you gave `tts.py`; `at` is the second the line starts in the final film). `qc` checks that the
-   voice lines say exactly the passed script.
+   (`words.json` and `dur.json` are what the library's `tts.py` and `sh STUDIO/bin/studio voice asr <name>` write;
+   `lines_file` is the `lines.json` you gave `tts.py`; `at` is the second the line starts in the final film). `qc`
+   checks that the voice lines say exactly the passed script.
+
+## The checks before rendering (every film, specs/020)
+
+Each fault comes with its shot or line id, the second, and how to fix it. Fix and run the same command again.
+
+- The page exports `window.SHOTS` (`[[t0, t1, set, shot id]]`, joined from 0 to `DUR`), and should export
+  `window.CARDS` (`[[t0, t1, id, text]]`) and `window.CUES` (or write `cues.json`), and draw no subtitle or card
+  when `window.CLEAN` is true.
+- **Voice step**, right after the voice is made: `sh STUDIO/bin/studio voice asr <name>` (the studio's speech model;
+  never call `asr_check.py` yourself), then `sh STUDIO/bin/studio qc voice <name>`. Redo only the lines it names.
+- **Picture step**, before any full render: `sh STUDIO/bin/studio qc plan <name>` (seconds; rhythm, shot lengths,
+  subtitles, cards), then `sh STUDIO/bin/studio qc shots <name>` (one frame per shot; look at
+  `.check/shots/sheet-1.jpg` once). A shot that is flat or dark on purpose:
+  `sh STUDIO/bin/studio qc except <name> <shot> <rule> --reason "…"`, one shot at a time. A style warning: fix it,
+  or accept it with `sh STUDIO/bin/studio qc accept-style <name> --reason "…"` when the brief asks for it.
+- **Render step:** `render` refuses to start until both checks pass, and stops at a chunk with black frames or a
+  still shot: fix that shot and run it again (the chunks before it are kept). Never use `--skip-checks` for the
+  delivered film.
 
 A changed version of a finished film ("Request changes"): copy the old film's SCRIPT.md, SOURCES.md, checks.json
 and `.check/` with the rest. Only when the note changes the narration, change the script as asked and run
@@ -117,7 +135,8 @@ file you write. It costs little: write it in one `Write`, run one command, fix a
 ## Finishing
 
 - Self-check against DIRECTOR.md §11 with one contact sheet and the loudness check, then
-  `sh STUDIO/bin/studio qc <name>` (narration rhythm, cuts, stills over 6 s, characters with no font): fix what it
+  `sh STUDIO/bin/studio qc <name>` (the same rhythm rules as `qc plan`, plus loudness range, sound against picture,
+  stills over 6 s, characters with no font): fix what it
   reports and run it again. Then the Publish step, then `job done <id> --film <name>`. The studio checks loudness (−14 ± 1 LUFS, true peak ≤ −1 dB), reading time, `qc` and
   the script's review again before delivery; a failure there gives you one round to fix it. After that fix and the
   new render, run `studio publish <name>` again before `job done`: the thumbnails come from the render.

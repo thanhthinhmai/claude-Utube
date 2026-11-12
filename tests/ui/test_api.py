@@ -81,6 +81,24 @@ class Api(unittest.TestCase):
         self.assertIn("00:00:00.000 --> 00:00:01.000", vtt)
         self.assertEqual(self.c.get("/api/v1/films/half-done/video").json()["error"]["code"], "not_found")
 
+    def test_film_tiers(self):  # specs/020 T051: the QC tiers on the film and job pages
+        import json
+        self.assertIsNone(self.c.get("/api/v1/films/demo-film").json()["tiers"])
+        bad = {"ref": "P27.2", "rule": "cut_in_sentence", "severity": "block", "measure": 0.6, "limit": 0.0,
+               "fix": "move the cut to ≥ 314.06 s", "excepted": None}
+        warn = {"ref": "film", "rule": "style_luma", "severity": "warn", "measure": 0.18, "limit": "0.198–0.299"}
+        (self.p.dir / "films" / "demo-film" / "checks.json").write_text(json.dumps({"tiers": {
+            "plan": {"pass": False, "at": "t", "issues": [bad]},
+            "shots": {"pass": True, "at": "t", "issues": [warn], "style_accept": {"reason": "night film"}}}}))
+        t = self.c.get("/api/v1/films/demo-film").json()["tiers"]
+        rows = {r["tier"]: r for r in t["rows"]}
+        self.assertEqual([r["tier"] for r in t["rows"]], ["voice", "plan", "shots", "render", "final"])
+        self.assertFalse(rows["voice"]["ran"])
+        self.assertEqual((rows["plan"]["pass"], rows["plan"]["problems"]), (False, 1))
+        self.assertEqual((rows["shots"]["warnings"], rows["shots"]["style_accepted"]), (1, "night film"))
+        self.assertEqual(t["open"][0]["ref"], "P27.2")
+        self.assertIn("tiersHtml(f.tiers)", (Path(__file__).resolve().parents[2] / "tools/studio/studio/web/app.js").read_text())
+
     def test_publish_pack(self):  # specs/011 contracts/api.md
         import io
         import json

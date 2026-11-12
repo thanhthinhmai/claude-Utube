@@ -469,6 +469,7 @@ async function pageJob(id) {
     <div class="panel"><p class="section-title">Current step</p><p style="font-size:16px;font-weight:600">${esc(j.step)}</p>
       ${pct !== null ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ""}</div>
     ${qualityHtml(j.qa)}
+    ${j.links.film ? `<div id="tiers-slot"></div>` : ""}
     ${j.lesson_draft ? `<p class="notice">A draft lesson (#${j.lesson_draft.n}) is waiting on the <a href="#/channels/${esc(j.lesson_draft.scope)}">channel page</a>: approve it there.</p>` : ""}
     ${j.status === "done" && j.links.film && j.qa && j.qa.publish ? `<div class="panel" id="publish"><p class="section-title">Publish</p><p class="muted">Loading…</p></div>` : ""}
     ${revs ? `<h2>Reviews</h2><ul class="reviews">${revs}</ul>` : ""}
@@ -484,6 +485,9 @@ async function pageJob(id) {
       ${links ? `<p class="section-title" style="margin-top:18px">Results</p><p style="display:grid;gap:4px;margin:0">${links.replaceAll(" · ", "")}</p>` : ""}
     </aside></div>`;
   if (j.status === "done" && j.links.film && j.qa && j.qa.publish) fillPublish(j.links.film, j.qa.publish);
+  if (j.links.film) get(`/films/${encodeURIComponent(j.links.film)}`).then((/** @type {any} */ f) => {
+    const slot = document.getElementById("tiers-slot"); if (slot) slot.innerHTML = tiersHtml(f.tiers);
+  }).catch(() => {});
   const sendAnswer = /** @type {HTMLButtonElement | null} */ (document.getElementById("send-answer"));
   if (sendAnswer) sendAnswer.onclick = async () => {
     const note = field("answer").value.trim(), msg = document.getElementById("answer-msg");
@@ -611,6 +615,22 @@ async function pageFilms() {
     : `<p class="panel muted">${MODE === "online" ? "No finished films yet." : "No films in the films/ folder yet."}</p>`}`;
 }
 
+const TIER = { voice: "Voice", plan: "Plan", shots: "Shots", render: "Render", final: "Final" };
+/** The film's QC tiers (specs/020): one row per stage, then the open problems. @param {any} t */
+function tiersHtml(t) {
+  if (!t) return "";
+  const rows = t.rows.map((/** @type {any} */ r) => `<tr><td>${esc(TIER[r.tier] || r.tier)}</td>${r.ran
+    ? `<td class="${r.pass ? "pass" : "fail"}">${r.pass ? "✓ pass" : "✗ not yet"}${r.skipped_checks ? ` · checks skipped: ${esc(r.skipped_checks)}` : ""}</td>
+       <td class="num">${r.problems}</td><td class="num">${r.warnings}${r.style_accepted ? ` <span class="muted">(accepted: ${esc(r.style_accepted)})</span>` : ""}</td>
+       <td class="num">${r.exceptions}</td>`
+    : `<td class="muted">not run</td><td></td><td></td><td></td>`}</tr>`).join("");
+  const open = t.open.map((/** @type {any} */ i) => `<li>${i.warn ? "!" : "✗"} ${esc(TIER[i.tier] || i.tier)} · ${esc(String(i.ref))} · ${esc(i.rule)} ${esc(String(i.measure))}
+    <span class="muted">(limit ${esc(String(i.limit))})</span>${i.fix ? ` → ${esc(i.fix)}` : ""}</li>`).join("");
+  return `<div class="panel" id="tiers" style="min-width:0"><p class="section-title">Checks by stage</p>
+    <div class="table-wrap" style="width:0;min-width:100%"><table><tr><th>Stage</th><th>Result</th><th>Problems</th><th>Warnings</th><th>Exceptions</th></tr>${rows}</table></div>
+    ${open ? `<ul class="plain" style="overflow-wrap:anywhere">${open}</ul>${t.open_total > t.open.length ? `<p class="muted">… ${t.open_total - t.open.length} more in CHECKS.md</p>` : ""}` : ""}</div>`;
+}
+
 async function pageFilm(name) {
   const f = await get(`/films/${encodeURIComponent(name)}`);
   const base = `${API}/films/${encodeURIComponent(name)}`;
@@ -621,6 +641,7 @@ async function pageFilm(name) {
       </video><p class="muted">Turn subtitles on or off with the player’s CC button.</p>
       ${MODE === "online" ? `<p><a class="button primary" href="${base}/download">Download</a> <button class="danger" id="del-film">Delete this film</button></p>` : ""}`
     : `<p class="notice">${f.rendering ? "The film is still rendering: see progress on the Jobs page." : "No film file yet."}</p>`}
+    ${tiersHtml(f.tiers)}
     ${f.treatment_html ? `<h2>Script (TREATMENT)</h2><div class="panel md">${f.treatment_html}</div>` : ""}
     ${f.credits ? `<h2>Third-party assets (CREDITS)</h2><pre class="log">${esc(f.credits)}</pre>` : ""}`;
   const del = document.getElementById("del-film");

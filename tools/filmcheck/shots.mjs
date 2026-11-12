@@ -70,7 +70,7 @@ const measure = async (/** @type {any} */ a) => {
 
 // Runs in the page: a contact sheet from frame data URLs, each cell labelled with its shot id, faults outlined red
 const sheet = async (/** @type {any} */ a) => {
-  const cw = 320, ch = 180, pad = 6, lab = 22, rows = Math.ceil(a.cells.length / a.cols);
+  const cw = 200, ch = 112, pad = 6, lab = 18, rows = Math.ceil(a.cells.length / a.cols);   // 6 columns stay under 1280 px (tools/runner/JOB.md)
   const c = document.createElement('canvas'); c.width = a.cols * (cw + pad) + pad; c.height = rows * (ch + lab + pad) + pad;
   const g = /** @type {CanvasRenderingContext2D} */ (c.getContext('2d'));
   g.fillStyle = '#111'; g.fillRect(0, 0, c.width, c.height);
@@ -78,8 +78,8 @@ const sheet = async (/** @type {any} */ a) => {
     const cell = a.cells[i], x = pad + (i % a.cols) * (cw + pad), y = pad + Math.floor(i / a.cols) * (ch + lab + pad);
     const img = new Image(); img.src = cell.url; await img.decode();
     g.drawImage(img, x, y + lab, cw, ch);
-    g.fillStyle = cell.bad ? '#e53935' : '#ddd'; g.font = '600 16px sans-serif'; g.fillText(cell.label, x + 2, y + 16);
-    if (cell.bad) { g.strokeStyle = '#e53935'; g.lineWidth = 5; g.strokeRect(x + 2.5, y + lab + 2.5, cw - 5, ch - 5); }
+    g.fillStyle = cell.bad ? '#e53935' : '#ddd'; g.font = '600 13px sans-serif'; g.fillText(cell.label, x + 2, y + 13);
+    if (cell.bad) { g.strokeStyle = '#e53935'; g.lineWidth = 4; g.strokeRect(x + 2, y + lab + 2, cw - 4, ch - 4); }
   }
   return c.toDataURL('image/jpeg', 0.85);
 };

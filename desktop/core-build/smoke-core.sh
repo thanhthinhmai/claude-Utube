@@ -69,7 +69,7 @@ if [ "${SMOKE_VOICE:-}" = 1 ]; then
   printf '[{"id": "a", "text": "The quick brown fox jumps over the lazy dog."}]' > "$work/lines.json"
   lib/lemo-opuscar/.venv/bin/python lib/lemo-opuscar/core/tts/tts.py "$work/lines.json" "$work/voice" || fail "kokoro"
   [ -s "$work/voice/a.wav" ] || fail "no wav"
-  lib/lemo-opuscar/.venv/bin/python lib/lemo-opuscar/core/tts/asr_check.py "$work/lines.json" "$work/voice" --lang en || fail "whisper"
+  lib/lemo-opuscar/.venv/bin/python lib/lemo-opuscar/core/tts/asr_check.py "$work/lines.json" "$work/voice" --lang en --model small.en || fail "whisper"   # the studio model (tools/asr.json)
   say "voice ok"
 fi
 say "all ok"
