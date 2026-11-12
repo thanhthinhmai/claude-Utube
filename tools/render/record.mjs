@@ -30,7 +30,7 @@ const { pageURL } = await import(pathToFileURL(path.join(LIB, 'core', 'render', 
 
 fs.mkdirSync(path.join(FILM, 'out'), { recursive: true });
 const LOG = path.join(FILM, 'out', 'render.log');
-fs.writeFileSync(LOG, '');
+fs.writeFileSync(LOG, process.env.STUDIO_RENDER_SKIPPED_CHECKS ? `render: checks skipped — ${process.env.STUDIO_RENDER_SKIPPED_CHECKS}\n` : '');   // specs/020 FR-009
 const t0 = Date.now();
 const log = (/** @type {string} */ s) => { console.log(s); fs.appendFileSync(LOG, s + '\n'); };
 const secs = () => Math.round((Date.now() - t0) / 1000);

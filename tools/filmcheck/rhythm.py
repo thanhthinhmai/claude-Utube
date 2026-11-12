@@ -239,8 +239,13 @@ def message(i: dict) -> str:
 def line(i: dict) -> str:
     """One report line (contracts/cli.md): ref, time, rule, measure vs limit, text, fix."""
     at = f"{i['at']:.2f} s" if isinstance(i.get("at"), (int, float)) else ""
-    cmp_ = "≥" if i["rule"] in ("silence", "tail", "shot_long", "pause_in_para") else "<"
-    s = f"{i['ref']} {at}  {i['rule']} {i['measure']} {cmp_} {i['limit']}"
+    if i["rule"] == "cut_in_sentence":
+        what = f"the sentence ends {i['measure']} s later"
+    else:
+        cmp_ = {"silence": ">", "tail": ">", "shot_long": ">", "pause_in_para": "≥", "pause_in_line": "≥",
+                "tail_mismatch": ">"}.get(i["rule"], "<")
+        what = f"{i['measure']} {cmp_} {i['limit']}"
+    s = f"{i['ref']} {at}  {i['rule']} {what}"
     if i.get("text"):
         s += f"  {i['text']}"
     if i.get("fix"):

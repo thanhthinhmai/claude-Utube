@@ -645,6 +645,58 @@ def cmd_render_setting(a) -> int:
     return 0
 
 
+# ---------- QC tiers (specs/020) ----------
+QC_SUBS = ("voice", "plan", "shots", "except", "accept-style", "final")
+
+
+def lib_dir() -> str:
+    return os.environ.get("STUDIO_LIB") or str(HERE.parents[1] / "lib" / "lemo-opuscar")
+
+
+def tier_lines(res: dict, name: str) -> list:
+    from filmcheck import rhythm
+    lines = [f"  ! {s}" for s in res.get("skipped") or []]
+    for i in res["issues"]:
+        mark = "·" if i.get("excepted") else ("!" if i["severity"] == "warn" else "✗")
+        lines.append(f"  {mark} {rhythm.line(i)}")
+    return lines
+
+
+def cmd_qc_plan(a) -> int:
+    from filmcheck import plancheck
+    d = film_dir(a.film)
+    try:
+        r = plancheck.run(d, lib_dir())
+    except plancheck.PlanError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    blk = [i for i in r["issues"] if i["severity"] == "block" and not i.get("excepted")]
+    m = r["measures"]
+    lines = tier_lines(r, d.name)
+    summary = f"{m['shots']} shots" + (f" · silence {m['silence_ratio']:.0%}" if "silence_ratio" in m else "") \
+        + f" · {r['seconds']:.1f} s"
+    lines.append(f"{'✓' if r['pass'] else '✗'} plan: " + ("all rules pass" if r["pass"] else f"{len(blk)} problem(s)")
+                 + f" · {summary}")
+    out(a, r, lines)
+    return 0 if r["pass"] else 1
+
+
+def cmd_render_gate(a) -> int:
+    from filmcheck import tiers
+    d = film_dir(a.film)
+    if a.skip_checks is not None:
+        if not a.skip_checks.strip():
+            print("✗ render: --skip-checks needs a reason", file=sys.stderr)
+            return 2
+        tiers.record_skip(d, a.skip_checks.strip())
+        print(f"! render: checks skipped — {a.skip_checks.strip()}")
+        return 0
+    why = tiers.gate(d)
+    for w in why:
+        print(f"✗ render: {w}", file=sys.stderr)
+    return 1 if why else 0
+
+
 def not_yet(a) -> int:
     print(f"✗ not built yet: {a.cmd}", file=sys.stderr)
     return 2
@@ -673,6 +725,13 @@ def parser() -> argparse.ArgumentParser:
     q = sub.add_parser("qc", help="measure a finished film")
     q.add_argument("film")
     q.add_argument("--json", action="store_true")
+
+    s = sub.add_parser("qc-plan", help="tier 1: check the plan before rendering (specs/020)")
+    s.add_argument("film")
+    s.add_argument("--json", action="store_true")
+    s = sub.add_parser("render-gate", help="may this film be rendered? (specs/020)")
+    s.add_argument("film")
+    s.add_argument("--skip-checks", default=None)
 
     pb = sub.add_parser("publish", help="make and check a film's publish pack (specs/011)")
     pb.add_argument("film")
@@ -782,6 +841,7 @@ def parser() -> argparse.ArgumentParser:
 COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("script", "status"): cmd_status,
             ("script", "skip"): cmd_skip, ("web", "fetch"): cmd_fetch, ("config", "editor-model"): cmd_editor_model, ("config", "render"): cmd_render_setting,
             ("qc", "qc"): cmd_qc, ("publish", "publish"): cmd_publish,
+            ("qc-plan", "qc-plan"): cmd_qc_plan, ("render-gate", "render-gate"): cmd_render_gate,
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach,
@@ -794,8 +854,11 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
 
 
 def main(argv=None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if len(argv) > 1 and argv[0] == "qc" and argv[1] in QC_SUBS:      # qc plan <film> → qc-plan <film>
+        argv = (["qc"] if argv[1] == "final" else [f"qc-{argv[1]}"]) + argv[2:]
     a = parser().parse_args(argv)
-    if a.group in ("qc", "publish"):
+    if "cmd" not in a or a.cmd is None:
         a.cmd = a.group
     return COMMANDS.get((a.group, a.cmd), not_yet)(a)
 

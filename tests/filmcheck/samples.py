@@ -370,7 +370,7 @@ def speak(text: str, word=0.32, gap=0.04, sent_gap=0.3):
 
 
 def make_tier_film(root: Path, name: str, *, shots, lines=(), cues=None, cards=None, dur=None, style=None,
-                   asr=None, script=True) -> Path:
+                   asr=None, script=True, export_shots=True) -> Path:
     """films/<name>/ for the 020 tiers. shots: [{id, t0, t1, look?, hue?, dim?}]; lines: [{id, para, at, text}]
     (stamps from speak(), or asr[id] when given: a different transcript of the same line); cues: [[t0, t1, text]];
     cards: [{id, t0, t1, text, pos?}]. No mp4: the page is the film."""
@@ -397,6 +397,9 @@ def make_tier_film(root: Path, name: str, *, shots, lines=(), cues=None, cards=N
                                          + "\n".join(f"[{p}] {' '.join(t)}" for p, t in paras.items()) + "\n", encoding="utf-8")
     total = dur if dur is not None else max(s["t1"] for s in shots)
     film = {"dur": total, "shots": shots, "cues": cues, "cards": cards}
-    (d / "index.html").write_text(TIER_PAGE.replace("FILM_JSON", json.dumps(film)), encoding="utf-8")
+    page = TIER_PAGE.replace("FILM_JSON", json.dumps(film))
+    if not export_shots:
+        page = page.replace("window.SHOTS = F.shots", "const NO_SHOTS = F.shots")
+    (d / "index.html").write_text(page, encoding="utf-8")
     (d / "TREATMENT.md").write_text(f"Style: {style or 'test-style'}\n", encoding="utf-8")
     return d

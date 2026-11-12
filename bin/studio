@@ -478,10 +478,25 @@ deps_gpu() {
 
 # Ghi video (specs/019): GPU nếu được, chia phần, làm tiếp khi bị ngắt
 cmd_render() {
-  [ -n "${1:-}" ] || { echo "dùng: sh bin/studio render <phim> [--fps N] [--workers N] [--out FILE] [--size WxH] [--until S]" >&2; exit 2; }
+  [ -n "${1:-}" ] || { echo "dùng: sh bin/studio render <phim> [--fps N] [--workers N] [--out FILE] [--size WxH] [--until S] [--skip-checks \"lý do\"]" >&2; exit 2; }
   [ -d "$LIB/node_modules/playwright-core" ] || { echo "✗ chưa cài gói lõi của thư viện. Chạy: sh bin/studio deps" >&2; exit 1; }
+  # specs/020: cổng kiểm trước khi mở trình duyệt; --skip-checks "<lý do>" bỏ qua và được ghi lại
+  film=$1; shift; skip=; has_skip=0
+  for a in "$@"; do shift
+    if [ "$has_skip" = 1 ]; then skip=$a; has_skip=2; continue; fi
+    if [ "$a" = --skip-checks ]; then has_skip=1; continue; fi
+    set -- "$@" "$a"
+  done
+  [ "$has_skip" != 1 ] || { echo "✗ render: --skip-checks cần một lý do" >&2; exit 2; }
+  py=python3; [ -x "$VENV/bin/python" ] && py="$VENV/bin/python"
+  if [ "$has_skip" = 2 ]; then
+    STUDIO_ROOT="${STUDIO_ROOT:-$ROOT}" STUDIO_LIB="$LIB" "$py" "$ROOT/tools/filmcheck/cli.py" render-gate "$film" --skip-checks "$skip" || exit $?
+    STUDIO_RENDER_SKIPPED_CHECKS=$skip; export STUDIO_RENDER_SKIPPED_CHECKS
+  else
+    STUDIO_ROOT="${STUDIO_ROOT:-$ROOT}" STUDIO_LIB="$LIB" "$py" "$ROOT/tools/filmcheck/cli.py" render-gate "$film" || exit $?
+  fi
   render_env
-  STUDIO_LIB="$LIB" exec node "$ROOT/tools/render/record.mjs" "$@"
+  STUDIO_LIB="$LIB" exec node "$ROOT/tools/render/record.mjs" "$film" "$@"
 }
 
 # Công cụ trang của thư viện (still, events, readcheck) với cùng cách dựng hình

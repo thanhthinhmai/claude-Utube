@@ -78,13 +78,13 @@ description: "Tasks for 020 — QC per shot before render"
 
 ### Tests
 
-- [ ] T012 [P] [US1] Tạo `tests/filmcheck/test_plan.py`:
+- [X] T012 [P] [US1] Tạo `tests/filmcheck/test_plan.py`:
   - phim `plan-10` (sinh bằng `make_tier_film`) có 10 lỗi: 3 `cut_in_sentence`, 2 `cut_too_soon`, 2 `key_shot_short`, 1 `shot_long`, 1 `silence`, 1 `tail`;
   - `qc plan --json` → đúng 10 issue, đúng `ref`, mã 1, ≤ 10 s;
   - bản sửa → mã 0;
   - phim không giọng → chỉ có `shot_short`, `shot_long`, `tail`, `card_read` (US1 AC6);
   - phim không có `SHOTS` → in `no shot list`, các luật cảnh bị bỏ qua.
-- [ ] T013 [P] [US1] Thêm vào `tests/filmcheck/test_cli.py` các ca cổng render (gọi `cli.py render-gate`):
+- [X] T013 [P] [US1] Thêm vào `tests/filmcheck/test_cli.py` các ca cổng render (gọi `cli.py render-gate`):
   - chưa kiểm → mã 1, in lệnh cần chạy;
   - đã đạt → mã 0;
   - đạt rồi sửa `index.html` → mã 1 (US1 AC4);
@@ -93,24 +93,24 @@ description: "Tasks for 020 — QC per shot before render"
 
 ### Implementation
 
-- [ ] T014 [US1] Tạo `tools/filmcheck/plan.mjs` (`@ts-check`, dùng `openDemo` của `core/render/page.mjs` như `texts.mjs`):
+- [X] T014 [US1] Tạo `tools/filmcheck/plan.mjs` (`@ts-check`, dùng `openDemo` của `core/render/page.mjs` như `texts.mjs`):
   - đọc `window.DUR`, `SHOTS`, `CUES`, `CARDS` sau `READY`, không gọi `render(t)`;
   - in một dòng JSON `{dur, shots|null, cues|null, cards|null}`.
-- [ ] T015 [US1] Tạo `tools/filmcheck/plancheck.py`:
+- [X] T015 [US1] Tạo `tools/filmcheck/plancheck.py`:
   - `run(film_dir, lib)` gọi `plan.mjs` và chuẩn hoá `SHOTS` theo data-model: "duy nhất trong phim", "`0 ≤ t0 < t1 ≤ DUR`", "nối liền (lệch tối đa 1/fps)". Thiếu `id` thì gán `S<n>` và cảnh báo.
   - phụ đề: `CUES`, nếu không có thì `cues.json`, rồi `<phim>.srt`.
   - thẻ chữ: `CARDS`; không có thì chạy `node core/render/readcheck.mjs` của thư viện, đọc dòng `OK/FAIL … need … got …`, và ghi `skipped`/ghi chú "cards via readcheck".
   - lưu `.check/plan-input.json` gắn dấu vân tay; nguồn chưa đổi thì đọc lại file này.
   - gọi `rhythm.sentences` và `rhythm.measure`, áp ngoại lệ, rồi `tiers.save_tier(…, "plan", …)` với `measures.sentences` và `seconds`.
-- [ ] T016 [US1] Sửa `tools/filmcheck/cli.py`: trong parser `qc`, đọc từ đầu tiên. Nếu nó thuộc `voice plan shots except accept-style final` thì đó là lệnh con; nếu không thì là tên phim (như cũ).
+- [X] T016 [US1] Sửa `tools/filmcheck/cli.py`: trong parser `qc`, đọc từ đầu tiên. Nếu nó thuộc `voice plan shots except accept-style final` thì đó là lệnh con; nếu không thì là tên phim (như cũ).
   - Thêm `cmd_qc_plan`: in mỗi issue một dòng theo mẫu của `contracts/cli.md`, cuối cùng `✓/✗ plan: …`.
   - Thêm `--json`; mã thoát 0/1/2.
-- [ ] T017 [US1] Sửa `tools/filmcheck/cli.py`: thêm lệnh ẩn `render-gate <phim> [--skip-checks R]` theo mục "Cổng render" của `contracts/checks.md`. Ở bước này chỉ kiểm `tiers.plan`; phần `shots` được thêm ở T026. Lệnh in các dòng `✗ render: …` và trả mã 1/0/2.
-- [ ] T018 [US1] Sửa `cmd_render` trong `bin/studio`:
+- [X] T017 [US1] Sửa `tools/filmcheck/cli.py`: thêm lệnh ẩn `render-gate <phim> [--skip-checks R]` theo mục "Cổng render" của `contracts/checks.md`. Ở bước này chỉ kiểm `tiers.plan`; phần `shots` được thêm ở T026. Lệnh in các dòng `✗ render: …` và trả mã 1/0/2.
+- [X] T018 [US1] Sửa `cmd_render` trong `bin/studio`:
   - tách `--skip-checks <lý do>` khỏi đối số;
   - gọi `python cli.py render-gate` trước `record.mjs`; mã ≠ 0 thì thoát với cùng mã;
   - khi có `--skip-checks` thì đặt `STUDIO_RENDER_SKIPPED_CHECKS` để `record.mjs` ghi dòng `render: checks skipped — <lý do>` vào `render.log`.
-- [ ] T019 [US1] Sửa `tools/render/record.mjs`: nếu có `STUDIO_RENDER_SKIPPED_CHECKS` thì ghi dòng đó ngay sau khi tạo `render.log`.
+- [X] T019 [US1] Sửa `tools/render/record.mjs`: nếu có `STUDIO_RENDER_SKIPPED_CHECKS` thì ghi dòng đó ngay sau khi tạo `render.log`.
 - [ ] T020 [US1] Chạy thật trên `films/pet-swap`:
   - trước khi đo, thêm `window.CARDS` (`[[t0, t1, id, text]]`, lấy từ các thẻ mà `TEXTS` đang đọc) vào `films/pet-swap/main.js` (file của phim, ngoài git), để `qc plan` không phải chạy `readcheck`. FR-008 chỉ cam kết với phim có `CARDS`; ghi thêm thời gian của đường `readcheck` để so;
   - `sh bin/studio qc plan pet-swap`: kỳ vọng 0 lỗi nhịp; ghi lại thời gian (FR-008 ≤ 10 s).
