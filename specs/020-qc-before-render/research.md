@@ -78,7 +78,7 @@ Bảng ảnh vẽ trong trang bằng canvas: mỗi ô có mã cảnh, ô lỗi v
 
 ## R6. Số đo phong cách (FR-013, FR-017)
 
-**Quyết định**: viết `tools/filmcheck/stylerefs.py`. Nó đọc bảng "Key numbers" trong `my-styles/<slug>/EVIDENCE.md`: các hàng `luma p50`, `saturation p50`, `cuts/min`, `loudness range`, lấy cột khoảng `a–b`. Sau đó `my-styles/<slug>/qc.json` (nếu có) ghi đè từng khoá: `luma_p50`, `saturation_p50`, `cuts_per_min`, `loudness_range`, `shot_max`, `still_max`, `subtitle_zone`, `dark_p50`, `blown_share`. Phong cách thư viện không có hai file này, nên kết quả là "bỏ qua so phong cách".
+**Quyết định**: viết `tools/filmcheck/stylerefs.py`. Phong cách của phim lấy theo thứ tự: dòng `Style:` của `TREATMENT.md`, rồi `film.style` trong `channel.json` (ảnh chụp kênh, specs/012), rồi cụm "style \`slug\`" trong `TREATMENT.md`, rồi `style` của đầu vào việc online. Hai nguồn giữa được thêm khi làm, vì `pet-swap` không có dòng `Style:`. Nó đọc bảng "Key numbers" trong `my-styles/<slug>/EVIDENCE.md`: các hàng `luma p50`, `saturation p50`, `cuts/min`, `loudness range`, lấy cột khoảng `a–b`. Sau đó `my-styles/<slug>/qc.json` (nếu có) ghi đè từng khoá: `luma_p50`, `saturation_p50`, `cuts_per_min`, `loudness_range`, `shot_max`, `still_max`, `subtitle_zone`, `dark_p50`, `blown_share`. Phong cách thư viện không có hai file này, nên kết quả là "bỏ qua so phong cách".
 
 Phép so dùng trung vị trên mọi ảnh giữa cảnh, theo trọng số độ dài cảnh. Với `pet-swap` và Dusk Hypothetical: độ sáng 0,13 nằm ngoài 0,198–0,299, bão hoà 0,53 nằm ngoài 0,319–0,504 (SC-004).
 

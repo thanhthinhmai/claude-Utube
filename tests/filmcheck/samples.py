@@ -345,7 +345,7 @@ window.render = (t) => {
   const card = document.getElementById('card'), k = (F.cards || []).find(k => t >= k.t0 && t < k.t1);
   card.textContent = k ? k.text : '';
   card.style.opacity = k && !window.CLEAN ? 1 : 0;
-  card.style.top = k && k.pos === 'bottom' ? '84%' : '40%';
+  card.style.top = k && k.pos === 'bottom' ? '84%' : k && k.pos === 'off' ? '97%' : '40%';
   const cue = (F.cues || []).find(q => t >= q[0] && t < q[1]);
   document.getElementById('sub').textContent = cue && !window.CLEAN ? cue[2] : '';
 };

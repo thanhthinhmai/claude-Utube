@@ -86,8 +86,12 @@ class ShotCheck(unittest.TestCase):
         r = tiers.load_tier(self.d, "shots")
         self.assertEqual([i["rule"] for i in r["issues"] if i["severity"] == "block" and not i.get("excepted")],
                          ["missing_glyph"])
+        j = json.loads(self.cli("qc", "except", "shots-6", "--list", "--json").stdout)              # T055
+        self.assertEqual(len(j["exceptions"]), 4)
         self.assertEqual(self.cli("qc", "accept-style", "shots-6").returncode, 2)                       # no reason
-        self.assertEqual(self.cli("qc", "accept-style", "shots-6", "--reason", "a darker film on purpose").returncode, 0)
+        acc = self.cli("qc", "accept-style", "shots-6", "--reason", "a darker film on purpose", "--json")
+        self.assertEqual(acc.returncode, 0)
+        self.assertEqual(json.loads(acc.stdout)["style_accept"]["reason"], "a darker film on purpose")
         gate = self.cli("render-gate", "shots-6")
         self.assertIn("1 open frame problem", gate.stderr)
         self.assertNotIn("style warning", gate.stderr)

@@ -339,8 +339,8 @@ description: "Tasks for 020 — QC per shot before render"
 
 ## Phase 9: Convergence
 
-- [ ] T054 Report a card that is never fully on screen (readcheck's `BAD … never fully visible` lines) as `card_read` in `tools/filmcheck/plancheck.py` `readcheck_cards`, and add a test of the readcheck path (a tier film without `window.CARDS`) to `tests/filmcheck/test_plan.py` per FR-006 (partial)
-- [ ] T055 Accept `--json` on `qc except` and `qc accept-style` in `tools/filmcheck/cli.py` (print the recomputed tier results) per contracts/cli.md (partial)
-- [ ] T056 Compute each shot's `para` (the paragraph of the first sentence in the shot) and store it in `.check/plan-input.json` in `tools/filmcheck/plancheck.py` per data-model "Shot" (partial)
-- [ ] T057 Remove the undocumented `flat_share` style key from `tools/filmcheck/shotcheck.py`, or add it to `stylerefs.KEYS` and to data-model "Style references" per data-model (unrequested)
-- [ ] T058 Document the extra sources for the film's style (`channel.json` `film.style`, a "style \`slug\`" mention in TREATMENT.md) and language (`channel.json` `rules.language`) in `specs/020-qc-before-render/contracts/cli.md` and research R6 per contracts/cli.md (unrequested)
+- [X] T054 Report a card that is never fully on screen (readcheck's `BAD … never fully visible` lines) as `card_read` in `tools/filmcheck/plancheck.py` `readcheck_cards`, and add a test of the readcheck path (a tier film without `window.CARDS`) to `tests/filmcheck/test_plan.py` per FR-006 (partial)
+- [X] T055 Accept `--json` on `qc except` and `qc accept-style` in `tools/filmcheck/cli.py` (print the recomputed tier results) per contracts/cli.md (partial)
+- [X] T056 Compute each shot's `para` (the paragraph of the first sentence in the shot) and store it in `.check/plan-input.json` in `tools/filmcheck/plancheck.py` per data-model "Shot" (partial)
+- [X] T057 Remove the undocumented `flat_share` style key from `tools/filmcheck/shotcheck.py`, or add it to `stylerefs.KEYS` and to data-model "Style references" per data-model (unrequested)
+- [X] T058 Document the extra sources for the film's style (`channel.json` `film.style`, a "style \`slug\`" mention in TREATMENT.md) and language (`channel.json` `rules.language`) in `specs/020-qc-before-render/contracts/cli.md` and research R6 per contracts/cli.md (unrequested)

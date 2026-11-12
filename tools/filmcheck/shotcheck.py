@@ -60,7 +60,7 @@ def wmedian(pairs) -> float:
 
 def score(frames: list, shots: list, cues, style: dict, dur: float, film_dir=None) -> tuple:
     """(issues, measures, skipped) from measured frames (see shots.mjs `measure`)."""
-    flat = float(style.get("flat_share") or FLAT_SHARE)
+    flat = FLAT_SHARE
     dark = float(style.get("dark_p50") or DARK_P50)
     blown = float(style.get("blown_share") or BLOWN_SHARE)
     zone = style.get("subtitle_zone") or SUB_ZONE

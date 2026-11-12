@@ -158,6 +158,29 @@ class PlanCheck(unittest.TestCase):
         rhythm_words = ("cut at", "shot with the last words", "silent", "pause", "ends", "shot S", "cue")
         self.assertEqual([p for p in r["problems"] if any(w in p for w in rhythm_words)], [], r["problems"])
 
+    def test_cards_through_readcheck(self):                              # T054: a page without window.CARDS
+        shots = shots_of([3.0, 6.0], 9.0)
+        cards = [{"id": "short", "t0": 0.5, "t1": 1.2, "text": "A CARD TOO SHORT TO READ"},
+                 {"id": "long", "t0": 3.2, "t1": 7.5, "text": "FINE"},
+                 {"id": "cut", "t0": 7.6, "t1": 8.9, "text": "HALF OFF THE FRAME", "pos": "off"}]
+        d = samples.make_tier_film(self.root, "rc", shots=shots, cards=cards)
+        page = (d / "index.html").read_text().replace("if (F.cards) window.CARDS", "if (false) window.CARDS")
+        (d / "index.html").write_text(page)
+        r = json.loads(self.cli("qc", "plan", "rc", "--json").stdout)
+        self.assertEqual(r["sources"]["cards"], "readcheck")
+        self.assertIn("cards via readcheck (the page has no window.CARDS)", r["skipped"])
+        got = sorted((i["text"], i["measure"]) for i in r["issues"] if i["rule"] == "card_read")
+        self.assertEqual([t for t, _ in got], ["A CARD TOO SHORT TO READ", "HALF OFF THE FRAME"])
+        self.assertEqual(dict(got)["HALF OFF THE FRAME"], 0.0)              # never fully visible: 0 s readable
+
+    def test_shot_paragraphs(self):                                      # T056: data-model Shot.para
+        ls = lines(2)
+        cuts, dur = good_cuts(ls)
+        d = samples.make_tier_film(self.root, "para", shots=shots_of(cuts, dur), lines=ls, asr=asr(ls), cards=[], dur=dur)
+        self.assertEqual(self.cli("qc", "plan", "para").returncode, 0)
+        shots = json.loads((d / ".check" / "plan-input.json").read_text())["shots"]
+        self.assertEqual([s["para"] for s in shots], ["P01", "P01", "P02", "P02"])
+
     def test_cached_input_and_changed_source(self):
         ls = lines(3)
         cuts, dur = good_cuts(ls)

@@ -8,7 +8,7 @@ Mã thoát chung, giống `qc` của specs/010:
 Mọi lệnh nhận `--json` và khi đó in object kết quả tầng ([data-model.md](../data-model.md)).
 
 ## `sh bin/studio voice asr <phim> [--lang en|zh|…]`
-- Chạy `core/tts/asr_check.py` của thư viện trên `films/<phim>/lines.json` và `voices/`, với `--model` lấy từ `tools/asr.json` theo ngôn ngữ. Ngôn ngữ lấy theo thứ tự: `--lang`, rồi `CHANNEL_BRIEF`, rồi mặc định `en`.
+- Chạy `core/tts/asr_check.py` của thư viện trên `films/<phim>/lines.json` và `voices/`, với `--model` lấy từ `tools/asr.json` theo ngôn ngữ. Ngôn ngữ lấy theo thứ tự: `--lang`, rồi `rules.language` trong `channel.json` (ảnh chụp kênh của phim, specs/012), rồi dòng `Language:` của `CHANNEL_BRIEF.md` hoặc `SCRIPT.md`, rồi mặc định `en`.
 - In dòng `model: <tên>`.
 - Thay cho việc gọi thẳng asr_check trong luồng làm phim.
 

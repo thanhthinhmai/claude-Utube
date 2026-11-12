@@ -17,6 +17,7 @@ FPS_TOL = 1 / 24 + 1e-3
 LATIN_CPS, CJK_CPS, READ_PAD, READ_MIN = 15, 4.5, 1.5, 1.5        # core/render/readcheck.mjs defaults
 CJK = re.compile(r"[぀-ヿ㐀-鿿가-힯豈-﫿]")
 RC_LINE = re.compile(r"^(OK|BAD)\s+(\S+)\s+at ([\d.]+)s\s+\d+ chars\s+need ([\d.]+)s\s+got ([\d.]+)s\s+(\".*\")?")
+RC_PARTIAL = re.compile(r"^BAD\s+(\S+)\s+at ([\d.]+)s\s+never fully visible.*?(\".*\")?\s*$")
 
 
 class PlanError(Exception):
@@ -95,6 +96,12 @@ def readcheck_cards(d: Path, lib) -> list:
         if m:
             out.append({"id": m.group(2), "t0": float(m.group(3)), "need": float(m.group(4)), "got": float(m.group(5)),
                         "text": json.loads(m.group(6)) if m.group(6) else ""})
+            continue
+        m = RC_PARTIAL.match(ln.strip())          # a card never fully on screen cannot be read: got 0 s
+        if m:
+            text = json.loads(m.group(3)) if m.group(3) else ""
+            out.append({"id": m.group(1), "t0": float(m.group(2)), "need": round(read_need(text), 2), "got": 0.0,
+                        "text": text, "partial": True})
     return out
 
 
@@ -170,6 +177,13 @@ def run(film_dir: Path, lib) -> dict:
                                                          "shot_short", "shot_long")]
     m["sentences"] = sents
     m["shots"] = len(shots or [])
+    if shots and sents:                      # data-model "Shot.para": the paragraph of the first sentence in the shot
+        for s in shots:
+            x = next((x for x in sents if s["t0"] - 1e-6 <= x["start"] < s["t1"] - 1e-6), None) \
+                or next((x for x in sents if x["start"] < s["t0"] < x["end"]), None)
+            s["para"] = x["para"] if x else None
+        inp["shots"] = shots
+        (d / ".check" / "plan-input.json").write_text(json.dumps(inp, ensure_ascii=False), encoding="utf-8")
     m["narration"] = bool(nar)
     exc = tiers.load_exceptions(d)
     tiers.apply_exceptions(issues, exc)

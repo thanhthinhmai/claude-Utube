@@ -722,11 +722,11 @@ def cmd_qc_accept_style(a) -> int:
     from filmcheck import shotcheck, tiers
     d = film_dir(a.film)
     try:
-        shotcheck.accept_style(d, a.reason)
+        r = shotcheck.accept_style(d, a.reason)
     except tiers.TierError as e:
         print(f"✗ {e}", file=sys.stderr)
         return 2
-    print(f"✓ style warnings accepted: {a.reason.strip()}")
+    out(a, r, [f"✓ style warnings accepted: {a.reason.strip()}"])
     return 0
 
 
@@ -734,8 +734,8 @@ def cmd_qc_except(a) -> int:
     from filmcheck import tiers
     d = film_dir(a.film)
     if a.list or not a.shot:
-        for e in tiers.load_exceptions(d):
-            print(f"  {e['shot']} {e['rule']} — {e['reason']} ({e.get('at', '')})")
+        exc = tiers.load_exceptions(d)
+        out(a, {"exceptions": exc}, [f"  {e['shot']} {e['rule']} — {e['reason']} ({e.get('at', '')})" for e in exc])
         return 0
     if not a.rule:
         print("✗ usage: qc except <film> <shot> <rule> --reason \"…\" | --remove", file=sys.stderr)
@@ -745,17 +745,16 @@ def cmd_qc_except(a) -> int:
             if not tiers.remove_exception(d, a.shot, a.rule):
                 print(f"✗ no exception for {a.shot} {a.rule}", file=sys.stderr)
                 return 2
-            print(f"✓ removed: {a.shot} {a.rule}")
+            lines = [f"✓ removed: {a.shot} {a.rule}"]
         else:
             tiers.add_exception(d, a.shot, a.rule, a.reason)
-            print(f"✓ exception: {a.shot} {a.rule} — {a.reason.strip()}")
+            lines = [f"✓ exception: {a.shot} {a.rule} — {a.reason.strip()}"]
     except tiers.TierError as e:
         print(f"✗ {e}", file=sys.stderr)
         return 2
     t = tiers.recompute(d).get("tiers") or {}
-    for k in ("plan", "shots"):
-        if t.get(k):
-            print(f"  {k}: {'pass' if t[k]['pass'] else 'fail'}")
+    lines += [f"  {k}: {'pass' if t[k]['pass'] else 'fail'}" for k in ("plan", "shots") if t.get(k)]
+    out(a, {"exceptions": tiers.load_exceptions(d), "tiers": {k: t[k] for k in ("plan", "shots") if t.get(k)}}, lines)
     return 0
 
 
@@ -900,6 +899,7 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("qc-accept-style", help="accept the style warnings with a reason (specs/020)")
     s.add_argument("film")
     s.add_argument("--reason", default="")
+    s.add_argument("--json", action="store_true")
     s = sub.add_parser("qc-except", help="mark one shot as an exception to one rule (specs/020)")
     s.add_argument("film")
     s.add_argument("shot", nargs="?")
@@ -907,6 +907,7 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--reason", default="")
     s.add_argument("--list", action="store_true")
     s.add_argument("--remove", action="store_true")
+    s.add_argument("--json", action="store_true")
     s = sub.add_parser("qc-voice", help="tier 0: check the voice lines (specs/020)")
     s.add_argument("film")
     s.add_argument("--json", action="store_true")
