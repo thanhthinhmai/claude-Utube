@@ -15,7 +15,14 @@ THRESHOLDS = {   # what CHECKS.md shows next to each measure (contracts/cli.md)
     "tail_s": "≤ 1.5 s",
     "stills_bad": "no still picture longer than the style allows (6 s)",
     "missing_glyphs": "0 characters without a font",
+    "shots_short": "every shot ≥ 1.1 s",
+    "shots_long": "every shot ≤ the style's longest (6 s)",
+    "cues_short": "each subtitle ≥ max(1.8 s, its speech + 0.6 s)",
+    "loudness_range": "inside the style's range",
+    "av_sync": "sound and picture lengths within 0.1 s",
 }
+TIER_NAMES = (("voice", "Voice (tier 0)"), ("plan", "Plan (tier 1)"), ("shots", "Shots (tier 2)"),
+              ("render", "Render (tier 3)"), ("final", "Final (tier 4)"))
 
 
 THRESHOLDS_PUBLISH = {   # the publish pack's measures in CHECKS.md (specs/011 contracts/cli.md)
@@ -32,7 +39,7 @@ THRESHOLDS_PUBLISH = {   # the publish pack's measures in CHECKS.md (specs/011 c
 def empty() -> dict:
     return {"narration": None,
             "script": {"verdict": "pending", "skip_reason": None, "machine": [], "editor": [], "fix_rounds": 0},
-            "film": None, "publish": None}
+            "film": None, "publish": None, "tiers": {}}
 
 
 def load(film_dir: Path) -> dict:
@@ -116,6 +123,7 @@ def markdown(data: dict) -> str:
         out.append("")
         if f.get("problems"):
             out += ["Problems:", "", *[f"- {p}" for p in f["problems"]], ""]
+    out += tiers_markdown(data.get("tiers") or {})
     p = data.get("publish")
     if p:
         out += [f"**Publish:** {'pass' if p.get('pass') else 'fail'}", ""]
@@ -137,3 +145,39 @@ def markdown(data: dict) -> str:
         if p.get("problems"):
             out += ["Problems:", "", *[f"- {x}" for x in p["problems"]], ""]
     return "\n".join(out).rstrip() + "\n"
+
+
+def tiers_markdown(tiers: dict) -> list:
+    """The "Tiers" part of CHECKS.md (specs/020 contracts/checks.md)."""
+    if not tiers:
+        return []
+    out = ["**Tiers**", "", "| Tier | Result | Problems | Warnings | Exceptions | At |", "|---|---|---|---|---|---|"]
+    open_, excepted, accepted = [], [], []
+    for key, label in TIER_NAMES:
+        r = tiers.get(key)
+        if not r:
+            out.append(f"| {label} | not run | | | | |")
+            continue
+        iss = r.get("issues") or []
+        blk = [i for i in iss if i.get("severity") == "block" and not i.get("excepted")]
+        wrn = [i for i in iss if i.get("severity") == "warn"]
+        exc = [i for i in iss if i.get("excepted")]
+        res = "pass" if r.get("pass") else "fail"
+        if key == "render" and r.get("skipped_checks"):
+            res += f" · checks skipped: {r['skipped_checks'].get('reason')}"
+        out.append(f"| {label} | {res} | {len(blk)} | {len(wrn)} | {len(exc)} | {r.get('at') or ''} |")
+        open_ += [(key, i) for i in blk + wrn]
+        excepted += [(key, i) for i in exc]
+        sa = r.get("style_accept")
+        if sa and sa.get("reason") and wrn:
+            accepted.append(f"- {label}: {len(wrn)} style warning(s) accepted — {sa['reason']}")
+    out.append("")
+    if open_:
+        out += ["Open:", ""] + [f"- {k}: {i.get('ref')} {i.get('rule')} {i.get('measure')} (limit {i.get('limit')})"
+                                + (f" → {i['fix']}" if i.get("fix") else "") for k, i in open_[:40]]
+        out += ([f"- … {len(open_) - 40} more"] if len(open_) > 40 else []) + [""]
+    if excepted:
+        out += ["Exceptions:", ""] + [f"- {k}: {i.get('ref')} {i.get('rule')} — {i['excepted'].get('reason')}" for k, i in excepted] + [""]
+    if accepted:
+        out += ["Style warnings accepted:", ""] + accepted + [""]
+    return out

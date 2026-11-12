@@ -19,9 +19,9 @@ description: "Tasks for 020 — QC per shot before render"
 
 ## Phase 1: Setup
 
-- [ ] T001 Tạo `tools/asr.json` với `{"en": "small.en", "*": "small"}`. Ghi lý do chọn (research R1) trong khoá `"_note"` của file đó và trong docstring của `tools/filmcheck/rhythm.py` (tạo ở T004).
-- [ ] T002 [P] Thêm `qc-exceptions.json` vào `SKIP_FILE` của `tools/render/lib.mjs`. Thêm ca test vào `tests/render/lib.test.mjs`: file đó đổi thì dấu vân tay không đổi.
-- [ ] T003 [P] Thêm hàm sinh phim thử vào `tests/filmcheck/samples.py`: `make_tier_film(root, name, *, shots, lines, words, cues=None, cards=None, script=None)`.
+- [X] T001 Tạo `tools/asr.json` với `{"en": "small.en", "*": "small"}`. Ghi lý do chọn (research R1) trong khoá `"_note"` của file đó và trong docstring của `tools/filmcheck/rhythm.py` (tạo ở T004).
+- [X] T002 [P] Thêm `qc-exceptions.json` vào `SKIP_FILE` của `tools/render/lib.mjs`. Thêm ca test vào `tests/render/lib.test.mjs`: file đó đổi thì dấu vân tay không đổi.
+- [X] T003 [P] Thêm hàm sinh phim thử vào `tests/filmcheck/samples.py`: `make_tier_film(root, name, *, shots, lines, words, cues=None, cards=None, script=None)`.
   - Hàm ghi `index.html` tối giản (2D canvas) xuất `window.DUR`, `SHOTS`, `CUES`, `CARDS`, `TEXTS`, `READY` theo `contracts/film-page.md`.
   - Hàm cũng ghi `lines.json`, `voices/words.json`, `voices/dur.json`, `narration.json`, `SCRIPT.md`.
 
@@ -29,39 +29,39 @@ description: "Tasks for 020 — QC per shot before render"
 
 ## Phase 2: Foundational (chặn mọi story)
 
-- [ ] T004 Tạo `tools/filmcheck/rhythm.py`: chuyển các hằng `SILENCE_MAX, LONG_PAUSE, CUT_AFTER, KEY_SHOT, TAIL_MAX, EPS` và phần thân của `narration_measures` từ `tools/filmcheck/qc.py` sang.
+- [X] T004 Tạo `tools/filmcheck/rhythm.py`: chuyển các hằng `SILENCE_MAX, LONG_PAUSE, CUT_AFTER, KEY_SHOT, TAIL_MAX, EPS` và phần thân của `narration_measures` từ `tools/filmcheck/qc.py` sang.
   - Đổi thành `measure(sentences, words, shots, dur, cues=None, cards=None, style=None) -> (measures, issues)`.
   - Mỗi issue có dạng Issue trong `data-model.md`: `tier, ref, at, rule, severity, measure, limit, text, fix`.
   - Tên luật lấy đúng theo bảng "plan" trong `contracts/checks.md`.
   - `cut_in_sentence` và `cut_too_soon` có `fix` = "move the cut to ≥ <mốc sớm nhất hợp lệ>". Mốc đó là `end + min(0.4, khoảng tới câu sau)`, hoặc đúng lúc câu sau bắt đầu.
-- [ ] T005 Trong `tools/filmcheck/rhythm.py`, thêm `sentences(lines_rows, words, narration)`:
+- [X] T005 Trong `tools/filmcheck/rhythm.py`, thêm `sentences(lines_rows, words, narration)`:
   - tách lời của `lines.json` theo `. ? ! …` (và `。？！`);
   - gắn từ đầu và từ cuối của mỗi câu lên mốc từ bằng `difflib.SequenceMatcher(autojunk=False)` trên từ đã chuẩn hoá (khối `replace` chia theo tỉ lệ, như `films/pet-swap/timeline.py`);
   - kẹp mốc từ vào `[0, dur dòng]` (FR-004);
   - trả về `[{para, line, n, start, end, text}]` theo `data-model.md`.
 
   Không dùng dấu câu của bản nhận dạng (FR-003).
-- [ ] T006 Trong `tools/filmcheck/rhythm.py`, thêm các luật mới:
+- [X] T006 Trong `tools/filmcheck/rhythm.py`, thêm các luật mới:
   - `shot_short` (< 1,1 s);
   - `shot_long` (> `style.shot_max`, mặc định 6 s);
   - `cue_short` (< max(1,8 s, thời gian nói trong phụ đề + 0,6 s));
   - `card_read` (đầu vào là danh sách `{id, at, need, got}`).
   
   Phim < 30 s: không có thay đổi ngưỡng nào (research R3).
-- [ ] T007 Sửa `tools/filmcheck/qc.py` để `narration_measures` gọi `rhythm.measure` (giữ khoá `measures` cũ: `silence_ratio`, `cuts_bad`, `key_shots_bad`, `long_pauses_bad`, `tail_s`), và `sentences` gọi `rhythm.sentences`. Chạy `sh tests/filmcheck/run.sh`; `tests/filmcheck/test_qc.py` phải đạt nguyên (sửa test chỉ khi lỗi nhịp giả do dấu câu Whisper biến mất, và ghi rõ trong commit).
-- [ ] T008 Tạo `tools/filmcheck/tiers.py`:
+- [X] T007 Sửa `tools/filmcheck/qc.py` để `narration_measures` gọi `rhythm.measure` (giữ khoá `measures` cũ: `silence_ratio`, `cuts_bad`, `key_shots_bad`, `long_pauses_bad`, `tail_s`), và `sentences` gọi `rhythm.sentences`. Chạy `sh tests/filmcheck/run.sh`; `tests/filmcheck/test_qc.py` phải đạt nguyên (sửa test chỉ khi lỗi nhịp giả do dấu câu Whisper biến mất, và ghi rõ trong commit).
+- [X] T008 Tạo `tools/filmcheck/tiers.py`:
   - `fingerprint(film_dir, part="all"|"voice")`: SHA-256 16 hex, cùng quy tắc bỏ file như `tools/render/lib.mjs` (thư mục `out stills publish .check node_modules`, file `*.mp4 *.log checks.json CHECKS.md qc-exceptions.json`). `part="voice"` chỉ tính `lines.json` và `voices/`.
   - `save_tier(film_dir, tier, result)` ghi qua `report.update` vào `checks.json → tiers.<tier>`, với các trường `pass, fingerprint, at, issues, measures, skipped, seconds`.
   - `load_exceptions` và `add_exception` cho `qc-exceptions.json`. Luật: "`shot` phải có trong `SHOTS`"; "`rule` phải thuộc danh sách luật cho phép ngoại lệ" (`flat dark blown still shot_long text_over_subtitle`); "`reason` không được rỗng, tối đa 200 ký tự".
   - `apply_exceptions(issues, exceptions)`: gắn `excepted`, rồi tính lại `pass` (chỉ lỗi `block` chưa có ngoại lệ mới tính).
-- [ ] T009 Sửa `tools/filmcheck/report.py`: thêm `tiers: {}` vào `empty()`; thêm mục "Tiers" vào `markdown()` theo `contracts/checks.md`. Mục gồm bảng 5 hàng `voice plan shots render final`; dưới bảng là lỗi còn mở, ngoại lệ kèm lý do, lệch phong cách đã chấp nhận kèm lý do.
-- [ ] T010 [P] Tạo `tests/filmcheck/test_rhythm.py`:
+- [X] T009 Sửa `tools/filmcheck/report.py`: thêm `tiers: {}` vào `empty()`; thêm mục "Tiers" vào `markdown()` theo `contracts/checks.md`. Mục gồm bảng 5 hàng `voice plan shots render final`; dưới bảng là lỗi còn mở, ngoại lệ kèm lý do, lệch phong cách đã chấp nhận kèm lý do.
+- [X] T010 [P] Tạo `tests/filmcheck/test_rhythm.py`:
   - (a) câu theo kịch bản: lời "Your alarm goes off at seven. But it sounds wrong." với bản nhận dạng "at 7, but it sounds wrong," → ranh giới sau "seven", và một cắt đặt ở đó + 0,4 s không bị báo (US3 AC2);
   - (b) mốc âm → 0, mốc vượt dur → dur (US3 AC3);
   - (c) `rhythm.measure` và `qc.narration_measures` cho cùng issues trên phim mẫu của `samples.make_film` (FR-010);
   - (d) hai lần chạy cho kết quả giống hệt (SC-006);
   - (e) mỗi luật mới có một ca đạt và một ca lỗi.
-- [ ] T011 [P] Tạo `tests/filmcheck/test_tiers.py`:
+- [X] T011 [P] Tạo `tests/filmcheck/test_tiers.py`:
   - dấu vân tay đổi khi sửa `index.html`, không đổi khi sửa `qc-exceptions.json` hay `checks.json`;
   - ngoại lệ bị từ chối khi sai mã cảnh, sai luật hoặc lý do rỗng;
   - `apply_exceptions` tính lại `pass`.
