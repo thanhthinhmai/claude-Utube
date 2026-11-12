@@ -84,6 +84,7 @@ class WorkerTab(unittest.TestCase):
             os.environ.pop(k, None)
 
     def test_render_in_worker_status(self):
+        os.environ.pop("STUDIO_RENDER_MODE", None)
         self.assertIsNone(self.a.get("/api/v1/admin/worker").json()["render"])      # VPS: no host, no line
         os.environ.update(STUDIO_RENDER_MODE="gpu", STUDIO_RENDER_RENDERER=RENDER["renderer"])
         self.assertEqual(self.a.get("/api/v1/admin/worker").json()["render"],

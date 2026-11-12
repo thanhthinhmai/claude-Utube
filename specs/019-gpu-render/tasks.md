@@ -104,7 +104,7 @@
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T034 [P] Run all suites: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ui/run.sh`, `sh tests/learn/run.sh`, `sh tests/online/run.sh`, `sh tests/license/run.sh`
+- [X] T034 [P] Run all suites: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ui/run.sh`, `sh tests/learn/run.sh`, `sh tests/online/run.sh`, `sh tests/license/run.sh`
 - [X] T035 [P] SC-003 timing check on the reference machine in software mode (`sh bin/studio config render software`): `sh bin/studio render pet-swap --fps 30 --until 30` vs the library's `node core/render/video.mjs films/pet-swap --fps 30` limited to the same 900 frames (temporary copy of the film with `window.DUR = 30`): same frame count, time within 10 %; write both times in quickstart.md "Results"
 - [X] T036 [P] Guard checks (SC-007): `git status --porcelain lib/` empty; `grep -rnE "apt(-get)? install|brew install" tools/render bin/studio` finds nothing outside printed hints
 - [X] T037 Update the memory note `reference-wsl-gpu-render` to point to the studio commands, and record results in `specs/019-gpu-render/quickstart.md` "Results"

@@ -241,14 +241,16 @@ class Studio(OnlineProject):
         import threading
         samples()
         self.old.update({k: os.environ.get(k) for k in ("RUNNER", "STUDIO_AGENT_CMD", "STUDIO_MODERATION",
-                                                         "ANTHROPIC_API_KEY", "ANTHROPIC_UPSTREAM", "STUDIO_CLAUDE_BIN")})
+                                                         "ANTHROPIC_API_KEY", "ANTHROPIC_UPSTREAM", "STUDIO_CLAUDE_BIN",
+                                                         "STUDIO_RENDER_MODE")})
         self.upstream_app = fake_upstream()
         self.upstream = Server(self.upstream_app)
         self.old["STUDIO_YOUTUBE_URL"] = os.environ.get("STUDIO_YOUTUBE_URL")
         os.environ.update(RUNNER="local", STUDIO_MODERATION="fake", ANTHROPIC_API_KEY=REAL_KEY,
                           ANTHROPIC_UPSTREAM=self.upstream.url, STUDIO_CLAUDE_BIN=str(FAKE_CLAUDE),
                           STUDIO_AGENT_CMD=f"{sys.executable} {FAKE_AGENT}",
-                          STUDIO_YOUTUBE_URL=self.upstream.url + "/youtube/v3")
+                          STUDIO_YOUTUBE_URL=self.upstream.url + "/youtube/v3",
+                          STUDIO_RENDER_MODE="software")   # specs/019: no GPU probe (no Chrome window) in these tests
         if plan:
             os.environ.pop("ANTHROPIC_API_KEY")
         sys.path.insert(0, str(REPO / "tools" / "runner"))
