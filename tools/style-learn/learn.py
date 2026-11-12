@@ -109,7 +109,7 @@ def cmd_compare(a):
 
 def cmd_save(a):
     from sl import save
-    return save.save(a.set, a.slug, a.en, a.cn, a.based_on, a.accept_proof)
+    return save.save(a.set, a.slug, a.en, a.cn, a.based_on, a.accept_proof, a.update)
 
 
 def cmd_clean(a):
@@ -164,6 +164,7 @@ def main(argv=None) -> int:
     v.add_argument("set"); v.add_argument("--slug", required=True); v.add_argument("--en", required=True)
     v.add_argument("--cn", default=""); v.add_argument("--based-on", required=True)
     v.add_argument("--accept-proof", action="store_true", help="người dùng đã chấp nhận khung chứng minh chưa đạt ngưỡng")
+    v.add_argument("--update", action="store_true", help="học lại một phong cách riêng đã có (giữ nhật ký sửa và phim mẫu)")
     v.set_defaults(fn=cmd_save)
 
     d = sub.add_parser("clean", help="xoá video và âm thanh tham chiếu của bộ")

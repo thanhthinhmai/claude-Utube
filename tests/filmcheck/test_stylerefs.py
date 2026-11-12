@@ -44,6 +44,14 @@ class StyleRefs(unittest.TestCase):
         self.assertNotIn("loudness_range", got)
         self.assertTrue(stylerefs.has_ranges(got))
 
+    def test_shot_grammar(self):                                       # specs/021 T016
+        self.style("sg")
+        (self.root / "my-styles" / "sg" / "shots.json").write_text(json.dumps({"scale_share": {"huge": [0.1, 0.3]}}))
+        got = stylerefs.load(self.film)
+        self.assertEqual(got["shot_grammar"]["scale_share"]["huge"], [0.1, 0.3])
+        self.assertTrue(stylerefs.has_shot_grammar(got))
+        self.assertFalse(stylerefs.has_shot_grammar({}))
+
     def test_no_measurements(self):
         self.style("plain")
         self.assertEqual(stylerefs.load(self.film), {})

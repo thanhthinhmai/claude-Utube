@@ -105,7 +105,7 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
 
 ### Tests
 
-- [ ] T014 [P] [US2] Thêm vào `tests/learn/test_save_clean.py`:
+- [X] T014 [P] [US2] Thêm vào `tests/learn/test_save_clean.py`:
   - `save --update` ghi đè phong cách cùng slug, giữ `created`, thêm `updated`;
   - từ chối (mã 1) khi `EVIDENCE.md` mới thiếu một dòng của bảng "Corrections log" cũ;
   - `shots.json` được ghi từ `summary.json` với khoảng của mỗi tỉ lệ;
@@ -113,12 +113,12 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
 
 ### Implementation
 
-- [ ] T015 [US2] Sửa `tools/style-learn/sl/save.py`:
+- [X] T015 [US2] Sửa `tools/style-learn/sl/save.py`:
   - `--update`: cho slug đã có trong `my-styles/`; so các dòng bảng "Corrections log" cũ với mới, thiếu dòng nào thì `StepError` kèm dòng đó; giữ `created`, ghi `updated` vào `style.json`;
   - ghi `shots.json` (data-model "ShotGrammarRefs": khoảng của mỗi tỉ lệ = [min, max] giữa các video; `longest_same_scale_max` = max; `top_set_share_max` = max; `focus_t` = `focus.FOCUS_T`);
   - khi lưu, giữ `DEMO.md`, `demo/`, `test.jpg`, `test.mp4` và `demo-checks.json` đã có trong phong cách (học lại không làm mất phim mẫu).
-- [ ] T016 [US2] Sửa `tools/filmcheck/stylerefs.py`: đọc `my-styles/<slug>/shots.json` vào khoá `shot_grammar` (giữ nguyên dạng lồng), và `has_shot_grammar(refs)`. Thêm test vào `tests/filmcheck/test_stylerefs.py`.
-- [ ] T017 [US2] Sửa `tools/style-learn/learn.py`: thêm cờ `--update` cho `save`.
+- [X] T016 [US2] Sửa `tools/filmcheck/stylerefs.py`: đọc `my-styles/<slug>/shots.json` vào khoá `shot_grammar` (giữ nguyên dạng lồng), và `has_shot_grammar(refs)`. Thêm test vào `tests/filmcheck/test_stylerefs.py`.
+- [X] T017 [US2] Sửa `tools/style-learn/learn.py`: thêm cờ `--update` cho `save`.
 - [ ] T018 [US2] Chạy thật: `sh bin/studio learn fetch dusk-hypothetical-2 --channel <kênh trong channels/dusk-hypothetical/references.json> --count 10` (người dùng xác nhận quyền dùng như lời nhắc của `fetch`), rồi `measure`, `shots`. Ghi thời gian từng bước. Lấy thời gian các bước của lần học `dusk-hypothetical` trước (2026-11-12) từ sổ việc `.studio/jobs` để so cho SC-003; không còn thì ghi "không có số so" và chỉ báo thời gian lần này. Kiểm số cắt mỗi phút với khoảng 16–26.
 - [ ] T019 [US2] Chạy thật: `learn label dusk-hypothetical-2`; xem các cảnh `check` trên bảng ảnh và sửa bằng `--set` nếu sai; rồi `learn label … --pass 2 --sample 40` (SC-001). Mở bằng mắt ít nhất 2 bảng ảnh có nhãn.
 - [ ] T020 [US2] Chốt hai ngưỡng trên dữ liệu thật:
