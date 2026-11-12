@@ -1,0 +1,18 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block}#t{position:fixed;left:40px;top:40px;color:#fff;font:600 48px sans-serif}</style>
+</head><body>
+<canvas id="c"></canvas><div id="t">TINY FILM</div>
+<script>
+// Test film for tests/render (specs/019): 3 s, a big frame counter drawn on a 2D canvas, a WebGL context for the renderer string.
+const c = document.getElementById('c'); c.width = innerWidth; c.height = innerHeight;
+const g = c.getContext('2d');
+window.GL = document.createElement('canvas').getContext('webgl2');
+window.DUR = 3;
+window.render = (t) => {
+  g.fillStyle = `hsl(${Math.round(t * 120)},60%,40%)`; g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = '#fff'; g.font = '700 200px sans-serif'; g.fillText(String(Math.round(t * 100) / 100), 100, c.height / 2);
+};
+window.TEXTS = () => { const r = document.getElementById('t').getBoundingClientRect(); return [{ id: 't', text: 'TINY FILM', x0: r.left, y0: r.top, x1: r.right, y1: r.bottom }]; };
+window.render(0); window.READY = true;
+</script></body></html>
