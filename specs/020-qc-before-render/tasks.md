@@ -111,7 +111,7 @@ description: "Tasks for 020 — QC per shot before render"
   - gọi `python cli.py render-gate` trước `record.mjs`; mã ≠ 0 thì thoát với cùng mã;
   - khi có `--skip-checks` thì đặt `STUDIO_RENDER_SKIPPED_CHECKS` để `record.mjs` ghi dòng `render: checks skipped — <lý do>` vào `render.log`.
 - [X] T019 [US1] Sửa `tools/render/record.mjs`: nếu có `STUDIO_RENDER_SKIPPED_CHECKS` thì ghi dòng đó ngay sau khi tạo `render.log`.
-- [ ] T020 [US1] Chạy thật trên `films/pet-swap`:
+- [X] T020 [US1] Chạy thật trên `films/pet-swap`:
   - trước khi đo, thêm `window.CARDS` (`[[t0, t1, id, text]]`, lấy từ các thẻ mà `TEXTS` đang đọc) vào `films/pet-swap/main.js` (file của phim, ngoài git), để `qc plan` không phải chạy `readcheck`. FR-008 chỉ cam kết với phim có `CARDS`; ghi thêm thời gian của đường `readcheck` để so;
   - `sh bin/studio qc plan pet-swap`: kỳ vọng 0 lỗi nhịp; ghi lại thời gian (FR-008 ≤ 10 s).
   - Thêm ca test `tests/filmcheck/test_plan.py::test_pet_swap_first_render`, bỏ qua khi không có `films/pet-swap`. Ca test dựng lại các mốc cắt của lần render đầu (mỗi cắt = đầu câu − 0,06 s, cảnh đầu đoạn bắt đầu giữa khoảng nghỉ) trên `timeline.json`, rồi kiểm ≥ 80 lỗi `cut_*` và mọi cảnh chứa câu cuối < 2,5 s đều bị báo (SC-002).
