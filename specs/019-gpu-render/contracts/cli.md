@@ -25,10 +25,11 @@ Downloads the full Playwright Chromium matching the library's `playwright-core` 
 
 Writes `"render"` to `.studio/config.json`. Prints the new value. `auto` is the default.
 
-## `sh bin/studio render <film> [--fps N] [--workers N] [--out FILE] [--size WxH]` (new)
+## `sh bin/studio render <film> [--fps N] [--workers N] [--out FILE] [--size WxH] [--until SECONDS]` (new)
 
 Records the film's video, resumable (data-model.md "Recording run").
 - `<film>`: a name under `films/` or a path to a folder with `index.html`.
+- `--until`: record only `[0, SECONDS)` (N = ceil(SECONDS × fps)), for tests and quick checks; part of the fingerprint.
 - Defaults: `--fps` 24 (as the library; pass the rate the style sets, e.g. 30); `--workers` per research R5; `--out` `<film>/out/video.mp4`; `--size` 1920x1080.
 - Progress on stdout and in `<film>/out/render.log`: the header line, then `<done>/<n> chunks  <seconds>s` every 5 chunks, then `video <path> · <N> frames · <seconds>s`.
 - Exit 1 when a chunk fails 4 times, when ffmpeg fails, or when the joined video does not have `N` frames.

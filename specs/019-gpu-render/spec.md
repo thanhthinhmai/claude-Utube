@@ -51,7 +51,7 @@ Người dùng làm phim như thường. Khi tới bước ghi video, xưởng t
 - video có đủ số khung;
 - thời gian ghi không quá 40 phút.
 
-Đặt xưởng ở chế độ ép dùng phần mềm, chạy lại trên 30 giây đầu của phim: lệnh trạng thái báo "phần mềm", video vẫn ra đúng số khung.
+Đặt xưởng ở chế độ ép dùng phần mềm, ghi lại 30 giây đầu của phim (lệnh ghi cho chọn chỉ ghi một khoảng đầu): lệnh trạng thái báo "phần mềm", video vẫn ra đúng số khung.
 
 **Acceptance Scenarios**:
 

@@ -16,7 +16,7 @@ sh tests/filmcheck/run.sh && sh tests/ui/run.sh
 sh bin/studio status                      # expect: ✓ dựng hình   GPU · ANGLE (… D3D12 (Intel(R) UHD Graphics 730) …)
 DISPLAY= sh bin/studio status             # expect: · dựng hình   phần mềm · không có màn hình đồ hoạ
 PLAYWRIGHT_BROWSERS_PATH=/tmp/empty sh bin/studio status   # expect: ✗ … thiếu Chromium đầy đủ → sh bin/studio deps gpu
-sh bin/studio config render software && sh bin/studio status   # expect: · … phần mềm · do cấu hình
+sh bin/studio config render software && sh bin/studio status   # expect: · dựng hình   phần mềm · do cấu hình
 sh bin/studio config render auto
 ```
 Each `status` returns in ≤ 30 s (`time`).
