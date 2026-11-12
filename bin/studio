@@ -495,8 +495,13 @@ cmd_render() {
   else
     STUDIO_ROOT="${STUDIO_ROOT:-$ROOT}" STUDIO_LIB="$LIB" "$py" "$ROOT/tools/filmcheck/cli.py" render-gate "$film" || exit $?
   fi
+  STUDIO_QC_LIMITS=$(STUDIO_ROOT="${STUDIO_ROOT:-$ROOT}" "$py" "$ROOT/tools/filmcheck/cli.py" qc-limits "$film" 2>/dev/null || echo '{}')
+  export STUDIO_QC_LIMITS
   render_env
-  STUDIO_LIB="$LIB" exec node "$ROOT/tools/render/record.mjs" "$film" "$@"
+  code=0
+  STUDIO_LIB="$LIB" node "$ROOT/tools/render/record.mjs" "$film" "$@" || code=$?
+  STUDIO_ROOT="${STUDIO_ROOT:-$ROOT}" "$py" "$ROOT/tools/filmcheck/cli.py" render-done "$film" || true
+  exit $code
 }
 
 # Công cụ trang của thư viện (still, events, readcheck) với cùng cách dựng hình

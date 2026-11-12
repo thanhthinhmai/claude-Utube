@@ -108,3 +108,49 @@ test('--until records only the start of the film', () => {
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.equal(frames(path.join(d, 'out/video.mp4')), 15);
 });
+
+// ---------- specs/020 tier 3 (T037) ----------
+const STILL_FIX = path.join(ROOT, 'tests/render/fixtures/still-8');
+const stillFilm = () => { const d = fs.mkdtempSync(path.join(os.tmpdir(), 'still-')); fs.copyFileSync(path.join(STILL_FIX, 'index.html'), path.join(d, 'index.html')); return d; };
+const runStill = (d, extra = []) => spawnSync('node', [REC, d, '--fps', '5', '--size', '320x240', '--workers', '1', ...extra],
+  { env: baseEnv({ STUDIO_RENDER_CHUNK: '10' }), encoding: 'utf8', timeout: 300000 });
+const chunksIn = (d) => { const b = path.join(d, 'out/.chunks'); return fs.readdirSync(b).filter(x => fs.statSync(path.join(b, x)).isDirectory())
+  .flatMap(x => fs.readdirSync(path.join(b, x)).filter(f => /^c_\d+\.mp4$/.test(f))).sort(); };
+const fixStill = (d) => fs.writeFileSync(path.join(d, 'index.html'), fs.readFileSync(path.join(d, 'index.html'), 'utf8').replace('const STILL = true', 'const STILL = false'));
+
+test('tier 3: a still shot stops the run, earlier chunks kept; after the fix only the rest is recorded (SC-009)', () => {
+  const d = stillFilm();
+  const r = runStill(d);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  const logTxt = fs.readFileSync(path.join(d, 'out/render.log'), 'utf8');
+  assert.match(logTxt, /✗ render: chunk 4 \(S2, 8 s\) still 8 s/);
+  assert.match(logTxt, /render: stopped at chunk 4 \(S2/);
+  assert.ok(!fs.existsSync(path.join(d, 'out/video.mp4')));
+  assert.deepEqual(chunksIn(d), ['c_0000.mp4', 'c_0001.mp4', 'c_0002.mp4', 'c_0003.mp4']);
+  const st = JSON.parse(fs.readFileSync(path.join(d, 'out/.chunks/STOPPED.json'), 'utf8'));
+  assert.equal(st.shot, 'S2');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(d, 'out/render-qc.json'), 'utf8')).pass, false);
+  fixStill(d);
+  const r2 = runStill(d);
+  assert.equal(r2.status, 0, r2.stdout + r2.stderr);
+  assert.match(fs.readFileSync(path.join(d, 'out/render.log'), 'utf8'), /render: reused 4 chunks from the stopped run/);
+  assert.equal(frames(path.join(d, 'out/video.mp4')), 120);
+  assert.ok(!fs.existsSync(path.join(d, 'out/.chunks/STOPPED.json')));
+  assert.equal(JSON.parse(fs.readFileSync(path.join(d, 'out/render-qc.json'), 'utf8')).reused, 4);
+});
+
+test('tier 3: --fresh records everything again; --no-stop records all and lists the faults', () => {
+  const d = stillFilm();
+  assert.equal(runStill(d).status, 1);
+  fixStill(d);
+  const r = runStill(d, ['--fresh']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.doesNotMatch(fs.readFileSync(path.join(d, 'out/render.log'), 'utf8'), /reused/);
+  const e = stillFilm();
+  const r2 = runStill(e, ['--no-stop']);
+  assert.equal(r2.status, 1, r2.stdout + r2.stderr);
+  assert.equal(frames(path.join(e, 'out/video.mp4')), 120);
+  const logTxt = fs.readFileSync(path.join(e, 'out/render.log'), 'utf8');
+  assert.match(logTxt, /still 8 s/);
+  assert.match(logTxt, /1 chunk fault\(s\) \(--no-stop\)/);
+});

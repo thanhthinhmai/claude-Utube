@@ -218,12 +218,12 @@ description: "Tasks for 020 — QC per shot before render"
 
 ### Tests
 
-- [ ] T036 [P] [US4] Tạo `tests/render/chunkcheck.test.mjs` cho các hàm thuần của `chunkcheck.mjs`:
+- [X] T036 [P] [US4] Tạo `tests/render/chunkcheck.test.mjs` cho các hàm thuần của `chunkcheck.mjs`:
   - đọc log ffmpeg → khoảng đen, khoảng đứng yên;
   - nối hình đứng yên qua ranh giới đoạn khi đoạn kề đã kiểm (cả khi kiểm lệch thứ tự);
   - ngưỡng `still_max`, bỏ qua cảnh có ngoại lệ `still`;
   - map thời điểm → mã cảnh theo `SHOTS`.
-- [ ] T037 [P] [US4] Thêm vào `tests/render/record.test.mjs` (phim `tests/render/fixtures/still-8`, 2D, khoảng 30 s, cảnh đứng yên 8 s từ giây 12; `STUDIO_RENDER_CHUNK` nhỏ):
+- [X] T037 [P] [US4] Thêm vào `tests/render/record.test.mjs` (phim `tests/render/fixtures/still-8`, 2D, khoảng 30 s, cảnh đứng yên 8 s từ giây 12; `STUDIO_RENDER_CHUNK` nhỏ):
   - dừng với mã 1, báo mã cảnh, các đoạn trước còn, có `STOPPED.json` (SC-009);
   - `--no-stop` ghi hết và liệt kê lỗi;
   - sửa cảnh (đổi một tham số của cảnh lỗi) rồi chạy lại → log có `reused N chunks`, N = số đoạn trước chỗ lỗi;
@@ -231,20 +231,20 @@ description: "Tasks for 020 — QC per shot before render"
 
 ### Implementation
 
-- [ ] T038 [US4] Tạo `tools/render/chunkcheck.mjs`:
+- [X] T038 [US4] Tạo `tools/render/chunkcheck.mjs`:
   - `checkChunk(file, {fps, t0})` chạy `ffmpeg -vf scale=320:-2,blackdetect=d=0.25:pix_th=0.06,freezedetect=n=0.003:d=0.5`, rồi ghi `c_NNNN.json` với `{black: [], stills: [], head_still, tail_still}`;
   - `combine(results, {stillMax, shots, exceptions})` trả về lỗi `black_frames` và `still` có `{chunk, shot, at, rule, measure}`.
-- [ ] T039 [US4] Sửa `tools/render/record.mjs`:
+- [X] T039 [US4] Sửa `tools/render/record.mjs`:
   - sau `renameSync` của mỗi đoạn, gọi `checkChunk`, rồi `combine`;
   - lỗi và không có `--no-stop`: đặt `abort`, xoá đoạn lỗi và các đoạn sau, ghi `out/.chunks/STOPPED.json` (`{fingerprint, chunk_size, fps, size, first_bad, shot, rule, at, shots_hash}`), in `✗ render: chunk N (<shot>, <t> s) <rule> …`, mã 1;
   - `--no-stop`: gom lỗi, in ở cuối, mã 1 nếu có lỗi;
   - đọc `SHOTS` từ trang (đã mở sẵn trong `openPage`) và `still_max`, ngoại lệ (qua biến `STUDIO_QC_LIMITS` mà `bin/studio` đặt từ `stylerefs` và `qc-exceptions.json`).
-- [ ] T040 [US4] Sửa `tools/render/record.mjs` để dùng lại đoạn (research R8):
+- [X] T040 [US4] Sửa `tools/render/record.mjs` để dùng lại đoạn (research R8):
   - khi bắt đầu, nếu có `STOPPED.json` cùng `chunk_size`, `fps`, `size` và không có `--fresh`: chép các đoạn của thư mục cũ có `z ≤ first_bad.a`, và nằm trước cảnh đầu tiên có dòng `SHOTS` khác `shots_hash` cũ, sang thư mục mới;
   - log `reused N chunks from the stopped run`;
   - ghi `tiers.render.reused_chunks` qua `tools/filmcheck/cli.py render-done` (lệnh ẩn mới, cũng ghi `tiers.render.pass` và `stopped`);
   - xoá `STOPPED.json` khi ghi xong mà đạt.
-- [ ] T041 [US4] Sửa `cmd_render` trong `bin/studio`: chuyển `--no-stop` và `--fresh` cho `record.mjs`; đặt `STUDIO_QC_LIMITS` (JSON `{still_max, exceptions}` do `cli.py qc-limits <phim>` in ra); sau `record.mjs` gọi `cli.py render-done`. Cập nhật `usage`.
+- [X] T041 [US4] Sửa `cmd_render` trong `bin/studio`: chuyển `--no-stop` và `--fresh` cho `record.mjs`; đặt `STUDIO_QC_LIMITS` (JSON `{still_max, exceptions}` do `cli.py qc-limits <phim>` in ra); sau `record.mjs` gọi `cli.py render-done`. Cập nhật `usage`.
 
 **Checkpoint**: `sh tests/render/run.sh` đạt. Commit.
 

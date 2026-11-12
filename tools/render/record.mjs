@@ -11,6 +11,7 @@ import path from 'node:path';
 import { spawn, execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { LIB, isSoftware, resolveFilm, fingerprint, planChunks } from './lib.mjs';
+import { checkChunk, combine } from './chunkcheck.mjs';
 
 const argv = process.argv.slice(2);
 const opt = (/** @type {string} */ k, /** @type {string|null} */ d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
@@ -21,6 +22,10 @@ const [W, H] = String(opt('--size', '1920x1080')).split('x').map(Number);
 const UNTIL = opt('--until', null) != null ? +(/** @type {string} */ (opt('--until', null))) : null;
 const OUT = path.resolve(opt('--out', null) || path.join(FILM, 'out', 'video.mp4'));
 const CHUNK_MAX = +(process.env.STUDIO_RENDER_CHUNK || 10 * FPS);   // ≤ 10 s of film per chunk (FR-008)
+// specs/020 tier 3: each finished chunk is checked (black frames, stills); a fault stops the run unless --no-stop
+const NO_STOP = argv.includes('--no-stop'), FRESH = argv.includes('--fresh');
+const LIMITS = (() => { try { return JSON.parse(process.env.STUDIO_QC_LIMITS || '{}'); } catch { return {}; } })();
+const STILL_MAX = +(LIMITS.still_max || 6);
 if (!(FPS > 0) || !(W > 0 && H > 0 && W % 2 === 0 && H % 2 === 0) || (UNTIL != null && !(UNTIL > 0))) { console.error('bad --fps, --size or --until'); process.exit(2); }
 
 const { chromium } = await import(pathToFileURL(path.join(LIB, 'node_modules', 'playwright-core', 'index.mjs')).href);
@@ -41,6 +46,7 @@ const procs = new Set();     // running ffmpeg processes
 const browsers = new Set();
 let crashHookUsed = false;   // test hook: STUDIO_RENDER_TEST_CRASH_AT=<frame> closes the browser once
 class GpuLost extends Error {}
+class QcStop extends Error { constructor(/** @type {any[]} */ faults) { super('tier 3 fault'); this.faults = faults; } }
 class Abort extends Error {}
 let abort = /** @type {Error|null} */ (null);
 
@@ -81,6 +87,7 @@ async function run() {
   const ctx0 = await openPage();
   const N = Math.ceil((UNTIL != null ? Math.min(UNTIL, ctx0.dur) : ctx0.dur) * FPS);
   const fp = fingerprint(FILM, W, H, FPS, UNTIL);
+  const shots = await ctx0.p.evaluate(() => { const s = /** @type {any} */ (window).SHOTS; return Array.isArray(s) ? s : []; });
   const memWorkers = Math.max(1, Math.floor(os.freemem() / (1.5 * 2 ** 30)));
   const memCap = +(process.env.STUDIO_RENDER_TEST_FREE_GB ? Math.max(1, Math.floor(+process.env.STUDIO_RENDER_TEST_FREE_GB / 1.5)) : memWorkers);
   const want = Math.max(1, +(opt('--workers', null) || Math.min(2, memCap)));   // FR-011: GPU and software alike
@@ -93,7 +100,21 @@ async function run() {
   for (const f of fs.readdirSync(CH)) if (f.endsWith('.part.mp4')) fs.rmSync(path.join(CH, f), { force: true });
   const chunks = planChunks(N, CHUNK);
   const name = (/** @type {number} */ c) => path.join(/** @type {string} */ (CH), `c_${String(c).padStart(4, '0')}.mp4`);
+  reused = reuseStopped(chunks, name, shots, fp, CHUNK);
   const todo = chunks.filter(x => !fs.existsSync(name(x.c)));
+  // tier 3 results of chunks already on disk (this run's earlier attempt, or reused)
+  const checked = [];
+  const check = (/** @type {{c:number,a:number,z:number}} */ x) => {
+    const j = name(x.c).replace(/\.mp4$/, '.json');
+    let res = null;
+    try { res = JSON.parse(fs.readFileSync(j, 'utf8')); } catch { res = checkChunk(name(x.c), (x.z - x.a) / FPS); fs.writeFileSync(j, JSON.stringify(res)); }
+    checked.push({ c: x.c, t0: x.a / FPS, t1: x.z / FPS, res });
+    const got = combine(checked, { stillMax: STILL_MAX, shots, exceptions: LIMITS.exceptions || [], dur: N / FPS, fps: FPS });
+    for (const f of got) if (!faults.some(g => g.rule === f.rule && g.at === f.at)) { faults.push(f); log(`✗ render: chunk ${f.chunk} (${f.shot || '?'}, ${f.at} s) ${f.rule} ${f.measure} s`); }
+    if (faults.length && !NO_STOP && !abort) abort = new QcStop(faults);
+  };
+  for (const x of chunks) if (fs.existsSync(name(x.c))) check(x);
+  stopInfo = { fp, CHUNK, shots };
   const workers = Math.max(1, Math.min(todo.length || 1, want));
   log(`render: ${mode} · ${ctx0.r} · ${N} frames · ${chunks.length} chunks (${chunks.length - todo.length} already done) · ${workers} workers`
     + (mode === 'gpu' && GPU_EXE ? ' · a Chrome window is open off-screen, do not close it' : ''));
@@ -115,6 +136,7 @@ async function run() {
       }
     } catch (e) { ff.stdin.destroy(); ff.kill('SIGKILL'); await done.catch(() => {}); fs.rmSync(part, { force: true }); throw e; }
     ff.stdin.end(); await done; fs.renameSync(part, name(x.c));
+    check(x);
   }
 
   async function worker(/** @type {number} */ w, /** @type {any} */ ctx) {
@@ -138,6 +160,7 @@ async function run() {
   }
   await Promise.all(Array.from({ length: workers }, (_, w) => worker(w, w === 0 ? ctx0 : null)));
   if (abort) throw abort;
+  if (faults.length && !(NO_STOP)) throw new QcStop(faults);
 
   fs.writeFileSync(path.join(CH, 'list.txt'), chunks.map(x => `file '${path.basename(name(x.c))}'`).join('\n'));
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
@@ -150,17 +173,68 @@ async function run() {
   log(`video ${OUT} · ${N} frames · ${mode} · ${secs()}s`);
 }
 
+let reused = 0;
+const faults = /** @type {any[]} */ ([]);
+let stopInfo = /** @type {any} */ (null);
+const STOPPED = path.join(FILM, 'out', '.chunks', 'STOPPED.json');
+const shotsUntil = (/** @type {any[]} */ shots, /** @type {number} */ t) => JSON.stringify(shots.filter(s => s[0] < t - 1e-6).map(s => [+(+s[0]).toFixed(3), +(+s[1]).toFixed(3), String(s[3] || '')]));
+
+/** specs/020 R8: after a tier-3 stop and a fix, the chunks wholly before the fault (and before the first changed shot) are copied. */
+function reuseStopped(/** @type {{c:number,a:number,z:number}[]} */ chunks, /** @type {(c:number)=>string} */ name, /** @type {any[]} */ shots, /** @type {string} */ fp, /** @type {number} */ chunkSize) {
+  if (FRESH || !fs.existsSync(STOPPED)) return 0;
+  let st; try { st = JSON.parse(fs.readFileSync(STOPPED, 'utf8')); } catch { return 0; }
+  if (st.fingerprint === fp || st.chunk_size !== chunkSize || st.fps !== FPS || st.size !== `${W}x${H}` || st.mode !== mode) return 0;
+  if (!fs.existsSync(st.folder)) return 0;
+  let limit = st.first_bad_t;
+  for (const s of st.shots) {                       // the first shot that is not the same as in the stopped run
+    const n = shots.find(x => String(x[3] || '') === s[2]);
+    if (!n || Math.abs(n[0] - s[0]) > 1e-3 || Math.abs(n[1] - s[1]) > 1e-3) { limit = Math.min(limit, s[0]); break; }
+  }
+  let k = 0;
+  for (const x of chunks) {
+    if (x.z / FPS > limit + 1e-6) break;
+    const old = path.join(st.folder, path.basename(name(x.c)));
+    if (!fs.existsSync(old) || fs.existsSync(name(x.c))) continue;
+    fs.copyFileSync(old, name(x.c));
+    if (fs.existsSync(old.replace(/\.mp4$/, '.json'))) fs.copyFileSync(old.replace(/\.mp4$/, '.json'), name(x.c).replace(/\.mp4$/, '.json'));
+    k++;
+  }
+  log(`render: reused ${k} chunks from the stopped run`);
+  return k;
+}
+
+function writeResult(/** @type {any} */ stopped) {
+  try {
+    fs.writeFileSync(path.join(FILM, 'out', 'render-qc.json'), JSON.stringify({ pass: !faults.length, faults, reused, stopped,
+      no_stop: NO_STOP, skipped_checks: process.env.STUDIO_RENDER_SKIPPED_CHECKS || null, at: new Date().toISOString() }));
+  } catch {}
+}
+
 try {
   try { await run(); }
   catch (e) {
     if (!(e instanceof GpuLost)) throw e;
     log(`render: GPU lost (${e.message}) → re-recording everything in software`);
     if (CH) fs.rmSync(CH, { recursive: true, force: true });
-    mode = 'software'; abort = null;
+    mode = 'software'; abort = null; faults.length = 0;
     await run();
   }
+  writeResult(null);
+  if (faults.length) { log(`render: ${faults.length} chunk fault(s) (--no-stop): see above`); cleanupAndExit(1); }
   cleanupAndExit(0);
 } catch (e) {
+  if (e instanceof QcStop && CH && stopInfo) {
+    const first = Math.min(...e.faults.map((/** @type {any} */ f) => f.chunk));
+    for (const f of fs.readdirSync(CH)) { const m = /^c_(\d+)\.(mp4|json)$/.exec(f); if (m && +m[1] >= first) fs.rmSync(path.join(CH, f), { force: true }); }
+    const f0 = e.faults.find((/** @type {any} */ f) => f.chunk === first);
+    const st = { fingerprint: stopInfo.fp, chunk_size: stopInfo.CHUNK, fps: FPS, size: `${W}x${H}`, mode, folder: CH, first_bad: first,
+      first_bad_t: first * stopInfo.CHUNK / FPS, shot: f0.shot, rule: f0.rule, at: f0.at,
+      shots: JSON.parse(shotsUntil(stopInfo.shots, first * stopInfo.CHUNK / FPS)) };
+    fs.writeFileSync(STOPPED, JSON.stringify(st));
+    writeResult(st);
+    log(`render: stopped at chunk ${first} (${f0.shot || '?'}, ${f0.at} s, ${f0.rule}); chunks before it are kept. Fix the shot and run again.`);
+    cleanupAndExit(1);
+  }
   log(`render: failed — ${String(/** @type {any} */ (e)?.message || e).split('\n')[0]}`);
   cleanupAndExit(1);
 }

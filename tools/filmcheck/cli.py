@@ -802,6 +802,35 @@ def cmd_qc_voice(a) -> int:
     return 0 if r["pass"] else 1
 
 
+def cmd_qc_limits(a) -> int:
+    """JSON for tools/render/record.mjs (tier 3): the style's still limit and the film's exceptions."""
+    from filmcheck import qc, tiers
+    d = film_dir(a.film)
+    print(json.dumps({"still_max": qc.still_limit(d),
+                      "exceptions": [{"shot": e["shot"], "rule": e["rule"]} for e in tiers.load_exceptions(d)]}))
+    return 0
+
+
+def cmd_render_done(a) -> int:
+    """Save tiers.render from out/render-qc.json written by record.mjs (specs/020 FR-021)."""
+    from filmcheck import tiers
+    d = film_dir(a.film)
+    try:
+        q = json.loads((d / "out" / "render-qc.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return 0
+    issues = [{"tier": "render", "ref": f.get("shot") or f"chunk {f.get('chunk')}", "at": f.get("at"), "rule": f["rule"],
+               "severity": "block", "measure": f.get("measure"), "limit": f.get("limit"), "text": f"chunk {f.get('chunk')}",
+               "fix": "fix the shot and render again (earlier chunks are kept)", "excepted": None} for f in q.get("faults") or []]
+    old = tiers.load_tier(d, "render") or {}
+    skipped = old.get("skipped_checks") if q.get("skipped_checks") else None
+    res = tiers.result("render", issues, {"no_stop": q.get("no_stop")}, [], 0.0, tiers.fingerprint(d),
+                       stopped=q.get("stopped") and {k: q["stopped"].get(k) for k in ("first_bad", "shot", "rule", "at")},
+                       reused_chunks=q.get("reused", 0), skipped_checks=skipped)
+    tiers.save_tier(d, "render", res)
+    return 0
+
+
 def cmd_render_gate(a) -> int:
     from filmcheck import tiers
     d = film_dir(a.film)
@@ -869,6 +898,9 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("voice-asr", help="word stamps with the studio's recogniser model (specs/020)")
     s.add_argument("film")
     s.add_argument("--lang", default=None)
+    for name in ("qc-limits", "render-done"):
+        s = sub.add_parser(name, help="used by sh bin/studio render (specs/020)")
+        s.add_argument("film")
     s = sub.add_parser("render-gate", help="may this film be rendered? (specs/020)")
     s.add_argument("film")
     s.add_argument("--skip-checks", default=None)
@@ -984,7 +1016,8 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("qc-plan", "qc-plan"): cmd_qc_plan, ("render-gate", "render-gate"): cmd_render_gate,
             ("qc-shots", "qc-shots"): cmd_qc_shots, ("qc-accept-style", "qc-accept-style"): cmd_qc_accept_style,
             ("qc-except", "qc-except"): cmd_qc_except, ("qc-voice", "qc-voice"): cmd_qc_voice,
-            ("voice-asr", "voice-asr"): cmd_voice_asr,
+            ("voice-asr", "voice-asr"): cmd_voice_asr, ("qc-limits", "qc-limits"): cmd_qc_limits,
+            ("render-done", "render-done"): cmd_render_done,
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach,
