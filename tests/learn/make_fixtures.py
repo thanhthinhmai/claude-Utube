@@ -99,6 +99,42 @@ def rainbow(out: Path) -> None:
     encode(out, [img] * 30, 640, 360)
 
 
+def _box_blur(img: np.ndarray, r: int = 12, n: int = 3) -> np.ndarray:
+    f = img.astype(np.float32)
+    for _ in range(n):
+        for ax in (0, 1):
+            c = np.cumsum(np.pad(f, [(r + 1, r) if a == ax else (0, 0) for a in range(3)], mode="edge"), axis=ax)
+            f = (np.take(c, range(2 * r + 1, c.shape[ax]), axis=ax) - np.take(c, range(0, c.shape[ax] - 2 * r - 1), axis=ax)) / (2 * r + 1)
+    return np.clip(f, 0, 255).astype(np.uint8)
+
+
+def shots6(out: Path) -> None:
+    """specs/021: 18 s at 24 fps, 1280×720 with 2.05:1 bars, six 3-s shots with known focus and places.
+    1 sharp (place A) · 2 all blurred (place B) · 3 sharp (A, moved) · 4 one corner sharp (place C) ·
+    5 sharp (B) · 6 a text card on a plain dark field. Neighbouring shots are dark violet, so the cuts are subtle."""
+    w, h, bar = 1280, 720, 48
+    def place(seed, tint):
+        r = np.random.default_rng(seed)
+        blocks = r.integers(0, 170, (h // 8 + 1, w // 8 + 1, 3))
+        img = np.repeat(np.repeat(blocks, 8, 0), 8, 1)[:h, :w] + np.array(tint)
+        return np.clip(img, 0, 255).astype(np.uint8)
+    A, B, C = place(1, (40, 20, 70)), place(2, (60, 25, 50)), place(3, (25, 30, 80))
+    s1, s3 = A, np.roll(A, 24, axis=1)
+    s2, s5 = _box_blur(B), B
+    s4 = _box_blur(C)
+    s4[bar + 8:bar + 150, 8:300] = C[bar + 8:bar + 150, 8:300]   # only the top-left corner is sharp (inside one tile)
+    s6 = np.full((h, w, 3), (18, 12, 28), np.uint8)
+    s6[330:390, 440:840] = (230, 200, 120)                      # a gold "title" bar
+    shots = [s1, s2, s3, s4, s5, s6]
+    for s in shots:
+        s[:bar] = 0
+        s[h - bar:] = 0
+    frames = []
+    for s in shots:
+        frames += [s] * 72
+    encode(out, frames, w, h, fps=24)
+
+
 def long_video(out: Path) -> None:
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=160x90:r=30:d=300",
                     "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", str(out)], check=True)
@@ -146,6 +182,7 @@ def main() -> None:
     long_video(out / "long.mp4")
     portrait(out / "portrait.mp4")
     tone(out / "tone.mp4", out)
+    shots6(out / "shots6.mp4")
     (out / "broken.mp4").write_bytes(np.random.default_rng(1).integers(0, 255, 5000, np.uint8).tobytes())
 
 

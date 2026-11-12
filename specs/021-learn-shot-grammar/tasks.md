@@ -62,13 +62,13 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
 
 ### Tests
 
-- [ ] T008 [P] [US1] Thêm vào `tests/learn/make_fixtures.py` video `shots6.mp4` (1280×720, 24 fps, 18 s):
+- [X] T008 [P] [US1] Thêm vào `tests/learn/make_fixtures.py` video `shots6.mp4` (1280×720, 24 fps, 18 s):
   - 6 cảnh 3 s, cắt cứng giữa hai cảnh tối giống nhau (để kiểm R2);
   - cảnh 1, 3, 5 nét; cảnh 2 mờ hết; cảnh 4 chỉ nét một góc;
   - cảnh 6 là thẻ chữ trên nền trơn;
   - hai cặp cảnh dùng cùng một nền (2 bối cảnh lặp lại);
   - có dải đen 2.05:1.
-- [ ] T009 [P] [US1] Tạo `tests/learn/test_shots.py`:
+- [X] T009 [P] [US1] Tạo `tests/learn/test_shots.py`:
   - `learn shots` trên `shots6.mp4` → 6 cảnh, mốc cắt lệch ≤ 1 khung;
   - `focused_share` đúng thứ tự (cảnh 2 = 0, cảnh 4 ≤ 1/12);
   - gom ra 4 bối cảnh;
@@ -80,18 +80,18 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
 
 ### Implementation
 
-- [ ] T010 [US1] Tạo `tools/style-learn/sl/shots.py`:
+- [X] T010 [US1] Tạo `tools/style-learn/sl/shots.py`:
   - `detect(path, segs, flashes)`: ffmpeg `scdet=threshold=15` trên từng đoạn đo; gộp các điểm cắt cách nhau < 0,3 s; bỏ chớp sáng (research R2);
   - `frames(path, shots)`: khung giữa mỗi cảnh ≥ 0,5 s, 960×540 (thêm viền nếu khác tỉ lệ), vào `profile/<vid>/shot-frames/S001.jpg`;
   - `focus.measure` cho từng khung;
   - `signature(img)`: biểu đồ màu 4×4×4 trên ảnh 64 px, cộng độ sáng 3×3 vùng; `group(sigs, SET_D)` gom bằng liên kết đơn ra `B1…`;
   - `sheets(...)`: Pillow, 6 cột × tối đa 8 hàng, ô 200×112, nhãn `S001` (thêm `· CU · eye` khi đã có nhãn), ra `shot-sheets/<vid>_shots_<n>.jpg`;
   - ghi `profile/<vid>/shots.json` theo data-model "ShotLabel".
-- [ ] T011 [US1] Sửa `tools/style-learn/learn.py`:
+- [X] T011 [US1] Sửa `tools/style-learn/learn.py`:
   - lệnh `shots <set> [--only]`: gọi `sl/shots.py` cho từng video đã đo; in số cảnh và số cắt mỗi phút, ngoài 16–26 thì in `!` (contracts/cli.md); làm tiếp khi chạy lại;
   - lệnh `label <set> [--pass 2 --sample N] [--set vNN:Sxxx key=value …]`: gọi `filmcheck.labeler` (thêm `tools/` vào `sys.path`); ghi nhãn, `contradicts` thành `check: true` và in ra; `--pass 2` ghi `labels-pass2.json` và `agreement.json` (data-model "AgreementReport"; thứ tự bậc ecu < cu < med < wide < huge).
-- [ ] T012 [US1] Sửa `tools/style-learn/sl/summary.py`: tính `shot_grammar` cho mỗi video từ `shots.json` (data-model "ShotGrammar"; chỉ tính cảnh có nhãn, không `insert`/`short`/`unknown`), rồi cho cả bộ theo định dạng (trung vị và khoảng giữa các video); thêm vào `summary.md` một bảng "Shot grammar".
-- [ ] T013 [US1] Kiểm `sh bin/studio learn shots|label <set>` chạy được qua `bin/studio` (lệnh `learn` chuyển thẳng cho `learn.py`); thêm `shots|label` vào dòng `learn <lệnh>` ở phần trợ giúp đầu `bin/studio`.
+- [X] T012 [US1] Sửa `tools/style-learn/sl/summary.py`: tính `shot_grammar` cho mỗi video từ `shots.json` (data-model "ShotGrammar"; chỉ tính cảnh có nhãn, không `insert`/`short`/`unknown`), rồi cho cả bộ theo định dạng (trung vị và khoảng giữa các video); thêm vào `summary.md` một bảng "Shot grammar".
+- [X] T013 [US1] Kiểm `sh bin/studio learn shots|label <set>` chạy được qua `bin/studio` (lệnh `learn` chuyển thẳng cho `learn.py`); thêm `shots|label` vào dòng `learn <lệnh>` ở phần trợ giúp đầu `bin/studio`.
 
 **Checkpoint**: `sh tests/learn/run.sh` đạt. Commit.
 

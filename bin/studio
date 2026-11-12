@@ -4,7 +4,7 @@
 #   sh bin/studio status [--json]       trạng thái xưởng (không dùng mạng, không ghi file)
 #   sh bin/studio deps [voice] [music]  cài gói của thư viện (Node, Python, giọng, nhạc) vào lib/lemo-opuscar
 #   sh bin/studio deps learn [--extra]  cài công cụ học phong cách vào tools/.venv (--extra: tải video, chép lời)
-#   sh bin/studio learn <lệnh> …        học phong cách: fetch | measure | transcribe | summary | check-names | compare | save | clean
+#   sh bin/studio learn <lệnh> …        học phong cách: fetch | measure | shots | label | transcribe | summary | check-names | compare | save | clean
 #   sh bin/studio deps ui               cài giao diện web (tools/.venv)
 #   sh bin/studio deps online           cài thêm gói cho chế độ online (specs/007)
 #   sh bin/studio admin create <email>  tạo tài khoản quản trị (chế độ online: STUDIO_MODE=online, STUDIO_DATA)

@@ -64,6 +64,32 @@ def cmd_transcribe(a):
     return 0
 
 
+def cmd_shots(a):
+    from sl import shots
+    done = shots.shots_set(a.set, a.only)
+    print(f"Shots: {len(done)} video(s) split (already split ones skipped).")
+    return 0
+
+
+def cmd_label(a):
+    from sl import shots
+    from filmcheck import labeler
+    if a.set_label:
+        for item in a.set_label:
+            ref, *pairs = item.split()
+            row = shots.set_label(a.set, ref, pairs)
+            print(f"✓ {ref}: {row.get('scale')} · {row.get('angle')} (edited by the user)")
+        return 0
+    try:
+        if a.pass_ == 2:
+            shots.second_pass(a.set, a.sample)
+        else:
+            shots.label_set(a.set)
+    except labeler.LabelError as e:
+        raise StepError(str(e)) from None
+    return 0
+
+
 def cmd_summary(a):
     from sl import summary
     s = summary.build(a.set)
@@ -113,6 +139,16 @@ def main(argv=None) -> int:
     t = sub.add_parser("transcribe", help="chép lời (cần deps learn --extra)")
     t.add_argument("set"); t.add_argument("--model", default=None, help="default: the studio's model in tools/asr.json"); t.add_argument("--lang", default="auto")
     t.set_defaults(fn=cmd_transcribe)
+
+    sh = sub.add_parser("shots", help="tách cảnh, khung giữa cảnh, độ nét, bối cảnh (specs/021)")
+    sh.add_argument("set"); sh.add_argument("--only", nargs="*"); sh.set_defaults(fn=cmd_shots)
+
+    lb = sub.add_parser("label", help="gán nhãn cỡ cảnh và góc máy bằng một lượt Claude độc lập (specs/021)")
+    lb.add_argument("set"); lb.add_argument("--pass", dest="pass_", type=int, default=1, choices=(1, 2))
+    lb.add_argument("--sample", type=int, default=40)
+    lb.add_argument("--set", dest="set_label", action="append", metavar="'vNN:Sxxx key=value …'",
+                    help="sửa tay một nhãn, ví dụ --set 'v03:S014 scale=huge angle=top'")
+    lb.set_defaults(fn=cmd_label)
 
     s = sub.add_parser("summary", help="tổng hợp cả bộ")
     s.add_argument("set"); s.set_defaults(fn=cmd_summary)

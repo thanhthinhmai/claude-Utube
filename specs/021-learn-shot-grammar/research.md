@@ -20,7 +20,7 @@ Kết quả gồm: phương sai từng ô, `focused_share` (số ô nét / 12), 
 
 ## R2. Tách cảnh của video tham chiếu (giả định của spec, SC-001)
 
-**Quyết định**: thêm bước `learn shots <set>` dò lại cắt cảnh bằng ffmpeg `scdet` với ngưỡng 15 (thang 0–100), hợp với điểm cắt sẵn có của `measure`. Hai điểm cắt cách nhau dưới 0,3 s thì gộp, và chớp sáng mà `measure` đã đánh dấu thì bỏ. Sau đó số cắt mỗi phút được kiểm với khoảng đã sửa trong nhật ký của `dusk-hypothetical` (16–26 lần mỗi phút): ngoài khoảng thì in cảnh báo cho người học xem lại.
+**Quyết định**: thêm bước `learn shots <set>` dò lại cắt cảnh bằng **điểm cảnh (scene score) của ffmpeg** (`select='gt(scene,0.15)'`), đúng thước đo đã dùng làm bằng chứng ở nhật ký sửa #1. (Lúc làm, thử `scdet` với ngưỡng 15 trước: cắt giữa hai cảnh tối chỉ có điểm khoảng 4, nên bị bỏ sót.) Hai điểm cắt cách nhau dưới 0,3 s thì gộp, và chớp sáng mà `measure` đã đánh dấu thì bỏ. Sau đó số cắt mỗi phút được kiểm với khoảng đã sửa trong nhật ký của `dusk-hypothetical` (16–26 lần mỗi phút): ngoài khoảng thì in cảnh báo cho người học xem lại.
 
 **Lý do**: nhật ký sửa #1 của `dusk-hypothetical` ghi rằng phép dò hiện có chỉ ra 7,7 cắt mỗi phút, còn ngưỡng cảnh 0,15 ra 53 cắt trên 2 phút (khoảng 26 mỗi phút), khớp với lượt soát bằng mắt. Nhãn cảnh chỉ đúng khi tách cảnh đúng.
 
