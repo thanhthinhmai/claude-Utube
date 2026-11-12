@@ -65,7 +65,7 @@ Thêm `tools/asr.json`.
 | Nguyên tắc | Đánh giá |
 |---|---|
 | I. Spec là nguồn sự thật | Đạt. Spec đã duyệt và đã làm rõ (2026-11-12). Công nghệ chỉ nằm trong plan |
-| II. Không đoán | Đạt, với 1 điểm cần người dùng xác nhận: spec nói "ngưỡng theo phim ngắn của `qc` hiện nay", nhưng `qc` không có ngưỡng riêng cho phim ngắn. Research R3 đề xuất: dùng cùng ngưỡng nhịp, chỉ bỏ so số lần cắt mỗi phút khi phim < 30 s |
+| II. Không đoán | Đạt. Spec nói "ngưỡng theo phim ngắn của `qc` hiện nay", nhưng `qc` không có ngưỡng riêng cho phim ngắn. Người dùng đã duyệt (2026-11-12) cách ở research R3: dùng cùng ngưỡng nhịp, chỉ bỏ so số lần cắt mỗi phút khi phim < 30 s |
 | III. MVP theo story | Đạt. US1 (tầng 1 + cổng) tự chạy được. US3 (câu theo kịch bản) là nền của US1, nên phần `rhythm.sentences` làm trong giai đoạn nền; phần còn lại của US3 (tầng 0, mô hình chung) để sau |
 | IV. Đo được | Đạt. Mọi SC có số. Quickstart có chạy thật trên `pet-swap` và xem bằng mắt bảng ảnh và thumbnail |
 | V. Đơn giản | Có 2 điểm phức tạp, ghi ở Complexity Tracking |

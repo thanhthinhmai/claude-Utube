@@ -13,6 +13,7 @@
 ### Session 2026-11-12
 
 - Q: Phim lệch số đo của phong cách thì có chặn render không? → A: Không chặn. Lỗi nhịp (tầng 1) và lỗi khung (khung phẳng, quá tối hoặc cháy, chữ thiếu phông, chữ đè phụ đề ở tầng 2) chặn render; lệch phong cách chỉ cảnh báo, và render được khi người làm phim ghi một dòng lý do (FR-009, FR-013).
+- Q: Phim dưới 30 s dùng ngưỡng nào? → A: Cùng ngưỡng nhịp như phim dài; chỉ bỏ so số lần cắt mỗi phút với phong cách (`qc` hiện nay không có ngưỡng riêng cho phim ngắn).
 
 ## Bối cảnh
 
@@ -146,7 +147,7 @@ Sau khi ghép tiếng, bước kiểm cuối chỉ còn âm lượng, đỉnh ti
 - **Phim không xuất danh sách cảnh** (phim cũ, phim của thư viện): kiểm kế hoạch dò mốc cắt từ một bản xem trước độ phân giải thấp, hoặc báo "không có danh sách cảnh" và chỉ chạy các luật không cần cảnh.
 - **Một cảnh cố ý phẳng hoặc tối** (thẻ chữ, khoảnh khắc tắt đèn có chủ đích): người làm phim đánh dấu cảnh đó là ngoại lệ, kèm lý do; ngoại lệ hiện trong báo cáo.
 - **Dòng giọng do người dùng tự thu**: kiểm giọng vẫn chạy, nhưng chỉ báo, không đề nghị tạo lại.
-- **Phim rất ngắn (dưới 30 s)**: luật lặng và luật cắt mỗi phút dùng ngưỡng theo phim ngắn của `qc` hiện nay.
+- **Phim rất ngắn (dưới 30 s)**: luật nhịp dùng cùng ngưỡng như phim dài; phép so số lần cắt mỗi phút với phong cách được bỏ qua và báo là đã bỏ qua.
 - **Không có GPU**: kiểm hình theo cảnh vẫn chạy bằng phần mềm (≈ 1 s mỗi ảnh). Lệnh báo trước thời gian ước tính.
 - **Chế độ online**: worker chạy đủ các tầng như máy phát triển. Báo cáo của mỗi tầng hiện trên trang việc.
 - **Phụ đề của phim chưa đạt**: gói đăng báo lỗi và chỉ về kiểm kế hoạch, không tự cắt lại phụ đề.

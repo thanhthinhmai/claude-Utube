@@ -38,7 +38,7 @@ Mỗi mục: **Quyết định**, **Lý do**, **Đã cân nhắc**.
 
 **Lý do**: SC-005 chỉ đúng khi hai bên dùng cùng một code.
 
-**Phim ngắn (edge case)**: `qc` hiện nay **không** có ngưỡng riêng cho phim ngắn. Plan hiểu edge case như sau: phim dưới 30 s dùng cùng ngưỡng nhịp, và bỏ qua phép so "số lần cắt mỗi phút" với phong cách (đếm trên dưới nửa phút thì không đáng tin). Cần người dùng xác nhận.
+**Phim ngắn (edge case)**: `qc` hiện nay **không** có ngưỡng riêng cho phim ngắn. Plan hiểu edge case như sau: phim dưới 30 s dùng cùng ngưỡng nhịp, và bỏ qua phép so "số lần cắt mỗi phút" với phong cách (đếm trên dưới nửa phút thì không đáng tin). Người dùng đã duyệt (2026-11-12).
 
 ## R4. Đọc kế hoạch của phim mà không dựng hình (FR-005, FR-008)
 
