@@ -49,14 +49,11 @@ def deny_terms(data: dict) -> list:
 def proper_nouns(name: str) -> list:
     """Capitalised words inside sentences (not at their start) that occur twice or more in the transcripts:
     likely names of people or characters, so they are blocked too (FR-015)."""
-    counts, lower = {}, {}
+    counts = {}
     for f in (refset.set_dir(name) / "profile").glob("*/words.json"):
         words = [w.get("word", "").strip() for w in refset.read_json(f).get("words", [])]
         for i, w in enumerate(words):
             core = w.strip("\"'“”‘’()[],;:.!?")
-            if core[:1].islower():
-                k = tuple(tokens(core))
-                lower[k] = lower.get(k, 0) + 1
             if i == 0 or not core[:1].isupper() or core == "I" or len(core) < 3:
                 continue
             if words[i - 1].rstrip("\"'”’)").endswith((".", "!", "?")):
@@ -64,8 +61,7 @@ def proper_nouns(name: str) -> list:
             tk = tokens(core)
             if tk:
                 counts[tuple(tk)] = counts.get(tuple(tk), 0) + 1
-    # a word that is mostly written in lower case ("The" after a quote) is an ordinary word, not a name
-    return [list(k) for k, n in counts.items() if n >= 2 and lower.get(k, 0) < n]
+    return [list(k) for k, n in counts.items() if n >= 2]
 
 
 def transcript_grams(name: str) -> set:
