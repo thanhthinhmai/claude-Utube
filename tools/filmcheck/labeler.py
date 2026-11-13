@@ -19,21 +19,24 @@ SYSTEM = """You are the studio's shot labeler. You look at contact sheets of vid
 captioned with its shot id, and label every listed shot. Judge only what you see in the pictures you are given; do
 not guess what the film is about or what it intends.
 
-Shot scale (by how much of a standing figure the frame shows; with no figure, by the subject in focus):
-- ecu: part of a face, or one small object, fills the frame
-- cu: head and shoulders
-- med: from the waist or knees up
-- wide: whole figure with some of the place around it
-- huge: figure smaller than a quarter of the frame height, or a view over a whole place, crowd or city
+The first image is the studio's guide (not a shot): one figure at each scale, captioned with the rule.
+Shot scale: decide by where the frame's bottom edge cuts the main figure (on big-headed figures the head counts as the
+face); with no figure, by the subject in focus:
+- ecu: the edge cuts the head or face (part of the face fills the frame), or one small object fills the frame
+- cu: the edge falls between the chin and the chest (head and shoulders)
+- med: the edge falls between the chest and the knees
+- wide: the whole figure is in the frame and is at least a quarter of the frame height
+- huge: the figure is under a quarter of the frame height, or a view over a whole place, crowd or city
+When two figures differ, use the one in focus; when it is between two scales, use the edge rule exactly as written.
 - insert: a text card, a flat graphic, an empty backdrop carrying only text or numbers
 - unknown: you cannot tell
-Camera angle:
+Camera angle (eye unless the picture clearly shows otherwise):
 - eye: at eye level of the subject
-- low: camera below, looking up
-- high: camera above, looking down at a slant
-- top: looking straight down
-- ots: over the shoulder, a blurred head or shoulder in the foreground
-- unknown: you cannot tell
+- low: clearly looking up: ceiling or sky behind the subject, the subject towers
+- high: clearly looking down at a slant: the floor or ground fills the background behind the subject
+- top: looking straight down, the floor is the whole background
+- ots: over the shoulder: a blurred head or shoulder of another figure in the foreground (this wins over eye)
+- unknown: you cannot tell; for a text card or flat graphic use eye
 foreground_blur: true when a large out-of-focus shape (head, shoulder, object) sits in the foreground at an edge.
 place: where the shot is, in at most three lowercase words ("bedroom", "football field", "empty void"). Use the same
 words for every shot in the same place, across all the sheets you are given; a text card on a plain backdrop is
@@ -52,8 +55,12 @@ class LabelError(Exception):
     """The labeler could not run or did not answer as asked."""
 
 
+GUIDE = Path(__file__).resolve().parent / "labeler-guide.png"      # code-drawn (tools/style-learn/sl/guide.py)
+
+
 def prompt(sheets: list, ids: list, hints: dict) -> str:
-    lines = ["Read these contact sheets:", *[f"* {Path(s).resolve()}" for s in sheets], "",
+    guide = [f"* {GUIDE} (the guide: read it first; it is not a shot)"] if GUIDE.is_file() else []
+    lines = ["Read these images:", *guide, *[f"* {Path(s).resolve()}" for s in sheets], "",
              "Label these shots (id, measured focus share, sharpest tile column,row):"]
     for i in ids:
         h = hints.get(i) or {}

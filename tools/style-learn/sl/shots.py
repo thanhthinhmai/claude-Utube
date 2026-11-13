@@ -206,13 +206,36 @@ def _videos_with_shots(name: str) -> list:
     return [v for v in data["videos"] if shots_file(name, v["id"]).exists()]
 
 
+def cell_frames(prof: Path, rows: list) -> dict:
+    """After `clean` the full-size frames are gone: cut each shot's picture back out of its labelled contact sheet
+    (the same 200×112 picture the labeler saw), without the caption. {id: path}."""
+    out, cache = {}, {}
+    tmp = prof / "label-cells"
+    tmp.mkdir(exist_ok=True)
+    for r in rows:
+        sheet, _, n = (r.get("evidence") or "").partition("#")
+        f = prof / "shot-sheets" / sheet
+        if not n or not f.exists():
+            continue
+        n = int(n) - 1
+        im = cache.setdefault(sheet, Image.open(f).convert("RGB"))
+        x, y = 6 + (n % COLS) * (CW + 6), 6 + (n // COLS) * (CH + LAB + 6) + LAB
+        dst = tmp / f"{r['id']}.jpg"
+        im.crop((x, y, x + CW, y + CH)).save(dst, quality=92)
+        out[r["id"]] = dst
+    return out
+
+
 def label_set(name: str, log=print) -> dict:
     total = {"shots": 0, "calls": 0, "check": []}
     for v in _videos_with_shots(name):
         prof = refset.profile_dir(name, v["id"])
         d = refset.read_json(shots_file(name, v["id"]))
         full = [r for r in d["shots"] if not r.get("short")]
-        plain = draw_sheets(full, lambda s: prof / s["frame"], prof / "label-sheets", f"{v['id']}_plain", captions=False)
+        cells = {} if all((prof / r["frame"]).exists() for r in full) else cell_frames(prof, full)
+        full = [r for r in full if not cells or r["id"] in cells]
+        plain = draw_sheets(full, lambda s: cells.get(s["id"]) or prof / s["frame"], prof / "label-sheets",
+                            f"{v['id']}_plain", captions=False)
         hints = {r["id"]: r.get("focus") or {} for r in full}
         got = labeler.label(plain, hints)
         for r in full:
@@ -226,7 +249,10 @@ def label_set(name: str, log=print) -> dict:
                 if r["check"]:
                     total["check"].append(f"{v['id']}:{r['id']}")
         d["labeler"] = {"model": got["model"], "usage": got["usage"], "calls": got["calls"]}
-        draw_sheets(full, lambda s: prof / s["frame"], prof / "shot-sheets", f"{v['id']}_shots")
+        draw_sheets(full, lambda s: cells.get(s["id"]) or prof / s["frame"], prof / "shot-sheets", f"{v['id']}_shots")
+        if cells:
+            import shutil
+            shutil.rmtree(prof / "label-cells", ignore_errors=True)
         refset.write_json(shots_file(name, v["id"]), d)
         total["shots"] += len(full)
         total["calls"] += got["calls"]
@@ -268,8 +294,16 @@ def second_pass(name: str, n: int = 40, seed: int = 21, log=print) -> dict:
         raise refset.StepError("no labelled shot yet: run learn label first")
     pick = random.Random(seed).sample(pool, min(n, len(pool)))
     tmp = refset.set_dir(name) / "profile" / "pass2"
-    rows = [{**r, "id": f"{vid}-{r['id']}", "_vid": vid} for vid, r in pick]
-    groups = draw_sheets(rows, lambda s: refset.profile_dir(name, s["_vid"]) / s["frame"], tmp, "pass2", captions=False)
+    rows = [{**r, "id": f"{vid}-{r['id']}", "_vid": vid, "_sid": r["id"]} for vid, r in pick]
+    cells = {}
+    for vid in {x["_vid"] for x in rows}:
+        prof = refset.profile_dir(name, vid)
+        mine = [x for x in rows if x["_vid"] == vid]
+        if not all((prof / x["frame"]).exists() for x in mine):
+            got_cells = cell_frames(prof, [{**x, "id": x["_sid"]} for x in mine])
+            cells.update({f"{vid}-{k}": p for k, p in got_cells.items()})
+    groups = draw_sheets(rows, lambda s: cells.get(s["id"]) or refset.profile_dir(name, s["_vid"]) / s["frame"], tmp, "pass2",
+                         captions=False)
     got = labeler.label(groups, {r["id"]: r.get("focus") or {} for r in rows})
     same = within = angle = 0
     scale_n = 0

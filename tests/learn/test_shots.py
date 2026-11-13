@@ -74,6 +74,14 @@ class Shots(unittest.TestCase):
         d = json.loads(shots.shots_file("six", "v01").read_text())
         self.assertEqual(d["shots"][1]["scale"], "huge")
 
+        # after clean the full-size frames are gone: labelling again cuts the pictures out of the labelled sheets
+        import shutil
+        shutil.rmtree(refset.profile_dir("six", "v01") / "shot-frames")
+        shots.label_set("six", log=lambda *_: None)
+        d = json.loads(shots.shots_file("six", "v01").read_text())
+        self.assertEqual(d["shots"][2]["scale"], "huge")
+        self.assertFalse((refset.profile_dir("six", "v01") / "label-cells").exists())
+
         s = summary.build("six")
         vj = json.loads((refset.profile_dir("six", "v01") / "video.json").read_text())
         g = vj["shot_grammar"]
