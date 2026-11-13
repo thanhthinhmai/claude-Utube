@@ -149,7 +149,7 @@ class EditorModel(unittest.TestCase):
                 os.environ[k] = v
 
     def test_default_is_inherit(self):
-        self.assertEqual((editor.editor_model(), editor.model_args()), ("inherit", []))
+        self.assertEqual((editor.editor_model(), editor.model_args()), ("inherit", ["--model", "claude-opus-5-5"]))
         os.environ["STUDIO_MODEL"] = "claude-opus-5-5"
         self.assertEqual(editor.model_args(), ["--model", "claude-opus-5-5"])
 

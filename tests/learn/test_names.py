@@ -49,6 +49,13 @@ class Names(unittest.TestCase):
         self.assertEqual(self.check("Bob style hats."), [])                # only once
         self.assertEqual(self.check("Later the camera rests."), [])        # sentence start, not a name
 
+    def test_common_word_capitalised_is_not_a_name(self):
+        words = 'he said "The end" and "The door" , then the cat met Alice , then Alice left'.split()
+        refset.write_json(refset.profile_dir("names-set", "v02") / "words.json",
+                          {"words": [{"word": w, "start": i, "end": i + .5} for i, w in enumerate(words)]})
+        self.assertEqual(self.check("The camera rests on the hero."), [])   # "The" is mostly lower case
+        self.assertTrue(self.check("A heroine like alice walks in."))
+
     def test_strings_and_cli_exit(self):
         self.assertTrue(names.check_strings("names-set", ["meo-luoi-studio"]))
         self.f.write_text("clean\n", encoding="utf-8")

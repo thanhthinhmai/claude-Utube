@@ -1,0 +1,20 @@
+{
+ "line": "Big sphere-headed 3D figures act second-person hypotheticals in a soft low-poly world graded to permanent violet dusk, cut every few seconds under a narrator who never stops.",
+ "line_cn": "",
+ "borrows": [],
+ "slug": "dusk-hypothetical",
+ "en": "Dusk Hypothetical",
+ "cn": "",
+ "based_on": "brick-toy",
+ "library_version": "bebbbe1",
+ "created": "2026-11-12",
+ "source": "learned",
+ "reference": {
+  "videos": 10,
+  "measured_seconds": 1800.0,
+  "formats": [
+   "landscape"
+  ]
+ },
+ "updated": "2026-11-13"
+}
