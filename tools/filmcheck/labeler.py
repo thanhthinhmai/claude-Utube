@@ -35,13 +35,17 @@ Camera angle:
 - ots: over the shoulder, a blurred head or shoulder in the foreground
 - unknown: you cannot tell
 foreground_blur: true when a large out-of-focus shape (head, shoulder, object) sits in the foreground at an edge.
+place: where the shot is, in at most three lowercase words ("bedroom", "football field", "empty void"). Use the same
+words for every shot in the same place, across all the sheets you are given; a text card on a plain backdrop is
+"text card".
 Each shot comes with a measured focus: the share of the frame in focus (0-1) and the column, row of the sharpest
 tile (4 x 3 grid). Use it to check yourself, not to replace looking. Answer every listed id exactly once."""
 
 SCHEMA = {"type": "object", "required": ["shots"], "properties": {"shots": {"type": "array", "items": {
-    "type": "object", "required": ["id", "scale", "angle", "foreground_blur", "confidence"],
+    "type": "object", "required": ["id", "scale", "angle", "foreground_blur", "place", "confidence"],
     "properties": {"id": {"type": "string"}, "scale": {"enum": SCALES}, "angle": {"enum": ANGLES},
-                   "foreground_blur": {"type": "boolean"}, "confidence": {"enum": ["high", "low"]}}}}}}
+                   "foreground_blur": {"type": "boolean"}, "place": {"type": "string", "maxLength": 40},
+                   "confidence": {"enum": ["high", "low"]}}}}}}
 
 
 class LabelError(Exception):
@@ -65,7 +69,9 @@ def _valid(ans, ids: list):
     for s in ans["shots"]:
         if not isinstance(s, dict) or s.get("id") not in ids or s.get("scale") not in SCALES or s.get("angle") not in ANGLES:
             return None
+        place = " ".join(str(s.get("place") or "unknown").lower().split()[:3])
         out[s["id"]] = {"scale": s["scale"], "angle": s["angle"], "foreground_blur": bool(s.get("foreground_blur")),
+                        "place": place,
                         "confidence": s.get("confidence") if s.get("confidence") in ("high", "low") else "low"}
     return out if set(out) == set(ids) else None
 

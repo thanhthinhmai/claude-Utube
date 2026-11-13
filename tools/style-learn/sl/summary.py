@@ -60,6 +60,7 @@ def build(name: str) -> dict:
     d = refset.set_dir(name)
     profs = []
     from . import shots as shotmod
+    shotmod.refocus(name)                                     # specs/021: shares at the current focus threshold
     for v in data["videos"]:
         f = d / "profile" / v["id"] / "video.json"
         if v.get("state") in ("measured", "transcribed") and f.exists():

@@ -61,8 +61,9 @@ class Shots(unittest.TestCase):
 
     def test_label_edit_summary_and_agreement(self):
         shots.shots_set("six", log=lambda *_: None)
-        self.labels({"S001": ["cu", "eye", True], "S002": ["ecu", "low", False], "S003": ["huge", "top", False],
-                     "S004": ["cu", "eye", False], "S005": ["wide", "ots", True], "S006": ["insert", "eye", False]})
+        self.labels({"S001": ["cu", "eye", True, "violet room"], "S002": ["ecu", "low", False, "red room"],
+                     "S003": ["huge", "top", False, "violet room"], "S004": ["cu", "eye", False, "blue hall"],
+                     "S005": ["wide", "ots", True, "red room"], "S006": ["insert", "eye", False, "text card"]})
         shots.label_set("six", log=lambda *_: None)
         d = json.loads(shots.shots_file("six", "v01").read_text())
         self.assertEqual([r["scale"] for r in d["shots"]], ["cu", "ecu", "huge", "cu", "wide", "insert"])
@@ -80,7 +81,8 @@ class Shots(unittest.TestCase):
         self.assertEqual(g["inserts"], 1)
         self.assertEqual(g["scale_share"]["huge"], 0.4)
         self.assertEqual(g["subject_sharp_share"], 0.8)                   # 4 of 5 have a sharp tile
-        self.assertEqual(g["sets"], 4)
+        self.assertEqual(g["sets"], 4)                                    # places from the labeler (FR-004)
+        self.assertEqual(d["shots"][0]["set"], "violet room")
         self.assertIn("shot_grammar", s["by_orientation"]["landscape"])
         self.assertIn("Shot grammar", (refset.set_dir("six") / "profile" / "summary.md").read_text())
 

@@ -16,6 +16,7 @@
 - Q: "Khung mờ" (không vùng nào nét) chặn render hay chỉ cảnh báo? → A: Chặn, như khung phẳng hay quá tối; cảnh cố ý mờ thì đánh dấu ngoại lệ kèm lý do (FR-011).
 - Q: Khi kiểm một phim, ai gán nhãn cỡ cảnh và góc máy cho các cảnh của phim? → A: Một lượt Claude riêng, độc lập với người làm phim (như người biên tập kịch bản của specs/010), chỉ xem bảng ảnh; kết quả lưu theo nguồn phim, nguồn không đổi thì dùng lại (FR-010).
 - Q: Bộ nhãn chuẩn để đo SC-001 do ai làm? → A: Một lượt Claude thứ hai, độc lập, gán nhãn cùng 40 cảnh; SC-001 đo độ nhất quán giữa hai lượt (không đo độ đúng so với người). Độ đúng được kiểm trên phim thử có nhãn biết trước (SC-005).
+- Q: (2026-11-13, khi học lại) Gom bối cảnh theo màu và bố cục không dùng được trên kênh tông tím: gom lỏng thì gần hết cảnh thành một nhóm (76/85), gom chặt thì mỗi góc máy thành một nhóm (42–75/85). Đo bối cảnh cách nào? → A: Lượt gán nhãn ghi tên nơi ngắn cho mỗi cảnh; với phim dùng `set` của danh sách cảnh (FR-004).
 - Q: Phong cách học được có cần phim mẫu như phong cách thư viện không? → A: Có, thêm vào tính năng này: phong cách học được có `DEMO.md`, mã nguồn phim mẫu dựng lại được bằng một lệnh, và phim cùng ảnh đại diện, như phong cách thư viện và hướng dẫn "My styles" của thư viện (US4).
 
 ## Bối cảnh
@@ -125,7 +126,7 @@ Học xong, xưởng làm một phim mẫu ngắn theo đúng phong cách vừa 
 - **FR-001**: Bước học phong cách PHẢI gán cho mỗi cảnh của video tham chiếu: cỡ cảnh (đặc tả, cận, trung, toàn, toàn rất rộng, chèn, không rõ), góc máy (ngang tầm mắt, thấp, từ trên xuống, qua vai, không rõ), phần khung nét (0–1), chủ thể nét hay mờ, có tiền cảnh mờ hay không, và mã bối cảnh.
 - **FR-002**: Cỡ cảnh và góc máy PHẢI được Claude gán nhãn khi xem bảng ảnh, từng cảnh một; mỗi nhãn ghi ô bảng ảnh làm bằng chứng. Công cụ đo độ nét và kích thước vùng nét để kiểm chéo: nhãn mâu thuẫn với số đo (ví dụ "đặc tả" mà vùng nét chiếm rất nhỏ ở xa tâm) PHẢI được xem lại. Nhãn được lưu để người dùng soát lại.
 - **FR-003**: Độ nét PHẢI được đo bằng công cụ trên từng khung giữa cảnh, không tính dải đen và vùng phụ đề cháy vào hình. Cách đo độ nét PHẢI giống hệt khi đo video tham chiếu và khi đo phim (US3).
-- **FR-004**: Bối cảnh PHẢI được nhận ra bằng cách gom các cảnh giống nhau về màu và bố cục; kết quả có số bối cảnh, tỉ lệ cảnh của bối cảnh nhiều nhất, và thời gian trung vị giữa hai lần đổi bối cảnh.
+- **FR-004**: Bối cảnh PHẢI được nhận ra bằng tên nơi ngắn (ví dụ "bedroom", "football field") do lượt gán nhãn ghi cho mỗi cảnh, trong cùng một lượt cho cả một video để tên nơi nhất quán; kết quả có số bối cảnh, tỉ lệ cảnh của bối cảnh nhiều nhất, và thời gian trung vị giữa hai lần đổi bối cảnh. Với phim, bối cảnh là trường `set` của danh sách cảnh.
 - **FR-005**: Hồ sơ đo PHẢI có, cho mỗi định dạng: tỉ lệ từng cỡ cảnh, tỉ lệ từng góc máy, tỉ lệ hai cảnh liền nhau đổi cỡ, chuỗi cùng cỡ dài nhất, trung vị phần khung nét, tỉ lệ cảnh có chủ thể nét, tỉ lệ cảnh có tiền cảnh mờ, số bối cảnh, thời gian trung vị giữa hai lần đổi bối cảnh. Mỗi số có trung vị và khoảng giữa các video.
 - **FR-006**: Bảng ảnh của bước học PHẢI ghi mã cảnh và nhãn trên mỗi ô.
 - **FR-007**: Các số đo cách quay PHẢI được ghi vào phong cách: bảng "Key numbers" của bằng chứng, mục camera và chiều sâu của bản phong cách (kèm khung bằng chứng), và một chỗ máy đọc được để tầng kiểm dùng.

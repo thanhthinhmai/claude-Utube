@@ -7,7 +7,7 @@ variance of its Laplacian is at least FOCUS_T."""
 import subprocess
 from pathlib import Path
 
-FOCUS_T = 40.0          # set on the reference frames (research R1; T020)
+FOCUS_T = 200.0         # set on dusk-hypothetical's reference frames: 99.3 % have a tile this sharp (research R1, T020)
 W = 480
 COLS, ROWS = 4, 3
 EDGE = 3                # rows kept clear of a letterbox edge
@@ -70,3 +70,9 @@ def measure(image, subtitle_band: float = 0.18) -> dict:
     return {"tiles": tiles, "focused_share": round(sum(t >= FOCUS_T for t in tiles) / len(tiles), 3),
             "sharpest": tiles[best], "sharpest_at": [best % COLS, best // COLS],
             "letterbox": [round(top_bar / h, 3), round(bot_bar / h, 3)]}
+
+
+def share(tiles: list, t: float = None) -> float:
+    """The focused share of stored tile variances at a threshold (default FOCUS_T)."""
+    t = FOCUS_T if t is None else t
+    return round(sum(x >= t for x in tiles) / len(tiles), 3) if tiles else 0.0

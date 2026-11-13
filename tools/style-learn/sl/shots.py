@@ -22,7 +22,7 @@ from filmcheck import focus, labeler  # noqa: E402
 SCENE_T = 0.15          # ffmpeg scene score; dusk-hypothetical corrections #1: "scene > 0.15" matched the cuts seen by eye
 MERGE_S = 0.3           # cuts closer than this are one cut
 SHORT_S = 0.5           # shorter shots get no label
-SET_D = 0.35            # colour-signature distance under which two shots are the same place (research R4; T020)
+SET_D = 0.35            # colour grouping: only a first guess; the labeler's place names replace it (research R4, 2026-11-13)
 CPM_RANGE = (16, 26)    # cuts per minute expected of the set (warn outside; dusk-hypothetical corrections #1)
 COLS, PER, CW, CH, LAB = 6, 48, 200, 112, 18
 SCALE_ORDER = labeler.ORDER
@@ -184,6 +184,22 @@ def shots_set(name: str, only=None, log=print) -> list:
     return done
 
 
+def refocus(name: str) -> None:
+    """Recompute every focused_share from the stored tile variances with the current FOCUS_T (no new measuring)."""
+    for v in refset.load(name)["videos"]:
+        f = shots_file(name, v["id"])
+        if not f.exists():
+            continue
+        d = refset.read_json(f)
+        if d.get("focus_t") == focus.FOCUS_T:
+            continue
+        for r in d["shots"]:
+            if r.get("focus"):
+                r["focus"]["focused_share"] = focus.share(r["focus"]["tiles"])
+        d["focus_t"] = focus.FOCUS_T
+        refset.write_json(f, d)
+
+
 # ---------- learn label ----------
 def _videos_with_shots(name: str) -> list:
     data = refset.load(name)
@@ -205,6 +221,7 @@ def label_set(name: str, log=print) -> dict:
             lab = got["labels"].get(r["id"])
             if lab:
                 r.update(lab)
+                r["set"] = lab.get("place") or r.get("set")       # specs/021 FR-004 (2026-11-13): places from the labeler
                 r["check"] = labeler.contradicts(lab, r.get("focus"))
                 if r["check"]:
                     total["check"].append(f"{v['id']}:{r['id']}")
@@ -230,9 +247,11 @@ def set_label(name: str, ref: str, pairs: list) -> dict:
     for p in pairs:
         k, _, val = p.partition("=")
         if k == "scale" and val not in labeler.SCALES or k == "angle" and val not in labeler.ANGLES or k not in (
-                "scale", "angle", "foreground_blur", "set"):
+                "scale", "angle", "foreground_blur", "set", "place"):
             raise refset.UsageError(f"bad value {p} (scale: {'/'.join(labeler.SCALES)}; angle: {'/'.join(labeler.ANGLES)})")
         row[k] = (val.lower() in ("1", "true", "yes")) if k == "foreground_blur" else val
+        if k == "place":
+            row["set"] = val
     row["edited_by"] = "user"
     row["check"] = False
     refset.write_json(f, d)
@@ -270,11 +289,16 @@ def second_pass(name: str, n: int = 40, seed: int = 21, log=print) -> dict:
         if r["scale"] != b["scale"] or r["angle"] != b["angle"]:
             dis.append({"id": r["id"], "a": [r["scale"], r["angle"]], "b": [b["scale"], b["angle"]]})
     k = len(rows)
+    # angles of text cards are not defined (and not counted in the angle shares): agreement on the other shots too
+    cam = [r for r in rows if r["scale"] != "insert" and got["labels"][r["id"]]["scale"] != "insert"]
+    angle_cam = sum(r["angle"] == got["labels"][r["id"]]["angle"] for r in cam)
     rep = {"n": k, "scale_same": round(same / k, 3), "scale_within_one": round(within / max(scale_n, 1), 3),
-           "angle_same": round(angle / k, 3), "disagreements": dis, "model": got["model"]}
+           "angle_same": round(angle / k, 3), "angle_same_without_inserts": round(angle_cam / max(len(cam), 1), 3),
+           "n_without_inserts": len(cam), "disagreements": dis, "model": got["model"]}
     refset.write_json(refset.set_dir(name) / "profile" / "labels-pass2.json", got["labels"])
     refset.write_json(refset.set_dir(name) / "profile" / "agreement.json", rep)
-    log(f"scale same {rep['scale_same']:.2f} · within one {rep['scale_within_one']:.2f} · angle same {rep['angle_same']:.2f} (n={k})")
+    log(f"scale same {rep['scale_same']:.2f} · within one {rep['scale_within_one']:.2f} · angle same {rep['angle_same']:.2f}"
+        f" ({rep['angle_same_without_inserts']:.2f} without text cards, n={len(cam)}) · n={k}")
     return rep
 
 

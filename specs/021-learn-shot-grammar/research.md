@@ -12,7 +12,17 @@ Mỗi mục: **Quyết định**, **Lý do**, **Đã cân nhắc**.
 
 Kết quả gồm: phương sai từng ô, `focused_share` (số ô nét / 12), ô nét nhất và vị trí của nó. Style-learn (gọi từ `tools/.venv`) và `qc shots` dùng đúng module này trên ảnh cùng cỡ 960×540.
 
-**Ngưỡng**: thử ban đầu với `FOCUS_T = 40`. Trên số đo ngày 2026-11-12, ngưỡng này cho khung mẫu của phong cách 12/12 ô nét và `pet-swap` 128/192 khung không ô nào nét. Ngưỡng được chốt lại trên khung giữa cảnh của video tham chiếu khi học lại (T-task): ít nhất 95% khung tham chiếu có ít nhất một ô nét. Con số cuối cùng ghi vào research này và vào `focus.py`.
+**Ngưỡng (chốt ngày 2026-11-13, T020)**: `FOCUS_T = 200`. Đo trên 700 khung giữa cảnh của `dusk-hypothetical-2` (bỏ thẻ chữ), so với 192 khung của `pet-swap`:
+
+| Ngưỡng | Khung tham chiếu không qua | Khung `pet-swap` không ô nào nét |
+|---|---|---|
+| 40 | 2/700 | 130/192 |
+| 200 | 5/700 (0,7%) | 146/192 |
+| 614 (luật "95% qua" ghi ban đầu) | 35/700 (5%) | 151/192 |
+
+Luật ban đầu ("giá trị lớn nhất mà ít nhất 95% khung tham chiếu qua") cho 614, khi đó cứ 20 khung của một phim quay đúng như kênh thì 1 khung bị chặn. Vì vậy luật được đổi thành **ít nhất 99% khung tham chiếu qua**, ra 200. `summary` tính lại `focused_share` từ phương sai đã lưu của từng ô, nên đổi ngưỡng không phải đo lại.
+
+Ngưỡng thử ban đầu là `FOCUS_T = 40`. Trên số đo ngày 2026-11-12, ngưỡng này cho khung mẫu của phong cách 12/12 ô nét và `pet-swap` 128/192 khung không ô nào nét. Ngưỡng được chốt lại trên khung giữa cảnh của video tham chiếu khi học lại (T-task): ít nhất 95% khung tham chiếu có ít nhất một ô nét. Con số cuối cùng ghi vào research này và vào `focus.py`.
 
 **Lý do**: FR-003 đòi cách đo giống hệt ở hai phía. Tầng 2 hiện đo trong trang bằng JS, còn style-learn đo bằng numpy, nên hai bên dễ lệch nhau. Một module Python duy nhất, chạy trên cùng loại ảnh, thì không thể lệch. Ảnh 480×~270 chỉ khoảng 130 nghìn điểm, tính bằng Python thuần mất khoảng 0,1 s mỗi khung, 200 khung hết khoảng 20 s.
 
@@ -58,6 +68,15 @@ Góc máy:
 **Đã cân nhắc**: để Claude của phiên học tự gán nhãn trong skill. Bị loại, vì khi kiểm phim phải dùng lượt độc lập, nên dùng cùng một lượt cho cả hai phía là đơn giản nhất và giữ được FR-010.
 
 ## R4. Bối cảnh (FR-004)
+
+**Đổi ngày 2026-11-13 (người dùng chọn A)**: bối cảnh của video tham chiếu lấy từ trường `place` mà lượt gán nhãn ghi cho mỗi cảnh (tên nơi ngắn, chữ thường, tối đa 3 từ). Mỗi video được gán trong một lượt gọi, nên tên nơi nhất quán trong video. Lý do: gom theo chữ ký màu thất bại trên 10 video thật (bảng số ở dưới). Phần dưới đây là cách cũ, giữ lại để biết vì sao bỏ.
+
+| Cách gom (v06, 85 cảnh) | Số nhóm |
+|---|---|
+| liên kết đơn, `SET_D` 0,35 | 10 nhóm, nhóm lớn nhất 76 cảnh |
+| gom chặt, ngưỡng 0,15–0,30 | 75–42 nhóm |
+
+**Cách cũ:**
 
 **Quyết định**:
 - **Video tham chiếu**: mỗi khung giữa cảnh có một chữ ký màu (biểu đồ màu 4×4×4 trên ảnh 64 px, cộng độ sáng trung bình của 3×3 vùng). Gom bằng cách liên kết đơn: hai cảnh cùng bối cảnh khi khoảng cách chữ ký nhỏ hơn `SET_D`. Từ đó có số bối cảnh, tỉ lệ cảnh của bối cảnh nhiều nhất, và thời gian trung vị giữa hai lần đổi bối cảnh.
