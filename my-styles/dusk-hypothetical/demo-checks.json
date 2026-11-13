@@ -1,0 +1,708 @@
+{
+ "narration": true,
+ "script": {
+  "verdict": "pass",
+  "skip_reason": null,
+  "machine": [
+   {
+    "round": 1,
+    "score": 8.0,
+    "hard": {
+     "format": true,
+     "sources": false,
+     "length": true,
+     "unchanged": true,
+     "channel_language": true,
+     "banned_word": true,
+     "lesson_rule": true
+    },
+    "issues": [
+     {
+      "para": "SOURCES",
+      "sentence": 2,
+      "rule": "sources",
+      "detail": "P02: expected 'name, year (4 digits), link'"
+     },
+     {
+      "para": "P02",
+      "sentence": 1,
+      "rule": "sources",
+      "detail": "this sentence has a number but SOURCES.md has no line for P02 (a source, provided:<file>, or \"fiction\" for an invented detail)"
+     },
+     {
+      "para": "P01",
+      "sentence": 1,
+      "rule": "no_hook",
+      "detail": "no question, number or twist in the first 5 s"
+     }
+    ],
+    "est_seconds": 25.5,
+    "at": "2026-11-13T02:28:03Z"
+   },
+   {
+    "round": 2,
+    "score": 10.0,
+    "hard": {
+     "format": true,
+     "sources": false,
+     "length": true,
+     "unchanged": true,
+     "channel_language": true,
+     "banned_word": true,
+     "lesson_rule": true
+    },
+    "issues": [
+     {
+      "para": "P01",
+      "sentence": 0,
+      "rule": "sources",
+      "detail": "the quote \"Your alarm rings at seven. You hop out o\" is not in P01"
+     }
+    ],
+    "est_seconds": 25.8,
+    "at": "2026-11-13T02:28:07Z"
+   },
+   {
+    "round": 3,
+    "score": 10.0,
+    "hard": {
+     "format": true,
+     "sources": true,
+     "length": true,
+     "unchanged": true,
+     "channel_language": true,
+     "banned_word": true,
+     "lesson_rule": true
+    },
+    "issues": [],
+    "est_seconds": 25.8,
+    "at": "2026-11-13T02:28:11Z"
+   },
+   {
+    "round": 4,
+    "score": 10.0,
+    "hard": {
+     "format": true,
+     "sources": true,
+     "length": true,
+     "unchanged": true,
+     "channel_language": true,
+     "banned_word": true,
+     "lesson_rule": true
+    },
+    "issues": [],
+    "est_seconds": 25.8,
+    "at": "2026-11-13T02:28:11Z"
+   },
+   {
+    "round": 5,
+    "score": 10.0,
+    "hard": {
+     "format": true,
+     "sources": false,
+     "length": true,
+     "unchanged": true,
+     "channel_language": true,
+     "banned_word": true,
+     "lesson_rule": true
+    },
+    "issues": [
+     {
+      "para": "SOURCES",
+      "sentence": 1,
+      "rule": "sources",
+      "detail": "P01: expected 'name, year (4 digits), link'"
+     },
+     {
+      "para": "SOURCES",
+      "sentence": 8,
+      "rule": "sources",
+      "detail": "P03: expected 'name, year (4 digits), link'"
+     }
+    ],
+    "est_seconds": 25.1,
+    "at": "2026-11-13T02:28:54Z"
+   },
+   {
+    "round": 6,
+    "score": 10.0,
+    "hard": {
+     "format": true,
+     "sources": false,
+     "length": true,
+     "unchanged": true,
+     "channel_language": true,
+     "banned_word": true,
+     "lesson_rule": true
+    },
+    "issues": [
+     {
+      "para": "SOURCES",
+      "sentence": 1,
+      "rule": "sources",
+      "detail": "P01: expected 'name, year (4 digits), link'"
+     },
+     {
+      "para": "SOURCES",
+      "sentence": 8,
+      "rule": "sources",
+      "detail": "P03: expected 'name, year (4 digits), link'"
+     }
+    ],
+    "est_seconds": 25.1,
+    "at": "2026-11-13T02:28:54Z"
+   },
+   {
+    "round": 7,
+    "score": 10.0,
+    "hard": {
+     "format": true,
+     "sources": true,
+     "length": true,
+     "unchanged": true,
+     "channel_language": true,
+     "banned_word": true,
+     "lesson_rule": true
+    },
+    "issues": [],
+    "est_seconds": 25.1,
+    "at": "2026-11-13T02:28:59Z"
+   },
+   {
+    "round": 8,
+    "score": 10.0,
+    "hard": {
+     "format": true,
+     "sources": true,
+     "length": true,
+     "unchanged": true,
+     "channel_language": true,
+     "banned_word": true,
+     "lesson_rule": true
+    },
+    "issues": [],
+    "est_seconds": 25.1,
+    "at": "2026-11-13T02:28:59Z"
+   },
+   {
+    "round": 9,
+    "score": 10.0,
+    "hard": {
+     "format": true,
+     "sources": true,
+     "length": true,
+     "unchanged": true,
+     "channel_language": true,
+     "banned_word": true,
+     "lesson_rule": true
+    },
+    "issues": [],
+    "est_seconds": 25.1,
+    "at": "2026-11-13T02:29:48Z"
+   }
+  ],
+  "editor": [
+   {
+    "round": 1,
+    "model": "claude-haiku-5-5",
+    "score": 6.5,
+    "p1": 1,
+    "p2": 2,
+    "p3": 3,
+    "issues": [
+     {
+      "level": "P1",
+      "para": "P01",
+      "reason": "The hook says you keep rising after hopping out of bed, but 10% weaker gravity only gives jumps 11% higher (P04), so the story contradicts itself."
+     },
+     {
+      "level": "P2",
+      "para": "P03",
+      "reason": "'So today is only a little strange' does not clearly follow from the Moon fact; say that 10% is tiny next to the Moon's drop of about 83%."
+     },
+     {
+      "level": "P2",
+      "para": "P03",
+      "reason": "'On the Moon, gravity is one sixth of ours' has 9 words, which breaks the brief's rule of 5-8 word sentences."
+     },
+     {
+      "level": "P3",
+      "para": "P02",
+      "reason": "'dropped' is past tense, but the brief and channel ask for present tense; 'has dropped' or 'is ten percent weaker' would fit."
+     },
+     {
+      "level": "P3",
+      "para": "P04",
+      "reason": "A visibly slow coffee arc overstates a 10% change; a subtler image would match the 'slightly off' logline better."
+     },
+     {
+      "level": "P3",
+      "para": "P05",
+      "reason": "The style's ending is a pull-out with one last number, and P05 has none; consider ending on a small figure."
+     }
+    ],
+    "passed": false,
+    "bad_answer": false,
+    "customer_round": false,
+    "at": "2026-11-13T02:28:43Z"
+   },
+   {
+    "round": 2,
+    "model": "claude-haiku-5-5",
+    "score": 8.0,
+    "p1": 0,
+    "p2": 3,
+    "p3": 2,
+    "issues": [
+     {
+      "level": "P2",
+      "para": "P03",
+      "reason": "Putting 'one sixth' (the Moon's pull compared to Earth's) next to 'one tenth' (what Earth lost) can confuse a listener; say the Moon keeps a sixth and we keep nine tenths."
+     },
+     {
+      "level": "P2",
+      "para": "P04",
+      "reason": "'Coffee pours in a slow arc' is a physics claim, not an invented story detail, so the fiction label is wrong; at 0.9 g the pour is only about 5% slower, so 'slow' overstates it."
+     },
+     {
+      "level": "P2",
+      "para": "P01",
+      "reason": "The source note says hang time scales with 1/√g (5%), but for the same take-off speed it scales with 1/g (11%), which is the model P04 uses; the note contradicts itself."
+     },
+     {
+      "level": "P3",
+      "para": "P01",
+      "reason": "The treatment shows the hero drifting up near the ceiling, but 'land a beat late' (about 11% higher) is a small effect; make the picture match the line, not exaggerate it."
+     },
+     {
+      "level": "P3",
+      "para": "P05",
+      "reason": "The style's ending is a pull-out with one last number; the line has no number, so the closing card could add one, e.g. 'EARTH · 0.9 G'."
+     }
+    ],
+    "passed": true,
+    "bad_answer": false,
+    "customer_round": false,
+    "at": "2026-11-13T02:29:41Z"
+   }
+  ],
+  "fix_rounds": 1
+ },
+ "film": {
+  "pass": true,
+  "measures": {
+   "silence_ratio": 0.18,
+   "long_pauses_bad": [],
+   "cuts_bad": [],
+   "key_shots_bad": [],
+   "tail_s": 1.15,
+   "shots_short": [],
+   "shots_long": [],
+   "cues_short": [],
+   "cards_short": [],
+   "cuts": [
+    1.68,
+    4.68,
+    7.45,
+    9.43,
+    14.25,
+    16.42,
+    20.39
+   ],
+   "cuts_from": "shot list (tier 1)",
+   "voice_matches_script": true,
+   "stills_bad": [],
+   "channel_voice_bad": [],
+   "missing_glyphs": [],
+   "texts_checked": true,
+   "fonts_checked": true,
+   "render": {
+    "mode": "gpu",
+    "renderer": "ANGLE (Microsoft Corporation, D3D12 (Intel(R) UHD Graphics 730), OpenGL 4.1)"
+   },
+   "av_sync": 0.006,
+   "loudness_range": 2.9
+  },
+  "problems": [],
+  "warnings": [],
+  "at": "2026-11-13T03:26:43Z"
+ },
+ "publish": null,
+ "tiers": {
+  "voice": {
+   "pass": true,
+   "fingerprint": "e112a633c33a5b8f",
+   "at": "2026-11-13T02:32:01Z",
+   "issues": [],
+   "measures": {
+    "lines": 11,
+    "pauses": [],
+    "similarity_min": 1.0
+   },
+   "skipped": [],
+   "seconds": 0.0
+  },
+  "plan": {
+   "pass": true,
+   "fingerprint": "d5e91f0b2ccb8c7d",
+   "at": "2026-11-13T03:08:57Z",
+   "issues": [],
+   "measures": {
+    "silence_ratio": 0.18,
+    "long_pauses_bad": [],
+    "cuts_bad": [],
+    "key_shots_bad": [],
+    "tail_s": 1.15,
+    "shots_short": [],
+    "shots_long": [],
+    "cues_short": [],
+    "cards_short": [],
+    "sentences": [
+     {
+      "para": "P01",
+      "line": "l01",
+      "n": 0,
+      "start": 0.05,
+      "end": 1.39,
+      "text": "Your alarm rings at seven."
+     },
+     {
+      "para": "P01",
+      "line": "l02",
+      "n": 0,
+      "start": 1.678,
+      "end": 2.618,
+      "text": "You hop out of bed."
+     },
+     {
+      "para": "P01",
+      "line": "l03",
+      "n": 0,
+      "start": 2.868,
+      "end": 4.148,
+      "text": "Why do you land a beat late?"
+     },
+     {
+      "para": "P02",
+      "line": "l04",
+      "n": 0,
+      "start": 4.683,
+      "end": 7.083,
+      "text": "Overnight, Earth's pull droppe"
+     },
+     {
+      "para": "P03",
+      "line": "l05",
+      "n": 0,
+      "start": 7.453,
+      "end": 9.233,
+      "text": "The Moon pulls one sixth as ha"
+     },
+     {
+      "para": "P03",
+      "line": "l06",
+      "n": 0,
+      "start": 9.433,
+      "end": 10.973,
+      "text": "Today we lost just one tenth."
+     },
+     {
+      "para": "P04",
+      "line": "l07",
+      "n": 0,
+      "start": 11.52,
+      "end": 14.02,
+      "text": "Your bathroom scale reads ten "
+     },
+     {
+      "para": "P04",
+      "line": "l08",
+      "n": 0,
+      "start": 14.246,
+      "end": 16.206,
+      "text": "Your jumps go eleven percent h"
+     },
+     {
+      "para": "P04",
+      "line": "l09",
+      "n": 0,
+      "start": 16.42,
+      "end": 18.06,
+      "text": "Your coffee pours in a slow ar"
+     },
+     {
+      "para": "P05",
+      "line": "l10",
+      "n": 0,
+      "start": 18.483,
+      "end": 19.183,
+      "text": "Same body."
+     },
+     {
+      "para": "P05",
+      "line": "l10",
+      "n": 1,
+      "start": 19.503,
+      "end": 20.103,
+      "text": "Same breakfast."
+     },
+     {
+      "para": "P05",
+      "line": "l11",
+      "n": 0,
+      "start": 20.393,
+      "end": 22.453,
+      "text": "The planet just holds you a li"
+     }
+    ],
+    "shots": 8,
+    "narration": true
+   },
+   "skipped": [],
+   "seconds": 3.22,
+   "exceptions": [],
+   "sources": {
+    "cues": "window.CUES",
+    "cards": "window.CARDS"
+   }
+  },
+  "shots": {
+   "pass": true,
+   "fingerprint": "d5e91f0b2ccb8c7d",
+   "at": "2026-11-13T03:09:25Z",
+   "issues": [],
+   "measures": {
+    "frames": 9,
+    "luma_p50": 0.267,
+    "saturation_p50": 0.455,
+    "cuts_per_min": 17.8,
+    "style_source": "EVIDENCE.md + shots.json",
+    "render": {
+     "mode": "gpu",
+     "renderer": "ANGLE (Microsoft Corporation, D3D12 (Intel(R) UHD Graphics 730), OpenGL 4.1)"
+    },
+    "labels": {
+     "reused": false,
+     "model": "claude-opus-5-5",
+     "calls": 1,
+     "usage": {
+      "input_tokens": 4,
+      "output_tokens": 1288
+     }
+    },
+    "shot_grammar": {
+     "shots": 8,
+     "labelled": 7,
+     "inserts": 1,
+     "short": 0,
+     "unknown": 0,
+     "scale_share": {
+      "ecu": 0.143,
+      "cu": 0.143,
+      "med": 0.429,
+      "wide": 0.143,
+      "huge": 0.143
+     },
+     "angle_share": {
+      "eye": 0.714,
+      "low": 0.0,
+      "high": 0.143,
+      "top": 0.0,
+      "ots": 0.143
+     },
+     "scale_change_share": 0.6,
+     "longest_same_scale": 3,
+     "focused_share_p50": 0.541,
+     "subject_sharp_share": 1.0,
+     "foreground_blur_share": 0.143,
+     "sets": 7,
+     "top_set_share": 0.25,
+     "set_change_s_p50": 2.77
+    },
+    "sheets": [
+     ".check/shots/sheet-1.jpg"
+    ],
+    "per_frame": [
+     {
+      "key": "S01",
+      "shot": "S01",
+      "t": 0.839,
+      "luma_mean": 0.2876,
+      "sat_p50": 0.4742,
+      "dominant_share": 0.0735,
+      "luma_sd": 0.2688,
+      "content_p50": 0.2286,
+      "blown_share": 0.0131,
+      "text_share": 0,
+      "letterbox": [
+       0.06666666666666667,
+       0.06666666666666667
+      ]
+     },
+     {
+      "key": "S02",
+      "shot": "S02",
+      "t": 3.18,
+      "luma_mean": 0.1938,
+      "sat_p50": 0.4769,
+      "dominant_share": 0.1403,
+      "luma_sd": 0.1468,
+      "content_p50": 0.1918,
+      "blown_share": 0.0005,
+      "text_share": 0,
+      "letterbox": [
+       0.06666666666666667,
+       0.06666666666666667
+      ]
+     },
+     {
+      "key": "S03",
+      "shot": "S03",
+      "t": 6.068,
+      "luma_mean": 0.1012,
+      "sat_p50": 0.6296,
+      "dominant_share": 0.6456,
+      "luma_sd": 0.1051,
+      "content_p50": 0.0897,
+      "blown_share": 0,
+      "text_share": 0.1704,
+      "letterbox": [
+       0.06666666666666667,
+       0.06666666666666667
+      ]
+     },
+     {
+      "key": "S04",
+      "shot": "S04",
+      "t": 8.443,
+      "luma_mean": 0.2544,
+      "sat_p50": 0.4545,
+      "dominant_share": 0.0908,
+      "luma_sd": 0.1809,
+      "content_p50": 0.2595,
+      "blown_share": 0,
+      "text_share": 0.01,
+      "letterbox": [
+       0.06666666666666667,
+       0.06666666666666667
+      ]
+     },
+     {
+      "key": "S05",
+      "shot": "S05",
+      "t": 11.84,
+      "luma_mean": 0.2684,
+      "sat_p50": 0.41,
+      "dominant_share": 0.1174,
+      "luma_sd": 0.1768,
+      "content_p50": 0.2643,
+      "blown_share": 0,
+      "text_share": 0.0188,
+      "letterbox": [
+       0.06666666666666667,
+       0.06666666666666667
+      ]
+     },
+     {
+      "key": "S06",
+      "shot": "S06",
+      "t": 15.333,
+      "luma_mean": 0.2666,
+      "sat_p50": 0.3934,
+      "dominant_share": 0.1018,
+      "luma_sd": 0.1471,
+      "content_p50": 0.2671,
+      "blown_share": 0,
+      "text_share": 0.011,
+      "letterbox": [
+       0.06666666666666667,
+       0.06666666666666667
+      ]
+     },
+     {
+      "key": "S07",
+      "shot": "S07",
+      "t": 18.407,
+      "luma_mean": 0.4012,
+      "sat_p50": 0.2544,
+      "dominant_share": 0.1107,
+      "luma_sd": 0.2081,
+      "content_p50": 0.5201,
+      "blown_share": 0,
+      "text_share": 0,
+      "letterbox": [
+       0.06666666666666667,
+       0.06666666666666667
+      ]
+     },
+     {
+      "key": "S08",
+      "shot": "S08",
+      "t": 21.997,
+      "luma_mean": 0.0818,
+      "sat_p50": 0.6944,
+      "dominant_share": 0.4353,
+      "luma_sd": 0.099,
+      "content_p50": 0.0499,
+      "blown_share": 0,
+      "text_share": 0.016,
+      "letterbox": [
+       0.06666666666666667,
+       0.06666666666666667
+      ]
+     },
+     {
+      "key": "S05~C3",
+      "shot": "S05",
+      "t": 12.61,
+      "luma_mean": 0.2725,
+      "sat_p50": 0.4095,
+      "dominant_share": 0.1225,
+      "luma_sd": 0.181,
+      "content_p50": 0.2657,
+      "blown_share": 0,
+      "text_share": 0.0192,
+      "letterbox": [
+       0.06666666666666667,
+       0.06666666666666667
+      ]
+     }
+    ]
+   },
+   "skipped": [
+    "style cuts per minute: the film is under 30 s"
+   ],
+   "seconds": 26.71,
+   "exceptions": [],
+   "style_accept": null
+  },
+  "render": {
+   "pass": true,
+   "fingerprint": "d5e91f0b2ccb8c7d",
+   "at": "2026-11-13T03:26:15Z",
+   "issues": [],
+   "measures": {
+    "no_stop": false
+   },
+   "skipped": [],
+   "seconds": 0.0,
+   "stopped": null,
+   "reused_chunks": 0,
+   "skipped_checks": null
+  },
+  "final": {
+   "pass": true,
+   "fingerprint": "d5e91f0b2ccb8c7d",
+   "at": "2026-11-13T03:26:43Z",
+   "issues": [],
+   "measures": {
+    "silence_ratio": 0.18,
+    "tail_s": 1.15,
+    "av_sync": 0.006,
+    "loudness_range": 2.9
+   },
+   "skipped": [],
+   "seconds": 0.0
+  }
+ }
+}

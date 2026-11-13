@@ -188,15 +188,15 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
 
 **Independent Test**: `sh my-styles/dusk-hypothetical/demo/build.sh` dựng lại phim 15–30 s đúng số khung; phim đạt tầng 1–4 và phần so cách quay.
 
-- [ ] T028 [US4] Làm phim mẫu `films/dusk-demo/` theo luồng làm phim của `CLAUDE.md` (Brief → Treatment → kịch bản được chấm → giọng của kênh → các tầng 0–4 của specs/020 → render → qc), câu chuyện riêng của xưởng (không giống kênh tham chiếu, không giống `pet-swap` hay `pause-time`), 15–30 s. Phim mẫu không đăng lên kênh, nên bỏ bước gói đăng (3a) và không gắn đề của hàng đợi. Bảng cảnh lập theo `shots.json` của phong cách (tỉ lệ cỡ cảnh, góc máy, đổi cỡ giữa hai cảnh liền nhau, chủ thể nét).
-- [ ] T029 [US4] Đạt `qc shots` không có cảnh báo cách quay nào ngoài khoảng, và không có `blurred` nào ngoài ngoại lệ có lý do; đạt `qc plan` và `qc` (SC-008). Xem phim bằng mắt.
-- [ ] T030 [US4] Lưu phim mẫu vào `my-styles/dusk-hypothetical/` theo bước 5 của `lib/lemo-opuscar/MY-STYLES.md`:
+- [X] T028 [US4] Làm phim mẫu `films/dusk-demo/` theo luồng làm phim của `CLAUDE.md` (Brief → Treatment → kịch bản được chấm → giọng của kênh → các tầng 0–4 của specs/020 → render → qc), câu chuyện riêng của xưởng (không giống kênh tham chiếu, không giống `pet-swap` hay `pause-time`), 15–30 s. Phim mẫu không đăng lên kênh, nên bỏ bước gói đăng (3a) và không gắn đề của hàng đợi. Bảng cảnh lập theo `shots.json` của phong cách (tỉ lệ cỡ cảnh, góc máy, đổi cỡ giữa hai cảnh liền nhau, chủ thể nét).
+- [X] T029 [US4] Đạt `qc shots` không có cảnh báo cách quay nào ngoài khoảng, và không có `blurred` nào ngoài ngoại lệ có lý do; đạt `qc plan` và `qc` (SC-008). Xem phim bằng mắt.
+- [X] T030 [US4] Lưu phim mẫu vào `my-styles/dusk-hypothetical/` theo bước 5 của `lib/lemo-opuscar/MY-STYLES.md`:
   - `demo/` có mã nguồn, `CREDITS` (kèm giấy phép MIT của mã chép từ thư viện) và `build.sh` (`LIB=<đường dẫn>` ở đầu, ghi ra `${OUT:-…}` ngoài `demo/`); chạy thử từ thư mục đã lưu với `OUT` tạm, rồi kiểm `demo/` không có file mới;
   - `DEMO.md` theo `lib/lemo-opuscar/styles/_template/DEMO.md`;
   - `test.jpg` (ảnh đại diện), `test.mp4` (ngoài git), `demo-checks.json`.
 
   Mục 10 (Engine) của `STYLE.md` chỉ tới `demo/` trước.
-- [ ] T031 [US4] Cập nhật dòng của `dusk-hypothetical` trong `my-styles/README.md` (ghi có phim mẫu). Ghi kết quả SC-008 vào `quickstart.md`.
+- [X] T031 [US4] Cập nhật dòng của `dusk-hypothetical` trong `my-styles/README.md` (ghi có phim mẫu). Ghi kết quả SC-008 vào `quickstart.md`.
 
 **Checkpoint**: commit.
 

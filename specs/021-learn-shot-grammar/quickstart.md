@@ -36,7 +36,7 @@ Phải mở bằng mắt ít nhất một bảng ảnh cảnh có nhãn, và xem
 | SC-005 | **Đạt** | `grammar-30`: đủ 3 `blurred`, cảnh báo cỡ cảnh, góc máy và chuỗi 6 cảnh cùng cỡ đúng mã cảnh; không có báo nhầm (`tests/filmcheck/test_shots.py`) |
 | SC-006 | **Đạt** | `qc shots pet-swap` (nhãn làm lại bằng lượt gán nhãn mới, 1 lượt Opus): 145 khung mờ (chặn); toàn rất rộng 6% (kênh 10–24%), độ nét trung vị 0 (kênh 0,5–0,83), đổi cỡ 79% (kênh 57–77%) là cảnh báo kèm mã cảnh; cận 32% và ngang tầm mắt 81% nằm trong khoảng của kênh |
 | SC-007 | **Đạt** | `lib/lemo-opuscar` sạch; `learn clean` xoá 877 MB video và âm thanh, còn 15 MB số đo, nhãn và bảng ảnh có nhãn |
-| SC-008 | **Chưa làm** | Phim mẫu (T028–T031) để cho phiên sau |
+| SC-008 | **Đạt** | Phim mẫu `films/dusk-demo` ("What if gravity got 10% weaker overnight?", 23,6 s, 708 khung, 30 fps), lưu vào `my-styles/dusk-hypothetical/demo/`. Kịch bản: máy 10/10, biên tập 8,0 không P1 (1 vòng sửa). Tầng 0–4 đạt, không cảnh báo nào còn lại: cực cận 14%, cận 14%, trung 43%, rộng 14%, toàn rất rộng 14% (1 thẻ chữ để ngoài); ngang tầm mắt 71%, trên chéo 14%, qua vai 14%; đổi cỡ 60%; chuỗi cùng cỡ dài nhất 3; độ nét trung vị 0,54; không khung mờ, không ngoại lệ; −13,8 LUFS, dải 2,9 LU. `OUT=<tạm> sh my-styles/dusk-hypothetical/demo/build.sh` ra lại đúng 708 khung trong 96 s (GPU), `demo/` không thêm file. Đã xem bảng ảnh có nhãn và bảng khung của phim bằng mắt |
 
 **Số đo cách quay của kênh** (10 video mới nhất, 772 cảnh, nhãn có ảnh chuẩn): trung 30%, toàn 26%, toàn rất rộng 18%, cận 14%, đặc tả 10%; ngang tầm mắt 73%, từ trên chéo 12%, qua vai 11%, thấp 3%, thẳng từ trên 1%; đổi cỡ ở 70% số lần cắt; chủ thể nét ở 100% cảnh, trung vị 0,67 phần khung nét; 15 nơi mỗi video.
 
@@ -47,3 +47,10 @@ Phải mở bằng mắt ít nhất một bảng ảnh cảnh có nhãn, và xem
 - lượt gán nhãn luôn dùng Opus, không theo cài đặt của người biên tập.
 
 Bộ test: `tests/run.sh` (87 ok) · `tests/render` (đạt) · `tests/learn` (47) · `tests/filmcheck` (178) · `tests/ui` (41 + 33 desktop) · `tests/license` (18) · `tests/online` (196; trong lần chạy cả bộ có 2 lỗi kết nối chập chờn ở `test_host`, chạy riêng thì đạt 17/17).
+
+**Phim mẫu (T028–T031), điều học được**:
+- luật cắt giữa hai câu và "cảnh chứa câu cuối đoạn ≥ 2,5 s" buộc mỗi câu 5–8 từ và mỗi cảnh một hoặc hai câu; khoảng nghỉ 0,1 s trong đoạn, 0,3 s giữa các đoạn để lặng ≤ 20%;
+- độ nét trung vị lúc đầu 0,08: tường, sàn và nhà quá trơn nên ô nét cũng dưới `FOCUS_T`. Thêm chi tiết bề mặt (giấy dán tường, ván sàn, cửa sổ toà nhà, sao) và khẩu độ nhỏ thì lên 0,54–0,58; chi tiết nhiều quá thì vượt 0,83;
+- lượt gán nhãn đổi ý ở các cảnh có độ tin thấp (S05 rộng ↔ trung, S06 thấp ↔ ngang mắt, S08 cao ↔ ngang mắt): phải khép khung rõ ràng, đặt máy đúng tầm mắt nhân vật;
+- hai lỗi của xưởng tìm thấy và đã sửa: `qc voice` coi "11%" khác "eleven percent" (`voicecheck.py`); `job run` khi app đang chạy truyền `STUDIO_MODE=online` cho lệnh con, nên `render` tưởng là container và vẽ bằng phần mềm (878 s thay vì 71 s; `studio_cli.py`, test trong `tests/online/test_host.py`).
+

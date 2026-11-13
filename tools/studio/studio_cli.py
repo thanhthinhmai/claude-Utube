@@ -24,7 +24,9 @@ def _host_for_chat():
 
 
 HOST = _host_for_chat()
-if HOST:
+CHILD_ENV = None          # `job run` in the chat flow: the wrapped command runs on this machine as before, not as an
+if HOST:                  # online job (probe.mjs would take STUDIO_MODE=online for a container and render in software)
+    CHILD_ENV = os.environ.copy()
     os.environ.update(STUDIO_MODE="online", STUDIO_DATA=HOST["data"])
 
 from studio import jobs, launcher, reviews  # noqa: E402
@@ -151,7 +153,7 @@ def job_run(a, remote: bool = False) -> int:
         step(a.step)
     tail = collections.deque(maxlen=50)
     beat = float(os.environ.get("STUDIO_HEARTBEAT", "30"))
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, env=CHILD_ENV)
     done = threading.Event()
 
     def heartbeat():
