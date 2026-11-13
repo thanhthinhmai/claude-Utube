@@ -51,6 +51,15 @@ SCHEMA = {"type": "object", "required": ["shots"], "properties": {"shots": {"typ
                    "confidence": {"enum": ["high", "low"]}}}}}}
 
 
+def version() -> str:
+    """A short hash of the prompt, the schema and the guide: labels made by another version are made again."""
+    import hashlib
+    h = hashlib.sha256((SYSTEM + json.dumps(SCHEMA, sort_keys=True)).encode())
+    if GUIDE.is_file():
+        h.update(GUIDE.read_bytes())
+    return h.hexdigest()[:12]
+
+
 class LabelError(Exception):
     """The labeler could not run or did not answer as asked."""
 

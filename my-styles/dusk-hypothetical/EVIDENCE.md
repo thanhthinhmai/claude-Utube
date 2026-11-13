@@ -17,20 +17,20 @@ Learned from 10 landscape reference videos (≈ 10.5 min each), measured over 5 
 | loudness range | 2.85 LU | 2.4–3.3 |
 | first voice | 0.0 s | 0.0–0.0 |
 | speech rate | 3.73 w/s | 3.36–3.85 |
-| medium share | 0.34 | 0.23–0.47 |
-| wide share | 0.27 | 0.20–0.44 |
-| close-up share | 0.20 | 0.05–0.30 |
-| huge wide share | 0.14 | 0.05–0.22 |
-| extreme close-up share | 0.05 | 0.00–0.11 |
-| eye-level share | 0.66 | 0.49–0.75 |
-| high-angle share | 0.19 | 0.11–0.28 |
-| scale change between neighbours | 0.69 | 0.63–0.76 |
-| longest same-scale run | 4 | 3–6 |
+| medium share | 0.30 | 0.18–0.51 |
+| wide share | 0.26 | 0.13–0.37 |
+| close-up share | 0.14 | 0.06–0.42 |
+| huge wide share | 0.18 | 0.10–0.24 |
+| extreme close-up share | 0.10 | 0.01–0.17 |
+| eye-level share | 0.73 | 0.61–0.81 |
+| high-angle share | 0.12 | 0.05–0.24 |
+| scale change between neighbours | 0.70 | 0.57–0.77 |
+| longest same-scale run | 4 | 3–8 |
 | focused share p50 | 0.67 | 0.50–0.83 |
 | subject in focus | 1.00 | 0.99–1.00 |
-| foreground blur share | 0.16 | 0.03–0.41 |
-| places per video | 16 | 9–24 |
-| busiest place share | 0.26 | 0.13–0.48 |
+| foreground blur share | 0.14 | 0.08–0.37 |
+| places per video | 15 | 9–25 |
+| busiest place share | 0.26 | 0.13–0.44 |
 
 Palette (share of pixels): #271937 29 %, #07050a 21 % (bars + vignette), #493369 11 %, #796a8c 9 %, #5a4744 6 %, #4e2e38 5 %.
 
@@ -55,12 +55,13 @@ Palette (share of pixels): #271937 29 %, #07050a 21 % (bars + vignette), #493369
 | 9 | Constant shallow DOF | The subject is always in focus (100 % of shots), about two thirds of the frame sharp (median 0.67, 0.50–0.83); a blurred foreground in 16 % of shots | `focus.py` on every mid-shot frame (12 tiles, sharp from 200); foreground blur `v01_shots_1.jpg#1, #6` | numbers |
 | 10 | ≈ 16–26 cuts/min | ≈ 21–29 cuts/min on the 2026-11-13 set (scene > 0.15) | `learn shots`: 69–91 shots per 180 s | numbers |
 | 11 | Low angle and top-down are the main grammar | Eye level 66 %, high 19 %, over-the-shoulder 7 %, low 5 %, straight down 1 % | shot grammar; low `v01_shots_2.jpg#27`, top `v01_shots_1.jpg#27`, ots `v01_shots_1.jpg#7` | numbers |
+| 12 | Shares of #8, #9, #11 from a first labelling without a guide (two labellings agreed on 70 % of scales) | Relabelled with a code-drawn guide and frame-edge rules (agreement 80 % scale, 97 % within one step, 88 % angle): medium 30 %, wide 26 %, huge wide 18 %, close-up 14 %, extreme close-up 10 %; eye 73 %, high 12 %, over-the-shoulder 11 %, low 3 %, top 1 %; scale changes in 70 % of cuts, runs up to 4–8; blurred foreground 14 % | `profile/agreement.json`; `tools/filmcheck/labeler-guide.png` | numbers |
 
 Tool note: the style-learn cut detector undercounts cuts in dark, low-contrast footage; `learn shots` (specs/021) splits shots with the scene score > 0.15 instead.
 
 ## Shot grammar
 
-Re-learned on 2026-11-13 from the ten most recent videos of the same reference channel (5 windows each, 1800 s): 807 shots, 772 labelled by the studio's independent shot labeler (one Opus run per video, from contact sheets of one mid-shot frame per shot), focus measured by `tools/filmcheck/focus.py`. Two independent labellings of 40 shots agreed on the scale for 70 %, within one step for 100 %, on the angle for 68 % (77 % leaving out text cards). The numbers the checks compare with are in `shots.json`.
+Re-learned on 2026-11-13 from the ten most recent videos of the same reference channel (5 windows each, 1800 s): 807 shots, 772 labelled by the studio's independent shot labeler (one Opus run per video, from contact sheets of one mid-shot frame per shot), focus measured by `tools/filmcheck/focus.py`. The labeler reads a code-drawn guide of the five scales and frame-edge rules first; two independent labellings of 40 shots then agreed on the scale for 80 %, within one step for 97 %, on the angle for 88 % (85 % leaving out text cards). The numbers the checks compare with are in `shots.json`.
 
 ## Why `based_on: brick-toy`
 

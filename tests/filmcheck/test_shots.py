@@ -192,6 +192,19 @@ class Scoring(unittest.TestCase):
         iss, _, skipped = shotcheck.score(frames[:1], shots[:1], None, {"cuts_per_min": [16, 26]}, 2.0)
         self.assertIn("under 30 s", skipped[-1])
 
+    def test_scale_change_advice_follows_the_direction(self):          # specs/021: too many changes ≠ too few
+        rows = [{"id": f"S{i}", "t0": i, "t1": i + 1, "scale": sc, "angle": "eye"} for i, sc in enumerate(["cu", "med", "cu", "med"])]
+        style = {"shot_grammar": {"scale_share": {"cu": [0, 1]}, "scale_change_share": [0.4, 0.6]}}
+        mids = [{"shot": r["id"], "focus": {"focused_share": 0.5}} for r in rows]
+        import tempfile as _t
+        d = Path(_t.mkdtemp(dir=TMP))
+        (d / ".check").mkdir()
+        labels = {r["id"]: {"scale": r["scale"], "angle": "eye"} for r in rows}
+        (d / ".check" / "labels.json").write_text(json.dumps({"fingerprint": "fp", "labeler": shotcheck.labeler.version(), "labels": labels}))
+        iss, _, _, _ = shotcheck.shot_grammar(d, "fp", None, d, mids, rows, style, lambda *_: None)
+        i = next(x for x in iss if x["rule"] == "style_scale_change")
+        self.assertIn("keeps the same scale", i["fix"])
+
     def test_weighted_median(self):
         self.assertEqual(shotcheck.wmedian([(0.1, 1), (0.5, 5), (0.9, 1)]), 0.5)
 

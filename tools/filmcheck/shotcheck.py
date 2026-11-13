@@ -209,7 +209,7 @@ def shot_grammar(d: Path, fp: str, job: str, out: Path, mids: list, shots: list,
         old = json.loads(lf.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         old = {}
-    if old.get("fingerprint") == fp and old.get("labels"):
+    if old.get("fingerprint") == fp and old.get("labeler") == labeler.version() and old.get("labels"):
         labels, info = old["labels"], {"reused": True, "model": old.get("model")}
         say("  labels: reused")
     else:
@@ -223,7 +223,8 @@ def shot_grammar(d: Path, fp: str, job: str, out: Path, mids: list, shots: list,
             got = labeler.label(groups, {f["shot"]: f.get("focus") or {} for f in mids})
             labels = got["labels"]
             info = {"reused": False, "model": got["model"], "calls": got["calls"], "usage": got["usage"]}
-            lf.write_text(json.dumps({"fingerprint": fp, "model": got["model"], "at": tiers.now(), "labels": labels},
+            lf.write_text(json.dumps({"fingerprint": fp, "labeler": labeler.version(), "model": got["model"], "at": tiers.now(),
+                                      "labels": labels},
                                      ensure_ascii=False), encoding="utf-8")
             say(f"  labels: {len(labels)} shots · {got['model']} · {len(sheets)} sheet(s)")
         except (labeler.LabelError, ShotError) as e:
@@ -262,11 +263,14 @@ def shot_grammar(d: Path, fp: str, job: str, out: Path, mids: list, shots: list,
             issues.append(_gissue(rule + k, "film", v, _rng(r), pool, fix))
     if sg.get("scale_change_share") and g["scale_change_share"] is not None:
         r = sg["scale_change_share"]
-        if not (r[0] <= g["scale_change_share"] <= r[1]):
+        if g["scale_change_share"] < r[0]:
             same = [b["id"] for a, b in zip(rows, rows[1:]) if a.get("scale") and a.get("scale") == b.get("scale")
                     and a["scale"] not in ("insert", "unknown")]
             issues.append(_gissue("style_scale_change", "film", g["scale_change_share"], _rng(r), same,
                                   "cut between different scales more often (these shots repeat the scale before them)"))
+        elif g["scale_change_share"] > r[1]:
+            issues.append(_gissue("style_scale_change", "film", g["scale_change_share"], _rng(r), [],
+                                  "the style keeps the same scale across a cut more often: let some neighbouring shots share a scale"))
     if sg.get("longest_same_scale_max"):
         for run in labeler.runs(rows):
             if len(run) > sg["longest_same_scale_max"]:

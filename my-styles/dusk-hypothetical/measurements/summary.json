@@ -197,75 +197,75 @@
    ],
    "shot_grammar": {
     "scale_ecu": {
-     "median": 0.0455,
-     "min": 0.0,
-     "max": 0.108,
+     "median": 0.098,
+     "min": 0.014,
+     "max": 0.167,
      "n": 10
     },
     "scale_cu": {
-     "median": 0.2015,
-     "min": 0.054,
-     "max": 0.301,
+     "median": 0.139,
+     "min": 0.056,
+     "max": 0.424,
      "n": 10
     },
     "scale_med": {
-     "median": 0.3425,
-     "min": 0.233,
-     "max": 0.469,
+     "median": 0.3015,
+     "min": 0.176,
+     "max": 0.514,
      "n": 10
     },
     "scale_wide": {
-     "median": 0.2705,
-     "min": 0.203,
-     "max": 0.438,
+     "median": 0.257,
+     "min": 0.125,
+     "max": 0.365,
      "n": 10
     },
     "scale_huge": {
-     "median": 0.1375,
-     "min": 0.051,
-     "max": 0.219,
+     "median": 0.179,
+     "min": 0.102,
+     "max": 0.236,
      "n": 10
     },
     "angle_eye": {
-     "median": 0.6595,
-     "min": 0.486,
-     "max": 0.75,
+     "median": 0.726,
+     "min": 0.611,
+     "max": 0.814,
      "n": 10
     },
     "angle_low": {
-     "median": 0.0505,
-     "min": 0.031,
-     "max": 0.192,
+     "median": 0.0325,
+     "min": 0.0,
+     "max": 0.081,
      "n": 10
     },
     "angle_high": {
-     "median": 0.1865,
-     "min": 0.105,
-     "max": 0.284,
+     "median": 0.1205,
+     "min": 0.054,
+     "max": 0.239,
      "n": 10
     },
     "angle_top": {
-     "median": 0.014,
+     "median": 0.007,
      "min": 0.0,
-     "max": 0.032,
+     "max": 0.047,
      "n": 10
     },
     "angle_ots": {
-     "median": 0.0665,
-     "min": 0.0,
-     "max": 0.149,
+     "median": 0.111,
+     "min": 0.03,
+     "max": 0.167,
      "n": 10
     },
     "scale_change_share": {
-     "median": 0.687,
-     "min": 0.627,
-     "max": 0.763,
+     "median": 0.7015,
+     "min": 0.574,
+     "max": 0.767,
      "n": 10
     },
     "longest_same_scale": {
      "median": 4.0,
      "min": 3.0,
-     "max": 6.0,
+     "max": 8.0,
      "n": 10
     },
     "focused_share_p50": {
@@ -281,27 +281,27 @@
      "n": 10
     },
     "foreground_blur_share": {
-     "median": 0.164,
-     "min": 0.034,
-     "max": 0.411,
+     "median": 0.139,
+     "min": 0.081,
+     "max": 0.365,
      "n": 10
     },
     "sets": {
-     "median": 16.0,
+     "median": 15.0,
      "min": 9.0,
-     "max": 24.0,
+     "max": 25.0,
      "n": 10
     },
     "top_set_share": {
      "median": 0.256,
      "min": 0.132,
-     "max": 0.475,
+     "max": 0.438,
      "n": 10
     },
     "set_change_s_p50": {
-     "median": 4.825,
-     "min": 2.78,
-     "max": 8.58,
+     "median": 4.315,
+     "min": 3.23,
+     "max": 6.55,
      "n": 10
     }
    }

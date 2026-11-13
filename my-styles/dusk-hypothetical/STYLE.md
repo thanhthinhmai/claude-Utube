@@ -8,7 +8,7 @@
 One glance reads as this style when:
 - the whole frame sits in a **violet dusk grade**: dark mid-tones, nothing near white, soft contrast, a strong vignette (evidence: `luma_p50` 0.26, `bright_p50` 0.002, `contrast_p50` 0.196, corner/centre luma ≈ 0.53);
 - the hero is a **sphere-headed chibi figure** with dot eyes, no nose, no ears, a hoodie and stick limbs (evidence: visual characters #1–3, 10+ frames each);
-- the world is **real 3D with the subject always in focus**: about two thirds of the frame is sharp, and about one shot in six has a blurred foreground head or shoulder at one edge (evidence: shot grammar `subject_sharp_share` 1.0, `focused_share_p50` 0.67 (0.50–0.83), `foreground_blur_share` 0.16 (0.03–0.41); corrections #9);
+- the world is **real 3D with the subject always in focus**: about two thirds of the frame is sharp, and about one shot in six has a blurred foreground head or shoulder at one edge (evidence: shot grammar `subject_sharp_share` 1.0, `focused_share_p50` 0.67 (0.50–0.83), `foreground_blur_share` 0.14 (0.08–0.37); corrections #9);
 - shots **change every 2–3 s by hard cut** (≈ 21–29 cuts/min), mostly **medium and wide**, and the shot scale changes between most neighbours (evidence: shot grammar, corrections #8, #10);
 - a **2.05:1 letterbox** sits inside the 16:9 frame (evidence: corrections #2).
 
@@ -54,15 +54,15 @@ Measured shot by shot on 772 shots of 10 reference videos (median, range between
 
 | Shot scale | Share | Angle | Share |
 |---|---|---|---|
-| medium (waist or knees up) | 34 % (23–47) | eye level | 66 % (49–75) |
-| wide (whole figure and place) | 27 % (20–44) | high, looking down at a slant | 19 % (11–28) |
-| close-up (head and shoulders) | 20 % (5–30) | over the shoulder, blurred foreground | 7 % (0–15) |
-| huge wide (figure under 1/4 of the frame) | 14 % (5–22) | low, looking up | 5 % (3–19) |
-| extreme close-up (part of a face, one object) | 5 % (0–11) | straight down | 1 % (0–3) |
+| medium (waist or knees up) | 30 % (18–51) | eye level | 73 % (61–81) |
+| wide (whole figure and place) | 26 % (13–37) | high, looking down at a slant | 12 % (5–24) |
+| huge wide (figure under 1/4 of the frame) | 18 % (10–24) | over the shoulder, blurred foreground | 11 % (3–17) |
+| close-up (head and shoulders) | 14 % (6–42) | low, looking up | 3 % (0–8) |
+| extreme close-up (part of a face, one object) | 10 % (1–17) | straight down | 1 % (0–5) |
 
-- The scale changes between neighbouring shots in **69 % (63–76 %)** of cuts; never more than **4–6** shots of the same scale in a row.
-- About **16 places** per video, the busiest holding a quarter of the shots (26 %, 13–48 %); the place changes every ≈ 5 s.
-- Text cards and flat inserts come on top of these shares (≈ 10 % of shots).
+- The scale changes between neighbouring shots in **70 % (57–77 %)** of cuts; never more than **4–8** shots of the same scale in a row.
+- About **15 places** per video, the busiest holding a quarter of the shots (26 %, 13–44 %); the place changes every ≈ 4 s.
+- Text cards and flat inserts come on top of these shares (≈ 8 % of shots).
 
 | Move | What it expresses | Can serve |
 |---|---|---|
