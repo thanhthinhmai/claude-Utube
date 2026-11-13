@@ -69,7 +69,9 @@ Each fault comes with its shot or line id, the second, and how to fix it. Fix an
   never call `asr_check.py` yourself), then `sh STUDIO/bin/studio qc voice <name>`. Redo only the lines it names.
 - **Picture step**, before any full render: `sh STUDIO/bin/studio qc plan <name>` (seconds; rhythm, shot lengths,
   subtitles, cards), then `sh STUDIO/bin/studio qc shots <name>` (one frame per shot; look at
-  `.check/shots/sheet-1.jpg` once). A shot that is flat or dark on purpose:
+  `.check/shots/sheet-1.jpg` once; `qc shots` also asks an independent Claude run to label shot scales and angles, counted in the job,
+  and blocks frames with nothing in focus). With a learned style that has `shots.json`, plan the shots to its scale and angle
+  shares and keep the subject in focus; read the style's `DEMO.md` and `demo/` first when it has them. A shot that is flat, dark or blurred on purpose:
   `sh STUDIO/bin/studio qc except <name> <shot> <rule> --reason "…"`, one shot at a time. A style warning: fix it,
   or accept it with `sh STUDIO/bin/studio qc accept-style <name> --reason "…"` when the brief asks for it.
 - **Render step:** `render` refuses to start until both checks pass, and stops at a chunk with black frames or a

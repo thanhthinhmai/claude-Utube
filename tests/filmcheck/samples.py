@@ -337,6 +337,10 @@ function look(s, t) {
     const x = R() * W + Math.sin(lt * 2 + i) * 40, y = R() * H, w = 40 + R() * 220, h = 40 + R() * 220;
     g.fillStyle = `hsl(${Math.round(R() * 360)},${30 + R() * 40}%,${(15 + R() * 55) * dim}%)`; g.fillRect(x, y, w, h);
   }
+  for (let i = 0; i < 900; i++) {          // fine detail (edges in every part of the frame), like a rendered set in focus
+    g.fillStyle = `hsl(${Math.round(R() * 360)},40%,${(20 + R() * 60) * dim}%)`;
+    g.fillRect(R() * W + Math.sin(lt + i) * 6, R() * H, 2 + R() * 6, 2 + R() * 6);
+  }
 }
 window.render = (t) => {
   if (window.CLEAN_SEEN !== undefined) window.CLEAN_SEEN = !!window.CLEAN;

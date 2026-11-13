@@ -14,7 +14,7 @@ from filmcheck import focus  # noqa: E402
 TMP = Path(__file__).resolve().parent / ".tmp"
 
 
-def make(path: Path, vf: str, src: str = "testsrc2=s=960x540:r=1"):
+def make(path: Path, vf: str, src: str = "cellauto=s=960x540:rule=110:rate=1"):     # fine detail everywhere, like a real frame
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", src, "-frames:v", "1", "-vf", vf, str(path)],
                    check=True)
     return path
@@ -45,7 +45,7 @@ class Focus(unittest.TestCase):
         vf = ("gblur=sigma=8,drawbox=x=0:y=0:w=iw:h=66:color=black:t=fill,drawbox=x=0:y=474:w=iw:h=66:color=black:t=fill,"
               "drawbox=x=300:y=420:w=360:h=24:color=white:t=fill,drawbox=x=310:y=426:w=20:h=12:color=black:t=fill,"
               "drawbox=x=360:y=426:w=20:h=12:color=black:t=fill,drawbox=x=410:y=426:w=20:h=12:color=black:t=fill")
-        r = focus.measure(make(self.d / "bars.jpg", vf))
+        r = focus.measure(make(self.d / "bars.jpg", vf, src="testsrc2=s=960x540:r=1"))   # a colour source: black stays 0
         self.assertAlmostEqual(r["letterbox"][0], 66 / 540, delta=0.02)
         self.assertAlmostEqual(r["letterbox"][1], 66 / 540, delta=0.02)
         self.assertEqual(r["focused_share"], 0.0, r)

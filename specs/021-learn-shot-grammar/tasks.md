@@ -119,21 +119,21 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
   - khi lưu, giữ `DEMO.md`, `demo/`, `test.jpg`, `test.mp4` và `demo-checks.json` đã có trong phong cách (học lại không làm mất phim mẫu).
 - [X] T016 [US2] Sửa `tools/filmcheck/stylerefs.py`: đọc `my-styles/<slug>/shots.json` vào khoá `shot_grammar` (giữ nguyên dạng lồng), và `has_shot_grammar(refs)`. Thêm test vào `tests/filmcheck/test_stylerefs.py`.
 - [X] T017 [US2] Sửa `tools/style-learn/learn.py`: thêm cờ `--update` cho `save`.
-- [ ] T018 [US2] Chạy thật: `sh bin/studio learn fetch dusk-hypothetical-2 --channel <kênh trong channels/dusk-hypothetical/references.json> --count 10` (người dùng xác nhận quyền dùng như lời nhắc của `fetch`), rồi `measure`, `shots`. Ghi thời gian từng bước. Lấy thời gian các bước của lần học `dusk-hypothetical` trước (2026-11-12) từ sổ việc `.studio/jobs` để so cho SC-003; không còn thì ghi "không có số so" và chỉ báo thời gian lần này. Kiểm số cắt mỗi phút với khoảng 16–26.
-- [ ] T019 [US2] Chạy thật: `learn label dusk-hypothetical-2`; xem các cảnh `check` trên bảng ảnh và sửa bằng `--set` nếu sai; rồi `learn label … --pass 2 --sample 40` (SC-001). Mở bằng mắt ít nhất 2 bảng ảnh có nhãn.
-- [ ] T020 [US2] Chốt hai ngưỡng trên dữ liệu thật:
+- [X] T018 [US2] Chạy thật: `sh bin/studio learn fetch dusk-hypothetical-2 --channel <kênh trong channels/dusk-hypothetical/references.json> --count 10` (người dùng xác nhận quyền dùng như lời nhắc của `fetch`), rồi `measure`, `shots`. Ghi thời gian từng bước. Lấy thời gian các bước của lần học `dusk-hypothetical` trước (2026-11-12) từ sổ việc `.studio/jobs` để so cho SC-003; không còn thì ghi "không có số so" và chỉ báo thời gian lần này. Kiểm số cắt mỗi phút với khoảng 16–26.
+- [X] T019 [US2] Chạy thật: `learn label dusk-hypothetical-2`; xem các cảnh `check` trên bảng ảnh và sửa bằng `--set` nếu sai; rồi `learn label … --pass 2 --sample 40` (SC-001). Mở bằng mắt ít nhất 2 bảng ảnh có nhãn.
+- [X] T020 [US2] Chốt hai ngưỡng trên dữ liệu thật:
   - `FOCUS_T`: giá trị lớn nhất mà ít nhất 95% khung tham chiếu có ít nhất một ô nét;
   - `SET_D`: xem bảng ảnh theo nhóm, các nhóm phải là cùng một nơi.
 
   Ghi số và cách chọn vào `research.md` (R1, R4) và vào `focus.py` và `sl/shots.py`. Chạy lại `shots` nếu `SET_D` đổi.
-- [ ] T021 [US2] `learn summary dusk-hypothetical-2`; cập nhật bản phong cách theo bước 4–5 của skill style-learn, **bắt đầu từ bản hiện có** của `my-styles/dusk-hypothetical/` (chép STYLE.md, EVIDENCE.md, style.json vào `references/dusk-hypothetical-2/style/`):
+- [X] T021 [US2] `learn summary dusk-hypothetical-2`; cập nhật bản phong cách theo bước 4–5 của skill style-learn, **bắt đầu từ bản hiện có** của `my-styles/dusk-hypothetical/` (chép STYLE.md, EVIDENCE.md, style.json vào `references/dusk-hypothetical-2/style/`):
   - thêm các hàng cách quay vào "Key numbers";
   - viết lại mục 6 (và phần chiều sâu ở mục 2) bằng con số kèm `bảng#ô`;
   - sửa luật nào sai so với số mới, mỗi chỗ sửa thêm một dòng vào nhật ký sửa (giữ mọi dòng cũ);
   - mục 10 (Engine) chỉ tới `demo/` (có ở T030) rồi mới tới `brick-toy`.
 
   Chạy `learn check-names`.
-- [ ] T022 [US2] `learn save dusk-hypothetical-2 --slug dusk-hypothetical --en "Dusk Hypothetical" --based-on brick-toy --update` (khung chứng minh: dùng lại khung đã duyệt nếu luật về hình không đổi, nếu không thì chạy `learn compare` như skill); rồi `learn clean dusk-hypothetical-2`. Ghi kết quả SC-001 – SC-004 và SC-007 (phần xoá video) vào `quickstart.md`.
+- [X] T022 [US2] `learn save dusk-hypothetical-2 --slug dusk-hypothetical --en "Dusk Hypothetical" --based-on brick-toy --update` (khung chứng minh: dùng lại khung đã duyệt nếu luật về hình không đổi, nếu không thì chạy `learn compare` như skill); rồi `learn clean dusk-hypothetical-2`. Ghi kết quả SC-001 – SC-004 và SC-007 (phần xoá video) vào `quickstart.md`.
 
 **Checkpoint**: commit (phong cách đã học lại).
 
@@ -176,7 +176,7 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
     - tỉ lệ bối cảnh nhiều nhất (theo `set` của `SHOTS`) → `style_top_set`.
   - Bỏ qua phần so (ghi `skipped`) khi phong cách không có `shot_grammar`.
 - [X] T026 [US3] Sửa `tools/filmcheck/cli.py` (`cmd_qc_shots`): in dòng `labels: …` và các tỉ lệ cỡ cảnh, góc máy của phim. Sửa `tools/filmcheck/report.py`: `CHECKS.md` có bảng "Shot grammar" (phim so với khoảng của phong cách).
-- [ ] T027 [US3] Chạy thật `sh bin/studio qc shots pet-swap` với phong cách đã học lại (SC-006): ghi số khung mờ, tỉ lệ toàn rất rộng, ngang tầm mắt, chuỗi cùng cỡ, thời gian, số lượt gán nhãn. Mở bảng ảnh có nhãn bằng mắt. Ghi vào `quickstart.md`.
+- [X] T027 [US3] Chạy thật `sh bin/studio qc shots pet-swap` với phong cách đã học lại (SC-006): ghi số khung mờ, tỉ lệ toàn rất rộng, ngang tầm mắt, chuỗi cùng cỡ, thời gian, số lượt gán nhãn. Mở bảng ảnh có nhãn bằng mắt. Ghi vào `quickstart.md`.
 
 **Checkpoint**: commit.
 
@@ -204,17 +204,17 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
 
 ## Phase 7: Polish
 
-- [ ] T032 [P] Sửa `.claude/skills/style-learn/SKILL.md`:
+- [X] T032 [P] Sửa `.claude/skills/style-learn/SKILL.md`:
   - thêm bước sau "Thu thập và đo": `learn shots`, `learn label`, xem các cảnh `check`, `learn label --pass 2 --sample 40`, báo độ nhất quán;
   - trong bước viết phong cách, mục 6 và chiều sâu ghi bằng số kèm `bảng#ô`;
   - thêm bước "Phim mẫu" sau khi lưu (theo `MY-STYLES.md` §5, đi đủ các tầng kiểm);
   - học lại một phong cách đã có thì dùng `save --update`.
-- [ ] T033 [P] Sửa `CLAUDE.md`:
+- [X] T033 [P] Sửa `CLAUDE.md`:
   - luồng làm phim: với phong cách riêng, đọc `DEMO.md` và `demo/` của nó trước phong cách gốc; bảng cảnh lập theo `shots.json` của phong cách nếu có;
   - mục Cấu trúc: `learn shots|label`, `focus.py`, `labeler.py`.
-- [ ] T034 [P] Sửa `tools/runner/JOB.md` (worker online): cùng hai ý của T033 cho phim, và `qc shots` có thể gọi lượt gán nhãn (một lượt Claude riêng, tính vào việc).
-- [ ] T035 Chạy đủ các bộ test: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/online/run.sh`, `sh tests/license/run.sh`. Ghi kết quả.
-- [ ] T036 Kiểm SC-007 (`git -C lib/lemo-opuscar status --short` trống; `references/dusk-hypothetical-2/` không còn video); đối chiếu SC-001 … SC-008 trong `quickstart.md`, ghi đạt, đạt một phần hoặc thất bại.
+- [X] T034 [P] Sửa `tools/runner/JOB.md` (worker online): cùng hai ý của T033 cho phim, và `qc shots` có thể gọi lượt gán nhãn (một lượt Claude riêng, tính vào việc).
+- [X] T035 Chạy đủ các bộ test: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/online/run.sh`, `sh tests/license/run.sh`. Ghi kết quả.
+- [X] T036 Kiểm SC-007 (`git -C lib/lemo-opuscar status --short` trống; `references/dusk-hypothetical-2/` không còn video); đối chiếu SC-001 … SC-008 trong `quickstart.md`, ghi đạt, đạt một phần hoặc thất bại.
 
 ---
 
