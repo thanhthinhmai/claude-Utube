@@ -147,7 +147,7 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
 
 ### Tests
 
-- [ ] T023 [P] [US3] Thêm vào `tests/filmcheck/test_shots.py`, phim thử `grammar-30` (30 cảnh, `make_tier_film`):
+- [X] T023 [P] [US3] Thêm vào `tests/filmcheck/test_shots.py`, phim thử `grammar-30` (30 cảnh, `make_tier_film`):
   - 3 cảnh mờ hết (`look: "blur"`: canvas vẽ xong rồi `filter: blur(12px)`; thêm vào `TIER_PAGE` của `samples.py`);
   - nhãn giả (`FAKE_LABELS`): 70% cận, 90% ngang tầm mắt, một chuỗi 6 cảnh cùng cỡ;
   - phong cách thử có `shots.json` với khoảng khác.
@@ -162,10 +162,10 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
 
 ### Implementation
 
-- [ ] T024 [US3] Sửa `tools/filmcheck/shots.mjs`:
+- [X] T024 [US3] Sửa `tools/filmcheck/shots.mjs`:
   - nhận `--plain` trong job để vẽ bảng ảnh không viền đỏ và không nhãn kiểm, cho lượt gán nhãn (`.check/shots/label-sheet-<n>.jpg`);
   - bảng ảnh thường ghi `<mã> · <CỠ> · <góc>` khi job có `labels`.
-- [ ] T025 [US3] Sửa `tools/filmcheck/shotcheck.py` (research R8):
+- [X] T025 [US3] Sửa `tools/filmcheck/shotcheck.py` (research R8):
   - `focus.measure` trên mỗi ảnh giữa cảnh, rồi luật `blurred` (`block`) khi `focused_share == 0`, kèm `sharpest`;
   - nhãn: nếu `.check/labels.json` có cùng `fingerprint` thì dùng lại; nếu không thì vẽ bảng `--plain`, gọi `labeler.label` (gợi ý độ nét theo mã), ghi `labels.json` (`fingerprint`, `model`, `at`, `labels`); `LabelError` thì cảnh báo `shot_grammar_unchecked`;
   - so với `refs["shot_grammar"]`:
@@ -175,7 +175,7 @@ description: "Tasks for 021 — learn the reference channel's shot grammar"
     - trung vị `focused_share` → `style_focus`;
     - tỉ lệ bối cảnh nhiều nhất (theo `set` của `SHOTS`) → `style_top_set`.
   - Bỏ qua phần so (ghi `skipped`) khi phong cách không có `shot_grammar`.
-- [ ] T026 [US3] Sửa `tools/filmcheck/cli.py` (`cmd_qc_shots`): in dòng `labels: …` và các tỉ lệ cỡ cảnh, góc máy của phim. Sửa `tools/filmcheck/report.py`: `CHECKS.md` có bảng "Shot grammar" (phim so với khoảng của phong cách).
+- [X] T026 [US3] Sửa `tools/filmcheck/cli.py` (`cmd_qc_shots`): in dòng `labels: …` và các tỉ lệ cỡ cảnh, góc máy của phim. Sửa `tools/filmcheck/report.py`: `CHECKS.md` có bảng "Shot grammar" (phim so với khoảng của phong cách).
 - [ ] T027 [US3] Chạy thật `sh bin/studio qc shots pet-swap` với phong cách đã học lại (SC-006): ghi số khung mờ, tỉ lệ toàn rất rộng, ngang tầm mắt, chuỗi cùng cỡ, thời gian, số lượt gán nhãn. Mở bảng ảnh có nhãn bằng mắt. Ghi vào `quickstart.md`.
 
 **Checkpoint**: commit.

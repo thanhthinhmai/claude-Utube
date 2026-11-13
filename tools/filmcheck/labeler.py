@@ -13,6 +13,7 @@ SCALES = ["ecu", "cu", "med", "wide", "huge", "insert", "unknown"]
 ANGLES = ["eye", "low", "high", "top", "ots", "unknown"]
 ORDER = ["ecu", "cu", "med", "wide", "huge"]          # "one step" for the agreement check
 SHEETS_PER_CALL = 4
+MODEL = "claude-opus-5-5"     # every Claude call of the studio is Opus; STUDIO_LABELER_MODEL only for tests
 
 SYSTEM = """You are the studio's shot labeler. You look at contact sheets of video frames, one frame per shot, each cell
 captioned with its shot id, and label every listed shot. Judge only what you see in the pictures you are given; do
@@ -86,7 +87,7 @@ def _call(sheets: list, ids: list, hints: dict, timeout: int) -> tuple:
     import subprocess
     args = [editor.claude_bin(), "-p", "--system-prompt", SYSTEM, "--tools", "Read", "--allowedTools", "Read",
             "--json-schema", json.dumps(SCHEMA), "--output-format", "json", "--no-session-persistence",
-            *editor.model_args()]
+            "--model", os.environ.get("STUDIO_LABELER_MODEL") or MODEL]
     for _ in range(2):
         try:
             p = subprocess.run(args, input=prompt(sheets, ids, hints), capture_output=True, text=True, timeout=timeout,
@@ -101,8 +102,11 @@ def _call(sheets: list, ids: list, hints: dict, timeout: int) -> tuple:
             raise LabelError(f"the labeler could not run: {(p.stderr or '').strip()[-300:]}")
         got = _valid(out.get("structured_output"), ids)
         if got is not None:
-            used = list((out.get("modelUsage") or {}).keys())
-            return got, (used[0] if used else editor.model_args()[-1]), out.get("usage") or {}
+            want = os.environ.get("STUDIO_LABELER_MODEL") or MODEL
+            used = out.get("modelUsage") or {}
+            # Claude Code also lists small helper models it used; the label run is the one asked for, else the busiest
+            model = want if want in used or not used else max(used, key=lambda k: (used[k] or {}).get("outputTokens", 0))
+            return got, model, out.get("usage") or {}
     raise LabelError("the labeler did not answer every shot in the asked form (twice)")
 
 
@@ -139,3 +143,67 @@ def steps_apart(a: str, b: str):
     if a in ORDER and b in ORDER:
         return abs(ORDER.index(a) - ORDER.index(b))
     return None
+
+
+def _median(v: list):
+    v = sorted(v)
+    if not v:
+        return None
+    m = len(v) // 2
+    return v[m] if len(v) % 2 else (v[m - 1] + v[m]) / 2
+
+
+def grammar(rows: list) -> dict:
+    """data-model ShotGrammar for shots in order ({id, t0, t1, scale, angle, foreground_blur, set, focus, short?});
+    the same numbers for a reference video (style-learn) and for a film (qc shots)."""
+    full = [r for r in rows if not r.get("short")]
+    lab = [r for r in full if r.get("scale") and r["scale"] not in ("insert", "unknown")]
+    n = len(lab)
+
+    def share(key, vals):
+        return {x: round(sum(r.get(key) == x for r in lab) / n, 3) if n else None for x in vals}
+    seq = [r["scale"] for r in full if r.get("scale") and r["scale"] != "unknown"]
+    pairs = [(a, b) for a, b in zip(seq, seq[1:]) if a != "insert" and b != "insert"]
+    run = best = 0
+    prev = None
+    for sc in seq:
+        run = run + 1 if sc == prev and sc != "insert" else 1
+        best = max(best, run)
+        prev = sc
+    sets = [r.get("set") for r in full if r.get("set")]
+    changes = [r["t0"] for r, q in zip(full[1:], full) if r.get("set") and r.get("set") != q.get("set")]
+    gaps = [b - a for a, b in zip(changes, changes[1:])]
+    fs = [r["focus"]["focused_share"] for r in full if r.get("focus")]
+    med = _median(fs)
+    gap = _median(gaps)
+    return {
+        "shots": len(rows), "labelled": n, "inserts": sum(r.get("scale") == "insert" for r in full),
+        "short": sum(bool(r.get("short")) for r in rows), "unknown": sum(r.get("scale") == "unknown" for r in full),
+        "scale_share": share("scale", ORDER),
+        "angle_share": share("angle", ["eye", "low", "high", "top", "ots"]),
+        "scale_change_share": round(sum(a != b for a, b in pairs) / len(pairs), 3) if pairs else None,
+        "longest_same_scale": best,
+        "focused_share_p50": round(med, 3) if med is not None else None,
+        "subject_sharp_share": round(sum((r.get("focus") or {}).get("focused_share", 0) > 0 for r in lab) / n, 3) if n else None,
+        "foreground_blur_share": round(sum(bool(r.get("foreground_blur")) for r in lab) / n, 3) if n else None,
+        "sets": len(set(sets)),
+        "top_set_share": round(max(sets.count(x) for x in set(sets)) / len(sets), 3) if sets else None,
+        "set_change_s_p50": round(gap, 2) if gap is not None else None,
+    }
+
+
+def runs(rows: list) -> list:
+    """[[ids]] of consecutive shots with the same scale (inserts and unknowns break a run)."""
+    out, cur, prev = [], [], None
+    for r in rows:
+        sc = r.get("scale")
+        if sc and sc not in ("insert", "unknown") and sc == prev:
+            cur.append(r["id"])
+        else:
+            if len(cur) > 1:
+                out.append(cur)
+            cur = [r["id"]] if sc and sc not in ("insert", "unknown") else []
+        prev = sc if sc not in ("insert", "unknown") else None
+    if len(cur) > 1:
+        out.append(cur)
+    return out

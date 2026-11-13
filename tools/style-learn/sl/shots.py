@@ -279,38 +279,7 @@ def second_pass(name: str, n: int = 40, seed: int = 21, log=print) -> dict:
 
 
 # ---------- grammar ----------
-def grammar(rows: list) -> dict:
-    """data-model ShotGrammar for one video (or any list of shots in order)."""
-    full = [r for r in rows if not r.get("short")]
-    lab = [r for r in full if r.get("scale") and r["scale"] not in ("insert", "unknown")]
-    n = len(lab)
-    share = lambda key, vals: {x: round(sum(r.get(key) == x for r in lab) / n, 3) if n else None for x in vals}  # noqa: E731
-    seq = [r["scale"] for r in full if r.get("scale") and r["scale"] not in ("unknown",)]
-    pairs = [(a, b) for a, b in zip(seq, seq[1:]) if a != "insert" and b != "insert"]
-    run = best = 0
-    prev = None
-    for s in seq:
-        run = run + 1 if s == prev and s != "insert" else 1
-        best = max(best, run)
-        prev = s
-    sets = [r.get("set") for r in full if r.get("set")]
-    changes = [r["t0"] for r, q in zip(full[1:], full) if r.get("set") and r.get("set") != q.get("set")]
-    gaps = [b - a for a, b in zip(changes, changes[1:])]
-    fs = [r["focus"]["focused_share"] for r in full if r.get("focus")]
-    return {
-        "shots": len(rows), "labelled": n, "inserts": sum(r.get("scale") == "insert" for r in full),
-        "short": sum(bool(r.get("short")) for r in rows), "unknown": sum(r.get("scale") == "unknown" for r in full),
-        "scale_share": share("scale", SCALE_ORDER),
-        "angle_share": share("angle", ["eye", "low", "high", "top", "ots"]),
-        "scale_change_share": round(sum(a != b for a, b in pairs) / len(pairs), 3) if pairs else None,
-        "longest_same_scale": best,
-        "focused_share_p50": round(float(np.median(fs)), 3) if fs else None,
-        "subject_sharp_share": round(sum((r.get("focus") or {}).get("focused_share", 0) > 0 for r in lab) / n, 3) if n else None,
-        "foreground_blur_share": round(sum(bool(r.get("foreground_blur")) for r in lab) / n, 3) if n else None,
-        "sets": len(set(sets)),
-        "top_set_share": round(max(sets.count(s) for s in set(sets)) / len(sets), 3) if sets else None,
-        "set_change_s_p50": round(float(np.median(gaps)), 2) if gaps else None,
-    }
+grammar = labeler.grammar      # one definition for reference videos and films (tools/filmcheck/labeler.py)
 
 
 GRAMMAR_METRICS = ["scale_change_share", "longest_same_scale", "focused_share_p50", "subject_sharp_share",

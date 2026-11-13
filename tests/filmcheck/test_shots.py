@@ -51,7 +51,8 @@ class ShotCheck(unittest.TestCase):
 
     @classmethod
     def cli(cls, *args):
-        env = {**os.environ, "STUDIO_LIB": str(LIB), "STUDIO_ROOT": str(cls.root)}
+        env = {**os.environ, "STUDIO_LIB": str(LIB), "STUDIO_ROOT": str(cls.root),
+               "STUDIO_CLAUDE_BIN": str(REPO / "tests/online/fake_claude")}       # never a real Claude in tests (specs/021)
         return subprocess.run([PY, str(REPO / "tools" / "filmcheck" / "cli.py"), *args], capture_output=True, text=True,
                               env=env, cwd=str(cls.root), timeout=900)
 
@@ -96,6 +97,80 @@ class ShotCheck(unittest.TestCase):
         self.assertIn("1 open frame problem", gate.stderr)
         self.assertNotIn("style warning", gate.stderr)
         self.assertIn("a darker film on purpose", (self.d / "CHECKS.md").read_text())
+
+
+SEQ = ("cu huge cu wide cu med cu huge cu wide " "cu cu cu cu cu cu " "med cu huge cu wide cu med cu huge cu wide cu med huge").split()
+
+
+@unittest.skipUnless(HAVE_PAGE, "needs node and the library's playwright-core")
+class Grammar(unittest.TestCase):
+    """specs/021 T023: blurred frames block; the film's shot grammar against the style's (labels from a fake Claude)."""
+
+    @classmethod
+    def setUpClass(cls):
+        TMP.mkdir(exist_ok=True)
+        cls.root = Path(tempfile.mkdtemp(dir=TMP))
+        st = cls.root / "my-styles" / "g-style"
+        st.mkdir(parents=True)
+        (st / "shots.json").write_text(json.dumps({
+            "scale_share": {"cu": [0.1, 0.35], "huge": [0.1, 0.3]}, "angle_share": {"eye": [0.35, 0.6]},
+            "scale_change_share": [0.75, 0.95], "longest_same_scale_max": 3, "focused_share_p50": [0.0, 1.0]}))
+        shots = [{"id": f"P{i:02d}.0", "t0": i * 2.0, "t1": i * 2.0 + 2, "set": "room"} for i in range(30)]
+        for i in (5, 15, 25):
+            shots[i]["look"] = "blur"
+        cls.d = samples.make_tier_film(cls.root, "grammar-30", shots=shots, cards=[], style="g-style")
+        cls.labels = cls.root / "labels.json"
+        cls.labels.write_text(json.dumps({f"P{i:02d}.0": [sc, "low" if i in (3, 17, 22) else "eye", False]
+                                          for i, sc in enumerate(SEQ)}))
+        cls.log = cls.root / "claude.log"
+        cls.r = cls.run_shots()
+
+    @classmethod
+    def run_shots(cls, **extra):
+        env = {**os.environ, "STUDIO_LIB": str(LIB), "STUDIO_ROOT": str(cls.root), "STUDIO_CLAUDE_BIN": str(REPO / "tests/online/fake_claude"),
+               "FAKE_LABELS": str(cls.labels), "FAKE_CLAUDE_LOG": str(cls.log), **extra}
+        p = subprocess.run([PY, str(REPO / "tools/filmcheck/cli.py"), "qc", "shots", "grammar-30", "--json"], capture_output=True,
+                           text=True, env=env, cwd=str(cls.root), timeout=900)
+        return json.loads(p.stdout) if p.stdout.strip() else {"error": p.stderr}
+
+    def test_blurred_frames_block(self):
+        got = sorted(i["ref"] for i in self.r["issues"] if i["rule"] == "blurred")
+        self.assertEqual(got, ["P05.0", "P15.0", "P25.0"], self.r.get("error"))
+        self.assertTrue(all(i["severity"] == "block" for i in self.r["issues"] if i["rule"] == "blurred"))
+
+    def test_grammar_warnings_with_shot_ids(self):
+        rules = {i["rule"]: i for i in self.r["issues"] if i["severity"] == "warn"}
+        self.assertIn("style_scale_cu", rules)
+        self.assertIn("style_angle_eye", rules)
+        run = rules["style_same_scale_run"]
+        self.assertEqual(run["shots"], [f"P{i:02d}.0" for i in range(10, 16)])
+        self.assertNotIn("style_scale_huge", rules)                        # 5/30 is inside 0.1–0.3
+        self.assertNotIn("style_scale_change", rules)
+        fault = {"P05.0", "P15.0", "P25.0", "film", "P10.0"}
+        false = {i["ref"] for i in self.r["issues"]} - fault
+        self.assertLessEqual(len(false), 1, false)                        # SC-005
+
+    def test_labels_are_reused_and_sheets_carry_them(self):
+        calls = len(self.log.read_text().splitlines())
+        again = self.run_shots()
+        self.assertTrue(again["measures"]["labels"]["reused"])
+        self.assertEqual(len(self.log.read_text().splitlines()), calls)   # no second labelling for the same source
+
+    def test_labeler_failure_is_a_warning(self):
+        (self.d / ".check" / "labels.json").unlink()
+        r = self.run_shots(FAKE_LABELS_MODE="fail")
+        self.assertIn("shot_grammar_unchecked", [i["rule"] for i in r["issues"]])
+        r = self.run_shots()                                               # restore the labels for the other tests
+        self.assertFalse(r["measures"]["labels"]["reused"])
+        self.assertTrue((self.d / ".check" / "shots" / "label-sheet-1.jpg").exists())   # the unmarked sheet the labeler saw
+
+    def test_style_without_grammar_is_skipped(self):
+        (self.root / "my-styles" / "g-style" / "shots.json").rename(self.root / "shots.json.bak")
+        try:
+            r = self.run_shots()
+            self.assertTrue(any("shot grammar" in x for x in r["skipped"]))
+        finally:
+            (self.root / "shots.json.bak").rename(self.root / "my-styles" / "g-style" / "shots.json")
 
 
 class Scoring(unittest.TestCase):

@@ -342,6 +342,7 @@ window.render = (t) => {
   if (window.CLEAN_SEEN !== undefined) window.CLEAN_SEEN = !!window.CLEAN;
   const s = F.shots.find(s => t >= s.t0 && t < s.t1) || F.shots[F.shots.length - 1];
   look(s, t);
+  c.style.filter = s.look === 'blur' ? 'blur(14px)' : 'none';      // specs/021: a shot with nothing in focus
   const card = document.getElementById('card'), k = (F.cards || []).find(k => t >= k.t0 && t < k.t1);
   card.textContent = k ? k.text : '';
   card.style.opacity = k && !window.CLEAN ? 1 : 0;
