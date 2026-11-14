@@ -32,8 +32,8 @@ class StyleRefs(unittest.TestCase):
     def test_dusk_hypothetical(self):
         ev = (REPO / "my-styles" / "dusk-hypothetical" / "EVIDENCE.md").read_text()
         got = stylerefs.from_evidence(ev)
-        self.assertEqual(got, {"luma_p50": [0.198, 0.299], "saturation_p50": [0.319, 0.504], "cuts_per_min": [21, 29],
-                               "loudness_range": [2.4, 3.3]})          # cuts/min re-measured by specs/021 (scene > 0.15)
+        self.assertEqual(got, {"luma_p50": [0.221, 0.292], "saturation_p50": [0.318, 0.41], "cuts_per_min": [18, 26],
+                               "loudness_range": [2.5, 3.7]})          # re-learned 2026-11-13 from ten full films (specs/021)
 
     def test_qc_json_overrides(self):
         self.style("s", "| Metric | Median | Range |\n|---|---|---|\n| luma p50 | 0.2 | 0.1–0.3 |\n"

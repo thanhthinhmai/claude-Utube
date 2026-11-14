@@ -1,7 +1,8 @@
 {
- "line": "Big sphere-headed 3D figures act second-person hypotheticals in a soft low-poly world graded to permanent violet dusk, cut every few seconds under a narrator who never stops.",
+ "line": "Big sphere-headed 3D toy figures act second-person hypotheticals in a busy low-poly world graded to permanent violet dusk, cut every two to three seconds under a narrator who never stops.",
  "line_cn": "",
  "borrows": [],
+ "updated": "2026-11-13",
  "slug": "dusk-hypothetical",
  "en": "Dusk Hypothetical",
  "cn": "",
@@ -11,10 +12,9 @@
  "source": "learned",
  "reference": {
   "videos": 10,
-  "measured_seconds": 1800.0,
+  "measured_seconds": 6654.0,
   "formats": [
    "landscape"
   ]
- },
- "updated": "2026-11-13"
+ }
 }
