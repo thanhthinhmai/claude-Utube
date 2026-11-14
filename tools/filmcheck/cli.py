@@ -409,6 +409,21 @@ def cmd_channel_set(a, channels):
         ch[f] = float(vals[0])
     elif f in ("name", "niche", "audience", "language", "style", "voice", "title_rules", "thumbnail_rules"):
         ch[f] = " ".join(vals)
+    elif f == "hero":                                            # specs/022: hero hoodie=#d9b23a hair=bald …
+        hero = dict(ch.get("hero") or {})
+        for v in vals:
+            k, eq, x = v.partition("=")
+            if not eq or k not in channels.HERO_KEYS:
+                raise channels.ChannelError(f"hero: use key=value with keys {', '.join(channels.HERO_KEYS)}")
+            if k == "glasses":
+                if x not in ("yes", "no"):
+                    raise channels.ChannelError("hero.glasses: yes or no")
+                hero[k] = x == "yes"
+            elif k == "hat" and x in ("none", ""):
+                hero[k] = None
+            else:
+                hero[k] = x
+        ch[f] = hero
     else:
         raise channels.ChannelError(f"unknown field {f}")
     channels.save(root(), ch, lib_dir())

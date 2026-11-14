@@ -78,10 +78,10 @@ description: "Tasks for 022 — film kit for the learned style"
 
 ## Phase 5: Nhân vật chính của kênh (FR-015, dùng cho US2 và US4)
 
-- [ ] T025 Sửa `tools/filmcheck/channels.py`: trường `hero` theo data-model.md, mục "Nhân vật chính": `hoodie`, `strings` là `#rrggbb`; `hair` trong `catalog.hair`; `hat` trong `catalog.hats` hoặc `null`; `glasses` bool; thiếu `hero` vẫn hợp lệ. `normal()` giữ `hero`; `channel_md()` in `Hero: hoodie … · strings … · hair …`; `attach()` chép vào `film.hero` của bản chụp. Kiểm ΔE (CIE76 trên Lab, hàm trong `tools/filmcheck/kit.py`) ≥ `avoid_hero.min_delta_e` khi phong cách của kênh có `kit/catalog.json`.
-- [ ] T026 Sửa `tools/filmcheck/cli.py`: `channel set <slug> hero <khoá=giá trị…>` đúng contracts/cli.md (`hat=none`, `glasses=yes|no`, chỉ đổi khoá nêu); `kit use` kiểm `film.hero` theo ΔE và in gợi ý khi kênh thiếu `hero`.
-- [ ] T027 [P] Test trong `tests/filmcheck/test_channels.py`: `set hero` đổi một khoá; khoá hoặc giá trị sai thoát 2; áo gần `avoid_hero` (ΔE < 25) thoát 2; `attach` có `film.hero`; kênh cũ không có `hero` vẫn `show` được.
-- [ ] T028 Đặt hero cho kênh: `sh bin/studio channel set dusk-hypothetical hero hoodie=#d9b23a strings=#ffffff hair=bald hat=none glasses=no`; kiểm `channels/dusk-hypothetical/channel.json` và `CHANNEL.md`.
+- [X] T025 Sửa `tools/filmcheck/channels.py`: trường `hero` theo data-model.md, mục "Nhân vật chính": `hoodie`, `strings` là `#rrggbb`; `hair` trong `catalog.hair`; `hat` trong `catalog.hats` hoặc `null`; `glasses` bool; thiếu `hero` vẫn hợp lệ. `normal()` giữ `hero`; `channel_md()` in `Hero: hoodie … · strings … · hair …`; `attach()` chép vào `film.hero` của bản chụp. Kiểm ΔE (CIE76 trên Lab, hàm trong `tools/filmcheck/kit.py`) ≥ `avoid_hero.min_delta_e` khi phong cách của kênh có `kit/catalog.json`.
+- [X] T026 Sửa `tools/filmcheck/cli.py`: `channel set <slug> hero <khoá=giá trị…>` đúng contracts/cli.md (`hat=none`, `glasses=yes|no`, chỉ đổi khoá nêu); `kit use` kiểm `film.hero` theo ΔE và in gợi ý khi kênh thiếu `hero`.
+- [X] T027 [P] Test trong `tests/filmcheck/test_channels.py`: `set hero` đổi một khoá; khoá hoặc giá trị sai thoát 2; áo gần `avoid_hero` (ΔE < 25) thoát 2; `attach` có `film.hero`; kênh cũ không có `hero` vẫn `show` được.
+- [X] T028 Đặt hero cho kênh: `sh bin/studio channel set dusk-hypothetical hero hoodie=#d9b23a strings=#ffffff hair=bald hat=none glasses=no`; kiểm `channels/dusk-hypothetical/channel.json` và `CHANNEL.md`.
 
 ---
 

@@ -1,12 +1,13 @@
 # Kênh Dusk Hypothetical (`dusk-hypothetical`)
 
-Cập nhật: 2026-11-13
+Cập nhật: 2026-11-14
 
 - Ngách: Second-person 'what if' hypotheticals: everyday superpowers, strange rules of the world, and what would really happen, with one real-world fact per beat · Khán giả: English-speaking teens and young adults (13-25) who like curious, slightly funny thought experiments, long enough to unfold in chapters
 - Ngôn ngữ: en · Độ dài: 600 s · Phong cách: dusk-hypothetical · Giọng: am_michael × 1.1
 - Hashtag luôn dùng: #whatif #hypothetical · Từ không dùng: –
 - Tiêu đề: Start with 'What If'; second person; under 60 characters; one concrete hook (a number, a power, a rule)
 - Thumbnail: One big sphere-headed figure close-up with a strong eye expression; 2-3 word gold caps text that adds to the title; violet dusk background
+- Hero: hoodie #d9b23a · strings #ffffff · hair bald
 
 ## Quyết định
 - 2026-11-12: Narration is second person, present tense, short sentences (5-8 words), fast steady pace; one real-world fact card per escalation beat; never copy the reference channel's structure (no mid-triumph cold open, no life-or-death binary climax)

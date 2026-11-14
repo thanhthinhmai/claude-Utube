@@ -93,6 +93,44 @@ class Store(unittest.TestCase):
         self.assertEqual(studio(self.root, "channel", "show", "tea").returncode, 0)
 
 
+class Hero(unittest.TestCase):  # specs/022 T027; FR-015
+    def setUp(self):
+        self.root = fresh()
+        samples.make_channel(self.root, "dusk-ish", style="kit-style")
+        k = Path(self.root) / "my-styles" / "kit-style" / "kit"
+        k.mkdir(parents=True)
+        (k / "catalog.json").write_text(json.dumps({"avoid_hero": {"hoodie": "#4f78b8", "min_delta_e": 25}}))
+
+    def test_set_show_attach(self):
+        r = studio(self.root, "channel", "set", "dusk-ish", "hero", "hoodie=#d9b23a", "strings=#ffffff", "hair=bald", "hat=none", "glasses=no")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        ch = channels.load(self.root, "dusk-ish")
+        self.assertEqual(ch["hero"], {"hoodie": "#d9b23a", "strings": "#ffffff", "hair": "bald", "hat": None, "glasses": False})
+        r = studio(self.root, "channel", "set", "dusk-ish", "hero", "hair=curly")          # one key changes, the rest stay
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(channels.load(self.root, "dusk-ish")["hero"]["hoodie"], "#d9b23a")
+        self.assertEqual(channels.load(self.root, "dusk-ish")["hero"]["hair"], "curly")
+        self.assertIn("Hero: hoodie #d9b23a", studio(self.root, "channel", "show", "dusk-ish").stdout)
+        film = Path(self.root) / "films" / "f1"
+        channels.attach(self.root, film, "dusk-ish")
+        snap = json.loads((film / "channel.json").read_text())
+        self.assertEqual(snap["film"]["hero"]["hair"], "curly")
+
+    def test_bad_values_and_too_close(self):
+        for args in (["colour=#ffffff"], ["hoodie=yellow"], ["hair=mohawk"], ["glasses=maybe"], ["hat=crown"]):
+            r = studio(self.root, "channel", "set", "dusk-ish", "hero", *args)
+            self.assertEqual(r.returncode, 2, args)
+        r = studio(self.root, "channel", "set", "dusk-ish", "hero", "hoodie=#5078b4")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("too close to the reference character", r.stderr)
+        self.assertNotIn("hero", channels.load(self.root, "dusk-ish"))
+
+    def test_old_channel_without_hero(self):
+        r = studio(self.root, "channel", "show", "dusk-ish")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertNotIn("Hero:", r.stdout)
+
+
 class Snapshot(unittest.TestCase):
     def setUp(self):
         self.root = fresh()

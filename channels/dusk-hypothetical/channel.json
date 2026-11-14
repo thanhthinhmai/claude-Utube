@@ -38,5 +38,12 @@
    "text": "2026-11-13: replaces the 'never copy the reference structure' rule. Follow the reference channel's script structure and pacing (opening, escalation, climax, ending, chapter rhythm, minute by minute); stories, lines, characters, voice, names and thumbnails stay our own."
   }
  ],
- "updated": "2026-11-13T07:03:35Z"
+ "updated": "2026-11-14T07:22:38Z",
+ "hero": {
+  "hoodie": "#d9b23a",
+  "strings": "#ffffff",
+  "hair": "bald",
+  "hat": null,
+  "glasses": false
+ }
 }
