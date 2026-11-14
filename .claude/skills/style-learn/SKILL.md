@@ -134,12 +134,14 @@ Các lỗi đã từng gặp (từ claude-animated-shorts), cần kiểm riêng:
    - mục 6 (Camera grammar) và phần chiều sâu ở mục 2 ghi **bằng số** từ mục "Shot grammar" của `summary.md`: tỉ lệ từng cỡ cảnh và góc máy, tỉ lệ đổi cỡ giữa hai cảnh liền nhau, chuỗi cùng cỡ dài nhất, phần khung nét, bối cảnh; thêm các hàng đó vào "Key numbers" của `EVIDENCE.md`;
    - chỉ ghi những gì đúng cho **mọi** phim theo phong cách này; không ghi câu chuyện;
    - mục 10 (Engine) mô tả cách dựng bằng bộ máy `render(t)` dựa trên `based_on`;
-   - mục 11 gợi ý cấu trúc, cách mở đầu và cách kết **khác** kênh gốc.
+   - mục 11 (cấu trúc phim), specs/022: xem kênh mà phong cách được học cho (`sh bin/studio channel show <kênh>`):
+     - kênh có quyết định **theo cấu trúc của kênh tham chiếu**: viết thêm `references/<set>/style/STRUCTURE.md` gồm các màn, tỉ lệ thời lượng, mốc chuyển, nhịp leo thang (đo từ bản chép lời và bảng cảnh), **không** câu chữ, nhân vật, câu chuyện hay tên nào của kênh tham chiếu; mục 11 trỏ tới `STRUCTURE.md`;
+     - kênh không có quyết định đó, hoặc chưa gắn kênh: mục 11 gợi ý cấu trúc, cách mở đầu và cách kết **khác** kênh gốc (luật cũ), không viết `STRUCTURE.md`.
 3. **Viết `references/<set>/style/EVIDENCE.md`:** tóm tắt 3 báo cáo cùng nhật ký sửa, và lý do chọn `based_on`.
 4. **Viết `references/<set>/style/style.json`:** `{"line": "<một câu tiếng Anh>", "line_cn": "", "borrows": [], "size": "<WxH nếu không phải 1920x1080>"}`.
 5. Chạy kiểm tra tên:
    ```sh
-   sh bin/studio learn check-names <set> references/<set>/style/STYLE.md references/<set>/style/EVIDENCE.md references/<set>/style/style.json
+   sh bin/studio learn check-names <set> references/<set>/style/STYLE.md references/<set>/style/EVIDENCE.md references/<set>/style/style.json [references/<set>/style/STRUCTURE.md]
    ```
    Mã 1 thì sửa và chạy lại cho tới khi đạt.
 

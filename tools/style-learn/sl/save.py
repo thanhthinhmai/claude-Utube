@@ -57,6 +57,10 @@ def _proof_sources(proof: Path) -> list:
 
 CORR_HEAD = "## Corrections log"
 DEMO_FILES = ("DEMO.md", "demo", "test.jpg", "test.mp4", "demo-checks.json")
+KEEP_ON_UPDATE = DEMO_FILES + ("kit",)                     # specs/022: the film kit stays with the style too
+# specs/022 FR-013: the only files of references/<set>/style/ that go into the style; work files (logs, reviews, .job)
+# stay behind. The proof frame's sources come from proof/, the measurements from profile/.
+STYLE_FILES = ("STYLE.md", "EVIDENCE.md", "style.json", "STRUCTURE.md", "shots.json")
 
 
 def corrections(text: str) -> list:
@@ -127,9 +131,12 @@ def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bo
     if raster:      # could be a frame of the reference video: only code-drawn sources go into the style
         raise StepError("proof/ có ảnh raster ngoài proof/out/ (có thể là khung của video gốc), không được lưu vào phong cách: "
                         + ", ".join(str(p.relative_to(d)) for p in raster) + ". Vẽ bằng code, hoặc chuyển vào proof/out/")
-    pkg_files = [p for p in style.rglob("*") if p.is_file()] + _proof_sources(proof)
-    bad = [p for p in pkg_files if p.suffix.lower() in MEDIA_EXT or p.name == "words.json"
-           or (p.parent != style and p.suffix.lower() not in SOURCE_EXT)]
+    skipped = sorted(p.relative_to(style) for p in style.rglob("*") if p.is_file() and str(p.relative_to(style)) not in STYLE_FILES
+                     and p.suffix.lower() not in MEDIA_EXT)
+    pkg_files = [style / f for f in STYLE_FILES if (style / f).is_file()] + _proof_sources(proof)
+    every = [p for p in style.rglob("*") if p.is_file()] + _proof_sources(proof)   # media anywhere is refused, not skipped
+    bad = [p for p in every if p.suffix.lower() in MEDIA_EXT or p.name == "words.json"
+           or (p.parent != style and style not in p.parents and p.suffix.lower() not in SOURCE_EXT)]
     if bad:
         raise StepError("gói phong cách không được chứa media hay bản chép lời: " + ", ".join(str(p.relative_to(d)) for p in bad))
     viol = names.check_strings(name, [slug, en, cn]) + names.check_files(
@@ -148,11 +155,11 @@ def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bo
     (tmp / "measurements").mkdir(parents=True)
     shutil.copy2(style / "STYLE.md", tmp / "STYLE.md")
     shutil.copy2(style / "EVIDENCE.md", tmp / "EVIDENCE.md")
-    for p in style.rglob("*"):
-        rel = p.relative_to(style)
-        if p.is_file() and str(rel) not in ("STYLE.md", "EVIDENCE.md", "style.json"):
-            (tmp / rel).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(p, tmp / rel)
+    for f in STYLE_FILES:
+        if f not in ("STYLE.md", "EVIDENCE.md", "style.json") and (style / f).is_file():
+            shutil.copy2(style / f, tmp / f)
+    for rel in skipped:
+        print(f"skipped: style/{rel}")
     summ = d / "profile" / "summary.json"
     s = scrub(refset.read_json(summ)) if summ.exists() else {}
     refset.write_json(tmp / "measurements" / "summary.json", s)
@@ -179,7 +186,7 @@ def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bo
     if refs:
         refset.write_json(tmp / "shots.json", refs)
     if update:                                               # the demo film stays with the style (specs/021 FR-015)
-        for f in DEMO_FILES:
+        for f in KEEP_ON_UPDATE:
             src = old / f
             if src.is_dir():
                 shutil.copytree(src, tmp / f)

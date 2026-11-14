@@ -29,4 +29,22 @@ Phải xem bằng mắt bảng ảnh danh mục và ít nhất vài phút phim m
 
 ## Kết quả
 
-(điền khi làm xong)
+### US1 (2026-11-14, GPU Intel UHD 730 qua WSLg)
+
+| # | SC | Kết quả | Số đo |
+|---|---|---|---|
+| 1 | SC-001 | đạt | 8 bối cảnh, cảnh toàn có người phụ: độ sáng 0,223–0,286, bão hoà 0,343–0,398. `qc shots kit-catalog` (51 cảnh, nhãn Opus): 0 phẳng, tối, cháy; 3 khung mờ (C024, C041 do lấy nét ở tâm đầu; C051 là cảnh chèn cố ý mờ). Sửa lấy nét vào mặt: C024 25% ô nét, C041 42% ô nét (đo bằng `focus.py`, không chạy lại lượt gán nhãn); C051 ghi ngoại lệ |
+| 2 | SC-002 | đạt (so gián tiếp) | Khung gốc `ref.jpg` đã bị `learn clean` xoá. So với khung chứng minh vòng 9: độ sáng Δ 0,013, bão hoà Δ 0,015, rất tối Δ 0,6 điểm %, màu khớp 6. Trường hợp xấu nhất so với khung gốc (từ `compare.json`): 0,026 / 0,025 / 2,0 điểm %, bảng màu 5/4. Lần chụp đầu, không sửa |
+| 3 | SC-003 | đạt | 1.000 người, 10 s, 60 fps, 1920×1080, 600 khung: 64 s trên GPU; người phân biệt được bằng màu áo, tóc, mũ |
+
+### US3 (2026-11-14)
+
+| # | SC | Kết quả | Số đo |
+|---|---|---|---|
+| 6 | SC-006 | đạt | `test_work_files_left_out_structure_kept`: `label.log`, `pipeline.log`, `review-1.md`, `review-2.md`, `.job` không vào phong cách; `STRUCTURE.md` được lưu; `--update` giữ `kit/` và `demo/`; tên kênh trong `STRUCTURE.md` thì dừng. `tests/learn`: 48/48 |
+| — | US3 #2 | đạt (kiểm bằng đọc) | SKILL.md bước 2: kênh `dusk-hypothetical` có quyết định 2026-11-13 → nhánh `STRUCTURE.md`; phong cách chưa gắn kênh → luật cũ (xưởng chưa có kênh thứ hai để thử) |
+
+Sửa trong lúc chạy thật (ghi để phim sau không gặp lại):
+- Chrome trên GPU của WSL2 vẽ hình bo tròn trong suốt thành hình chữ X trên canvas có nhận khung WebGL: đồ hoạ vẽ trên canvas riêng, làm mờ nền ở canvas cảnh.
+- Sương mù 8–24 m che mất khán đài: mỗi bối cảnh tự đặt `fog`; nhà thi đấu, phố, sân vận động có `grade` riêng trong giới hạn.
+- Máy quay chui qua trần và tường: mỗi bối cảnh khai `room`, máy kéo lại gần và mở rộng góc.
