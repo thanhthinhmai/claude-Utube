@@ -1,0 +1,31 @@
+{
+ "version": 1,
+ "sets": ["classroom", "lockers", "gym", "street", "bedroom", "cafeteria", "stadium", "void"],
+ "poses": ["stand", "sit", "walk", "hold-phone", "hold-book", "hold-bag", "hold-cup", "hold-paper", "point", "cheer", "shrug"],
+ "faces": ["dot", "half", "wow", "happy", "blank", "angry", "sad", "sweat"],
+ "hair": ["bald", "short", "bun", "curly"],
+ "hats": ["cap", "beanie"],
+ "cams": {
+  "ecu":        {"scale": "ecu",  "angle": "eye"},
+  "close":      {"scale": "cu",   "angle": "eye"},
+  "mid-eye":    {"scale": "med",  "angle": "eye"},
+  "mid-low":    {"scale": "med",  "angle": "low"},
+  "ots":        {"scale": "med",  "angle": "ots"},
+  "wide-eye":   {"scale": "wide", "angle": "eye"},
+  "wide-high":  {"scale": "wide", "angle": "high"},
+  "very-wide":  {"scale": "huge", "angle": "eye"},
+  "huge-high":  {"scale": "huge", "angle": "high"},
+  "top":        {"scale": "huge", "angle": "top"},
+  "insert":     {"scale": "insert", "angle": "eye"}
+ },
+ "gfx": ["counter", "menu", "diagram", "bubble", "stat", "title", "chapter", "end-choice"],
+ "moods": ["dusk", "alarm", "night", "lilac"],
+ "hoodies": ["#c0423e", "#3f9a9a", "#e07a3a", "#7a5cc0", "#4f8f4a", "#d9608c", "#3f6fc0", "#c99a2e", "#8a4a6a"],
+ "hair_colours": ["#4a2e22", "#1c1420", "#c8903a", "#8a4a2a"],
+ "hero_default": {"hoodie": "#d9b23a", "strings": "#ffffff", "hair": "bald", "hat": null, "glasses": false},
+ "avoid_hero": {
+  "hoodie": "#4f78b8",
+  "min_delta_e": 25,
+  "measured": "median of the lit hoodie pixels of the reference hero in five shot cells of the re-learn set (graded colour, 2026-11-14); the threshold is not measured, approved by the user 2026-11-14"
+ }
+}
