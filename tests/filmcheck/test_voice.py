@@ -100,9 +100,23 @@ class VoiceCheck(unittest.TestCase):
         self.assertIn("check the recording", r["issues"][0]["fix"])
         self.assertFalse(r["pass"])
 
+    def test_line_asr_text_is_expected(self):  # a line's "asr" field overrides its text, as in asr_check.py
+        d = voice_film(self.root, "voice-asr", n=3)
+        rows = json.loads((d / "lines.json").read_text())
+        words = json.loads((d / "voices" / "words.json").read_text())
+        heard = " ".join(w[0] for w in words["l01"])
+        rows[0]["text"] = "Your mum calls on a Sunday about the colour of the neighbour's car."
+        rows[0]["asr"] = heard
+        (d / "lines.json").write_text(json.dumps(rows))
+        r = voicecheck.run(d, LIB)
+        self.assertNotIn(("asr_mismatch", "l01"), [(i["rule"], i["ref"]) for i in r["issues"]])
+
     def test_percent_sign_is_a_word(self):
         self.assertGreaterEqual(voicecheck.similar("Your jumps go eleven percent higher.", "Your jumps go 11% higher."), 0.99)
         self.assertLess(voicecheck.similar("Your jumps go eleven percent higher.", "Your jumps go 11 higher."), 0.92)
+
+    def test_accents_fold(self):
+        self.assertGreaterEqual(voicecheck.similar("At the café, the barista squints.", "At the cafe, the barista squints."), 0.99)
 
     def test_cli(self):
         voice_film(self.root, "voice-cli", n=2)
