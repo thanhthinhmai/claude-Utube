@@ -110,6 +110,8 @@ Framing: subject centre or centre-right and in focus; the hero is often small in
 
 ## 10. Engine
 
+**Use the film kit:** [`kit/`](kit/) (specs/022) holds the jointed figures, crowds to thousands, eight sets, camera placements, graphics and the grade that passed the proof frame (`kit/GRADE.md`). Copy it into the film with `sh bin/studio kit use <film>`, write a scene table and call `film({scenes})`; the names a scene may use are in `kit/catalog.json`, the catalogue page is `kit/catalog.html`. Write new figures, lights or graphics only for a `custom:` set, from `kit/sets/parts.js`.
+
 Read this style's own demo first: [`DEMO.md`](DEMO.md) and [`demo/`](demo/) (`index.html`: figure, sets, post settings, a shot plan following §6; `mix.py`: the voice-first mix). Then the three.js contract of the library (`TECHNIQUE.md` §2), taking the perspective camera, rig and DOF approach of `brick-toy` but replacing bricks with smooth primitives. Post: `makePost(renderer, scene, camera, w, h, { ssaa: 2, ao: true })` from `/core/three/post.js`; helpers `eio`/`eo`/`ss` and `mulberry` from `/core/lib.js`.
 
 Minimal recipe (not from any demo): `figure({hoodie, hair, eyes})` = `SphereGeometry` head (≈ 1/3 of the height) on a thin neck, rounded-box hoodie torso, `CapsuleGeometry` limbs, sphere hands, flat black decals 1 mm above the head; `crowd(n, seed)` = `InstancedMesh` copies of that figure with `mulberry`-random hoodie colours, placed in rows; a room = floor + walls + one repeated prop grid (desks, lockers, seats) + a lit window grid; warm pink key from one side, violet hemisphere fill, one practical light with bloom; grade to §3, vignette ≈ 0.5, draw the 2.04:1 bars last.
