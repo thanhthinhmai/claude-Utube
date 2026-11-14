@@ -43,6 +43,7 @@ const ARMS = {
   point: (sx, L, t, sit) => sx > 0 ? { elbow: V(0.3, L + 0.44, 0.2), hand: V(0.32, L + 0.54, 0.5) } : ARMS.rest(sx, L, t, sit),
   cheer: (sx, L) => ({ elbow: V(sx * 0.36, L + 0.7, 0.02), hand: V(sx * 0.3, L + 0.98, 0.06) }),
   shrug: (sx, L) => ({ elbow: V(sx * 0.36, L + 0.28, 0.06), hand: V(sx * 0.44, L + 0.46, 0.14) }),
+  hug: (sx, L) => ({ elbow: V(sx * 0.32, L + 0.36, 0.24), hand: V(-sx * 0.08, L + 0.42, 0.46) }),   // arms round someone in front
 };
 // pose name → legs, arms, held item, head pitch
 export const POSES = {
@@ -57,6 +58,7 @@ export const POSES = {
   point: { legs: 'stand', arms: 'point' },
   cheer: { legs: 'stand', arms: 'cheer', pitch: -0.15 },
   shrug: { legs: 'stand', arms: 'shrug', tilt: 0.12 },
+  hug: { legs: 'stand', arms: 'hug', pitch: 0.1 },
 };
 export const FACES = ['dot', 'half', 'wow', 'happy', 'blank', 'angry', 'sad', 'sweat'];
 export const HAIR = ['bald', 'short', 'bun', 'curly'];

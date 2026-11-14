@@ -112,8 +112,14 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
       { head: new THREE.Vector3(set.anchors.hero.x, (set.anchors.hero.y || 0) + 1.57, set.anchors.hero.z), facing: set.anchors.hero.ry || 0 };
     const cp = place(cam, camName(s.cam), subj.head, subj.facing, camOpts, k, set.room);
     stage.focus(cp.focus, cp.aper); stage.aim(new THREE.Vector3(subj.head.x, 0, subj.head.z));
-    shoulder.group.visible = !!cp.shoulder;
-    if (cp.shoulder) { shoulder.group.position.set(cp.shoulder.x, cp.shoulder.y - 1.6, cp.shoulder.z); shoulder.group.rotation.y = cp.shoulderFacing; shoulder.pose('stand'); }
+    // over the shoulder: the hero is the soft shoulder in front when the hero is in the shot but not its subject
+    const heroFront = cp.shoulder && subj.who !== 'hero' && heroFig.group.visible;
+    shoulder.group.visible = !!cp.shoulder && !heroFront;
+    if (cp.shoulder) {
+      const f = heroFront ? heroFig : shoulder;
+      f.group.position.set(cp.shoulder.x, cp.shoulder.y - 1.6, cp.shoulder.z); f.group.rotation.y = cp.shoulderFacing;
+      if (!heroFront) f.pose('stand');
+    }
 
     // crowd (slots already taken by the cast are left out)
     for (const [, cr] of crowds) cr.group.visible = false;

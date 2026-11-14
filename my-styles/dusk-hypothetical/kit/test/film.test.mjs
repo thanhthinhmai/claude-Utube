@@ -22,6 +22,7 @@ test('CARDS come from every graphic with text, at scene time', () => {
 test('CUES are clipped to the film', () => {
   const p = plan([S('S001')], [[0, 1, 'one'], [1.5, 3, 'two'], [5, 6, 'gone']]);
   assert.deepEqual(p.CUES, [[0, 1, 'one'], [1.5, 3, 'two']]);
+  assert.deepEqual(plan([S('S001')], [{ t0: 0.2, t1: 1, text: 'obj' }]).CUES, [[0.2, 1, 'obj']]);
 });
 
 const bad = (scenes, re) => assert.throws(() => check(scenes), re);

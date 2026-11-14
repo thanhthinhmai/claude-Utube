@@ -83,7 +83,9 @@ export function plan(scenes, cues = [], catalog = CATALOG) {
     timed.push({ ...s, t0, t1 }); SHOTS.push([t0, t1, s.set, s.id]); CARDS.push(...cardsOf(s, t0)); t += s.dur;
   }
   const DUR = R(t);
-  const CUES = (cues || []).map(([a, b, x]) => [R(a), R(b), String(x)]).filter(([a, b]) => b > a && a < DUR);
+  // cues as rows [t0, t1, text] or as the studio's cues.json objects {t0, t1, text}
+  const CUES = (cues || []).map((c) => (Array.isArray(c) ? c : [c.t0, c.t1, c.text]))
+    .map(([a, b, x]) => [R(a), R(b), String(x)]).filter(([a, b]) => b > a && a < DUR);
   return { DUR, SHOTS, CARDS, CUES, scenes: timed };
 }
 

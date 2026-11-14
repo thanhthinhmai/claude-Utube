@@ -15,7 +15,7 @@
 {
  "version": 1,
  "sets": ["classroom", "lockers", "gym", "street", "bedroom", "cafeteria", "stadium", "void"],
- "poses": ["stand", "sit", "walk", "hold-phone", "hold-book", "hold-bag", "hold-cup", "hold-paper", "point", "cheer", "shrug"],
+ "poses": ["stand", "sit", "walk", "hold-phone", "hold-book", "hold-bag", "hold-cup", "hold-paper", "point", "cheer", "shrug", "hug"],
  "faces": ["dot", "half", "wow", "happy", "blank", "angry", "sad", "sweat"],
  "hair": ["bald", "short", "bun", "curly"], "hats": ["cap", "beanie"],
  "cams": {"ecu": {"scale": "ecu", "angle": "eye"}, "mid-eye": {"scale": "med", "angle": "eye"}, "ots": {"scale": "med", "angle": "ots"}, …},
