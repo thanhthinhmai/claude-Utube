@@ -156,7 +156,7 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
         boxes.push(...drawGfx(ctx, g, lt - at, A, { anchor }));
       }
       const cue = P.CUES.find(([a, b]) => t >= a && t < b);
-      if (cue) boxes.push(...drawCue(ctx, cue[2], A));
+      if (cue) drawCue(ctx, cue[2], A);          // subtitles are declared in CUES, not in TEXTS (tier 2 checks other text against them)
     }
   }
 
