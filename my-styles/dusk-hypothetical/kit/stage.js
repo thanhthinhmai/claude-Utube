@@ -33,6 +33,11 @@ export function makeStage(size = [innerWidth, innerHeight]) {
   const view = document.createElement('canvas'); view.width = W; view.height = H;
   view.style.cssText = 'display:block;position:fixed;left:0;top:0;z-index:1'; document.body.appendChild(view);
   const ctx = view.getContext('2d');
+  // graphics and subtitles go on their own canvas above: on WSL2's GPU (ANGLE/D3D12) a 2D canvas that also takes the
+  // WebGL frame draws curved translucent fills as overlapping triangles (an X across every panel)
+  const over = document.createElement('canvas'); over.width = W; over.height = H;
+  over.style.cssText = 'display:block;position:fixed;left:0;top:0;z-index:2'; document.body.appendChild(over);
+  const octx = over.getContext('2d', { willReadFrequently: true });
   for (const [id, pos] of [['cu-top', 'top:0'], ['cu-bot', 'bottom:0']]) {     // letterbox bars, 6.4 % each
     if (document.getElementById(id)) continue;
     const b = document.createElement('div'); b.id = id;
@@ -61,7 +66,7 @@ export function makeStage(size = [innerWidth, innerHeight]) {
 
   let mood = 'dusk';
   const stage = {
-    W, H, renderer, scene, cam, post, ctx, lights: { hemi, key, sun, rim, front },
+    W, H, renderer, scene, cam, post, ctx, octx, view, lights: { hemi, key, sun, rim, front },
     // set the mood and an optional per-scene nudge: exposure replaces the value (0.6–1.0), saturation is a factor (0.85–1.15)
     grade(name = 'dusk', nudge = {}) {
       const m = MOODS[name] || MOODS.dusk; mood = name;
@@ -81,7 +86,7 @@ export function makeStage(size = [innerWidth, innerHeight]) {
       front.position.set(target.x, 1.6, target.z + 4);
     },
     focus(dist, aper = GRADE.dof.aper) { setDof(post, { focus: dist, aper, maxCoc: GRADE.dof.maxCoc }); },
-    draw() { post.composer.render(); ctx.drawImage(renderer.domElement, 0, 0, W, H); },
+    draw() { post.composer.render(); ctx.drawImage(renderer.domElement, 0, 0, W, H); octx.clearRect(0, 0, W, H); },
     get mood() { return mood; },
   };
   stage.grade('dusk');

@@ -41,8 +41,8 @@ Phần thuần (`film.js` tính thời gian, `SHOTS`, `CARDS`, kiểm tên theo 
 
 **Quyết định**: ba mức theo khoảng cách tới máy:
 - **gần** (≤ 12 người, ≤ 6 m): nhân vật đủ khớp của R3;
-- **vừa** (6–25 m): `InstancedMesh` cho 4 phần (thân áo, đầu, tóc hoặc mũ, chân), mỗi phần một lần vẽ cho mọi người; màu theo từng người (`instanceColor`);
-- **xa** (> 25 m): `Points` có kích thước theo khoảng cách, màu áo.
+- **vừa** (6–40 m): `InstancedMesh` cho 7 phần (thân áo, đầu, tóc hoặc mũ, hai chân, hai tay), mỗi phần một lần vẽ cho mọi người; màu theo từng người (`instanceColor`);
+- **xa** (> 40 m): `Points` có kích thước theo khoảng cách, màu áo.
 
 Người phân biệt bằng màu áo (bảng màu của phong cách, `mulberry` có hạt giống theo cảnh) rồi tóc hoặc mũ. Chuyển động: đứng im hoặc cùng một nhịp nhún nhẹ theo `t` (mục 5 của `STYLE.md`).
 

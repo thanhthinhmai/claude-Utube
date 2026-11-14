@@ -22,6 +22,8 @@ Measured target of the style (`style.json`, `EVIDENCE.md`): median luma **0.26**
 
 Moods (one shot each, STYLE.md lighting #5): `alarm` red-pink, `night` blue, `lilac` bright after-beat. Each multiplies exposure by 0.95–1.05 and saturation by 0.95–1.06.
 
+Sets nudge too (inside the same limits): `gym` exposure 0.62 and saturation ×0.95, `street` 0.70 and saturation ×1.08, `stadium` 0.64 and ×1.15 (big bright floors under the sun). A scene's `grade` wins over its set's.
+
 Per-scene nudge (scene table `grade`): `exposure` replaces the exposure, 0.6–1.0; `saturation` multiplies the post saturation, 0.85–1.15.
 
 Checked: the catalogue page (`catalog.html`), every set in a wide shot with extras, through `qc shots` (results in `specs/022-style-film-kit/quickstart.md`).
