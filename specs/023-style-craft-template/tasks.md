@@ -86,7 +86,7 @@ description: "Tasks for 023: template from the reference channel's craft"
   Bỏ cảnh `short`, `insert`. Luật hình chỉ tính 8 phim 3D (danh sách phim phẳng lấy từ `R/style/EVIDENCE.md`).
 - [X] T012 [US1] `craft-summary` ghi phần `framing` (theo cỡ cảnh) và `light` vào `R/profile/craft-summary.json`, in bảng. Thêm test trên `shots.json` nhỏ dựng tay vào `tests/learn/test_template.py`.
 - [X] T013 [US1] Chạy `learn craft-summary dusk-hypothetical-3`; ghi số vào ghi chú làm việc `R/style/craft-notes.md`.
-- [ ] T014 [US1] Rà `S/STYLE.md` mục 1–11 (FR-001):
+- [X] T014 [US1] Rà `S/STYLE.md` mục 1–11 (FR-001):
   - gắn `[bằng chứng: …]` cho từng luật, lấy từ `R/analysis/*.md`, `EVIDENCE.md`, `summary.json`, `shots.json`;
   - luật phụ đề in trên hình gắn `[xưởng]`;
   - luật không có bằng chứng mà không phải luật của xưởng thì bỏ, ghi vào `S/EVIDENCE.md` → "Nhật ký sửa" (ngày, luật, lý do).
