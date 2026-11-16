@@ -146,3 +146,55 @@ class TemplateCheck(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LookSummary(unittest.TestCase):
+    """specs/023 T012: framing and light by scale from shots.json and the shot sheets; flat films left out."""
+
+    def setUp(self):
+        from PIL import Image
+        from sl import shots
+        self.p = Project()
+        data = refset.new_set("look-set", "videos", [])
+        for vid in ("v01", "v03"):
+            data["videos"].append({"id": vid, "file": f"{vid}.mp4", "state": "measured"})
+        refset.save("look-set", data)
+        for vid in ("v01", "v03"):
+            prof = refset.profile_dir("look-set", vid)
+            prof.mkdir(parents=True, exist_ok=True)
+            frames = []
+            for i, col in enumerate([(200, 150, 60), (30, 30, 60)]):      # a warm lit frame, a dark one
+                im = Image.new("RGB", (320, 180), (40, 30, 60))
+                im.paste(col, (160, 20, 320, 160))                       # bright on the right
+                f = prof / f"f{i}.jpg"
+                im.save(f)
+                frames.append(f)
+            rows = [{"id": f"S00{i + 1}", "scale": sc, "focus": {"sharpest_at": [c, 1], "focused_share": fs},
+                     "foreground_blur": fb} for i, (sc, c, fs, fb) in enumerate([("cu", 3, 0.25, True), ("wide", 1, 0.75, False)])]
+            groups = shots.draw_sheets(rows, lambda s, fr=frames, rs=rows: fr[rs.index(s)], prof / "shot-sheets", f"{vid}_shots")
+            for r, n in zip(rows, range(1, 3)):
+                r["evidence"] = f"{groups[0][0].name}#{n}"
+            rows.append({"id": "S003", "scale": "insert"})
+            refset.write_json(prof / "shots.json", {"shots": rows})
+
+    def tearDown(self):
+        self.p.close()
+
+    def test_by_scale(self):
+        s = template.craft_summary("look-set")
+        fr = s["framing"]["by_scale"]
+        self.assertEqual(set(fr), {"cu", "wide"})                         # insert left out
+        self.assertEqual(s["framing"]["films"], ["v01"])                  # v03 is a flat film
+        self.assertEqual(fr["cu"]["off_centre"], 1.0)
+        self.assertEqual(fr["wide"]["off_centre"], 0.0)
+        self.assertEqual(fr["cu"]["focused_share"], [0.25, 0.25, 0.25])
+        self.assertEqual(fr["cu"]["foreground_blur"], 1.0)
+        li = s["light"]["by_scale"]
+        self.assertGreater(li["cu"]["warm_share"][1], 0.2)                # the warm frame
+        self.assertEqual(li["cu"]["lit_from_right"], 1.0)
+        self.assertTrue((refset.set_dir("look-set") / "profile" / "craft-summary.json").exists())
+
+    def test_cell_by_shot_id(self):
+        template.craft_summary("look-set")
+        im = template.cell("look-set", "v01_shots_1.jpg#S002")
+        self.assertEqual(im.size, (200, 112))

@@ -18,7 +18,7 @@ BEAT_ROWS = ["độ dài cảnh", "chuỗi cỡ cảnh", "máy động", "diễn
              "từ mỗi phút"]
 MIN_EVIDENCE, MIN_VIDEOS = 3, 2
 
-EV_SHEET = re.compile(r"^(v\d{2})_shots_\d+\.jpg#S\d{3,4}$")
+EV_SHEET = re.compile(r"^(v\d{2})_shots_\d+\.jpg#(S\d{3,4}|\d{1,2})$")   # a shot id or a cell number (as shots.json writes it)
 EV_STRIP = re.compile(r"^(v\d{2})/strips/(S\d{3,4})\.jpg#[0-7]$")
 EV_FILE = re.compile(r"^(v\d{2})/evidence/[\w.-]+\.jpg$")
 STYLE_TAG = re.compile(r"\[(xưởng|bằng chứng:\s*[^\]]+)\]")
@@ -104,7 +104,7 @@ def evidence_problems(where: str, lines: list, prof: Path) -> list:
     for r in refs:
         m = EV_SHEET.match(r) or EV_STRIP.match(r) or EV_FILE.match(r)
         if not m:
-            out.append(f"{where}: bằng chứng sai dạng '{r}' (dạng: vNN_shots_N.jpg#Sxxx, vNN/strips/Sxxx.jpg#k, vNN/evidence/<tên>.jpg)")
+            out.append(f"{where}: bằng chứng sai dạng '{r}' (dạng: vNN_shots_N.jpg#Sxxx hoặc #ô, vNN/strips/Sxxx.jpg#k, vNN/evidence/<tên>.jpg)")
             continue
         vid = m.group(1)
         vids.add(vid)
@@ -354,3 +354,141 @@ def cli(slug: str, partial: str = None) -> int:
     print("✓ TEMPLATE.md, template.json và nhãn luật của STYLE.md đạt"
           + (f" (mục {rng[0]}–{rng[1]})" if rng else ""))
     return 0
+
+
+# ---------------------------------------------------------------- look measures from what learning kept (R10, US1)
+
+FLAT_FILMS = ("v03", "v08")       # EVIDENCE.md corrections #15: the look rules come from the 3D films
+SKIP_SCALES = ("insert", "short", "unknown", None)
+LETTERBOX = 0.07                  # top and bottom share of a sheet cell left out (2.04:1 bars inside 16:9)
+
+
+def shot_rows(name: str, look_only: bool = False) -> list:
+    """Every labelled shot of the set: shots.json rows with their video id."""
+    out = []
+    data = refset.load(name)
+    for v in data["videos"]:
+        if look_only and v["id"] in FLAT_FILMS:
+            continue
+        f = refset.profile_dir(name, v["id"]) / "shots.json"
+        if not f.exists():
+            continue
+        for r in json.loads(f.read_text(encoding="utf-8")).get("shots", []):
+            out.append(dict(r, video=v["id"]))
+    return out
+
+
+def cell(name: str, ref: str):
+    """The picture of one shot-sheet cell ("v01_shots_3.jpg#7" or "…#S087"), caption left out, as a PIL image."""
+    from PIL import Image
+    from .shots import COLS, CW, CH, LAB
+    sheet, _, n = ref.partition("#")
+    vid = sheet.split("_")[0]
+    path = refset.profile_dir(name, vid) / "shot-sheets" / sheet
+    if n.startswith("S"):
+        rows = [r for r in shot_rows(name) if r["video"] == vid and r["id"] == n]
+        if not rows or "#" not in (rows[0].get("evidence") or ""):
+            raise refset.StepError(f"không thấy ô của {vid}:{n} trong shots.json")
+        n = rows[0]["evidence"].partition("#")[2]
+    k = int(n) - 1
+    x, y = 6 + (k % COLS) * (CW + 6), 6 + (k // COLS) * (CH + LAB + 6) + LAB
+    return Image.open(path).convert("RGB").crop((x, y, x + CW, y + CH))
+
+
+def light_of(img) -> dict:
+    """Warm highlights, contrast and the side the light comes from, inside the picture (letterbox left out)."""
+    import numpy as np
+    a = np.asarray(img, np.float32) / 255.0
+    h = a.shape[0]
+    a = a[int(h * LETTERBOX):h - int(h * LETTERBOX)]
+    lum = a @ np.array([0.2126, 0.7152, 0.0722], np.float32)
+    mx, mn = a.max(-1), a.min(-1)
+    sat = np.where(mx > 0, (mx - mn) / np.maximum(mx, 1e-6), 0)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    d = np.maximum(mx - mn, 1e-6)
+    hue = np.where(mx == r, ((g - b) / d) % 6, np.where(mx == g, (b - r) / d + 2, (r - g) / d + 4)) * 60
+    warm = (lum > 0.6) & (hue >= 20) & (hue <= 60) & (sat > 0.25)
+    w = lum.shape[1]
+    lr = float(lum[:, w // 2:].mean() - lum[:, :w // 2].mean())
+    tb = float(lum[lum.shape[0] // 2:].mean() - lum[:lum.shape[0] // 2].mean())
+    return {"warm_share": float(warm.mean()), "range": float(np.percentile(lum, 90) - np.percentile(lum, 10)),
+            "side_lr": lr, "side_tb": tb}
+
+
+def _q(vals, nd=3):
+    import numpy as np
+    if not vals:
+        return None
+    return [round(float(x), nd) for x in np.percentile(vals, [25, 50, 75])]
+
+
+def look_summary(name: str) -> dict:
+    """framing and light by shot scale, from shots.json and the shot sheets (8 3D films)."""
+    rows = [r for r in shot_rows(name, look_only=True) if r.get("scale") not in SKIP_SCALES]
+    by = {}
+    for r in rows:
+        by.setdefault(r["scale"], []).append(r)
+    framing, light = {}, {}
+    all_light = []
+    for sc, rs in by.items():
+        cols, rws, fs, fg = [0] * 4, [0] * 3, [], 0
+        lights = []
+        for r in rs:
+            f = r.get("focus") or {}
+            if f.get("sharpest_at"):
+                c, w = f["sharpest_at"]
+                cols[c] += 1
+                rws[w] += 1
+            if f.get("focused_share") is not None:
+                fs.append(f["focused_share"])
+            fg += bool(r.get("foreground_blur"))
+            if r.get("evidence"):
+                try:
+                    lights.append(light_of(cell(name, f"{r['evidence']}")))
+                except (OSError, refset.StepError, ValueError):
+                    pass
+        n = max(1, sum(cols))
+        framing[sc] = {"n": len(rs), "col": [round(x / n, 3) for x in cols], "row": [round(x / n, 3) for x in rws],
+                       "off_centre": round((cols[0] + cols[3]) / n, 3), "focused_share": _q(fs),
+                       "foreground_blur": round(fg / len(rs), 3)}
+        all_light += lights
+        light[sc] = _light_stats(lights)
+    return {"framing": {"by_scale": framing, "films": sorted({r["video"] for r in rows})},
+            "light": {"by_scale": light, "all": _light_stats(all_light)}}
+
+
+def _light_stats(ls: list) -> dict:
+    if not ls:
+        return {"n": 0}
+    side = [abs(x["side_lr"]) for x in ls]
+    return {"n": len(ls), "warm_share": _q([x["warm_share"] for x in ls], 4), "range": _q([x["range"] for x in ls]),
+            "side_lr_abs": _q(side), "raking": round(sum(s > 0.03 for s in side) / len(side), 3),
+            "lit_from_right": round(sum(x["side_lr"] > 0.03 for x in ls) / len(ls), 3),
+            "lit_from_left": round(sum(x["side_lr"] < -0.03 for x in ls) / len(ls), 3)}
+
+
+def craft_summary(name: str, parts=("look",)) -> dict:
+    """Write references/<set>/profile/craft-summary.json; parts already there and not rebuilt are kept."""
+    path = refset.set_dir(name) / "profile" / "craft-summary.json"
+    cur = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    cur["set"] = name
+    if "look" in parts:
+        cur.update(look_summary(name))
+    if "time" in parts:
+        from . import timesummary
+        cur.update(timesummary.build(name))
+    refset.write_json(path, cur)
+    return cur
+
+
+def print_summary(s: dict) -> None:
+    fr = s.get("framing", {}).get("by_scale", {})
+    if fr:
+        print("Cỡ cảnh | n | lệch tâm | cột 0–3 | focused_share p25/50/75 | tiền cảnh mờ")
+        for sc, v in sorted(fr.items(), key=lambda kv: -kv[1]["n"]):
+            print(f"{sc} | {v['n']} | {v['off_centre']} | {v['col']} | {v['focused_share']} | {v['foreground_blur']}")
+    li = s.get("light", {})
+    if li:
+        a = li.get("all", {})
+        print(f"Ánh sáng (cả bộ, {a.get('n')} ô): sáng ấm {a.get('warm_share')} · độ chênh {a.get('range')} · "
+              f"xiên {a.get('raking')} (phải {a.get('lit_from_right')}, trái {a.get('lit_from_left')})")

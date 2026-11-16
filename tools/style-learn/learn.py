@@ -117,6 +117,13 @@ def cmd_template_check(a):
     return template.cli(a.slug, a.partial)
 
 
+def cmd_craft_summary(a):
+    from sl import template
+    s = template.craft_summary(a.set, a.parts)
+    template.print_summary(s)
+    return 0
+
+
 def cmd_clean(a):
     from sl import save
     return save.clean(a.set, a.keep)
@@ -175,6 +182,10 @@ def main(argv=None) -> int:
     tc = sub.add_parser("template-check", help="kiểm TEMPLATE.md, template.json và nhãn luật của STYLE.md (specs/023)")
     tc.add_argument("slug"); tc.add_argument("--partial", metavar="a-b", help="chỉ kiểm mục a–b, bỏ công thức nhịp")
     tc.set_defaults(fn=cmd_template_check)
+
+    cs = sub.add_parser("craft-summary", help="gom số tay nghề của bộ: bố cục, độ sâu, ánh sáng; theo thời gian (specs/023)")
+    cs.add_argument("set"); cs.add_argument("--parts", nargs="+", default=["look"], choices=("look", "time"))
+    cs.set_defaults(fn=cmd_craft_summary)
 
     d = sub.add_parser("clean", help="xoá video và âm thanh tham chiếu của bộ")
     d.add_argument("set"); d.add_argument("--keep", action="store_true"); d.set_defaults(fn=cmd_clean)

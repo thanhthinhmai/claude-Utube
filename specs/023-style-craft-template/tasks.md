@@ -77,15 +77,15 @@ description: "Tasks for 023: template from the reference channel's craft"
 **Independent Test**: `learn template-check dusk-hypothetical` đạt mục 1–10 và nhãn luật (lệnh tạm cho phép thiếu mục 11–15 bằng `--partial 1-10`); mở từng bằng chứng được dẫn và đối chiếu.
 
 - [X] T009 [US1] Thêm `--partial <a-b>` vào `template-check` (chỉ kiểm các mục a–b, bỏ công thức nhịp), trong `SL/template.py` và `learn.py`.
-- [ ] T010 [US1] Viết `cell(sheet, n)` trong `SL/template.py`: cắt ô `#Sxxx` của `shot-sheets`, theo kích thước ô của `SL/shots.draw_sheets` (đọc lại đúng tham số, không đoán).
-- [ ] T011 [P] [US1] Viết các phép đo phần hình trong `SL/template.py` (research R10):
+- [X] T010 [US1] Viết `cell(sheet, n)` trong `SL/template.py`: cắt ô `#Sxxx` của `shot-sheets`, theo kích thước ô của `SL/shots.draw_sheets` (đọc lại đúng tham số, không đoán).
+- [X] T011 [P] [US1] Viết các phép đo phần hình trong `SL/template.py` (research R10):
   - **Bố cục theo cỡ cảnh**: phân bố `sharpest_at` trên lưới 3×4; tỉ lệ lệch tâm (cột 0 hoặc 3, hàng 0 hoặc 2); tỉ lệ cột 1/3.
   - **Độ sâu theo cỡ cảnh**: `focused_share` p25–p75; tỉ lệ `foreground_blur`.
   - **Ánh sáng** trên ô `shot-sheets`: tỉ lệ điểm sáng ấm (độ sáng > 0,6, sắc độ 20–60°), p90 − p10 độ sáng, hướng gradient độ sáng trội.
 
   Bỏ cảnh `short`, `insert`. Luật hình chỉ tính 8 phim 3D (danh sách phim phẳng lấy từ `R/style/EVIDENCE.md`).
-- [ ] T012 [US1] `craft-summary` ghi phần `framing` (theo cỡ cảnh) và `light` vào `R/profile/craft-summary.json`, in bảng. Thêm test trên `shots.json` nhỏ dựng tay vào `tests/learn/test_template.py`.
-- [ ] T013 [US1] Chạy `learn craft-summary dusk-hypothetical-3`; ghi số vào ghi chú làm việc `R/style/craft-notes.md`.
+- [X] T012 [US1] `craft-summary` ghi phần `framing` (theo cỡ cảnh) và `light` vào `R/profile/craft-summary.json`, in bảng. Thêm test trên `shots.json` nhỏ dựng tay vào `tests/learn/test_template.py`.
+- [X] T013 [US1] Chạy `learn craft-summary dusk-hypothetical-3`; ghi số vào ghi chú làm việc `R/style/craft-notes.md`.
 - [ ] T014 [US1] Rà `S/STYLE.md` mục 1–11 (FR-001):
   - gắn `[bằng chứng: …]` cho từng luật, lấy từ `R/analysis/*.md`, `EVIDENCE.md`, `summary.json`, `shots.json`;
   - luật phụ đề in trên hình gắn `[xưởng]`;
