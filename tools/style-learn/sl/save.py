@@ -58,9 +58,10 @@ def _proof_sources(proof: Path) -> list:
 CORR_HEAD = "## Corrections log"
 DEMO_FILES = ("DEMO.md", "demo", "test.jpg", "test.mp4", "demo-checks.json")
 KEEP_ON_UPDATE = DEMO_FILES + ("kit",)                     # specs/022: the film kit stays with the style too
+TEMPLATE_FILES = ("TEMPLATE.md", "template.json")          # specs/023: the craft template; a new one from style/ wins, else the old one is kept
 # specs/022 FR-013: the only files of references/<set>/style/ that go into the style; work files (logs, reviews, .job)
 # stay behind. The proof frame's sources come from proof/, the measurements from profile/.
-STYLE_FILES = ("STYLE.md", "EVIDENCE.md", "style.json", "STRUCTURE.md", "shots.json")
+STYLE_FILES = ("STYLE.md", "EVIDENCE.md", "style.json", "STRUCTURE.md", "shots.json") + TEMPLATE_FILES
 
 
 def corrections(text: str) -> list:
@@ -186,7 +187,7 @@ def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bo
     if refs:
         refset.write_json(tmp / "shots.json", refs)
     if update:                                               # the demo film stays with the style (specs/021 FR-015)
-        for f in KEEP_ON_UPDATE:
+        for f in KEEP_ON_UPDATE + tuple(f for f in TEMPLATE_FILES if not (tmp / f).exists()):
             src = old / f
             if src.is_dir():
                 shutil.copytree(src, tmp / f)

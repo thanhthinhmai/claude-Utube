@@ -141,6 +141,15 @@ class SaveClean(unittest.TestCase):
         (s / "demo").mkdir(); (s / "demo" / "build.sh").write_text("echo hi\n")
         self.assertEqual(save.save("learned-set", "night-ink", "Night Ink", "", "ink-wash", False, True), 0)
         self.assertTrue((s / "kit" / "film.js").exists() and (s / "demo" / "build.sh").exists())
+        # specs/023 T001: the template is kept on --update, and a new one from style/ replaces it
+        (s / "TEMPLATE.md").write_text("# Template: old\n"); (s / "kit" / "REVIEW.md").write_text("# Review\n")
+        self.assertEqual(save.save("learned-set", "night-ink", "Night Ink", "", "ink-wash", False, True), 0)
+        self.assertEqual((s / "TEMPLATE.md").read_text(), "# Template: old\n")
+        self.assertTrue((s / "kit" / "REVIEW.md").exists())
+        (st / "TEMPLATE.md").write_text("# Template: new\n"); (st / "template.json").write_text("{}\n")
+        self.assertEqual(save.save("learned-set", "night-ink", "Night Ink", "", "ink-wash", False, True), 0)
+        self.assertEqual((s / "TEMPLATE.md").read_text(), "# Template: new\n")
+        self.assertTrue((s / "template.json").exists())
         # a channel name in STRUCTURE.md stops the save
         (st / "STRUCTURE.md").write_text("# Structure in the manner of Mèo Lười Studio\n")
         with self.assertRaises(refset.StepError):

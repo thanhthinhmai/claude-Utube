@@ -28,9 +28,9 @@ description: "Tasks for 023: template from the reference channel's craft"
 
 ## Phase 1: Setup
 
-- [ ] T001 Thêm `TEMPLATE.md`, `template.json` vào `STYLE_FILES` của `SL/save.py`, và `kit/REVIEW.md` vào phần giữ khi `--update` (đã giữ cả `kit/`). Thêm test vào `tests/learn/test_save_clean.py`.
-- [ ] T002 [P] Tạo `tests/learn/synth.py`: hàm `make(path, spec)` dựng video 1280×720, 60 fps bằng numpy và ffmpeg, kèm đáp án.
-  - Nội dung có nền họa tiết và các cảnh: `still`, `drift-h` 20 px/s, `drift-v` 15 px/s, `push` 3 %/s, `pull` 3 %/s; một khối "tay" lên trong 0,4 s rồi giữ, có cảnh máy đứng và cảnh máy trôi; chuyển cảnh `cut`, `streak` 0,15 s, `dip` 0,13 s, `fade` 0,3 s, `wipe` 0,3 s.
+- [X] T001 Thêm `TEMPLATE.md`, `template.json` vào `STYLE_FILES` của `SL/save.py`, và `kit/REVIEW.md` vào phần giữ khi `--update` (đã giữ cả `kit/`). Thêm test vào `tests/learn/test_save_clean.py`.
+- [X] T002 [P] Tạo `tests/learn/synth.py`: hàm `make(path, spec)` dựng video 1280×720, 60 fps bằng numpy và ffmpeg, kèm đáp án.
+  - (Làm ở 640×360, 30 fps cho test nhanh; tốc độ trong đáp án quy về bề ngang 1280. Khung được ghi lần lượt sang ffmpeg, RAM ≈ 260 MB.) Có thêm cảnh `follow` (máy bám người đi) và chuyển cảnh `dissolve`. Nội dung có nền họa tiết và các cảnh: `still`, `drift-h` 20 px/s, `drift-v` 15 px/s, `push` 3 %/s, `pull` 3 %/s; một khối "tay" lên trong 0,4 s rồi giữ, có cảnh máy đứng và cảnh máy trôi; chuyển cảnh `cut`, `streak` 0,15 s, `dip` 0,13 s, `fade` 0,3 s, `wipe` 0,3 s.
   - Đáp án trả về: `{shots: [{t0, t1, cam, inner_spans, trans_in}]}`.
 
 ---
