@@ -316,6 +316,9 @@ def transition(path, t_cut, half=0.35):
     if any(lum[i] > 0.9 and lum[i] - ref > 0.3 for i in range(1, len(lum) - 1)):
         return {"type": "flash", "dur": round(int((lum > 0.9).sum()) / fps, 3)}
     span = float(np.abs(A - B).mean())
+    steps = np.abs(np.diff(g, axis=0)).mean((1, 2))
+    if span > 0.02 and steps.max() >= 0.6 * span:   # one frame-to-frame jump carries the change: a hard cut
+        return {"type": "cut", "dur": 0.0}
     dAf, dBf = np.abs(g - A).mean((1, 2)), np.abs(g - B).mean((1, 2))
     between = int(((dAf > 0.2 * span) & (dBf > 0.2 * span)).sum())   # frames that are neither the shot before nor after
     best = None
@@ -361,3 +364,112 @@ if __name__ == "__main__":
     except CraftError as e:
         print(f"✗ {e}", file=sys.stderr)
         sys.exit(3)
+
+
+# ---------------------------------------------------------------- a whole reference set (learn craft, T021)
+
+PERSON_SKIP = ("insert", "short", "unknown", None)
+STRIP_FRAMES, STRIP_W = 8, 320
+
+
+def _set_mod():
+    from . import refset
+    return refset
+
+
+def measure_video(name: str, vid: str, log=print) -> dict:
+    """craft.json of one video of a reference set: every shot of its shots.json."""
+    refset = _set_mod()
+    data = refset.load(name)
+    v = next(x for x in data["videos"] if x["id"] == vid)
+    path = refset.video_path(name, v)
+    prof = refset.profile_dir(name, vid)
+    rows = json.loads((prof / "shots.json").read_text(encoding="utf-8"))["shots"]
+    out = []
+    for i, s in enumerate(rows):
+        m = measure_shot(path, s)
+        m["scale"] = s.get("scale")
+        m["person"] = None if s.get("scale") is None else s.get("scale") not in PERSON_SKIP
+        out.append(m)
+        if (i + 1) % 50 == 0:
+            log(f"  {vid}: {i + 1}/{len(rows)} cảnh")
+    res = {"video": vid, "fps_sample": FPS, "shots": out}
+    refset.write_json(prof / "craft.json", res)
+    return res
+
+
+def strip(path, t0, t1, out, n=STRIP_FRAMES, w=STRIP_W):
+    """n frames evenly over [t0, t1] side by side, each w px wide."""
+    from PIL import Image
+    h = round(w * 9 / 16)
+    ts = [t0 + (t1 - t0) * (k + 0.5) / n for k in range(n)]
+    im = Image.new("RGB", (n * w, h))
+    for k, t in enumerate(ts):
+        f = _ffmpeg(["-ss", f"{t:.3f}", "-i", str(path), "-frames:v", "1", "-vf", f"scale={w}:{h}", "-f", "rawvideo",
+                     "-pix_fmt", "rgb24", "-"], w, h, 3)
+        if len(f):
+            im.paste(Image.fromarray(f[0].astype(np.uint8)), (k * w, 0))
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
+    im.save(out, quality=88)
+
+
+def pick_strips(name: str, n: int = 80, seed: int = 41) -> list:
+    """[(vid, shot)] of n person shots spread evenly over videos and scales (fixed seed)."""
+    import random
+    refset = _set_mod()
+    rnd = random.Random(seed)
+    pools = {}
+    for v in refset.load(name)["videos"]:
+        f = refset.profile_dir(name, v["id"]) / "shots.json"
+        if not f.exists():
+            continue
+        for s in json.loads(f.read_text(encoding="utf-8"))["shots"]:
+            if s.get("scale") not in PERSON_SKIP and s["t1"] - s["t0"] >= 1.0:
+                pools.setdefault((v["id"], s["scale"]), []).append(s)
+    keys = sorted(pools)
+    rnd.shuffle(keys)
+    out = []
+    while len(out) < n and any(pools.values()):
+        for k in keys:
+            if pools[k] and len(out) < n:
+                out.append((k[0], pools[k].pop(rnd.randrange(len(pools[k])))))
+    return out
+
+
+def craft_set(name: str, only=None, strips: int = 80, log=print) -> int:
+    refset = _set_mod()
+    data = refset.load(name)
+    done = 0
+    for v in data["videos"]:
+        if only and v["id"] not in only:
+            continue
+        if not refset.video_path(name, v).exists() or not (refset.profile_dir(name, v["id"]) / "shots.json").exists():
+            log(f"= {v['id']}: thiếu video hoặc shots.json, bỏ qua")
+            continue
+        r = measure_video(name, v["id"], log)
+        moving = sum(s["cam"]["type"] != "still" for s in r["shots"])
+        log(f"✓ {v['id']}: {len(r['shots'])} cảnh, máy động {moving}")
+        done += 1
+    if strips:
+        for vid, s in pick_strips(name, strips):
+            v = next(x for x in data["videos"] if x["id"] == vid)
+            path = refset.video_path(name, v)
+            if path.exists():
+                strip(path, s["t0"], s["t1"], refset.profile_dir(name, vid) / "strips" / f"{s['id']}.jpg")
+        log(f"✓ {strips} dải khung trong profile/<v>/strips/")
+    return 0 if done else 1
+
+
+def evidence(name: str, vid: str, t: float, label: str, w: int = 640) -> Path:
+    from PIL import Image
+    refset = _set_mod()
+    v = next(x for x in refset.load(name)["videos"] if x["id"] == vid)
+    h = round(w * 9 / 16)
+    f = _ffmpeg(["-ss", f"{t:.3f}", "-i", str(refset.video_path(name, v)), "-frames:v", "1", "-vf", f"scale={w}:{h}",
+                 "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], w, h, 3)
+    if not len(f):
+        raise CraftError(f"không lấy được khung {vid} @ {t}")
+    out = refset.profile_dir(name, vid) / "evidence" / f"{label}.jpg"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    Image.fromarray(f[0].astype(np.uint8)).save(out, quality=90)
+    return out

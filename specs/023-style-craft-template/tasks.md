@@ -119,18 +119,18 @@ description: "Tasks for 023: template from the reference channel's craft"
   - không ra một-một thì dừng và hỏi người dùng.
 
   URL kênh: lấy từ lần học 2026-11-13 (nhật ký phiên trước); không có thì hỏi người dùng. Rồi chạy `learn refetch dusk-hypothetical-3 --videos <10 URL>`. Không ghi URL hay tên kênh vào tệp trong git.
-- [ ] T021 [US2] Viết `learn craft <set> [--only vNN] [--strips 80]` trong `learn.py`, gọi `SL/craft.py` cho mọi cảnh của `shots.json`:
+- [X] T021 [US2] Viết `learn craft <set> [--only vNN] [--strips 80]` trong `learn.py`, gọi `SL/craft.py` cho mọi cảnh của `shots.json`:
   - ghi `R/profile/<v>/craft.json`, với `person` lấy từ nhãn 021 (không `insert`, không `short`);
   - cắt dải 8 khung (320 px) cho 80 cảnh có người, rải đều theo video và cỡ cảnh (hạt giống cố định), vào `R/profile/<v>/strips/Sxxx.jpg`;
   - thêm `learn evidence <set> <vNN> <giây> --name <tên>` (khung 640 px vào `R/profile/<v>/evidence/`).
-- [ ] T022 [P] [US2] Viết `SL/soundcraft.py` theo research R5, R6:
+- [X] T022 [P] [US2] Viết `SL/soundcraft.py` theo research R5, R6:
   - `speech_stats(words)`: từ/phút theo cửa sổ 10 s; nghỉ trong câu, giữa câu, giữa đoạn (> 0,6 s); nghỉ trước từ là số (chữ số hoặc số viết bằng chữ);
   - `music_windows(audio, words)`: cửa sổ 5 s gồm có nhạc (độ phẳng phổ < 0,3 trong ≥ 70% khung ở khoảng nghỉ ≥ 0,25 s) và mức nhạc so với giọng (dB);
   - `sfx_onsets(audio, words)`: flux > 4σ ngoài lời hoặc vượt nền > 6 dB, tính số mỗi phút;
   - `tempo(onsets, gaps)`: chỉ đo ở khoảng không lời ≥ 4 s, kèm độ tin cậy.
 
   Lệnh `learn sound <set> [--only vNN]` ghi `R/profile/<v>/sound.json`; thiếu mốc từ thì mã 3.
-- [ ] T023 [P] [US2] Viết `tests/learn/test_soundcraft.py` trên âm thanh tổng hợp (giọng giả là chuỗi xung có mốc từ, nhạc là hoà âm 90 BPM ở −14 dB so với giọng, 6 tiếng gõ): đo đúng nghỉ (lệch ≤ 0,05 s), có nhạc, mức (lệch ≤ 2 dB), tempo (lệch ≤ 5 BPM), số tiếng động (lệch ≤ 1).
+- [X] T023 [P] [US2] Viết `tests/learn/test_soundcraft.py` trên âm thanh tổng hợp (giọng giả là chuỗi xung có mốc từ, nhạc là hoà âm 90 BPM ở −14 dB so với giọng, 6 tiếng gõ): đo đúng nghỉ (lệch ≤ 0,05 s), có nhạc, mức (lệch ≤ 2 dB), tempo (lệch ≤ 5 BPM), số tiếng động (lệch ≤ 1).
 - [ ] T024 [US2] Chạy lần lượt trên `dusk-hypothetical-3`: `learn transcribe` (nếu mốc từ cũ không còn), `learn craft --strips 80`, `learn sound`. Mọi lệnh bọc `job run` của bước học. Ghi thời gian chạy `learn craft` (mục tiêu ≤ 60 phút cho 10 video) vào `R/style/craft-notes.md`. Kiểm `still_ratio` tính từ `craft.json` so với `summary.json` (lệch ≤ 0,02 mỗi video); lệch hơn thì sửa phép đo trước khi đi tiếp.
 - [ ] T025 [US2] Claude, trong phiên:
   - đọc bản chép lời từng video, ghi `R/profile/beats.json` theo data-model.md (9 tên nhịp, liền nhau, phủ hết video, nhịp vắng thì bỏ);

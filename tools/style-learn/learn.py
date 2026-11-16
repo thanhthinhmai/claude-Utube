@@ -44,9 +44,11 @@ def cmd_transcribe(a):
     data = refset.load(a.set)
     n = 0
     for v in data["videos"]:
-        if v.get("state") != "measured":
-            continue
         path = refset.video_path(a.set, v)
+        again = v.get("state") == "transcribed" and path.exists() and \
+            not (refset.profile_dir(a.set, v["id"]) / "words.json").exists()      # refetched after clean (specs/023)
+        if v.get("state") != "measured" and not again:
+            continue
         meta = probe.probe(path)
         print(f"… chép lời {v['id']}")
         tr = speech.transcribe(path, meta, v["segments"], a.model, None if a.lang == "auto" else a.lang)
@@ -129,6 +131,25 @@ def cmd_craft_summary(a):
     return 0
 
 
+def cmd_craft(a):
+    from sl import craft
+    try:
+        return craft.craft_set(a.set, a.only, a.strips)
+    except craft.CraftError as e:
+        raise StepError(str(e))
+
+
+def cmd_evidence(a):
+    from sl import craft
+    print(craft.evidence(a.set, a.vid, a.t, a.name))
+    return 0
+
+
+def cmd_sound(a):
+    from sl import soundcraft
+    return soundcraft.sound_set(a.set, a.only)
+
+
 def cmd_clean(a):
     from sl import save
     return save.clean(a.set, a.keep)
@@ -190,6 +211,17 @@ def main(argv=None) -> int:
     tc = sub.add_parser("template-check", help="kiểm TEMPLATE.md, template.json và nhãn luật của STYLE.md (specs/023)")
     tc.add_argument("slug"); tc.add_argument("--partial", metavar="a-b", help="chỉ kiểm mục a–b, bỏ công thức nhịp")
     tc.set_defaults(fn=cmd_template_check)
+
+    cr = sub.add_parser("craft", help="đo máy, cử động trong cảnh, chuyển cảnh; cắt dải khung (specs/023)")
+    cr.add_argument("set"); cr.add_argument("--only", nargs="*"); cr.add_argument("--strips", type=int, default=80)
+    cr.set_defaults(fn=cmd_craft)
+
+    ev = sub.add_parser("evidence", help="trích một khung 640 px làm bằng chứng (video phải còn)")
+    ev.add_argument("set"); ev.add_argument("vid"); ev.add_argument("t", type=float); ev.add_argument("--name", required=True)
+    ev.set_defaults(fn=cmd_evidence)
+
+    so = sub.add_parser("sound", help="nhịp đọc, nhạc, tiếng động (cần learn transcribe trước; specs/023)")
+    so.add_argument("set"); so.add_argument("--only", nargs="*"); so.set_defaults(fn=cmd_sound)
 
     cs = sub.add_parser("craft-summary", help="gom số tay nghề của bộ: bố cục, độ sâu, ánh sáng; theo thời gian (specs/023)")
     cs.add_argument("set"); cs.add_argument("--parts", nargs="+", default=["look"], choices=("look", "time"))
