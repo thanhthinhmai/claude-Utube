@@ -112,6 +112,11 @@ def cmd_save(a):
     return save.save(a.set, a.slug, a.en, a.cn, a.based_on, a.accept_proof, a.update)
 
 
+def cmd_template_check(a):
+    from sl import template
+    return template.cli(a.slug, a.partial)
+
+
 def cmd_clean(a):
     from sl import save
     return save.clean(a.set, a.keep)
@@ -166,6 +171,10 @@ def main(argv=None) -> int:
     v.add_argument("--accept-proof", action="store_true", help="người dùng đã chấp nhận khung chứng minh chưa đạt ngưỡng")
     v.add_argument("--update", action="store_true", help="học lại một phong cách riêng đã có (giữ nhật ký sửa và phim mẫu)")
     v.set_defaults(fn=cmd_save)
+
+    tc = sub.add_parser("template-check", help="kiểm TEMPLATE.md, template.json và nhãn luật của STYLE.md (specs/023)")
+    tc.add_argument("slug"); tc.add_argument("--partial", metavar="a-b", help="chỉ kiểm mục a–b, bỏ công thức nhịp")
+    tc.set_defaults(fn=cmd_template_check)
 
     d = sub.add_parser("clean", help="xoá video và âm thanh tham chiếu của bộ")
     d.add_argument("set"); d.add_argument("--keep", action="store_true"); d.set_defaults(fn=cmd_clean)

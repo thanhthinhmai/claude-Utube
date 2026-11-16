@@ -57,14 +57,14 @@ description: "Tasks for 023: template from the reference channel's craft"
   - mọi thời điểm lệch ≤ 0,2 s;
   - cảnh máy trôi mà khối đứng yên thì `active_share` < ngưỡng (không lẫn máy với cử động);
   - in tỉ lệ đúng.
-- [ ] T006 Viết `SL/template.py`, phần kiểm theo contracts/template-format.md:
+- [X] T006 Viết `SL/template.py`, phần kiểm theo contracts/template-format.md:
   - `check_template(slug)`: 15 mục đúng tên và thứ tự; mỗi mục có mô tả, bảng số đo ≥ 1 dòng với cột "Khoảng" không rỗng; `Bằng chứng:` ≥ 3 từ ≥ 2 video hoặc `Ít bằng chứng: <n> khung`; mọi tệp được dẫn có trong `R/profile/`; có `Nên làm:`, `Không nên làm:`, `Trong bộ dựng:`; 9 nhịp theo thứ tự hook, explain, benefit, scale, cost, crisis, ending, sting, end-card;
   - `check_numbers`: số trong cột `Nguồn` khớp `template.json` hoặc `craft-summary.json` (lệch ≤ 0,01);
   - `check_style_tags(slug)`: mỗi dòng bảng hoặc gạch đầu dòng mang luật ở mục 1–11 của `STYLE.md` có `[bằng chứng: …]` hoặc `[xưởng]`.
 
   Mỗi lỗi in mục hoặc dòng và lý do.
-- [ ] T007 [P] Viết `tests/learn/test_template.py`: mẫu đúng đạt; các mẫu thiếu (mất mục, < 3 bằng chứng, 1 video, thiếu nhãn luật, số lệch nguồn) mỗi cái báo đúng một lỗi.
-- [ ] T008 Thêm vào `tools/style-learn/learn.py` các lệnh `template-check <slug>` và `craft-summary <set>` (phần khung trước, gom số ở T012 và T026). Thêm vào `bin/studio` (định tuyến `learn` đã có) theo contracts/cli.md: mã 0 đạt, 1 lỗi, 2 sai cách gọi, 3 thiếu dữ liệu.
+- [X] T007 [P] Viết `tests/learn/test_template.py`: mẫu đúng đạt; các mẫu thiếu (mất mục, < 3 bằng chứng, 1 video, thiếu nhãn luật, số lệch nguồn) mỗi cái báo đúng một lỗi.
+- [X] T008 Thêm vào `tools/style-learn/learn.py` lệnh `template-check <slug>` (lệnh `craft-summary <set>` thêm cùng lúc với phần gom số ở T012). Thêm vào `bin/studio` (định tuyến `learn` đã có) theo contracts/cli.md: mã 0 đạt, 1 lỗi, 2 sai cách gọi, 3 thiếu dữ liệu.
 
 **Mốc kiểm**: `sh tests/learn/run.sh` đạt, có SC-003.
 
@@ -76,7 +76,7 @@ description: "Tasks for 023: template from the reference channel's craft"
 
 **Independent Test**: `learn template-check dusk-hypothetical` đạt mục 1–10 và nhãn luật (lệnh tạm cho phép thiếu mục 11–15 bằng `--partial 1-10`); mở từng bằng chứng được dẫn và đối chiếu.
 
-- [ ] T009 [US1] Thêm `--partial <a-b>` vào `template-check` (chỉ kiểm các mục a–b, bỏ công thức nhịp), trong `SL/template.py` và `learn.py`.
+- [X] T009 [US1] Thêm `--partial <a-b>` vào `template-check` (chỉ kiểm các mục a–b, bỏ công thức nhịp), trong `SL/template.py` và `learn.py`.
 - [ ] T010 [US1] Viết `cell(sheet, n)` trong `SL/template.py`: cắt ô `#Sxxx` của `shot-sheets`, theo kích thước ô của `SL/shots.draw_sheets` (đọc lại đúng tham số, không đoán).
 - [ ] T011 [P] [US1] Viết các phép đo phần hình trong `SL/template.py` (research R10):
   - **Bố cục theo cỡ cảnh**: phân bố `sharpest_at` trên lưới 3×4; tỉ lệ lệch tâm (cột 0 hoặc 3, hàng 0 hoặc 2); tỉ lệ cột 1/3.
