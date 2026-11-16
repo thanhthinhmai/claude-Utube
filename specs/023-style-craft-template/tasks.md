@@ -90,9 +90,9 @@ description: "Tasks for 023: template from the reference channel's craft"
   - gắn `[bằng chứng: …]` cho từng luật, lấy từ `R/analysis/*.md`, `EVIDENCE.md`, `summary.json`, `shots.json`;
   - luật phụ đề in trên hình gắn `[xưởng]`;
   - luật không có bằng chứng mà không phải luật của xưởng thì bỏ, ghi vào `S/EVIDENCE.md` → "Nhật ký sửa" (ngày, luật, lý do).
-- [ ] T015 [US1] Xem bằng mắt `shot-sheets` theo từng thành phần (mặt, thân áo, bối cảnh và đạo cụ, đám đông, thẻ số liệu, thẻ tiêu đề và thẻ cuối, cảnh không khí). Mỗi thành phần chọn ≥ 3 ô từ ≥ 2 video; với cảnh đêm hiếm, ghi `Ít bằng chứng: n khung`.
-- [ ] T016 [US1] Viết `S/TEMPLATE.md` mục 1–10 theo contracts/template-format.md, bằng lời của xưởng: mô tả, bảng số đo kèm khoảng và nguồn, bằng chứng, nên làm, không nên làm, tên trong bộ dựng (tên mới của v2 ghi theo contracts/kit-api-v2.md). Viết `S/template.json` phần `framing`, `light` kèm `source`.
-- [ ] T017 [US1] Chạy kiểm:
+- [X] T015 [US1] Xem bằng mắt `shot-sheets` theo từng thành phần (mặt, thân áo, bối cảnh và đạo cụ, đám đông, thẻ số liệu, thẻ tiêu đề và thẻ cuối, cảnh không khí). Mỗi thành phần chọn ≥ 3 ô từ ≥ 2 video; với cảnh đêm hiếm, ghi `Ít bằng chứng: n khung`.
+- [X] T016 [US1] Viết `S/TEMPLATE.md` mục 1–10 theo contracts/template-format.md, bằng lời của xưởng: mô tả, bảng số đo kèm khoảng và nguồn, bằng chứng, nên làm, không nên làm, tên trong bộ dựng (tên mới của v2 ghi theo contracts/kit-api-v2.md). Viết `S/template.json` phần `framing`, `light` kèm `source`.
+- [X] T017 [US1] Chạy kiểm:
   - `learn template-check dusk-hypothetical --partial 1-10`;
   - `learn check-names dusk-hypothetical-3 S/TEMPLATE.md S/STYLE.md S/template.json`.
 

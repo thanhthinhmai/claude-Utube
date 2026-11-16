@@ -1,0 +1,68 @@
+{
+ "version": 1,
+ "set": "dusk-hypothetical-3",
+ "framing": {
+  "by_scale": {
+   "ecu": {
+    "off_centre": 0.256,
+    "middle": 0.744,
+    "focused_share": [
+     0.25,
+     0.667
+    ],
+    "foreground_blur": 0.12
+   },
+   "wide": {
+    "off_centre": 0.135,
+    "middle": 0.865,
+    "focused_share": [
+     0.5,
+     0.75
+    ],
+    "foreground_blur": 0.095
+   },
+   "cu": {
+    "off_centre": 0.08,
+    "middle": 0.92,
+    "focused_share": [
+     0.417,
+     0.667
+    ],
+    "foreground_blur": 0.253
+   },
+   "huge": {
+    "off_centre": 0.202,
+    "middle": 0.798,
+    "focused_share": [
+     0.417,
+     0.833
+    ],
+    "foreground_blur": 0.083
+   },
+   "med": {
+    "off_centre": 0.12,
+    "middle": 0.881,
+    "focused_share": [
+     0.5,
+     0.833
+    ],
+    "foreground_blur": 0.215
+   }
+  }
+ },
+ "light": {
+  "warm_share": [
+   0.0,
+   0.0164
+  ],
+  "range": [
+   0.345,
+   0.549
+  ],
+  "raking": 0.553
+ },
+ "source": {
+  "framing": "craft-summary.json → framing.by_scale (sharpest tile, focused_share p25–p75, foreground_blur; 8 3D films)",
+  "light": "craft-summary.json → light.all (shot-sheet cells, p25–p75)"
+ }
+}
