@@ -150,6 +150,16 @@ def cmd_sound(a):
     return soundcraft.sound_set(a.set, a.only)
 
 
+def cmd_beats(a):
+    from sl import timesummary
+    probs = timesummary.check_beats(a.set)
+    for x in probs:
+        print(f"✗ {x}")
+    if not probs:
+        print("✓ beats.json đạt")
+    return 1 if probs else 0
+
+
 def cmd_clean(a):
     from sl import save
     return save.clean(a.set, a.keep)
@@ -222,6 +232,9 @@ def main(argv=None) -> int:
 
     so = sub.add_parser("sound", help="nhịp đọc, nhạc, tiếng động (cần learn transcribe trước; specs/023)")
     so.add_argument("set"); so.add_argument("--only", nargs="*"); so.set_defaults(fn=cmd_sound)
+
+    bt = sub.add_parser("beats", help="kiểm profile/beats.json (specs/023)")
+    bt.add_argument("set"); bt.add_argument("--check", action="store_true", required=True); bt.set_defaults(fn=cmd_beats)
 
     cs = sub.add_parser("craft-summary", help="gom số tay nghề của bộ: bố cục, độ sâu, ánh sáng; theo thời gian (specs/023)")
     cs.add_argument("set"); cs.add_argument("--parts", nargs="+", default=["look"], choices=("look", "time"))
