@@ -106,13 +106,13 @@ description: "Tasks for 023: template from the reference channel's craft"
 
 **Independent Test**: test của T005, T023 đạt; `template-check` đạt đủ (không `--partial`); không còn tệp media trong `R/`.
 
-- [ ] T018 [P] [US2] Viết `refetch` trong `SL/fetch.py` (research R1):
+- [X] T018 [P] [US2] Viết `refetch` trong `SL/fetch.py` (research R1):
   - tải từng URL vào thư mục tạm;
   - ghép với `vNN` theo độ dài (lệch ≤ 1 s); nếu nhiều video trùng độ dài thì so 5 khung giữa cảnh với ô `shot-sheets` (ΔE trung bình ≤ 12);
   - ghép được thì chuyển vào `R/videos/vNN.mp4` và ghi `url` vào `set.json`; không ghép được thì báo và bỏ qua (mã 1);
   - in lời nhắc bản quyền như `fetch`;
   - `fetch` từ nay cũng ghi `url`.
-- [ ] T019 [P] [US2] Viết `tests/learn/test_refetch.py`: ghép theo độ dài với tệp giả (video tổng hợp ngắn, `set.json` giả), không tải mạng; độ dài trùng thì dùng khung; không ghép được thì mã 1.
+- [X] T019 [P] [US2] Viết `tests/learn/test_refetch.py`: ghép theo độ dài với tệp giả (video tổng hợp ngắn, `set.json` giả), không tải mạng; độ dài trùng thì dùng khung; không ghép được thì mã 1.
 - [ ] T020 [US2] Tìm 10 URL:
   - liệt kê video của kênh tham chiếu bằng yt-dlp (`--flat-playlist`, có độ dài, không tải);
   - ghép với 10 độ dài của `set.json` (637, 640, 636, 614, 649, 629, 610, 376, 639, 1224 s);

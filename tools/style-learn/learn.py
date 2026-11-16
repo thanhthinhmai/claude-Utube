@@ -25,6 +25,11 @@ def cmd_fetch(a):
     return 0
 
 
+def cmd_refetch(a):
+    from sl import fetch
+    return fetch.refetch(a.set, a.videos)
+
+
 def cmd_measure(a):
     from sl import measure
     done = measure.measure_set(a.set, a.only)
@@ -143,6 +148,9 @@ def main(argv=None) -> int:
     f.add_argument("--max-seconds", type=float, default=180)
     f.add_argument("--deny", nargs="*")
     f.set_defaults(fn=cmd_fetch)
+
+    rf = sub.add_parser("refetch", help="tải lại video của một bộ đã học, vào đúng vNN cũ (specs/023)")
+    rf.add_argument("set"); rf.add_argument("--videos", nargs="+", required=True); rf.set_defaults(fn=cmd_refetch)
 
     m = sub.add_parser("measure", help="đo mọi khung của phần được đo")
     m.add_argument("set"); m.add_argument("--only", nargs="*")
