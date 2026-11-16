@@ -37,7 +37,7 @@ description: "Tasks for 023: template from the reference channel's craft"
 
 ## Phase 2: Foundational (chặn mọi story)
 
-- [ ] T003 Viết `SL/craft.py` theo research R2:
+- [X] T003 Viết `SL/craft.py` theo research R2:
   - `sample(path, t0, t1, fps=12, size=(320,180))`;
   - `block_shifts(a, b, block=16, search=8)`;
   - `fit_camera(shifts)` → `(dx, dy, zoom)`, bình phương tối thiểu, loại ngoại lai 2 vòng;
@@ -45,14 +45,14 @@ description: "Tasks for 023: template from the reference channel's craft"
   - `classify_cam(series)` → `still` (< 4 px/s ở bề ngang 1280 và < 0,5 %/s), `drift-h`, `drift-v`, `push`, `pull`, `follow`, kèm `px_s`, `zoom_pct_s`, `ease_in_s`, `ease_out_s`;
   - `inner(series)` → `active_share`, `peak`, `spans [t0, t1, độ lớn, [x, y]]` (≥ 2 mẫu liền), `rise_s` (10→90%);
   - `measure_shot(path, shot)` → một phần tử `shots[]` của `craft.json` (data-model.md).
-- [ ] T004 Thêm vào `SL/craft.py` hàm `transition(path, t_cut)` theo research R3, xét ±0,3 s ở fps gốc:
+- [X] T004 Thêm vào `SL/craft.py` hàm `transition(path, t_cut)` theo research R3, xét ±0,3 s ở fps gốc:
   - `streak`: ≥ 2 khung có hàng độ sáng > 0,8 chiếm ≥ 15% chiều cao, kéo dài 0,08–0,25 s;
   - `dip`: độ sáng < 0,03 trong ≥ 2 khung;
   - `fade`: độ sáng đổi đơn điệu ≥ 0,15 s;
   - `wipe`: ranh giới hiệu khung chạy qua khung;
   - `flash`/`dissolve` dùng lại `SL/motion.events`;
   - còn lại `cut`.
-- [ ] T005 Viết `tests/learn/test_craft.py` trên video của T002 (SC-003):
+- [X] T005 Viết `tests/learn/test_craft.py` trên video của T002 (SC-003):
   - ≥ 90% cảnh có cử động được nhận, ≥ 90% loại máy đúng, ≥ 90% chuyển cảnh không phải `cut` đúng loại;
   - mọi thời điểm lệch ≤ 0,2 s;
   - cảnh máy trôi mà khối đứng yên thì `active_share` < ngưỡng (không lẫn máy với cử động);

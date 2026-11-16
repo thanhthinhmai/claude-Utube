@@ -72,8 +72,8 @@ def shot_frame(wld, i, s, t):
     zoom = (1 + s.get("zoom", 0) / 100) ** t
     img = view(wld, cx, cy, zoom)
     if s.get("hand") is not None:                       # a "hand" rises 60 px in 0.4 s, then holds
-        k = ease((t - s["hand"]) / 0.4)
-        hx, hy = int(W * 0.62), int(H * 0.62 - 60 * k)
+        k = ease((t - s["hand"]) / 0.4)                 # drawn in the world: it slides with the background when the camera moves
+        hx, hy = int(W * 0.62 - s.get("vx", 0) * t), int(H * 0.62 - 60 * k - s.get("vy", 0) * t)
         img[hy:hy + 50, hx:hx + 28] = (225, 190, 160)
     if s.get("static_block"):                           # a block fixed in the world: moves only with the camera
         x = int(W * 0.4 - s["vx"] * t)
