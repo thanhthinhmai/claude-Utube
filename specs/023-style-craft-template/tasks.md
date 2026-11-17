@@ -177,7 +177,7 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
   - không có `template.json` → `skipped`;
   - thiếu venv → mã 3;
   - `style_*` trên số giả ngoài và trong khoảng.
-- [X] T034 [US4] (Kết quả 2026-11-17, kit 022 cũ: tầng 4 báo máy đứng 100 % (khoảng 0,24–0,84), motion720 0,0014 (0,008–0,176), người đứng yên 35 % (≤ 0,055). Tầng 2, khung vẽ với `CLEAN` và `SUBJECT` (người dùng chọn A: bỏ đám đông khỏi phép đo): `still_person` 13/21 cảnh = 13/14 cảnh được xét; 4 cảnh < 2 s và 3 cảnh không người không thuộc diện xét. SC-005 nửa đầu: đạt theo cảnh được xét, chưa đạt con số 15/21 của spec.) Chạy trên `hundred-words` **khi kit của phim còn là bản cũ**: `qc shots hundred-words`, `qc hundred-words`.
+- [X] T034 [US4] (Kết quả 2026-11-17, kit 022 cũ: tầng 4 báo máy đứng 100 % (khoảng 0,24–0,84), motion720 0,0014 (0,008–0,176), người đứng yên 35 % (≤ 0,055). Tầng 2, khung vẽ với `CLEAN` và `SUBJECT` (người dùng chọn A: bỏ đám đông khỏi phép đo): `still_person` 13/21 cảnh = 13/14 cảnh được xét; 4 cảnh < 2 s và 3 cảnh không người không thuộc diện xét. SC-005 nửa đầu (đã sửa 2026-11-17: ≥ 90 % cảnh được xét): **đạt**, 13/14 = 93 %.) Chạy trên `hundred-words` **khi kit của phim còn là bản cũ**: `qc shots hundred-words`, `qc hundred-words`.
   - Ghi kết quả vào `films/hundred-words/compare/before.json`.
   - Chụp khung cũ cho bảng ba cột (`page still` một khung giữa mỗi cảnh, vào `films/hundred-words/compare/old/`).
   - Mốc kiểm: SC-005 nửa đầu (≥ 15/21 cảnh, tỉ lệ máy đứng yên bị báo).

@@ -47,6 +47,7 @@ Người dùng muốn: học **cách làm** của kênh mẫu và viết thành 
 - Q: Nhạc nền lấy từ đâu? → A: Tự soạn bằng bộ nhạc cụ mẫu có sẵn của thư viện, theo công thức nhạc đo được cho từng nhịp; không dùng bản nhạc của bên ngoài.
 - Q: Giọng đọc có nằm trong phạm vi không? → A: Có, giữ giọng của kênh (`am_michael` ×1,1) nhưng học và áp nhịp đọc của kênh mẫu (tốc độ theo nhịp, chỗ ngắt, chỗ nhấn, khoảng lặng trước số liệu), và có cách sửa chữ bị đọc sai.
 - Q: Nâng cấp skill học phong cách (công cụ đo chuyển động, chứng minh bằng đoạn video) làm trong 023 hay để sau? → A: Làm luôn trong 023: công cụ đo nằm trong bước học, skill có bước đo chuyển động, chứng minh bằng đoạn video và bước viết `TEMPLATE.md`.
+- Q (2026-11-17, sau khi đo): Đếm cảnh "người đứng yên" thế nào và mục tiêu trên phim cũ là bao nhiêu? → A: Đo phần cảnh 3D không có phụ đề, thẻ chữ và đám đông (đám đông của kênh đứng yên); chỉ xét cảnh có người dài từ 2 s; mục tiêu trên phim cũ đổi từ ≥ 15/21 thành ≥ 90 % số cảnh được xét (phim cũ chỉ có 14 cảnh như vậy). Khoảng máy đứng yên đổi theo số đo mới có tính máy đẩy vào.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -200,7 +201,7 @@ Phim thử 1 phút được dựng lại bằng bộ dựng mới (cùng kịch 
 - **SC-002**: Mỗi thành phần của `TEMPLATE.md` có ≥ 1 số đo kèm khoảng và ≥ 3 khung mẫu từ ≥ 2 video (hoặc ghi "ít bằng chứng" kèm số khung có); mỗi nhịp của `STRUCTURE.md` có một công thức.
 - **SC-003**: Trên video thử có chuyển động biết trước, phép đo mới nhận đúng ≥ 90% cảnh có cử động nhân vật, ≥ 90% loại chuyển động máy và ≥ 90% chuyển cảnh không phải cắt thường, với thời điểm lệch ≤ 0,2 s.
 - **SC-004**: Cả 4 đợt bảng so được người dùng duyệt, mỗi đợt sau tối đa 2 lần sửa.
-- **SC-005**: Trên phim thử cũ, luật "cảnh có người đứng yên" báo ≥ 15/21 cảnh và tỉ lệ máy đứng yên bị báo ngoài khoảng; trên phim làm lại, 0 cảnh có người đứng yên, và tỉ lệ máy đứng yên cùng độ chuyển động máy nằm trong khoảng của kênh mẫu (hiện 0,72–0,93 và p50 0,008–0,176).
+- **SC-005**: Trên phim thử cũ, luật "cảnh có người đứng yên" báo ≥ 90 % số cảnh có người dài từ 2 s (ngưỡng đo từ kênh mẫu), và tỉ lệ máy đứng yên bị báo ngoài khoảng; trên phim làm lại, 0 cảnh có người đứng yên, và tỉ lệ máy đứng yên cùng độ chuyển động máy nằm trong khoảng của kênh mẫu (đo lại 2026-11-17 có tính cả máy đẩy vào: máy đứng 0,24–0,84; motion720 p50 0,008–0,176).
 - **SC-006**: Trên bảng so ba cột của phim làm lại, người dùng thấy bản mới gần kênh mẫu hơn bản cũ ở mọi loại cảnh được so; người dùng chấp nhận phim làm lại làm điểm xuất phát cho phim dài.
 - **SC-007**: Sau khi học, 0 tệp video hay âm thanh mẫu còn trong `references/`; `check-names` đạt trên `TEMPLATE.md`, `STYLE.md` và mọi tệp chữ mới của bộ dựng.
 
