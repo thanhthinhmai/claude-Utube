@@ -55,8 +55,8 @@ One glance reads as this style when:
 
 - Smooth animation on ones at **60 fps**, like the current reference films (the older 24 fps films were left out); no stepping, no boil [bằng chứng: EVIDENCE.md → corrections #22; motion-depth §7.6]
 - Render with `--fps 60` [xưởng]
-- Camera **locked in ≈ 80 % of shots** (still ratio 0.86, 0.72–0.93); moves are slow drifts (median ≈ 16 px/s at 1280 px, sideways twice as often as vertical) or slow push-ins; big tilts and follows of 1.5–3 s are kept for set pieces; no whips, no handheld [bằng chứng: summary.json → still_ratio; motion-depth §1.1–3, §1.6]
-- Figures are **posed**: life comes from lid droops, head tilts, mouth flaps on dialogue; gestures rise in 0.3–0.6 s then hold; a fall-and-get-up gag takes ≈ 1 s; walks are a simple stride [bằng chứng: motion-depth §6.1–4]
+- The camera **slowly pushes in** by default: a push in about half of close-ups and mediums (1–5 %/s); a truly still camera (no shift, no zoom) only about a third of the runtime (0.24–0.84 per film, median 0.36); sideways drifts are rare; big tilts, long dollies and follows of 1.5–3 s are kept for set pieces; no whips, no handheld [bằng chứng: craft-summary.json → motion.still_ratio, motion.by_scale; motion-depth §1.3, §1.6; v01/strips/S010.jpg#7]
+- Every shot makes **one thing happen**: an expression change, a gesture, a head tilt, a mouth flap under a bubble, or a prop that acts; gestures rise in ≈ 0.4 s (0.25–0.83) then hold; a fall-and-get-up gag takes ≈ 1 s; walks are a simple stride [bằng chứng: motion-depth §6.1–4; craft-summary.json → motion.person_still_cam; TEMPLATE.md §11]
 - Objects act short and eased: a lid opens in ≈ 0.4 s, an item lifts with a 0.3 s bloom, a phone tilts to camera in ≈ 1 s [bằng chứng: motion-depth §6.5]
 - Graphics pop or fade in within 0.07–0.15 s, bars fill with an ease-out over ≈ 1.3 s, counters roll up and hold [bằng chứng: motion-depth §2.7, §6.6]
 - Crowds stay frozen or share one tiny idle bob; only the hero acts [bằng chứng: motion-depth §6.8]

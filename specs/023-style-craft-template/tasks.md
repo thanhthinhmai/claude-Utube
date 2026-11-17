@@ -143,8 +143,8 @@ description: "Tasks for 023: template from the reference channel's craft"
 
   Thêm test vào `tests/learn/test_template.py`. Chạy cả hai lệnh.
 - [X] T027 [US2] Chạy `learn clean dusk-hypothetical-3` ngay khi T024–T026 xong (cả khi dừng hay lỗi, FR-006). Kiểm `find R \( -name '*.mp4' -o -name '*.wav' -o -name '*.m4a' -o -name '*.webm' \)` ra rỗng (SC-007).
-- [ ] T028 [US2] Viết `S/TEMPLATE.md` mục 11–15 và `## Công thức nhịp` (9 nhịp). Viết đủ `S/template.json` (`motion`, `transitions`, `voice`, `sound`, `beats`, `source`) theo data-model.md; mọi số lấy từ `craft-summary.json`.
-- [ ] T029 [US2] Chạy `learn template-check dusk-hypothetical` (đủ, không `--partial`) và `check-names` trên các tệp mới. Mốc kiểm: SC-002, SC-007.
+- [X] T028 [US2] Viết `S/TEMPLATE.md` mục 11–15 và `## Công thức nhịp` (9 nhịp). Viết đủ `S/template.json` (`motion`, `transitions`, `voice`, `sound`, `beats`, `source`) theo data-model.md; mọi số lấy từ `craft-summary.json`.
+- [X] T029 [US2] Chạy `learn template-check dusk-hypothetical` (đủ, không `--partial`) và `check-names` trên các tệp mới. Mốc kiểm: SC-002, SC-007.
 
 ---
 

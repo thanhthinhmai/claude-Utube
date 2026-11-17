@@ -158,3 +158,217 @@ Bằng chứng: v02_shots_1.jpg#21, v02_shots_3.jpg#20, v05_shots_5.jpg#8, v06_s
 Nên làm: đổi tông cả khung cho một nhịp (báo động đỏ hồng, đêm xanh, sau biến cố trắng tím) rồi trở lại tím; giữ một mảng tím trong khung.
 Không nên làm: đổi tông kéo dài thành một kiểu nhìn mới; báo động mà không đổi màu cả khung; cảnh đêm đen đặc không có đốm đèn.
 Trong bộ dựng: `catalog.moods` (`dusk`, `alarm`, `night`, `lilac`), `scene.mood`, `scene.grade`
+
+## 11. Diễn xuất nhân vật
+
+Cảnh nào cũng có **một việc xảy ra trong cảnh**. Có thể là nét mặt đổi (mí sụp hay mở, cười chuyển sang chữ "o", mày nhíu lại), một động tác tay (đưa, chạm, đẩy, ôm mặt, vẫy), một cái đầu nghiêng hay quay về phía máy, miệng mấp máy khi bong bóng thoại bật lên, hay một đạo cụ tự diễn. Động tác lên nhanh rồi giữ, không lặp vòng. Người trong đám đông đứng yên khi chủ thể diễn. Khi máy đứng, gần như luôn có gì đó động. Cảnh có người mà máy đứng và không có cử động nào rất hiếm.
+
+| Số đo | Giá trị | Khoảng | Nguồn |
+|---|---|---|---|
+| thời gian lên của một động tác (s) | 0,417 | 0,25–0,833 | template.json → motion.rise_s |
+| phần cảnh có cử động (máy đứng, có người; p25–p75) | — | 0,254–1,0 | template.json → motion.person_still_cam_active |
+| cảnh máy đứng có người mà không cử động | 0,108 | — hiếm | template.json → motion.person_still_cam_none |
+| thời lượng "người đứng yên" tối đa mỗi phim | 0,055 | 0,003–0,055 | template.json → motion.dead_share_max |
+
+Bằng chứng: v09/strips/S082.jpg#0, v06/strips/S192.jpg#5, v05/strips/S062.jpg#4, v03/strips/S149.jpg#6, v06/strips/S215.jpg#2, v06/strips/S180.jpg#6, v01/strips/S146.jpg#3
+Nên làm: mỗi cảnh một việc: đổi nét mặt, một động tác tay, một cái nghiêng đầu hay một đạo cụ tự diễn; động tác lên trong 0,25–0,8 s rồi giữ; miệng mấp máy khi có bong bóng; chớp mắt cho cảnh dài.
+Không nên làm: cảnh có người mà máy đứng và không có gì động; cả đám đông cùng diễn; động tác lặp vòng như máy.
+Trong bộ dựng: `cast[].act`, `cast[].talk`, `cast[].blink`, `cast[].path`, `catalog.acts`
+
+## 12. Chuyển động máy
+
+Máy **đẩy chậm vào** là mặc định. Khoảng một nửa số cận và trung cảnh có máy đẩy vào, tốc độ khoảng 1–5 %/s. Máy đứng thật (không dời, không phóng) chỉ khoảng một phần ba thời lượng. Máy trôi ngang hay dọc rất hiếm. Máy bám theo khi nhân vật chạy hoặc đi. Những cú máy lớn để dành cho cảnh đinh: lia lên mặt nhà, tiến dài theo hành lang, bám theo máy bay. Đồ hoạ trọn khung thường đứng yên.
+
+| Số đo | Giá trị | Khoảng | Nguồn |
+|---|---|---|---|
+| thời lượng máy đứng thật (theo phim) | 0,364 | 0,243–0,836 | template.json → motion.still_ratio |
+| cận có máy đẩy vào | 0,589 | 0,39–0,62 (theo cỡ) | template.json → motion.cam_by_scale.cu.push |
+| trung cảnh có máy đẩy vào | 0,495 | 0,39–0,62 (theo cỡ) | template.json → motion.cam_by_scale.med.push |
+| tốc độ đẩy ở cận (%/s, p25–p75) | — | 0,955–4,271 | template.json → motion.cam_by_scale.cu.zoom_pct_s |
+| tốc độ máy dời ở trung cảnh (px/s ở 1280, p25–p75) | — | 13,86–46,358 | template.json → motion.cam_by_scale.med.drift_px_s |
+| motion720 p50 (theo phim) | — | 0,008–0,176 | template.json → motion.motion720_p50 |
+
+Bằng chứng: v01/strips/S010.jpg#7, v10/strips/S073.jpg#0, v02/strips/S160.jpg#0, v06/strips/S190.jpg#4, v04/strips/S065.jpg#4, v01_shots_1.jpg#3
+Nên làm: đẩy chậm vào ở khoảng một nửa số cận và trung cảnh, có lúc bắt đầu và dừng mềm; bám theo khi nhân vật chạy; giữ cú máy lớn cho cảnh đinh; đồ hoạ trọn khung để đứng.
+Không nên làm: máy đứng chết ở mọi cảnh; lia nhanh, rung tay; trôi ngang liên tục.
+Trong bộ dựng: `move: 'auto' | {type, speed}`, `catalog.moves`, `camera.js → place`
+
+## 13. Chuyển cảnh
+
+Gần như toàn là cắt thẳng. Mờ dần ra đen chỉ dùng một hai lần mỗi phim để khép một hồi. Nháy đen ngắn là một nhịp trong cận đang giữ. Đổi trạng thái hay trang phục dùng một vệt sáng 0,15 s ngay trong cảnh, không dùng ở chỗ cắt. Không mờ chồng, không trượt.
+
+| Số đo | Giá trị | Khoảng | Nguồn |
+|---|---|---|---|
+| chỗ cắt là cắt thẳng | 0,9904 | — gần như tất cả | template.json → transitions.cut |
+| mờ dần mỗi phim | 0,3 | 0–2 | template.json → transitions.fade_per_film |
+| độ dài nháy đen (s) | — | 0,117–0,162 | template.json → transitions.dip_s |
+| vệt sáng đổi trạng thái (s) | 0,15 | 0,13–0,17 | motion-depth §2.3 |
+
+Bằng chứng: v01/strips/S081.jpg#6, v04/strips/S054.jpg#6, v07/strips/S215.jpg#5, v02_shots_3.jpg#20
+Nên làm: cắt thẳng; vệt sáng 0,15 s để nhân vật đổi trạng thái trong cảnh; nháy đen 0,12 s làm nhịp; mờ dần đen tối đa 2 lần để khép hồi.
+Không nên làm: mờ chồng giữa hai cảnh; vật che trượt; hiệu ứng chuyển cảnh trang trí.
+Trong bộ dựng: `trans: 'cut' | 'dip' | 'fade'`, `act: 'swap'` (vệt sáng trong cảnh), `stage.js`
+
+## 14. Âm thanh
+
+Nhạc nền chạy liền suốt phim, kể cả dưới lời. Trong các khoảng nghỉ của lời, nhạc chỉ thấp hơn giọng vài dB, nên khoảng nghỉ không bao giờ trống. Tempo đều, vào khoảng 115–120 BPM (độ tin cậy thấp). Tiếng động dày: điểm bật âm ngoài lời khoảng 18–43 lần mỗi phút (mức trần, có lẫn phách nhạc). Bản trộn nén chặt ở −14 LUFS.
+
+| Số đo | Giá trị | Khoảng | Nguồn |
+|---|---|---|---|
+| cửa sổ 5 s có nhạc | 0,975 | — gần như liền | template.json → sound.music_share |
+| nhạc trong khoảng nghỉ so với giọng (dB, p25–p75) | — | -8,5–-3,3 | template.json → sound.music_under_voice_db |
+| điểm bật âm ngoài lời mỗi phút (theo phim, mức trần) | — | 18,19–42,96 | template.json → sound.sfx_per_min |
+| tempo (BPM, độ tin cậy thấp) | — | 114–120 | template.json → sound.tempo |
+| độ lớn (LUFS) | −14 | −14,4 – −14,0 | sound-script §6.1 |
+
+Bằng chứng: v01/evidence/sfx-a.jpg, v04/evidence/sfx-b.jpg, v06/evidence/sfx-c.jpg
+Nên làm: nhạc nền liền suốt phim, giảm vừa đủ khi có lời; tiếng động cho mỗi việc trong cảnh (đạo cụ, đồ hoạ bật ra, số đếm); −14 LUFS, dải âm lượng hẹp.
+Không nên làm: khoảng lặng trống; nhạc tắt giữa phim; dùng nhạc của kênh mẫu hay nhạc bên ngoài.
+Trong bộ dựng: `kit/sound/score.py`, `kit/sound/sfx.py`, `kit/sound/mix.py`, `events.json`
+
+## 15. Nhịp đọc lời
+
+Giọng đọc nhanh và liền, khoảng 140–200 từ mỗi phút, không chậm lại ở cao trào. Nghỉ giữa các từ trong câu ngắn, nghỉ cuối câu dài hơn một chút, nghỉ giữa đoạn dưới 0,75 s. Trước một con số có một khoảng nghỉ dài hơn nghỉ cuối câu, để con số đến như một nhịp nhấn. (Mốc từ lấy từ máy nhận dạng giọng, nên khoảng nghỉ trong câu có thể dài hơn thật một chút.)
+
+| Số đo | Giá trị | Khoảng | Nguồn |
+|---|---|---|---|
+| từ mỗi phút (cửa sổ 10 s, p10–p90) | 168,0 | 138,0–198,0 | template.json → voice.wpm |
+| nghỉ trong câu (s) | — | 0,28–0,44 | template.json → voice.pause_in |
+| nghỉ cuối câu (s) | — | 0,42–0,54 | template.json → voice.pause_sent |
+| nghỉ giữa đoạn (s) | — | 0,64–0,74 | template.json → voice.pause_para |
+| nghỉ trước con số (s) | — | 0,46–0,64 | template.json → voice.pre_number |
+
+Bằng chứng: v06/evidence/number-a.jpg, v09/evidence/number-b.jpg, v09/evidence/number-c.jpg
+Nên làm: giữ giọng của kênh; xếp dòng theo các khoảng nghỉ trên; để một khoảng nghỉ dài hơn trước mỗi con số; câu ngắn.
+Không nên làm: nghỉ giữa đoạn trên 1 s; chậm lại ở cao trào; bắt chước giọng của kênh mẫu.
+Trong bộ dựng: `kit/sound/timing.py → schedule`, `voice make` (`say` cho chữ đọc sai)
+
+## Công thức nhịp
+
+Đo trên 9 phim có `beats.json` (v02 không xếp theo thứ tự chuẩn nên bỏ ra). Độ dài cảnh là p25–p75. "Diễn xuất" là phần cảnh máy đứng có người mà có cử động.
+
+### hook
+
+| Mục | Giá trị |
+|---|---|
+| độ dài cảnh (s) | 1,43–2,85 |
+| chuỗi cỡ cảnh hay gặp | med → med → med; wide → cu → cu; med → med → cu |
+| máy động | 69 % số cảnh |
+| diễn xuất | 95 % cảnh máy đứng có người |
+| đồ hoạ | 4 % cảnh là đồ hoạ trọn khung; thẻ tiêu đề câu hỏi ở 30–55 s; ít đồ hoạ trọn khung |
+| chuyển cảnh | cắt thẳng |
+| tiếng động | 29,51 điểm bật mỗi phút (mức trần) |
+| nhạc | liền; trong khoảng nghỉ thấp hơn giọng 5,3 dB |
+| từ mỗi phút | 162 |
+
+### explain
+
+| Mục | Giá trị |
+|---|---|
+| độ dài cảnh (s) | 2,53–5,81 |
+| chuỗi cỡ cảnh hay gặp | wide → insert → wide; wide → wide → insert; insert → wide → cu |
+| máy động | 35 % số cảnh |
+| diễn xuất | 97 % cảnh máy đứng có người |
+| đồ hoạ | 28 % cảnh là đồ hoạ trọn khung; nhiều thẻ số liệu trọn khung xen cảnh rộng (cảnh rộng → thẻ → cảnh rộng) |
+| chuyển cảnh | cắt thẳng |
+| tiếng động | 30,08 điểm bật mỗi phút (mức trần) |
+| nhạc | liền; trong khoảng nghỉ thấp hơn giọng 6,4 dB |
+| từ mỗi phút | 168 |
+
+### benefit
+
+| Mục | Giá trị |
+|---|---|
+| độ dài cảnh (s) | 1,46–3,23 |
+| chuỗi cỡ cảnh hay gặp | med → med → med; wide → med → med; wide → wide → wide |
+| máy động | 61 % số cảnh |
+| diễn xuất | 92 % cảnh máy đứng có người |
+| đồ hoạ | 7 % cảnh là đồ hoạ trọn khung; số đếm và nhãn trên cảnh; thẻ số liệu rải rác |
+| chuyển cảnh | cắt thẳng |
+| tiếng động | 31,28 điểm bật mỗi phút (mức trần) |
+| nhạc | liền; trong khoảng nghỉ thấp hơn giọng 3,7 dB |
+| từ mỗi phút | 168 |
+
+### scale
+
+| Mục | Giá trị |
+|---|---|
+| độ dài cảnh (s) | 1,67–3,85 |
+| chuỗi cỡ cảnh hay gặp | med → med → med; huge → huge → med; huge → med → med |
+| máy động | 58 % số cảnh |
+| diễn xuất | 92 % cảnh máy đứng có người |
+| đồ hoạ | 10 % cảnh là đồ hoạ trọn khung; số lớn trên cảnh rất rộng, thẻ số liệu |
+| chuyển cảnh | cắt thẳng |
+| tiếng động | 29,52 điểm bật mỗi phút (mức trần) |
+| nhạc | liền; trong khoảng nghỉ thấp hơn giọng 4,8 dB |
+| từ mỗi phút | 168 |
+
+### cost
+
+| Mục | Giá trị |
+|---|---|
+| độ dài cảnh (s) | 1,62–3,88 |
+| chuỗi cỡ cảnh hay gặp | med → wide → med; med → med → wide; wide → cu → med |
+| máy động | 60 % số cảnh |
+| diễn xuất | 80 % cảnh máy đứng có người |
+| đồ hoạ | 3 % cảnh là đồ hoạ trọn khung; ít đồ hoạ |
+| chuyển cảnh | cắt thẳng |
+| tiếng động | 21,4 điểm bật mỗi phút (mức trần) |
+| nhạc | liền; trong khoảng nghỉ thấp hơn giọng 11,6 dB |
+| từ mỗi phút | 168 |
+
+### crisis
+
+| Mục | Giá trị |
+|---|---|
+| độ dài cảnh (s) | 1,71–4,3 |
+| chuỗi cỡ cảnh hay gặp | huge → huge → huge; huge → cu → huge; huge → huge → cu |
+| máy động | 60 % số cảnh |
+| diễn xuất | 90 % cảnh máy đứng có người |
+| đồ hoạ | 9 % cảnh là đồ hoạ trọn khung; đồng hồ đếm ngược, thẻ số liệu y tế hay vật lý |
+| chuyển cảnh | cắt thẳng |
+| tiếng động | 25,02 điểm bật mỗi phút (mức trần) |
+| nhạc | liền; trong khoảng nghỉ thấp hơn giọng 6,2 dB |
+| từ mỗi phút | 162 |
+
+### ending
+
+| Mục | Giá trị |
+|---|---|
+| độ dài cảnh (s) | 1,5–4,23 |
+| chuỗi cỡ cảnh hay gặp | med → cu → cu; med → wide → cu; wide → cu → cu |
+| máy động | 62 % số cảnh |
+| diễn xuất | 86 % cảnh máy đứng có người |
+| đồ hoạ | 5 % cảnh là đồ hoạ trọn khung; ít đồ hoạ; số đếm lần cuối |
+| chuyển cảnh | cắt thẳng |
+| tiếng động | 19,18 điểm bật mỗi phút (mức trần) |
+| nhạc | liền; trong khoảng nghỉ thấp hơn giọng 6,5 dB |
+| từ mỗi phút | 180 |
+
+### sting
+
+| Mục | Giá trị |
+|---|---|
+| độ dài cảnh (s) | 1,54–3,5 |
+| chuỗi cỡ cảnh hay gặp | med → med → med; med → cu → med; cu → med → med |
+| máy động | 67 % số cảnh |
+| diễn xuất | 90 % cảnh máy đứng có người |
+| đồ hoạ | 3 % cảnh là đồ hoạ trọn khung; ít đồ hoạ |
+| chuyển cảnh | cắt thẳng |
+| tiếng động | 23,3 điểm bật mỗi phút (mức trần) |
+| nhạc | liền; trong khoảng nghỉ thấp hơn giọng 8,6 dB |
+| từ mỗi phút | 174 |
+
+### end-card
+
+| Mục | Giá trị |
+|---|---|
+| độ dài cảnh (s) | 8,53–9,7 |
+| chuỗi cỡ cảnh hay gặp | huge → insert → huge; insert → huge → insert; huge → insert → insert |
+| máy động | 11 % số cảnh |
+| diễn xuất | 100 % cảnh máy đứng có người |
+| đồ hoạ | 67 % cảnh là đồ hoạ trọn khung; thẻ câu hỏi cuối có hai lựa chọn và hàng nhân vật |
+| chuyển cảnh | nháy đen hoặc mờ dần vào thẻ cuối |
+| tiếng động | 54,43 điểm bật mỗi phút (mức trần) |
+| nhạc | liền; trong khoảng nghỉ thấp hơn giọng 6,9 dB |
+| từ mỗi phút | 126 |
