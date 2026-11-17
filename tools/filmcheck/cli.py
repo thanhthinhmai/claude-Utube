@@ -281,13 +281,15 @@ def cmd_qc(a) -> int:
     from filmcheck import tiers
     fin = [{"tier": "final", "ref": "film", "at": None, "rule": "qc", "severity": "block", "measure": p, "limit": "",
             "text": "", "fix": "", "excepted": None} for p in r["problems"]]
-    fin += [{"tier": "final", "ref": "film", "at": None, "rule": "loudness_range", "severity": "warn", "measure": w,
-             "limit": "", "text": "", "fix": "", "excepted": None} for w in r.get("warnings", [])]
+    warns = [w if isinstance(w, dict) else {"rule": "loudness_range", "text": w, "measure": w, "limit": ""}
+             for w in r.get("warnings", [])]
+    fin += [{"tier": "final", "ref": "film", "at": None, "rule": w["rule"], "severity": "warn", "measure": w.get("measure"),
+             "limit": w.get("limit", ""), "text": w.get("text", ""), "fix": "", "excepted": None} for w in warns]
     tiers.save_tier(d, "final", tiers.result("final", fin, {k: r["measures"].get(k) for k in
-                                                           ("silence_ratio", "tail_s", "av_sync", "loudness_range")},
+                                                           ("silence_ratio", "tail_s", "av_sync", "loudness_range", "motion")},
                                              [], 0.0, tiers.fingerprint(d)))
     m = r["measures"]
-    lines = [f"  ✗ {p}" for p in r["problems"]] + [f"  ! {w}" for w in r.get("warnings", [])]
+    lines = [f"  ✗ {p}" for p in r["problems"]] + [f"  ! {w['text']}" for w in warns]
     shots = tiers.load_tier(d, "shots") or {}
     open_style = [i for i in shots.get("issues", []) if i["severity"] == "warn"]
     acc = (shots.get("style_accept") or {}).get("reason")

@@ -156,21 +156,21 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
 
 **Independent Test**: test trong `tests/filmcheck`; trên `hundred-words` cũ, `still_person` báo ≥ 15/21 cảnh và tỉ lệ máy đứng yên bị báo.
 
-- [ ] T030 [US4] Viết `tools/filmcheck/motioncheck.py`:
+- [X] T030 [US4] Viết `tools/filmcheck/motioncheck.py`:
   - gọi `tools/.venv/bin/python -I -m` một điểm vào của `SL/craft.py` với danh sách ảnh hoặc mp4, đọc JSON trả về;
   - thiếu venv thì báo lỗi mã 3 "cần `sh bin/studio deps learn`";
   - `template_of(film_dir)` đọc `template.json` của phong cách; không có thì trả `None`, và luật ghi `skipped: no template`.
 
   Thêm điểm vào `python -m sl.craft frames|video` vào `SL/craft.py`.
-- [ ] T031 [US4] Sửa `tools/filmcheck/shots.mjs`:
+- [X] T031 [US4] Sửa `tools/filmcheck/shots.mjs`:
   - chụp thêm 4 khung mỗi cảnh ở 20, 40, 60, 80% độ dài, cỡ 320×180, vào `.check/shots/motion/<id>-<k>.jpg`;
   - đọc `window.CAST` nếu trang có.
 
   Sửa `tools/filmcheck/shotcheck.py`:
   - luật chặn `still_person`: cảnh có người (`CAST` > 0). Trang không có `CAST` (vd. kit 022) thì ước lượng: cảnh có người = mọi cảnh trừ nhãn tầng 2 `insert` và trừ cảnh không có nhân vật nhìn thấy theo lượt nhãn tầng 2; kết quả ghi `person: estimated` mà tỉ lệ khối cử động < `motion.person_active_share_min`; báo mã cảnh, thời điểm, "thêm `act`, `move` hoặc `talk`";
   - luật cảnh báo `style_depth`: `focused_share` ngoài khoảng của cỡ cảnh trong `framing.by_scale`.
-- [ ] T032 [US4] Sửa `tools/filmcheck/qc.py` và `stylerefs.py` (tầng 4): đo mp4 bằng `motioncheck`, rồi thêm cảnh báo phong cách `style_still_ratio`, `style_motion720`, `style_person_motion`, `style_transitions` theo `template.json`. `qc accept-style` dùng chung cho các luật này.
-- [ ] T033 [P] [US4] Viết `tests/filmcheck/test_motioncheck.py`:
+- [X] T032 [US4] Sửa `tools/filmcheck/qc.py` và `stylerefs.py` (tầng 4): đo mp4 bằng `motioncheck`, rồi thêm cảnh báo phong cách `style_still_ratio`, `style_motion720`, `style_person_motion`, `style_transitions` theo `template.json`. `qc accept-style` dùng chung cho các luật này.
+- [X] T033 [P] [US4] Viết `tests/filmcheck/test_motioncheck.py`:
   - khung thử đứng yên → `still_person`;
   - có cử động → đạt;
   - máy trôi mà người đứng yên → vẫn báo `still_person`;

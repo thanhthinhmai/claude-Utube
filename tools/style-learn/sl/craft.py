@@ -115,6 +115,21 @@ def block_shifts(a, b, search=SEARCH):
     return sx, sy, valid
 
 
+def global_shift(a, b):
+    """Whole pixels the content moved from a to b (phase correlation); (0, 0) when small or unsure."""
+    h, w = a.shape
+    win = np.outer(np.hanning(h), np.hanning(w)).astype(np.float32)
+    A, B = np.fft.fft2((a - a.mean()) * win), np.fft.fft2((b - b.mean()) * win)
+    r = A.conj() * B
+    r /= np.abs(r) + 1e-9
+    c = np.fft.ifft2(r).real
+    py, px = np.unravel_index(int(np.argmax(c)), c.shape)
+    if c[py, px] < 0.05:
+        return 0, 0
+    dy, dx = (py if py <= h // 2 else py - h), (px if px <= w // 2 else px - w)
+    return (int(dx), int(dy)) if max(abs(dx), abs(dy)) > SEARCH // 2 else (0, 0)
+
+
 def fit_camera(sx, sy, valid, shape):
     """(dx, dy, zoom, inliers): s(x, y) = (dx + zoom·x, dy + zoom·y) about the frame centre."""
     h, w = shape
@@ -164,8 +179,12 @@ def pairs(frames):
     """Per sampled pair: camera model, block diffs, and the median own shift of blocks that do not follow the camera."""
     out = []
     for a, b in zip(frames[:-1], frames[1:]):
-        sx, sy, valid = block_shifts(a, b)
+        gx, gy = global_shift(a, b)                  # a big camera move: match blocks around the whole-frame shift
+        bb = np.roll(b, (-gy, -gx), axis=(0, 1)) if (gx or gy) else b
+        sx, sy, valid = block_shifts(a, bb)
         dx, dy, z, inl = fit_camera(sx, sy, valid, a.shape)
+        dx, dy = dx + gx, dy + gy
+        sx, sy = sx + gx, sy + gy
         if abs(z) * a.shape[1] / 2 > 0.15:          # zooming: match again on the warped frame (block matching leans to whole px)
             rx, ry, rv = block_shifts(a, warp(b, dx, dy, z), search=2)
             ex, ey, ez, inl2 = fit_camera(rx, ry, rv, a.shape)
@@ -345,10 +364,13 @@ def transition(path, t_cut, half=0.35):
 # ---------------------------------------------------------------- command line (used by tools/filmcheck/motioncheck.py)
 
 def main(argv):
-    """python -m sl.craft frames <img…>       → {"cam", "inner", "noise"} for frames taken in order at 12/s
+    """python -m sl.craft frames [--fps F] <img…>  → {"cam", "inner", "noise"} for frames taken in order at F/s (12)
        python -m sl.craft video <mp4> <shots.json>  → {"shots": [...]} (shots.json: [{"id", "t0", "t1"}])"""
     if len(argv) >= 2 and argv[0] == "frames":
-        print(json.dumps(measure_frames(load_images(argv[1:]))))
+        fps = FPS
+        if argv[1] == "--fps":
+            fps, argv = float(argv[2]), [argv[0]] + argv[3:]
+        print(json.dumps(measure_frames(load_images(argv[1:]), 0.0, fps)))
         return 0
     if len(argv) == 3 and argv[0] == "video":
         shots = json.loads(Path(argv[2]).read_text())
