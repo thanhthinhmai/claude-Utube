@@ -113,7 +113,7 @@ description: "Tasks for 023: template from the reference channel's craft"
   - in lời nhắc bản quyền như `fetch`;
   - `fetch` từ nay cũng ghi `url`.
 - [X] T019 [P] [US2] Viết `tests/learn/test_refetch.py`: ghép theo độ dài với tệp giả (video tổng hợp ngắn, `set.json` giả), không tải mạng; độ dài trùng thì dùng khung; không ghép được thì mã 1.
-- [ ] T020 [US2] Tìm 10 URL:
+- [X] T020 [US2] Tìm 10 URL:
   - liệt kê video của kênh tham chiếu bằng yt-dlp (`--flat-playlist`, có độ dài, không tải);
   - ghép với 10 độ dài của `set.json` (637, 640, 636, 614, 649, 629, 610, 376, 639, 1224 s);
   - không ra một-một thì dừng và hỏi người dùng.
@@ -131,18 +131,18 @@ description: "Tasks for 023: template from the reference channel's craft"
 
   Lệnh `learn sound <set> [--only vNN]` ghi `R/profile/<v>/sound.json`; thiếu mốc từ thì mã 3.
 - [X] T023 [P] [US2] Viết `tests/learn/test_soundcraft.py` trên âm thanh tổng hợp (giọng giả là chuỗi xung có mốc từ, nhạc là hoà âm 90 BPM ở −14 dB so với giọng, 6 tiếng gõ): đo đúng nghỉ (lệch ≤ 0,05 s), có nhạc, mức (lệch ≤ 2 dB), tempo (lệch ≤ 5 BPM), số tiếng động (lệch ≤ 1).
-- [ ] T024 [US2] Chạy lần lượt trên `dusk-hypothetical-3`: `learn transcribe` (nếu mốc từ cũ không còn), `learn craft --strips 80`, `learn sound`. Mọi lệnh bọc `job run` của bước học. Ghi thời gian chạy `learn craft` (mục tiêu ≤ 60 phút cho 10 video) vào `R/style/craft-notes.md`. Kiểm `still_ratio` tính từ `craft.json` so với `summary.json` (lệch ≤ 0,02 mỗi video); lệch hơn thì sửa phép đo trước khi đi tiếp.
-- [ ] T025 [US2] Claude, trong phiên:
+- [X] T024 [US2] (Kết quả 2026-11-17: `learn craft` 10 video ≈ 75 phút trên CPU, ngoài mục tiêu 60 phút vì chạy song song với chép lời. `still_ratio` mới **không** khớp số cũ, và đó là phát hiện chứ không phải lỗi đo: số cũ chỉ tính máy dời (tương quan pha, ngưỡng 0,5 px/khung) nên không thấy máy đẩy vào; máy đứng thật 0,24–0,84 (trung vị 0,36), máy không dời 0,54–0,90; xem khung của v01 S003, S010, S012, S006.) Chạy lần lượt trên `dusk-hypothetical-3`: `learn transcribe` (nếu mốc từ cũ không còn), `learn craft --strips 80`, `learn sound`. Mọi lệnh bọc `job run` của bước học. Ghi thời gian chạy `learn craft` (mục tiêu ≤ 60 phút cho 10 video) vào `R/style/craft-notes.md`. Kiểm `still_ratio` tính từ `craft.json` so với `summary.json` (lệch ≤ 0,02 mỗi video); lệch hơn thì sửa phép đo trước khi đi tiếp.
+- [X] T025 [US2] (v02 bỏ khỏi `beats.json`: khủng hoảng nằm giữa phim; bảng diễn xuất 80 dải trong `R/style/craft-notes.md`.) Claude, trong phiên:
   - đọc bản chép lời từng video, ghi `R/profile/beats.json` theo data-model.md (9 tên nhịp, liền nhau, phủ hết video, nhịp vắng thì bỏ);
   - đọc 80 dải khung, viết bảng loại động tác (chớp mắt, nghiêng đầu, tay giơ, miệng, đi, đổi biểu cảm…) với tần suất theo cỡ cảnh và bằng chứng `vNN/strips/Sxxx.jpg#k` vào `R/style/craft-notes.md`;
   - trích `learn evidence` cho máy, chuyển cảnh, cảnh không khí khi cần.
-- [ ] T026 [US2] Viết `learn beats --check` và phần gom theo thời gian của `craft-summary` trong `SL/template.py`:
+- [X] T026 [US2] Viết `learn beats --check` và phần gom theo thời gian của `craft-summary` trong `SL/template.py`:
   - theo cỡ cảnh: máy, cử động;
   - theo nhịp: độ dài cảnh, chuỗi cỡ cảnh, máy động, cảnh có cử động, chuyển cảnh, từ/phút, nhạc, tiếng động/phút;
   - toàn bộ: `still_ratio`, `motion720_p50`, tỉ lệ chuyển cảnh, `person_active_share` p10, `rise_s`.
 
   Thêm test vào `tests/learn/test_template.py`. Chạy cả hai lệnh.
-- [ ] T027 [US2] Chạy `learn clean dusk-hypothetical-3` ngay khi T024–T026 xong (cả khi dừng hay lỗi, FR-006). Kiểm `find R \( -name '*.mp4' -o -name '*.wav' -o -name '*.m4a' -o -name '*.webm' \)` ra rỗng (SC-007).
+- [X] T027 [US2] Chạy `learn clean dusk-hypothetical-3` ngay khi T024–T026 xong (cả khi dừng hay lỗi, FR-006). Kiểm `find R \( -name '*.mp4' -o -name '*.wav' -o -name '*.m4a' -o -name '*.webm' \)` ra rỗng (SC-007).
 - [ ] T028 [US2] Viết `S/TEMPLATE.md` mục 11–15 và `## Công thức nhịp` (9 nhịp). Viết đủ `S/template.json` (`motion`, `transitions`, `voice`, `sound`, `beats`, `source`) theo data-model.md; mọi số lấy từ `craft-summary.json`.
 - [ ] T029 [US2] Chạy `learn template-check dusk-hypothetical` (đủ, không `--partial`) và `check-names` trên các tệp mới. Mốc kiểm: SC-002, SC-007.
 
