@@ -219,19 +219,19 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
 
 ### Đợt 2: khung hình (bố cục, độ sâu, ánh sáng, bối cảnh, cảnh không khí)
 
-- [ ] T041 [US3] Sửa `K/camera.js` theo mục 3, 4, 12:
+- [X] T041 [US3] Sửa `K/camera.js` theo mục 3, 4, 12:
   - `frame: 'auto'` đặt chủ thể theo phân bố ô của cỡ cảnh; ECU lệch tâm hoặc cắt một mắt; vật tiền cảnh mờ;
   - độ sâu theo `focused_share` của cỡ cảnh;
   - `move` (`drift-h`, `drift-v`, `push`, `pull`, `follow`, `tilt`) có bắt đầu và dừng mềm; `auto` theo `motion.cam_by_scale` với hạt giống là mã cảnh.
 
   Test trong `K/test/camera.test.mjs`: vị trí máy theo `t`, tốc độ trong khoảng.
-- [ ] T042 [P] [US3] Sửa `K/stage.js` và `K/sets/*.js` theo mục 5, 6, 10:
+- [X] T042 [P] [US3] Sửa `K/stage.js` và `K/sets/*.js` theo mục 5, 6, 10:
   - đèn chính ấm xiên, mảng sáng tối;
   - mỗi bối cảnh có bộ đạo cụ kể chuyện (thêm phần vào `K/sets/parts.js`);
   - cảnh đêm và báo động cách điệu theo bằng chứng.
 
   Kiểm độ sáng và bão hoà của 8 bối cảnh vẫn trong khoảng (SC-001 của 022).
-- [ ] T043 [US3] Chụp và `learn pairs --batch 2` cho bố cục theo từng cỡ cảnh, độ sâu, ánh sáng, từng bối cảnh, cảnh đêm và báo động; `page clip` cho máy trôi, đẩy, bám.
+- [X] T043 [US3] Chụp và `learn pairs --batch 2` cho bố cục theo từng cỡ cảnh, độ sâu, ánh sáng, từng bối cảnh, cảnh đêm và báo động; `page clip` cho máy trôi, đẩy, bám.
 - [ ] T044 [US3] **Đợt duyệt 2**, như T040.
 
 ### Đợt 3: đồ hoạ (thẻ số liệu, thẻ tiêu đề, thẻ cuối)

@@ -88,6 +88,12 @@ export function makeCrowd({ n = 0, slots, area, seed = 1, bob = true, scale = 1 
     for (const [d, i] of dist) {
       const p = people[i], y0 = p.y || 0, b = bob ? 0.012 * Math.sin(t * 2.4 + p.phase) : 0;
       let f = figures.get(i);
+      if (d < 1.1) {                                     // right at the lens: a black disc, not a soft head (specs/023)
+        if (f) f.group.visible = false;
+        for (const m of Object.values(parts)) m.setMatrixAt(i, hide);
+        pos.set([0, -999, 0], i * 3);
+        continue;
+      }
       if (near.has(i)) {
         if (!f) { f = makeFigure({ ...p, scale }); figures.set(i, f); group.add(f.group); f.face(p.face); }
         f.group.visible = true; f.group.position.set(p.x, y0 + b, p.z); f.group.rotation.y = p.ry || 0;

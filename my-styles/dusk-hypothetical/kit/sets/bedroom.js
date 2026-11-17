@@ -1,6 +1,6 @@
 // Bedroom at dusk: bed, desk with a lamp, a window with the skyline, a shelf grid of books, posters, fairy lights.
 import * as THREE from 'three';
-import { floor, wall, ceiling, box, lamp, stringLights, windows, desk, chair, mesh, mulberry, plant } from './parts.js';
+import { backpack, box, ceiling, chair, desk, floor, lamp, laptop, mesh, mulberry, plant, poster, stringLights, wall, windows } from './parts.js';
 
 export function build() {
   const g = new THREE.Group(), lights = [];
@@ -28,6 +28,10 @@ export function build() {
   stringLights(g, { x0: -3.3, x1: 3.3, y: 2.85, z: -4.8, n: 30, sag: 0.3 });
   plant(g, 3.0, -1.0, { h: 0.8 });
   lamp(g, lights, { x: -1.0, y: 2.9, z: -1.5, r: 0.18, color: '#ffe0b8', power: 2.6, range: 7 });
+  // story props: posters over the bed, a glowing laptop, a bag on the floor (TEMPLATE.md §6)
+  poster(g, -2.6, 1.9, -2.95, { seed: 3 }); poster(g, -1.8, 2.0, -2.95, { seed: 5, w: 0.5, h: 0.7 });
+  laptop(g, 2.0, 0.78, -1.9, { ry: -0.3 });
+  backpack(g, 0.9, -1.4, { color: '#4f8f4a', ry: 0.4 });
   return {
     group: g, lights, room: { x0: -3.3, x1: 3.3, z0: -4.8, z1: 3.5, y1: 2.85 },
     anchors: { hero: { x: 0, y: 0, z: -1, ry: 0 }, heroSeat: { x: -2.15, z: -2.4, ry: 1.2, seat: 0.61 }, extras: [{ x: 1.0, y: 0, z: -2.2, ry: -0.4 }, { x: -1.2, y: 0, z: -1.6, ry: 0.4 }], crowd: { area: { x0: -2, x1: 2, z0: -3, z1: -1.5 } }, fg: [{ x: 2.4, y: 0.9, z: 1.2 }] },

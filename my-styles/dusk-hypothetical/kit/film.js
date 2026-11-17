@@ -3,13 +3,13 @@
 // DUR, SHOTS, CARDS, CUES, TEXTS(t), render(t), READY, and reads CLEAN and SUBJECT on every frame.
 import * as THREE from 'three';
 import { makeStage } from './stage.js';
-import { plan, sceneAt, camName, CATALOG } from './plan.js';
+import { plan, sceneAt, camName, CATALOG, mulberry } from './plan.js';
 import { SETS } from './sets/index.js';
 import * as parts from './sets/parts.js';
 import { makeFigure } from './figure.js';
 import { actState, blinkOn, talkOn, breath, riseOf } from './acting.js';
 import { makeCrowd, lookOf } from './crowd.js';
-import { place } from './camera.js';
+import { place, frameX } from './camera.js';
 import { drawGfx, drawCue, area, SERIF, SANS } from './graphics.js';
 
 export { plan, CATALOG };
@@ -92,6 +92,10 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
     for (const [, o] of built) o.group.visible = o === set;
     const [fn, ff] = set.fog || [8, 24]; scene.fog.near = fn; scene.fog.far = ff;   // big places see further
     stage.grade(s.mood || 'dusk', { ...(set.grade || {}), ...(s.grade || {}) });   // set default, then the scene
+    if (s.mood === 'alarm') {                // the alarm light pulses red about once a second (v02 strip S097; TEMPLATE.md §10)
+      const pulse = 0.7 + 0.3 * Math.sin(t * Math.PI * 2 * 1.1);
+      stage.lights.front.intensity *= pulse; stage.lights.rim.intensity *= pulse; stage.lights.hemi.intensity *= 0.85 + 0.15 * pulse;
+    }
 
     // cast
     const used = [], shown = new Set(), heads = [];
@@ -130,8 +134,14 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
     const camOpts = typeof s.cam === 'object' ? s.cam : {};
     const subj = heads[camOpts.subject ?? -1] || heads.find((h) => h.who === 'hero') || heads[0] ||
       { head: new THREE.Vector3(set.anchors.hero.x, (set.anchors.hero.y || 0) + 1.57, set.anchors.hero.z), facing: set.anchors.hero.ry || 0 };
-    const cp = place(cam, camName(s.cam), subj.head, subj.facing, camOpts, k, set.room);
-    stage.focus(cp.focus, cp.aper); stage.aim(new THREE.Vector3(subj.head.x, 0, subj.head.z));
+    // specs/023: the scene's camera move, where the subject sits, and the side the light comes from, all seeded by the scene
+    const rand = mulberry([...s.id].reduce((h, ch) => (h * 33 + ch.charCodeAt(0)) | 0, 7) >>> 0);
+    const scale = (CATALOG.cams[camName(s.cam)] || {}).scale;
+    const fx = frameX(s.frame, scale, template, rand);
+    const raking = (template && template.light && template.light.raking) ?? 0.55;
+    const lightSide = s.light ?? (rand() < raking ? (rand() < 0.5 ? -1 : 1) : 0);
+    const cp = place(cam, camName(s.cam), subj.head, subj.facing, { ...camOpts, move: s._move, lt, dur: s.dur, fx }, k, set.room);
+    stage.focus(cp.focus, cp.aper); stage.aim(new THREE.Vector3(subj.head.x, 0, subj.head.z), lightSide);
     // over the shoulder: the hero is the soft shoulder in front when the hero is in the shot but not its subject
     const heroFront = cp.shoulder && subj.who !== 'hero' && heroFig.group.visible;
     shoulder.group.visible = !!cp.shoulder && !heroFront;
