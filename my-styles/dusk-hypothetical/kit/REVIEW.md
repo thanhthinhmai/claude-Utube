@@ -4,7 +4,7 @@ Bảng so nằm trong `references/dusk-hypothetical-3/pairs/<đợt>/` (ngoài g
 
 | Đợt | Thành phần | Lần | Ngày | Quyết định | Ghi chú của người dùng |
 |---|---|---|---|---|---|
-| 1 | mặt (`faces.jpg`) | 1 | 2026-11-17 | chờ duyệt | |
-| 1 | thân áo (`bodies.jpg`) | 1 | 2026-11-17 | chờ duyệt | |
-| 1 | đám đông (`crowds.jpg`) | 1 | 2026-11-17 | chờ duyệt | |
-| 1 | diễn xuất (`acting.jpg`, `acting*.mp4`) | 1 | 2026-11-17 | chờ duyệt | |
+| 1 | mặt (`faces.jpg`) | 1 | 2026-11-17 | duyệt | "Duyệt" (cả đợt) |
+| 1 | thân áo (`bodies.jpg`) | 1 | 2026-11-17 | duyệt | "Duyệt" (cả đợt) |
+| 1 | đám đông (`crowds.jpg`) | 1 | 2026-11-17 | duyệt | "Duyệt" (cả đợt) |
+| 1 | diễn xuất (`acting.jpg`, `acting*.mp4`) | 1 | 2026-11-17 | duyệt | "Duyệt" (cả đợt) |
