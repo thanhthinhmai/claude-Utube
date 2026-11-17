@@ -34,6 +34,8 @@ const SCENES = [
 | `window.CAST` | `[[t0, t1, id, số người trong khung]]`, cho luật `still_person` |
 | `window.MOVES` | `[[t0, t1, id, loại máy, số động tác]]`, ghi lại lựa chọn `auto` để người làm phim đọc |
 
+Trang đọc thêm `window.SUBJECT` (công cụ đặt, như `CLEAN`): khi `true` thì không vẽ đám đông, chỉ còn dàn diễn viên của cảnh. Tầng 2 bật cả `CLEAN` và `SUBJECT` khi chụp khung cho luật `still_person`, để phụ đề, thẻ, số đếm và đám đông nhún nhẹ không bị tính là nhân vật cử động (người dùng chọn 2026-11-17).
+
 ## Âm thanh và nhịp đọc (`kit/sound/`, Python, chạy ngoài trang)
 
 | Tệp | Việc |

@@ -1,6 +1,6 @@
 // Film kit entry (specs/022, contracts/kit-api.md): a page writes a scene table and calls film({scenes}); this
 // builds the frame for any t and exports the library's page contract and specs/020's film-page contract:
-// DUR, SHOTS, CARDS, CUES, TEXTS(t), render(t), READY, and reads CLEAN on every frame.
+// DUR, SHOTS, CARDS, CUES, TEXTS(t), render(t), READY, and reads CLEAN and SUBJECT on every frame.
 import * as THREE from 'three';
 import { makeStage } from './stage.js';
 import { plan, sceneAt, camName, CATALOG } from './plan.js';
@@ -123,7 +123,8 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
 
     // crowd (slots already taken by the cast are left out)
     for (const [, cr] of crowds) cr.group.visible = false;
-    if (s.crowd && s.crowd.n > 0) {
+    // window.SUBJECT (specs/023): the motion check reads the cast only; crowds stay frozen in the style and are left out
+    if (s.crowd && s.crowd.n > 0 && !window.SUBJECT) {
       const key = `${s.id}|${s.set}|${s.crowd.n}|${s.crowd.seed ?? 1}`;
       let cr = crowds.get(key);
       if (!cr) {
