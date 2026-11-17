@@ -7,6 +7,7 @@ import { plan, sceneAt, camName, CATALOG } from './plan.js';
 import { SETS } from './sets/index.js';
 import * as parts from './sets/parts.js';
 import { makeFigure } from './figure.js';
+import { actState, blinkOn, talkOn, breath, riseOf } from './acting.js';
 import { makeCrowd, lookOf } from './crowd.js';
 import { place } from './camera.js';
 import { drawGfx, drawCue, area, SERIF, SANS } from './graphics.js';
@@ -28,8 +29,11 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
   }
   hero = { ...CATALOG.hero_default, ...(hero || {}) };
   const cueRows = typeof cues === 'string' ? (await readJSON(cues)) || [] : cues || [];
-  const P = plan(scenes, cueRows);
-  Object.assign(window, { DUR: P.DUR, SHOTS: P.SHOTS, CARDS: P.CARDS, CUES: P.CUES });
+  // the style's measures (specs/023): copied into the film's kit by "kit use"; beside the kit in my-styles
+  const template = (await readJSON(new URL('./template.json', import.meta.url))) || (await readJSON(new URL('../template.json', import.meta.url)));
+  const P = plan(scenes, cueRows, CATALOG, template);
+  const RISE = riseOf(template);
+  Object.assign(window, { DUR: P.DUR, SHOTS: P.SHOTS, CARDS: P.CARDS, CUES: P.CUES, CAST: P.CAST, MOVES: P.MOVES });
 
   const stage = makeStage(size || [innerWidth, innerHeight]);
   const A = { ...area(stage.W, stage.H), under: stage.ctx };
@@ -98,8 +102,24 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
       f.group.position.set(slot.x, slot.y || 0, slot.z); f.group.rotation.y = slot.ry || 0;
       f.group.scale.setScalar(c.scale || 1);
       const pose = c.pose === 'sit' ? 'sit' : c.pose || (slot.sit ? 'sit' : 'stand');
-      const j = f.pose(pose, lt, { sit: slot.sit, seat: slot.seat, turn: (c.turn || 0) * D2R, tilt: (c.tilt || 0) * D2R, nod: (c.nod || 0) * D2R, hold: c.hold });
-      f.face(c.face || 'dot');
+      // walking along a path (specs/023): position from the path at lt, facing the way it goes
+      if (c.path) {
+        const P0 = c.path, k2 = P0.findIndex((q) => q[0] > lt);
+        const [a, b] = k2 <= 0 ? (k2 === 0 ? [P0[0], P0[0]] : [P0.at(-2), P0.at(-1)]) : [P0[k2 - 1], P0[k2]];
+        const u = b[0] > a[0] ? Math.min(1, Math.max(0, (lt - a[0]) / (b[0] - a[0]))) : 1;
+        f.group.position.set(a[1] + (b[1] - a[1]) * u, slot.y || 0, a[2] + (b[2] - a[2]) * u);
+        if (b[1] !== a[1] || b[2] !== a[2]) f.group.rotation.y = Math.atan2(b[1] - a[1], b[2] - a[2]);
+        slot.x = f.group.position.x; slot.z = f.group.position.z; slot.ry = f.group.rotation.y;
+      }
+      // acting (specs/023, acting.js): act list, blinking, breathing, talking under the person's bubbles
+      const seed = c.who === 'hero' ? 1 : Number(c.who.slice(6)) + 2;
+      const st = actState(c.act || [], lt, RISE, { face: c.face });
+      const talk = c.talk || (s.gfx || []).filter((g) => g.type === 'bubble' && g.who === i)
+        .map((g) => [g.at ?? 0, Math.min((g.at ?? 0) + 1.2, g.until ?? s.dur)]);
+      const j = f.pose(pose, lt, { sit: slot.sit, seat: slot.seat, turn: (c.turn || 0) * D2R + st.turn, tilt: (c.tilt || 0) * D2R + st.tilt,
+        nod: (c.nod || 0) * D2R + st.pitch, hold: c.hold, breath: breath(seed, t),
+        mix: st.arms ? { from: st.from, to: st.arms, w: st.w, wave: st.wave } : null });
+      f.face(st.face || c.face || 'dot', { blink: c.blink !== false && blinkOn(seed, t, (c.blink && c.blink.every) || [2, 5]), talk: talkOn(talk, lt) });
       const head = new THREE.Vector3(0, (j.lift + 1.02) * (c.scale || 1), 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), slot.ry || 0).add(f.group.position);
       heads.push({ head, facing: slot.ry || 0, who: c.who });
     });

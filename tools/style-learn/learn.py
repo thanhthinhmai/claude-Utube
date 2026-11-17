@@ -160,6 +160,11 @@ def cmd_beats(a):
     return 1 if probs else 0
 
 
+def cmd_pairs(a):
+    from sl import pairs
+    return pairs.cli(a.set, a.batch, a.component, a.ours, a.ref, a.notes, a.clip, a.ref_strip, a.ref_seconds)
+
+
 def cmd_clean(a):
     from sl import save
     return save.clean(a.set, a.keep)
@@ -235,6 +240,13 @@ def main(argv=None) -> int:
 
     bt = sub.add_parser("beats", help="kiểm profile/beats.json (specs/023)")
     bt.add_argument("set"); bt.add_argument("--check", action="store_true", required=True); bt.set_defaults(fn=cmd_beats)
+
+    pr = sub.add_parser("pairs", help="bảng so bộ dựng | kênh mẫu (specs/023)")
+    pr.add_argument("set"); pr.add_argument("--batch", type=int, required=True, choices=(1, 2, 3, 4))
+    pr.add_argument("--component", required=True); pr.add_argument("--ours", nargs="+", required=True)
+    pr.add_argument("--ref", nargs="+", required=True); pr.add_argument("--notes", default="")
+    pr.add_argument("--clip"); pr.add_argument("--ref-strip"); pr.add_argument("--ref-seconds", type=float)
+    pr.set_defaults(fn=cmd_pairs)
 
     cs = sub.add_parser("craft-summary", help="gom số tay nghề của bộ: bố cục, độ sâu, ánh sáng; theo thời gian (specs/023)")
     cs.add_argument("set"); cs.add_argument("--parts", nargs="+", default=["look"], choices=("look", "time"))

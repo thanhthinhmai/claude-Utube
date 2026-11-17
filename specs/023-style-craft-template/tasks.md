@@ -192,12 +192,12 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
 
 ### Chung
 
-- [ ] T035 [US3] Chuẩn bị chung:
+- [X] T035 [US3] Chuẩn bị chung:
   - `learn pairs` trong `SL/pairs.py` và `learn.py` (contracts/cli.md, research R9): ≥ 3 cặp, dưới 3 thì mã 2; ảnh lưới `khung bộ dựng | khung mẫu`, có tên thành phần và số đo hai bên; với `--clip` thì mp4 hai nửa (trái là đoạn bộ dựng, phải là dải khung mẫu phát theo nhịp đo được, dựng từ ảnh), vào `R/pairs/<đợt>/`. Test trong `tests/learn/test_pairs.py`.
   - `page clip <phim> --from --to [--size]` trong `tools/filmcheck/cli.py` và `bin/studio`, dùng bộ ghi của specs/019 trên GPU, ≤ 10 s, ra `films/<phim>/.check/clips/`.
   - Phim nội bộ `films/kit-proof/` (trang có bảng cảnh chụp từng thành phần, có `channel attach` kênh `dusk-hypothetical`).
   - Tạo `K/REVIEW.md` theo data-model.md.
-- [ ] T036 [US3] Thêm vào `K/plan.js` phần kiểm trường mới (contracts/kit-api-v2.md):
+- [X] T036 [US3] Thêm vào `K/plan.js` phần kiểm trường mới (contracts/kit-api-v2.md):
   - `act` (động tác trong `catalog.acts`, thời điểm trong cảnh), `talk`, `path` (chỉ với `walk`), `blink`, `move` (`type` trong `catalog.moves`), `frame` (0–1), `trans` (`fade` ≤ 2 mỗi phim), `gfx.icon` trong `catalog.icons`;
   - xuất `CAST`, `MOVES`;
   - thêm `acts`, `moves`, `icons`, `trans` vào `K/catalog.json`;
@@ -205,7 +205,7 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
 
 ### Đợt 1: nhân vật (mặt, biểu cảm, áo, đám đông)
 
-- [ ] T037 [US3] Sửa `K/figure.js`, theo mục 1, 2, 11 của `TEMPLATE.md`:
+- [X] T037 [US3] Sửa `K/figure.js`, theo mục 1, 2, 11 của `TEMPLATE.md`:
   - mặt mới: mắt tròn có đốm sáng, mí cong mảnh, má hồng, miệng nhỏ; 8 biểu cảm vẽ lại;
   - thân hoodie thon có mũ trùm và tay áo;
   - chớp mắt 0,12 s theo hạt giống và `template.json`; thở;
@@ -214,7 +214,7 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
 
   Test trong `K/test/figure.test.mjs`: góc khớp đúng theo `t`, gọi đảo thứ tự cho cùng kết quả.
 - [ ] T038 [P] [US3] Sửa `K/crowd.js` theo mục 7: người gần và vừa cùng kiểu thân áo mới; đám đông xa để mờ thành đốm qua độ sâu (dựa vào T042).
-- [ ] T039 [US3] Chụp `kit-proof` cho mặt, biểu cảm, áo, đám đông; `page clip` cho chớp mắt, tay giơ, mấp máy; `learn pairs --batch 1` cho từng thành phần. Xem bảng bằng mắt trước, sửa chỗ thấy sai.
+- [X] T039 [US3] Chụp `kit-proof` cho mặt, biểu cảm, áo, đám đông; `page clip` cho chớp mắt, tay giơ, mấp máy; `learn pairs --batch 1` cho từng thành phần. Xem bảng bằng mắt trước, sửa chỗ thấy sai.
 - [ ] T040 [US3] **Đợt duyệt 1**: gửi người dùng các bảng của T039 (đường dẫn trong máy, không gửi ra ngoài). Ghi quyết định vào `K/REVIEW.md`. Sửa tối đa 2 lần; lần 3 chưa duyệt thì dừng và hỏi.
 
 ### Đợt 2: khung hình (bố cục, độ sâu, ánh sáng, bối cảnh, cảnh không khí)

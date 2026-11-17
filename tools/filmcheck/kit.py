@@ -71,9 +71,13 @@ def _files(d: Path) -> list:
 
 
 def kit_hash(d: Path) -> str:
+    """Hash of the kit's files and of the style's template.json beside it (copied in with the kit, specs/023)."""
     h = hashlib.sha256()
     for p in _files(d):
         h.update(str(p.relative_to(d).as_posix()).encode() + b"\0" + p.read_bytes() + b"\0")
+    tpl = d.parent / "template.json"
+    if tpl.is_file():
+        h.update(b"template.json\0" + tpl.read_bytes() + b"\0")
     return h.hexdigest()
 
 
@@ -122,6 +126,8 @@ def use(root: Path, film_dir: Path, style: str = None, update: bool = False) -> 
             q = tmp / p.relative_to(src)
             q.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(p, q)
+        if (src.parent / "template.json").is_file():           # specs/023: the page reads the style's measures
+            shutil.copy2(src.parent / "template.json", tmp / "template.json")
         (tmp / ".from").write_text(json.dumps({"style": style, "sha256": sha,
                                                "at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}) + "\n",
                                    encoding="utf-8")

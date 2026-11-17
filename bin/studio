@@ -505,10 +505,33 @@ cmd_render() {
   exit $code
 }
 
+# page clip <phim> --from S --to S [--size WxH] [--fps N] (specs/023): a short clip (≤ 10 s) for comparison sheets,
+# drawn frame by frame with the library's still tool (same renderer) and joined by ffmpeg; out: films/<phim>/.check/clips/
+page_clip() {
+  film=${1:-}; shift || true
+  from=""; to=""; size=1280x720; fps=30
+  while [ $# -gt 0 ]; do case $1 in --from) from=$2; shift 2 ;; --to) to=$2; shift 2 ;; --size) size=$2; shift 2 ;; --fps) fps=$2; shift 2 ;;
+    *) echo "dùng: sh bin/studio page clip <phim> --from S --to S [--size WxH] [--fps N]" >&2; exit 2 ;; esac; done
+  [ -n "$film" ] && [ -n "$from" ] && [ -n "$to" ] || { echo "dùng: sh bin/studio page clip <phim> --from S --to S [--size WxH] [--fps N]" >&2; exit 2; }
+  [ -f "$ROOT/films/$film/index.html" ] || { echo "✗ không có phim \"$film\"" >&2; exit 2; }
+  len=$(awk -v a="$from" -v b="$to" 'BEGIN{print (b>a && b-a<=10)?1:0}')
+  [ "$len" = 1 ] || { echo "✗ đoạn phải dài 0–10 s (--from < --to)" >&2; exit 2; }
+  out="$ROOT/films/$film/.check/clips"; tmp="$out/.frames-$$"; mkdir -p "$tmp"
+  step=$(awk -v f="$fps" 'BEGIN{printf "%.6f", 1/f}')
+  render_env
+  (cd "$LIB" && node core/render/still.mjs "$ROOT/films/$film" --range "$from:$to:$step" --out "$tmp" --prefix c_ --size "$size" >/dev/null) || { rm -rf "$tmp"; exit 1; }
+  (cd "$tmp" && ls c_*.jpg) | sed 's/^c_//; s/\.jpg$//' | sort -g | awk -v d="$tmp" '{print "file '\''" d "/c_" $0 ".jpg'\''"}' > "$tmp/list.txt"
+  mp4="$out/$from-$to.mp4"
+  ffmpeg -v error -y -f concat -safe 0 -r "$fps" -i "$tmp/list.txt" -c:v libx264 -pix_fmt yuv420p -r "$fps" "$mp4" || { rm -rf "$tmp"; exit 1; }
+  rm -rf "$tmp"
+  echo "✓ $mp4"
+}
+
 # Công cụ trang của thư viện (still, events, readcheck) với cùng cách dựng hình
 cmd_page() {
   tool=${1:-}; film=${2:-}
-  case $tool in still | events | readcheck) ;; *) echo "dùng: sh bin/studio page still|events|readcheck <phim> [đối số…]" >&2; exit 2 ;; esac
+  [ "$tool" = clip ] && { shift; page_clip "$@"; return; }
+  case $tool in still | events | readcheck) ;; *) echo "dùng: sh bin/studio page still|events|readcheck|clip <phim> [đối số…]" >&2; exit 2 ;; esac
   [ -n "$film" ] || { echo "dùng: sh bin/studio page $tool <phim> [đối số…]" >&2; exit 2; }
   if [ -f "$ROOT/films/$film/index.html" ]; then dir="$ROOT/films/$film"; elif [ -f "$film/index.html" ]; then dir=$(CDPATH='' cd -- "$film" && pwd -P)
   else echo "✗ không có phim \"$film\" (cần films/<tên>/index.html)" >&2; exit 2; fi
