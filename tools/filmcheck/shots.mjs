@@ -112,8 +112,10 @@ if (job.sheet) {
   }
   // specs/023: frames inside each shot for the motion check (no measure, no sheet), 320×180
   const motion = [];
+  // window.CLEAN (contracts/film-page.md) leaves subtitles, cards and overlays out: the motion rule reads the scene,
+  // so a ticking counter or a new subtitle line does not count as the figures moving
   for (const f of job.motion || []) {
-    await ctx.p.evaluate((/** @type {number} */ t) => { /** @type {any} */ (window).render(t); }, f.t);
+    await ctx.p.evaluate((/** @type {number} */ t) => { const w = /** @type {any} */ (window); w.CLEAN = true; w.render(t); w.CLEAN = false; }, f.t);
     const file = path.join(job.out, 'motion', f.key + '.jpg');
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, await ctx.p.screenshot({ type: 'jpeg', quality: 92 }));
