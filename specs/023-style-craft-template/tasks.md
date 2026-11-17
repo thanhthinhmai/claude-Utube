@@ -213,7 +213,7 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
   - tất cả là hàm của `t`.
 
   Test trong `K/test/figure.test.mjs`: góc khớp đúng theo `t`, gọi đảo thứ tự cho cùng kết quả.
-- [ ] T038 [P] [US3] Sửa `K/crowd.js` theo mục 7: người gần và vừa cùng kiểu thân áo mới; đám đông xa để mờ thành đốm qua độ sâu (dựa vào T042).
+- [X] T038 [P] [US3] Sửa `K/crowd.js` theo mục 7: người gần và vừa cùng kiểu thân áo mới; đám đông xa để mờ thành đốm qua độ sâu (dựa vào T042).
 - [X] T039 [US3] Chụp `kit-proof` cho mặt, biểu cảm, áo, đám đông; `page clip` cho chớp mắt, tay giơ, mấp máy; `learn pairs --batch 1` cho từng thành phần. Xem bảng bằng mắt trước, sửa chỗ thấy sai.
 - [ ] T040 [US3] **Đợt duyệt 1**: gửi người dùng các bảng của T039 (đường dẫn trong máy, không gửi ra ngoài). Ghi quyết định vào `K/REVIEW.md`. Sửa tối đa 2 lần; lần 3 chưa duyệt thì dừng và hỏi.
 
