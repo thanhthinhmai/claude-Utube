@@ -244,7 +244,7 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
 
   Test trong `K/test/graphics.test.mjs` (tên icon trong danh mục đều vẽ được).
 - [X] T046 [US3] Chụp, `page clip` (thẻ vào), `learn pairs --batch 3`.
-- [ ] T047 [US3] **Đợt duyệt 3**, như T040.
+- [X] T047 [US3] **Đợt duyệt 3**, như T040.
 
 ### Đợt 4: chuyển động và âm thanh (diễn xuất, máy, chuyển cảnh, tiếng động, nhạc)
 
