@@ -148,6 +148,33 @@ class CliAndEvents(unittest.TestCase):
         got = json.loads(self.p.cli("job", "show", jid).stdout)
         self.assertEqual((got["step"], got["log"][0]["line"]), ("Xong", "Bắt đầu việc"))
 
+    def test_job_run_live_log_progress_and_step_handback(self):  # lines and N/M while running; Mix during Render
+        jid, _ = self.start_job()
+        env = {**os.environ, "STUDIO_LOG_FLUSH": "0.2"}
+        render = subprocess.Popen([PY, CLI, "job", "run", jid, "--step", "Render", "--", "sh", "-c",
+                                   "echo 'render: gpu'; echo '1/4 chunks  3s'; echo '2/4 chunks  6s';"
+                                   " sleep 3; echo '4/4 chunks  9s'"],
+                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+        show = lambda: json.loads(self.p.cli("job", "show", jid).stdout)   # noqa: E731
+        deadline = time.time() + 2.5
+        while time.time() < deadline and (show()["progress"] or {}).get("done") != 2:
+            time.sleep(0.1)
+        j = show()
+        self.assertEqual(j["progress"], {"done": 2, "total": 4})               # progress before the command ends
+        self.assertIn("render: gpu", [l["line"] for l in j["log"]])            # and its lines
+        self.assertIsNone(render.poll())
+        mix = subprocess.run([PY, CLI, "job", "run", jid, "--step", "Mix", "--", "echo", "mix.wav"],
+                             capture_output=True, text=True, timeout=30, env=env)
+        self.assertEqual(mix.returncode, 0)
+        j = show()
+        self.assertEqual(j["step"], "Render")                                  # handed back to the longer run
+        self.assertEqual(j["progress"], {"done": 2, "total": 4})
+        self.assertIn("Render (still running)", [l["line"] for l in j["log"]])
+        self.assertEqual(render.wait(10), 0)
+        j = show()
+        self.assertEqual((j["step"], j["progress"]), ("Render", {"done": 4, "total": 4}))
+        self.assertNotIn("runs", j)
+
     def test_job_run_heartbeat(self):  # research §8
         jid, _ = self.start_job()
         # an old time, not "now": WSL's clock can step back a second, and the check is only that `job run` writes
