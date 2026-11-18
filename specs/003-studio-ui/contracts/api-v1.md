@@ -12,6 +12,8 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 | `GET /health` | `{ok, version, app, root}` | `root`: project folder the server serves (the launcher only stops servers of its own project) |
 | `GET /jobs?status=&kind=` | `{jobs: [Job]}`, mới nhất trước | |
 | `GET /jobs/{id}` | `Job` kèm `reviews: [Review]` | `404 not_found` |
+| `GET /jobs/{id}/done` | việc làm phim: `{film, steps: [{key, label, state, progress?}], sections: {script, voice, shots, mix, render}}` (specs/025) | `404` (không phải việc làm phim, không có quyền) |
+| `GET /jobs/{id}/files/{path}` | một tệp của thư mục phim trong danh sách cho phép (`SCRIPT.md`, `SOURCES.md`, `lines.json`, `voices/l…wav`, `out/mix.wav`, `.check/review-r…json`, `.check/labels.json`, `.check/shots/…jpg`, `checks.json`, `CHECKS.md`), `Range` cho âm thanh (025) | `400 bad_name` (`..`, tuyệt đối, liên kết ra ngoài) · `404` |
 | `GET /reviews?status=pending` | `{reviews: [Review]}` | |
 | `GET /reviews/{id}` | `Review` kèm `summary_html`, `decision\|null` | `404` |
 | `POST /reviews/{id}/decision` body `{value, note?}` | `201 Decision` (`source: ui`) | `409 already_decided` · `422 note_required` · `422 value_not_allowed` · `404` |

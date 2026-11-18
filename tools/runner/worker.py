@@ -473,6 +473,9 @@ class Worker:
     def start(self, j: dict) -> None:
         work = self.work_dir(j["id"])
         (work / ".home").mkdir(parents=True, exist_ok=True)
+        film = (j.get("input") or {}).get("film")
+        if j["kind"] == "film" and film and not j.get("film_dir"):     # specs/025: the job page reads the parts done
+            jobs.update(j["id"], lambda x: x.__setitem__("film_dir", str((work / "films" / film).resolve())))
         for f in (".result.json", ".review_pending"):
             (work / f).unlink(missing_ok=True)
         s = quotas.settings()                                    # s["model"]: the studio's one model (specs/024)
