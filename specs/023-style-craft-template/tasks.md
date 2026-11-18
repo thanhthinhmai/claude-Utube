@@ -261,7 +261,7 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
   - sửa `tools/filmcheck/voicecheck.py` thêm luật `mispronounced` (mã dòng, chữ đúng, chữ nghe được, "thêm `say` cho dòng <id>").
 
   Test trong `tests/filmcheck/test_voicemake.py`.
-- [ ] T051 [US3] Dựng một cảnh mẫu 20–30 s ở `kit-proof` có đủ diễn xuất, máy, chuyển cảnh, nhạc, tiếng động.
+- [X] T051 [US3] Dựng một cảnh mẫu 20–30 s ở `kit-proof` có đủ diễn xuất, máy, chuyển cảnh, nhạc, tiếng động.
   - `page clip` từng đoạn; trộn tiếng bằng `K/sound/`.
   - `learn pairs --batch 4` với số đo của bộ dựng (chạy `motioncheck` trên clip) đặt cạnh số của kênh mẫu.
   - Ghi số âm thanh (tiếng động/phút, mức nhạc) cạnh số của kênh.

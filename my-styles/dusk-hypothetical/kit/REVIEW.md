@@ -17,3 +17,6 @@ Bảng so nằm trong `references/dusk-hypothetical-3/pairs/<đợt>/` (ngoài g
 | 3 | thẻ số liệu (`fact-cards.jpg`, `fact-card-*.mp4`) | 1 | 2026-11-18 | duyệt | "duyệt" (cả đợt) |
 | 3 | thẻ tiêu đề (`title-card.jpg`) | 1 | 2026-11-18 | duyệt | "duyệt" (cả đợt) |
 | 3 | thẻ cuối (`end-card.jpg`, `end-card.mp4`) | 1 | 2026-11-18 | duyệt | "duyệt" (cả đợt) |
+| 4 | chuyển cảnh và đổi trạng thái (`transitions.jpg`) | 1 | 2026-11-18 | chờ duyệt | |
+| 4 | diễn xuất và máy trong phim mẫu (`acting-camera-*.mp4`) | 1 | 2026-11-18 | chờ duyệt | |
+| 4 | âm thanh: nhạc tự soạn, tiếng động, nhịp đọc (`sample-with-sound.mp4`) | 1 | 2026-11-18 | chờ duyệt | |
