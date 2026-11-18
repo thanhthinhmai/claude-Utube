@@ -1,5 +1,6 @@
 """Sound effects on events (specs/023 FR-008, TEMPLATE.md §14), drawn by the library's core/audio/sfx.py.
-place(events, n) → (n, 2) float array; events are {type, t, d?}: pop (a graphic appears), count (a counter rolls for
+place(events, n) → (n, 2) float array; events are {type, t, d?}: pop (a fact card or the closing card appears; speech
+bubbles and still counters make no sound, studio rule chosen by the user on 2026-11-18), count (a counter rolls for
 d s), streak (a light-streak swap), whoosh (a cut with a move), step (a footfall), hit (an impact)."""
 import numpy as np
 from core.audio import sfx as X
@@ -10,8 +11,8 @@ def place(events: list, n: int, seed: int = 5) -> np.ndarray:
     X._rng = np.random.default_rng(seed)           # same events, same sound
     for e in events:
         t, kind = float(e["t"]), e["type"]
-        if kind == "pop":
-            X.add(fx, X.pop(.7), t, gain=.32); X.add(fx, X.ding(.4), t + .02, gain=.08)
+        if kind == "pop":                       # a fact card or the closing card appears: soft (studio rule, 2026-11-18)
+            X.add(fx, X.pop(.6), t, gain=.16); X.add(fx, X.ding(.3), t + .02, gain=.035)
         elif kind == "count":
             for k in range(int(float(e.get("d", 1.2)) / .08)):
                 X.add(fx, X.click(1.6, .5), t + k * .08, gain=.08, pan=.1)

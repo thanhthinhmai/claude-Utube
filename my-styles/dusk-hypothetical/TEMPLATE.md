@@ -222,8 +222,8 @@ Nhạc nền chạy liền suốt phim, kể cả dưới lời. Trong các kho�
 | độ lớn (LUFS) | −14 | −14,4 – −14,0 | sound-script §6.1 |
 
 Bằng chứng: v01/evidence/sfx-a.jpg, v04/evidence/sfx-b.jpg, v06/evidence/sfx-c.jpg
-Nên làm: nhạc nền liền suốt phim, giảm vừa đủ khi có lời; tiếng động cho mỗi việc trong cảnh (đạo cụ, đồ hoạ bật ra, số đếm); −14 LUFS, dải âm lượng hẹp.
-Không nên làm: khoảng lặng trống; nhạc tắt giữa phim; dùng nhạc của kênh mẫu hay nhạc bên ngoài.
+Nên làm: nhạc nền liền suốt phim, giảm vừa đủ khi có lời; tiếng động cho việc trong cảnh (đạo cụ, bước chân, số đếm đang chạy); một tiếng nhẹ khi thẻ số liệu hoặc thẻ cuối hiện, bong bóng thoại và số đếm đứng yên thì im lặng (luật của xưởng, người dùng chọn 2026-11-18: chưa có bằng chứng kênh mẫu phát tiếng mỗi khi đồ hoạ hiện); −14 LUFS, dải âm lượng hẹp.
+Không nên làm: khoảng lặng trống; nhạc tắt giữa phim; tiếng bụp mỗi lần một bong bóng hay con số hiện ra; dùng nhạc của kênh mẫu hay nhạc bên ngoài.
 Trong bộ dựng: `kit/sound/score.py`, `kit/sound/sfx.py`, `kit/sound/mix.py`, `events.json`
 
 ## 15. Nhịp đọc lời
