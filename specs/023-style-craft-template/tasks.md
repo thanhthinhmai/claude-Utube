@@ -236,14 +236,14 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
 
 ### Đợt 3: đồ hoạ (thẻ số liệu, thẻ tiêu đề, thẻ cuối)
 
-- [ ] T045 [US3] Sửa `K/graphics.js` và `K/film.js` theo mục 8, 9:
+- [X] T045 [US3] Sửa `K/graphics.js` và `K/film.js` theo mục 8, 9:
   - `stat` có `icon`: hình ẩn dụ vẽ bằng code, ≥ 8 icon trong `catalog.icons`;
   - thẻ tiêu đề và thẻ chương theo template;
   - `end-choice` chữ đậm, biểu tượng lựa chọn, dàn nhân vật 3D thật (`figure.js`) sau thẻ;
   - hiệu ứng vào thẻ theo thời gian đo được.
 
   Test trong `K/test/graphics.test.mjs` (tên icon trong danh mục đều vẽ được).
-- [ ] T046 [US3] Chụp, `page clip` (thẻ vào), `learn pairs --batch 3`.
+- [X] T046 [US3] Chụp, `page clip` (thẻ vào), `learn pairs --batch 3`.
 - [ ] T047 [US3] **Đợt duyệt 3**, như T040.
 
 ### Đợt 4: chuyển động và âm thanh (diễn xuất, máy, chuyển cảnh, tiếng động, nhạc)

@@ -14,3 +14,6 @@ Bảng so nằm trong `references/dusk-hypothetical-3/pairs/<đợt>/` (ngoài g
 | 2 | bối cảnh và đạo cụ (`sets-props.jpg`) | 1 | 2026-11-17 | duyệt | "duyệt" (cả đợt, 2026-11-18) |
 | 2 | cảnh không khí (`mood.jpg`) | 1 | 2026-11-17 | duyệt | "duyệt" (cả đợt, 2026-11-18) |
 | 2 | chuyển động máy (`camera-*.mp4`) | 1 | 2026-11-17 | duyệt | "duyệt" (cả đợt, 2026-11-18) |
+| 3 | thẻ số liệu (`fact-cards.jpg`, `fact-card-*.mp4`) | 1 | 2026-11-18 | chờ duyệt | |
+| 3 | thẻ tiêu đề (`title-card.jpg`) | 1 | 2026-11-18 | chờ duyệt | |
+| 3 | thẻ cuối (`end-card.jpg`, `end-card.mp4`) | 1 | 2026-11-18 | chờ duyệt | |

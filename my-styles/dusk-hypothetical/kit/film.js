@@ -66,6 +66,7 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
   };
   const shoulder = makeFigure({ hoodie: '#5a4a9a', hair: 'short', hairColor: '#1c1420' }); scene.add(shoulder.group);
   const crowds = new Map();
+  const endFigs = new Map();                 // the closing card's cast (specs/023)
 
   function castPlace(s, set, c, i, used) {
     const a = set.anchors; let slot;
@@ -142,6 +143,38 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
     const lightSide = s.light ?? (rand() < raking ? (rand() < 0.5 ? -1 : 1) : 0);
     const cp = place(cam, camName(s.cam), subj.head, subj.facing, { ...camOpts, move: s._move, lt, dur: s.dur, fx }, k, set.room);
     stage.focus(cp.focus, cp.aper); stage.aim(new THREE.Vector3(subj.head.x, 0, subj.head.z), lightSide);
+    // closing card (TEMPLATE.md §9): the episode's cast as real figures in a row along the bottom of the picture,
+    // facing the camera, popping in one by one, each with a small act; the card's 2D parts draw over them
+    const end = (s.gfx || []).find((g) => g.type === 'end-choice' && lt >= (g.at ?? 0));
+    for (const f of endFigs.values()) f.group.visible = false;
+    let endFocus = 0;
+    const stool = set.group.getObjectByName('stool'); if (stool) stool.visible = !end;
+    if (end) {
+      const list = end.cast || ['#d9b23a', '#3f9a9a', '#c0423e', '#7a5cc0', '#4f8f4a', '#d9608c'];
+      // each figure stands on the floor where the view through the bottom of the picture meets it, a third of the picture high
+      const onFloor = (nx) => {
+        const p = new THREE.Vector3(nx, -0.72, 0.5).unproject(cam), dir = p.sub(cam.position).normalize();
+        if (dir.y > -0.02) return null;
+        return cam.position.clone().addScaledVector(dir, -cam.position.y / dir.y);
+      };
+      list.forEach((look, i) => {
+        const key = typeof look === 'string' ? look : JSON.stringify(look);
+        if (!endFigs.has(key)) { const f = makeFigure(typeof look === 'string' ? { hoodie: look } : look); scene.add(f.group); endFigs.set(key, f); }
+        const f = endFigs.get(key), born = (end.at ?? 0) + 0.25 + i * 0.12, u = Math.min(1, Math.max(0, (lt - born) / 0.18));
+        if (u <= 0) return;
+        const nx = list.length > 1 ? -0.62 + (1.24 * i) / (list.length - 1) : 0;
+        const p0 = onFloor(nx); if (!p0) return;
+        const dist = p0.distanceTo(cam.position), vis = 2 * dist * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
+        f.group.visible = true; f.group.position.copy(p0); f.group.position.y += 0.15 * (1 - u) * (1 - u);
+        f.group.rotation.y = Math.atan2(cam.position.x - p0.x, cam.position.z - p0.z); f.group.scale.setScalar((0.24 * vis) / 1.95);
+        endFocus = dist;
+        const act = ['wave', 'cheer', 'raise-hand', 'shrug-up', 'point', 'hands-face'][i % 6];
+        const st = actState([[born + 0.2, act]], lt, RISE);
+        f.pose('stand', lt, { mix: st.arms ? { to: st.arms, w: st.w, wave: st.wave } : null, breath: breath(i + 40, t) });
+        f.face(['happy', 'dot', 'wow', 'half'][i % 4], { blink: blinkOn(i + 40, t) });
+      });
+    }
+    if (endFocus) stage.focus(endFocus, 2.5);           // the closing card's figures are sharp
     // over the shoulder: the hero is the soft shoulder in front when the hero is in the shot but not its subject
     const heroFront = cp.shoulder && subj.who !== 'hero' && heroFig.group.visible;
     shoulder.group.visible = !!cp.shoulder && !heroFront;
@@ -184,7 +217,7 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
           const v = heads[g.who].head.clone().add(new THREE.Vector3(0, 0.45, 0)).project(cam);
           anchor = [(v.x + 1) / 2 * stage.W + 40 * A.u * (g.left ? -1 : 1), Math.max(A.y0 + 90 * A.u, (1 - v.y) / 2 * stage.H)];
         }
-        boxes.push(...drawGfx(ctx, g, lt - at, A, { anchor }));
+        boxes.push(...drawGfx(ctx, g, lt - at, A, { anchor, cast3d: true }));
       }
       const cue = P.CUES.find(([a, b]) => t >= a && t < b);
       if (cue) drawCue(ctx, cue[2], A);          // subtitles are declared in CUES, not in TEXTS (tier 2 checks other text against them)
