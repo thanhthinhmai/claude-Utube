@@ -192,7 +192,7 @@ async def run() -> int:
         disallowed_tools=["WebFetch"],          # pages open through the proxy: `studio web fetch` (specs/010 R4)
         permission_mode="acceptEdits",
         hooks={"PreToolUse": [HookMatcher(matcher="|".join(WRITE_TOOLS), hooks=[guard_writes])]},
-        model=inp.get("model") or os.environ.get("STUDIO_MODEL"),
+        model=os.environ.get("STUDIO_MODEL") or inp["model"],     # specs/024: the studio's one model, always given
         max_turns=MAX_TURNS,
         max_buffer_size=MAX_BUFFER,
         resume=(resume or {}).get("session") or None,

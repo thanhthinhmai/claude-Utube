@@ -924,7 +924,8 @@ def get_settings(request: Request):
     admin(request)
     s = quotas.settings()
     key = yt_topics.read_online_key(db.data_dir())        # specs/013: never the key itself
-    return {**s, "youtube_key_set": bool(key), "youtube_key_last4": key[-4:] if key else None,
+    return {**s, "models": [{"id": k, "name": v} for k, v in quotas.models()["allowed"].items()],   # specs/024
+            "youtube_key_set": bool(key), "youtube_key_last4": key[-4:] if key else None,
             "youtube_units_today": yt_topics.online_usage(db.data_dir(), s.get("youtube_daily_units", 9000)).today()}
 
 

@@ -684,9 +684,18 @@ def cmd_youtube_key(a, topics, channels):
 
 
 # ---------- config ----------
-def cmd_editor_model(a) -> int:
-    editor.set_editor_model(a.value)
-    print(f"✓ script editor model: {a.value}" + (" (same as the film)" if a.value == "inherit" else ""))
+def cmd_model(a) -> int:
+    """specs/024: the studio's one Claude model; no value prints it."""
+    from filmcheck import models
+    if a.value is None:
+        print(models.current())
+        return 0
+    try:
+        models.set_model(a.value)
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return 2
+    print(f"model: {a.value}")
     return 0
 
 
@@ -1103,15 +1112,15 @@ def parser() -> argparse.ArgumentParser:
 
     c = sub.add_parser("config", help="local settings").add_subparsers(dest="cmd", required=True)
     c.add_parser("youtube-key", help="save your YouTube Data API key (typed in, not shown)")
-    s = c.add_parser("editor-model")
-    s.add_argument("value", choices=list(editor.MODELS))
+    s = c.add_parser("model", help="the studio's one Claude model (specs/024); no value prints it")
+    s.add_argument("value", nargs="?")
     s = c.add_parser("render", help="auto: GPU when the machine can (specs/019); software: never the GPU")
     s.add_argument("value", choices=list(editor.RENDER_SETTINGS))
     return p
 
 
 COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("script", "status"): cmd_status,
-            ("script", "skip"): cmd_skip, ("web", "fetch"): cmd_fetch, ("config", "editor-model"): cmd_editor_model, ("config", "render"): cmd_render_setting,
+            ("script", "skip"): cmd_skip, ("web", "fetch"): cmd_fetch, ("config", "model"): cmd_model, ("config", "render"): cmd_render_setting,
             ("qc", "qc"): cmd_qc, ("publish", "publish"): cmd_publish,
             ("qc-plan", "qc-plan"): cmd_qc_plan, ("render-gate", "render-gate"): cmd_render_gate,
             ("qc-shots", "qc-shots"): cmd_qc_shots, ("qc-accept-style", "qc-accept-style"): cmd_qc_accept_style,

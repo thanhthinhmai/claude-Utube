@@ -7,13 +7,12 @@ import os
 import tempfile
 from pathlib import Path
 
-from filmcheck import editor
+from filmcheck import editor, models
 
 SCALES = ["ecu", "cu", "med", "wide", "huge", "insert", "unknown"]
 ANGLES = ["eye", "low", "high", "top", "ots", "unknown"]
 ORDER = ["ecu", "cu", "med", "wide", "huge"]          # "one step" for the agreement check
 SHEETS_PER_CALL = 4
-MODEL = "claude-opus-5-5"     # every Claude call of the studio is Opus; STUDIO_LABELER_MODEL only for tests
 
 SYSTEM = """You are the studio's shot labeler. You look at contact sheets of video frames, one frame per shot, each cell
 captioned with its shot id, and label every listed shot. Judge only what you see in the pictures you are given; do
@@ -102,6 +101,7 @@ def _env():
             env["ANTHROPIC_BASE_URL"] = env["STUDIO_PROXY"]
         env.setdefault("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "1")
         env.pop("ANTHROPIC_API_KEY", None)
+    models.helper_env(env)
     return env
 
 
@@ -109,7 +109,7 @@ def _call(sheets: list, ids: list, hints: dict, timeout: int) -> tuple:
     import subprocess
     args = [editor.claude_bin(), "-p", "--system-prompt", SYSTEM, "--tools", "Read", "--allowedTools", "Read",
             "--json-schema", json.dumps(SCHEMA), "--output-format", "json", "--no-session-persistence",
-            "--model", os.environ.get("STUDIO_LABELER_MODEL") or MODEL]
+            "--model", models.current()]
     for _ in range(2):
         try:
             p = subprocess.run(args, input=prompt(sheets, ids, hints), capture_output=True, text=True, timeout=timeout,
@@ -124,10 +124,8 @@ def _call(sheets: list, ids: list, hints: dict, timeout: int) -> tuple:
             raise LabelError(f"the labeler could not run: {(p.stderr or '').strip()[-300:]}")
         got = _valid(out.get("structured_output"), ids)
         if got is not None:
-            want = os.environ.get("STUDIO_LABELER_MODEL") or MODEL
-            used = out.get("modelUsage") or {}
-            # Claude Code also lists small helper models it used; the label run is the one asked for, else the busiest
-            model = want if want in used or not used else max(used, key=lambda k: (used[k] or {}).get("outputTokens", 0))
+            want = models.current()
+            model = models.main_model(out, want)
             return got, model, out.get("usage") or {}
     raise LabelError("the labeler did not answer every shot in the asked form (twice)")
 

@@ -55,7 +55,8 @@ class QualityView(unittest.TestCase):
             self.assertEqual(res["errors"], [])
             for s in ("Script: pass", "fix rounds 1", "Silence in the narration", "Time after the last word"):
                 self.assertIn(s, res["quality"])
-            self.assertEqual(quotas.settings()["editor_model"], "sonnet")
+            self.assertEqual((res["models"], res["editorSelect"]), (["Opus 5.5"], 0))   # specs/024 SC-004
+            self.assertEqual(quotas.settings()["model"], "claude-opus-5-5")
         finally:
             web.close()
 

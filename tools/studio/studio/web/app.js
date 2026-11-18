@@ -1011,8 +1011,7 @@ const SETTING = [
   ["learn_max_videos", "Videos per learn", "int"], ["upload_max_mb", "Upload size (MB)", "int"],
   ["upload_max_minutes", "Upload length (minutes)", "int"], ["job_token_cap", "Token limit per job", "int"],
   ["concurrency", "Jobs at the same time", "int"],
-  ["review_timeout_days", "Stop a job after waiting (days)", "int"], ["model", "Claude model", "text"],
-  ["editor_model", "Script editor model", "choice", [["inherit", "Same as jobs"], ["opus", "Opus"], ["sonnet", "Sonnet"], ["haiku", "Haiku"]]],
+  ["review_timeout_days", "Stop a job after waiting (days)", "int"], ["model", "Claude model (every Claude call of the studio)", "model"],
 ];
 const SETTINGS_TABS = [["general", "General"], ["users", "Users"], ["usage", "Usage"], ["worker", "Worker"], ["tokens", "API tokens"], ["lessons", "Shared lessons"]];
 const ROLE = { admin: "Owner", customer: "Member" };
@@ -1032,8 +1031,11 @@ async function pageSettings(tab = "general") {
   if (tab === "usage") return settingsUsage(top);
   if (tab === "lessons") return settingsLessons(top);
   const st = await get("/admin/settings");
-  const input = ([k, label, t, choices]) => t === "choice"
-    ? `<label>${label}<select id="s-${k}">${/** @type {string[][]} */ (choices).map(([v, l]) => `<option value="${v}"${st[k] === v ? " selected" : ""}>${l}</option>`).join("")}</select></label>`
+  // specs/024: the model list comes from the server (tools/models.json), never typed
+  const pick = (/** @type {string} */ k, /** @type {string} */ label, /** @type {string[][]} */ choices) =>
+    `<label>${label}<select id="s-${k}">${choices.map(([v, l]) => `<option value="${esc(v)}"${st[k] === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
+  const input = ([k, label, t, choices]) => t === "model" ? pick(k, label, (st.models || []).map((m) => [m.id, m.name]))
+    : t === "choice" ? pick(k, label, choices)
     : `<label>${label}<input id="s-${k}" type="${t === "text" ? "text" : "number"}" ${t === "num" ? 'step="0.01"' : ""} value="${esc(st[k])}"></label>`;
   const ytKey = `<section class="panel card-pad" id="yt-key"><h2>YouTube key</h2>
     <p class="muted">For scoring topics with YouTube numbers (specs/013). The key is kept on the server and never shown again.
@@ -1055,7 +1057,7 @@ async function pageSettings(tab = "general") {
     const data = {};
     for (const [k, , t] of SETTING) {
       const el = field(`s-${k}`);
-      data[k] = t === "text" || t === "choice" ? el.value.trim() : Number(el.value);
+      data[k] = t === "text" || t === "choice" || t === "model" ? el.value.trim() : Number(el.value);
     }
     await send("PUT", "/admin/settings", data);
     return "Saved.";
