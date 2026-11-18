@@ -232,7 +232,7 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
 
   Kiểm độ sáng và bão hoà của 8 bối cảnh vẫn trong khoảng (SC-001 của 022).
 - [X] T043 [US3] Chụp và `learn pairs --batch 2` cho bố cục theo từng cỡ cảnh, độ sâu, ánh sáng, từng bối cảnh, cảnh đêm và báo động; `page clip` cho máy trôi, đẩy, bám.
-- [ ] T044 [US3] **Đợt duyệt 2**, như T040.
+- [X] T044 [US3] **Đợt duyệt 2**, như T040.
 
 ### Đợt 3: đồ hoạ (thẻ số liệu, thẻ tiêu đề, thẻ cuối)
 
