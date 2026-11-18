@@ -265,7 +265,7 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
   - `page clip` từng đoạn; trộn tiếng bằng `K/sound/`.
   - `learn pairs --batch 4` với số đo của bộ dựng (chạy `motioncheck` trên clip) đặt cạnh số của kênh mẫu.
   - Ghi số âm thanh (tiếng động/phút, mức nhạc) cạnh số của kênh.
-- [ ] T052 [US3] **Đợt duyệt 4**, như T040. Mốc kiểm: SC-004.
+- [X] T052 [US3] **Đợt duyệt 4**, như T040. Mốc kiểm: SC-004.
 
 ---
 
