@@ -1,7 +1,8 @@
 // specs/023 T037: acting is a pure function of time (act list, blink, talk, breath) and the arm blend of figure.js.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { actState, blinkOn, talkOn, breath, riseOf, ease, BLINK_S } from '../acting.js';
+import { actState, blinkOn, talkOn, breath, riseOf, ease, BLINK_S, blackAt, streakAt } from '../acting.js';
+import { check } from '../plan.js';
 import { joints, makeFigure } from '../figure.js';
 
 test('an arm act rises in the rise time, then holds', () => {
@@ -66,4 +67,27 @@ test('figure: every face, blinking and talking, builds without error', () => {
     f.face(name); f.face(name, { blink: true }); f.face(name, { talk: true });
   }
   f.pose('sit', 1.2, { mix: { to: 'hands-face', w: 0.7 }, breath: 1.01 });
+});
+
+test('transitions: a dip is black across the cut, a fade ramps; the swap streak peaks at its time (T068)', () => {
+  const TR = { dip_s: [0.117, 0.162], fade_s: [0.259, 0.267], streak_s: 0.15 };
+  const a = { dur: 2, trans: 'cut' }, b = { dur: 2, trans: 'dip' }, c = { dur: 2, trans: 'fade' };
+  assert.equal(blackAt(a, b, 1.96, TR), 1);              // the end of the scene before a dip
+  assert.equal(blackAt(b, null, 0.03, TR), 1);           // the start of the dipped scene
+  assert.equal(blackAt(b, null, 0.1, TR), 0);
+  assert.equal(blackAt(a, a, 1.99, TR), 0);              // a cut has no black
+  assert.ok(blackAt(a, c, 1.95, TR) > 0.5 && blackAt(a, c, 1.95, TR) < 1);
+  assert.ok(Math.abs(blackAt(c, null, 0.0, TR) - 1) < 1e-9);
+  assert.equal(blackAt(c, null, 0.2, TR), 0);
+  assert.equal(streakAt(1.0, 1.0, TR), 1);
+  assert.ok(streakAt(1.05, 1.0, TR) > 0 && streakAt(1.05, 1.0, TR) < 1);
+  assert.equal(streakAt(1.08, 1.0, TR), 0);
+});
+
+test('plan.check: light and swap', () => {
+  const S = (extra) => ({ id: 'A', dur: 2, set: 'void', cam: 'close', ...extra });
+  check([S({ light: 1 })]);
+  assert.throws(() => check([S({ light: 2 })]), /A: light is/);
+  check([S({ cast: [{ who: 'hero', act: [[0.5, 'swap']], swap: { hoodie: '#7a5cc0' } }] })]);
+  assert.throws(() => check([S({ cast: [{ who: 'hero', swap: { hoodie: '#7a5cc0' } }] })]), /A: swap is/);
 });

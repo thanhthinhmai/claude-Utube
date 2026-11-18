@@ -68,6 +68,7 @@ export function check(scenes, catalog = CATALOG) {
       if (!has(catalog.moves || [], type)) bad(`unknown move "${type}"`);
       if (typeof s.move === 'object' && s.move.speed !== undefined && !(s.move.speed > 0)) bad('move.speed must be > 0');
     }
+    if (s.light !== undefined && ![-1, 0, 1].includes(s.light)) bad('light is -1 (key from the left), 0 (soft) or 1 (from the right)');
     if (s.frame !== undefined && s.frame !== 'auto' && !(s.frame && s.frame.x >= 0 && s.frame.x <= 1 && s.frame.y >= 0 && s.frame.y <= 1)) bad('frame is "auto" or {x, y} in 0–1');
     if (s.trans !== undefined) { if (!has(catalog.trans || [], s.trans)) bad(`unknown trans "${s.trans}"`); if (s.trans === 'fade' && ++fades > FADES_MAX) bad(`more than ${FADES_MAX} fades in the film`); }
     if (s.crowd && !(Number.isInteger(s.crowd.n) && s.crowd.n >= 0 && s.crowd.n <= CROWD_MAX)) bad(`crowd.n must be 0–${CROWD_MAX}`);
@@ -114,7 +115,7 @@ const seedOf = (id) => { let h = 5381; for (const ch of String(id)) h = (h * 33 
 const between = (r, lo, hi) => lo + (hi - lo) * r;
 export function moveOf(scene, template = null, catalog = CATALOG) {
   const m = scene.move;
-  if (m && typeof m === 'object') return { type: m.type, speed: m.speed ?? null };
+  if (m && typeof m === 'object') return { type: m.type, speed: m.speed ?? null, drift: m.drift ?? null };
   if (typeof m === 'string' && m !== 'auto') return { type: m, speed: null };
   const scale = (catalog.cams[camName(scene.cam)] || {}).scale;
   const b = template && template.motion && template.motion.cam_by_scale && template.motion.cam_by_scale[scale];
@@ -122,8 +123,10 @@ export function moveOf(scene, template = null, catalog = CATALOG) {
   const r = mulberry(seedOf(scene.id));
   if (r() >= b.moving) return { type: 'still', speed: null };
   if (castOf(scene).some((c) => c.pose === 'walk') && r() < 0.6) return { type: 'follow', speed: b.drift_px_s ? between(r(), ...b.drift_px_s) : 20 };
-  if (r() < (b.push || 0) / b.moving) return { type: 'push', speed: b.zoom_pct_s ? between(r(), ...b.zoom_pct_s) : 2 };
-  if (r() < 0.5) return { type: 'pull', speed: b.zoom_pct_s ? between(r(), ...b.zoom_pct_s) : 2 };
+  // a push or pull also drifts a little, as the reference's dolly does (T065: motion720 counts shifts, not zoom)
+  const drift = () => (b.drift_px_s ? between(r(), b.drift_px_s[0] * 0.5, b.drift_px_s[0]) : 6) * (r() < 0.5 ? -1 : 1);
+  if (r() < (b.push || 0) / b.moving) return { type: 'push', speed: b.zoom_pct_s ? between(r(), ...b.zoom_pct_s) : 2, drift: drift() };
+  if (r() < 0.5) return { type: 'pull', speed: b.zoom_pct_s ? between(r(), ...b.zoom_pct_s) : 2, drift: drift() };
   return { type: 'drift-h', speed: b.drift_px_s ? between(r(), ...b.drift_px_s) : 16 };
 }
 

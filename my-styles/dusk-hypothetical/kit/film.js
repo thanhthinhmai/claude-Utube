@@ -7,7 +7,7 @@ import { plan, sceneAt, camName, CATALOG, mulberry } from './plan.js';
 import { SETS } from './sets/index.js';
 import * as parts from './sets/parts.js';
 import { makeFigure } from './figure.js';
-import { actState, blinkOn, talkOn, breath, riseOf } from './acting.js';
+import { actState, blinkOn, talkOn, breath, riseOf, blackAt, streakAt } from './acting.js';
 import { makeCrowd, lookOf } from './crowd.js';
 import { place, frameX } from './camera.js';
 import { drawGfx, drawCue, area, SERIF, SANS } from './graphics.js';
@@ -222,19 +222,13 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
     // transitions into and out of this scene (specs/023, TEMPLATE.md §13): a dip is ≈ 0.12 s of black across the cut,
     // a fade goes to black and back over ≈ 0.27 s; the lengths come from template.json → transitions
     const TR = (template && template.transitions) || {};
-    const dipH = ((TR.dip_s && TR.dip_s[0]) || 0.117) / 2, fadeH = ((TR.fade_s && TR.fade_s[1]) || 0.267) / 2;
-    const next = P.scenes[P.scenes.indexOf(s) + 1];
-    let black = 0;
-    if ((s.trans === 'dip' && lt < dipH) || (next && next.trans === 'dip' && s.dur - lt < dipH)) black = 1;
-    if (s.trans === 'fade' && lt < fadeH) black = Math.max(black, 1 - lt / fadeH);
-    if (next && next.trans === 'fade' && s.dur - lt < fadeH) black = Math.max(black, 1 - (s.dur - lt) / fadeH);
+    const black = blackAt(s, P.scenes[P.scenes.indexOf(s) + 1], lt, TR);
     if (black > 0) { stage.ctx.fillStyle = `rgba(0,0,0,${black})`; stage.ctx.fillRect(0, 0, stage.W, stage.H); }
     // the light-streak swap: a bright horizontal smear over the person for ≈ 0.15 s around the change (motion-depth §2.3)
-    const sH = (TR.streak_s || 0.15) / 2;
     for (const st of streaks) {
-      const d = Math.abs(lt - st.at); if (d >= sH) continue;
+      const a = streakAt(lt, st.at, TR); if (a <= 0) continue;
       const box = new THREE.Box3().setFromObject(st.fig.group), lo = box.min.clone().project(cam), hi = box.max.clone().project(cam);
-      const y0 = (1 - Math.max(lo.y, hi.y)) / 2 * stage.H, y1 = (1 - Math.min(lo.y, hi.y)) / 2 * stage.H, a = 1 - d / sH;
+      const y0 = (1 - Math.max(lo.y, hi.y)) / 2 * stage.H, y1 = (1 - Math.min(lo.y, hi.y)) / 2 * stage.H;
       const gr = stage.ctx.createLinearGradient(0, y0, 0, y1);
       gr.addColorStop(0, 'rgba(255,240,230,0)'); gr.addColorStop(0.5, `rgba(255,245,235,${0.95 * a})`); gr.addColorStop(1, 'rgba(255,240,230,0)');
       stage.ctx.fillStyle = gr; stage.ctx.fillRect(0, y0, stage.W, y1 - y0);

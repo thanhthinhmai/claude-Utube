@@ -67,3 +67,20 @@ export function talkOn(talk = [], lt = 0) {
 }
 
 export const breath = (seed, t) => 1 + 0.012 * Math.sin((t / 3.6) * Math.PI * 2 + (seed % 17));
+
+// transitions (TEMPLATE.md §13): how black the frame is at scene time lt — a dip is ≈ 0.12 s of black across the cut, a
+// fade goes to black and back over ≈ 0.27 s; tr = template.json → transitions
+export function blackAt(scene, next, lt, tr = {}) {
+  const dipH = ((tr.dip_s && tr.dip_s[0]) || 0.117) / 2, fadeH = ((tr.fade_s && tr.fade_s[1]) || 0.267) / 2;
+  let black = 0;
+  if ((scene.trans === 'dip' && lt < dipH) || (next && next.trans === 'dip' && scene.dur - lt < dipH)) black = 1;
+  if (scene.trans === 'fade' && lt < fadeH) black = Math.max(black, 1 - lt / fadeH);
+  if (next && next.trans === 'fade' && scene.dur - lt < fadeH) black = Math.max(black, 1 - (scene.dur - lt) / fadeH);
+  return black;
+}
+
+// the light-streak swap (motion-depth §2.3): its strength at lt for a swap at `at`, ≈ 0.15 s long
+export function streakAt(lt, at, tr = {}) {
+  const half = (tr.streak_s || 0.15) / 2, d = Math.abs(lt - at);
+  return d < half ? 1 - d / half : 0;
+}

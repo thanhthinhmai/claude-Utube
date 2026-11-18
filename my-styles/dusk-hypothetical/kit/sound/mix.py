@@ -55,19 +55,29 @@ def mix(film: str) -> str:
     sc = score.compose(beats, dur, tpl, seed=7)
     music[:len(sc)] += sc[:n]
     fx = fxmod.place([e for e in ev["ev"] if e["type"] != "voice"], n)
-    # duck the score under the voice (−9 dB while speaking, 80 ms smoothing)
+    # duck the score under the voice (−6 dB while speaking, 80 ms smoothing)
     env = np.abs(voice).mean(1)
     k = int(.08 * SR)
     sm = np.convolve(env, np.ones(k) / k, "same")
     speaking = sm > .02 * (sm.max() + 1e-9)
-    duck = np.where(speaking, 10 ** (-9 / 20), 1.0)
+    duck = np.where(speaking, 10 ** (-6 / 20), 1.0)
     duck = np.convolve(duck, np.ones(k) / k, "same")
     music *= duck[:, None]
-    # level: the score in the pauses sits at the style's level under the voice
+    # level: the score in the pauses sits at the style's level under the voice, beat by beat (template.json →
+    # beats.<beat>.music_db: louder in the gains, quieter in the cost), which also gives the mix the style's loudness range
     target = np.mean(((tpl.get("sound") or {}).get("music_under_voice_db")) or [-8.5, -3.3])
     v, mgap = rms(voice[speaking]), rms(music[~speaking])
     if v > 0 and mgap > 0:
         music *= (v * 10 ** (target / 20)) / mgap
+    per = (tpl.get("beats") or {})
+    gain = np.ones(n)
+    for name, a, b in beats:
+        db = (per.get(name) or {}).get("music_db")
+        if db is not None:
+            gain[int(a * SR):int(b * SR)] = 10 ** ((db - target) / 20)
+    w = int(.5 * SR)
+    gain = np.convolve(np.pad(gain, w, mode="edge"), np.ones(w) / w, "same")[w:-w]   # half-second ramps between beats
+    music *= gain[:, None]
     out = voice + music + fx
     out = np.stack([X.limit(out[:, c], .95) for c in (0, 1)], 1)
     fade = int(.4 * SR)
@@ -76,7 +86,7 @@ def mix(film: str) -> str:
     raw = os.path.join(film, "out", "mix-raw.wav")
     wavfile.write(raw, SR, (out * 32767).astype(np.int16))
     dst = os.path.join(film, "out", "mix.wav")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", raw, "-af", "loudnorm=I=-14:TP=-1:LRA=4:linear=true", "-ar", str(SR), dst], check=True)
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", raw, "-af", "loudnorm=I=-14:TP=-1:LRA=7:linear=true", "-ar", str(SR), dst], check=True)
     os.remove(raw)
     return dst
 

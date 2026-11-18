@@ -53,7 +53,10 @@ test('auto moves follow the style: same table, same moves; shares near the measu
   const push = a.filter((m) => m.type === 'push').length / a.length;
   assert.ok(Math.abs(moving - want.moving) < 0.07, `moving ${moving} vs ${want.moving}`);
   assert.ok(Math.abs(push - want.push) < 0.07, `push ${push} vs ${want.push}`);
-  for (const m of a.filter((m) => m.type === 'push')) assert.ok(m.speed >= want.zoom_pct_s[0] && m.speed <= want.zoom_pct_s[1]);
+  for (const m of a.filter((m) => m.type === 'push')) {
+    assert.ok(m.speed >= want.zoom_pct_s[0] && m.speed <= want.zoom_pct_s[1]);
+    assert.ok(Math.abs(m.drift) >= want.drift_px_s[0] * 0.5 - 1e-9 && Math.abs(m.drift) <= want.drift_px_s[0] + 1e-9, `drift ${m.drift}`);   // T065
+  }
   assert.deepEqual(moveOf(S('X'), null), { type: 'still', speed: null });  // no template: still
 });
 

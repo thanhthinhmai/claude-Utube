@@ -76,8 +76,8 @@ Các khoảng số mà máy đọc được. Mỗi số kèm nguồn.
 
 ```json
 {"version": 1, "set": "dusk-hypothetical-3",
- "motion": {"still_ratio": [0.72, 0.93], "motion720_p50": [0.008, 0.176],
-            "person_active_share_min": 0.06, "person_active_p10": 0.09,
+ "motion": {"still_ratio": [0.24, 0.84], "motion720_p50": [0.008, 0.176],
+            "still_person_min_s": 2.0, "dead_share_max": 0.055, "person_still_cam_active": [0.25, 1.0], "person_still_cam_none": 0.108,
             "cam_by_scale": {"wide": {"moving": 0.27, "px_s": [8, 40]}, "close": {"moving": 0.08, "px_s": [4, 16]}},
             "rise_s": [0.3, 0.6]},
  "transitions": {"cut": 0.96, "streak": 0.02, "dip": 0.01, "fade": 0.01, "streak_s": [0.12, 0.18], "fade_max_per_film": 2},
@@ -85,7 +85,7 @@ Các khoảng số mà máy đọc được. Mỗi số kèm nguồn.
  "voice": {"wpm": [150, 175], "pause_in": [0.10, 0.20], "pause_sent": [0.28, 0.50], "pause_para": [0.6, 1.2], "pre_number": [0.25, 0.45]},
  "sound": {"sfx_per_min": [6, 18], "music_under_voice_db": [-18, -10]},
  "beats": {"hook": {"shot_s": [1.2, 2.6], "cam_moving": 0.2, "music": "on", "tempo": [85, 100]}},
- "source": {"still_ratio": "profile/summary.json", "person_active_p10": "craft-summary.json → person.active_share.p10"}}
+ "source": {"motion": "craft-summary.json → motion", "motion.dead_share_max": "craft-notes: highest film 0.055"}}
 ```
 
 Các số trong mẫu trên chỉ minh hoạ; số thật lấy từ `craft-summary.json`.
@@ -120,12 +120,14 @@ Luật:
 | `act` | mỗi người trong `cast` | `[[giây trong cảnh, động tác], …]` | động tác trong `catalog.acts`; thời điểm nằm trong cảnh |
 | `path` | mỗi người | `[[giây, x, z], …]` | chỉ cho tư thế `walk` |
 | `talk` | mỗi người | `[[t0, t1], …]` | miệng mấp máy; mặc định theo bong bóng của người đó |
+| `swap` | mỗi người | `{hoodie, hair, hat, glasses}` | cần act `swap` |
+| `light` | cảnh | `-1`, `0`, `1` | bên của đèn chính; mặc định theo hạt giống |
 | `move` | cảnh | `{type, speed?}` hoặc `"auto"` | `type` trong `catalog.moves`; `auto` chọn theo `template.json` |
 | `trans` | cảnh | `cut\|streak\|dip\|fade` | `fade` ≤ 2 lần mỗi phim |
 | `frame` | cảnh | `{x, y}` hoặc `"auto"` | vị trí chủ thể theo tỉ lệ khung; `auto` theo phân bố ô của cỡ cảnh |
 | `icon` | gfx `stat` | tên | trong `catalog.icons` |
 
-Trang phim xuất thêm `window.CAST = [[t0, t1, id, số người]]` cho tầng 2.
+Trang phim xuất thêm `window.CAST = [[t0, t1, id, số người]]` cho tầng 2, và đọc `window.SUBJECT` (công cụ đặt: không vẽ đám đông khi chụp khung cho `still_person`).
 
 ## Phim (`films/<tên>/`, ngoài git)
 

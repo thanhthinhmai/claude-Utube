@@ -21,10 +21,13 @@ const SCENES = [
 | `cast[].talk` | `[[t0, t1]]` | lấy từ khoảng hiện bong bóng của người đó | miệng mấp máy 6–9 lần/s, biên độ ngẫu nhiên theo hạt giống |
 | `cast[].path` | `[[giây, x, z]]` | không | đi thật theo đường, chân theo bước; chỉ khi `pose: 'walk'` |
 | `cast[].blink` | `false` hoặc `{every: [a, b]}` | theo `template.json` | chớp mắt 0,12 s; thời điểm lấy từ hạt giống của người |
-| `move` | `'auto'`, `'still'`, hoặc `{type, speed}` với `type` trong `catalog.moves` (`drift-h`, `drift-v`, `push`, `pull`, `follow`, `tilt`) | `'auto'` | `auto` chọn theo tỉ lệ máy động và tốc độ của cỡ cảnh trong `template.json`, dùng hạt giống là mã cảnh; bắt đầu và dừng mềm |
+| `move` | `'auto'`, `'still'`, hoặc `{type, speed, drift?}` với `type` trong `catalog.moves` (`drift-h`, `drift-v`, `push`, `pull`, `follow`, `tilt`) | `'auto'` | `auto` chọn theo tỉ lệ máy động và tốc độ của cỡ cảnh trong `template.json`, dùng hạt giống là mã cảnh; đẩy vào và kéo ra kèm một độ trôi nhỏ (`drift` px/s, nửa đến một lần p25 của `drift_px_s`); bắt đầu và dừng mềm. Đẩy vào và kéo ra là thu phóng ống kính, trôi và ngửa là xoay máy; tốc độ là số `learn craft` sẽ đo được, `camera.js → MEASURE_CAL` bù phần phép đo đọc thiếu |
 | `frame` | `'auto'` hoặc `{x, y}` (0–1) | `'auto'` | vị trí chủ thể; `auto` theo phân bố ô nét của cỡ cảnh |
 | `trans` | `'cut'`, `'streak'`, `'dip'`, `'fade'` | `'cut'` | chuyển cảnh vào cảnh này, độ dài theo `template.json → transitions`; `plan.check` báo lỗi khi `fade` > 2 |
 | `gfx[].icon` | tên trong `catalog.icons` | không | hình ẩn dụ vẽ bằng code trên thẻ `stat` |
+| `gfx[type=stat].over` | `true` | không | thẻ đặt trên cảnh đã làm mờ và tối thay cho nền tím |
+| `light` | `-1`, `0`, `1` | theo hạt giống: ≈ `template.json → light.raking` số cảnh lệch một bên, trái và phải chia đều | đèn chính từ trái, mềm từ sau, hay từ phải |
+| `cast[].swap` | một bộ dạng `{hoodie, hair, hat, glasses}` | không | cần một act `swap`; từ lúc đó người này mặc bộ mới, vệt sáng 0,15 s phủ lúc đổi |
 | `gfx[type=end-choice].cast` | danh sách `who` | 4 người của phim | dàn nhân vật 3D thật đứng sau thẻ cuối |
 
 ## Trang xuất thêm

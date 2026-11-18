@@ -60,7 +60,8 @@ export function place(cam, name, head, facing = 0, opts = {}, k = 0, room = null
   const zoom = mv.type === 'push' ? Math.pow(1 + sp / 100, run) : mv.type === 'pull' ? Math.pow(1 + sp / 100, -run) : 1;
   const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad((opts.fov ?? c.fov) / 2)) * (16 / 9));
   const radPerPx = hfov / 1280;
-  const pan = mv.type === 'drift-h' ? sp * radPerPx * (run - runMid) : 0;
+  const pan = (mv.type === 'drift-h' ? sp * radPerPx * (run - runMid) : 0)
+    + (mv.drift ? mv.drift * MEASURE_CAL['drift-h'] * radPerPx * (run - runMid) : 0);   // a push or pull's small sideways drift (T065)
   const tiltA = (mv.type === 'drift-v' || mv.type === 'tilt') ? sp * radPerPx * run : 0;
   const drift = (opts.drift ?? 0) * (k - 0.5);                               // slow sideways drift in metres
   const pos = new THREE.Vector3(Math.sin(yaw) * d, 0, Math.cos(yaw) * d).add(head);

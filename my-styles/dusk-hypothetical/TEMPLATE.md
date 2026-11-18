@@ -228,7 +228,7 @@ Trong bộ dựng: `kit/sound/score.py`, `kit/sound/sfx.py`, `kit/sound/mix.py`,
 
 ## 15. Nhịp đọc lời
 
-Giọng đọc nhanh và liền, khoảng 140–200 từ mỗi phút, không chậm lại ở cao trào. Nghỉ giữa các từ trong câu ngắn, nghỉ cuối câu dài hơn một chút, nghỉ giữa đoạn dưới 0,75 s. Trước một con số có một khoảng nghỉ dài hơn nghỉ cuối câu, để con số đến như một nhịp nhấn. (Mốc từ lấy từ máy nhận dạng giọng, nên khoảng nghỉ trong câu có thể dài hơn thật một chút.)
+Giọng đọc nhanh và liền, khoảng 140–200 từ mỗi phút, không chậm lại ở cao trào. Nghỉ giữa các từ trong câu ngắn, nghỉ cuối câu dài hơn một chút, nghỉ giữa đoạn dưới 0,75 s. Trước một con số có một khoảng nghỉ dài hơn nghỉ cuối câu, để con số đến như một nhịp nhấn. (Mốc từ lấy từ máy nhận dạng giọng nên các khoảng nghỉ đo được dài hơn thật. `kit/sound/timing.py → fit` co tất cả cùng một hệ số, giữ thứ tự trước số > giữa đoạn > cuối câu > trong câu, cho tới khi khoảng lặng của giọng ≤ 20 % phim (luật của xưởng, specs/020); phim nhiều dòng ngắn co tới ≈ 0,35.)
 
 | Số đo | Giá trị | Khoảng | Nguồn |
 |---|---|---|---|

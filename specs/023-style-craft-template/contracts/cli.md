@@ -14,6 +14,7 @@ Mã thoát theo quy ước của xưởng: 0 đạt, 1 có lỗi cần sửa, 2 
 | `learn evidence <set> <vNN> <giây> --name <tên>` | trích một khung 640 px làm bằng chứng (video phải còn) | `profile/<v>/evidence/<tên>.jpg` |
 | `learn template-check <slug>` | kiểm `TEMPLATE.md`, `template.json` và nhãn luật của `STYLE.md` (contracts/template-format.md). In từng chỗ thiếu: mục, dòng, lý do | — |
 | `learn pairs <set> --batch <1-4> --component <tên> --ours <ảnh…> --ref <bằng chứng…> [--clip <mp4 của bộ dựng> --ref-strip <vNN/strips/Sxxx.jpg> --ref-measure <khoá>]` | bảng so: ≥ 3 cặp ảnh; với thành phần có chuyển động thì thêm đoạn mp4 hai nửa, kèm số đo hai bên. Dưới 3 cặp thì mã 2 | `pairs/<đợt>/<thành phần>.jpg`, `.mp4` |
+| `learn compare <set> --clip <mp4>` | đo đoạn video của khung chứng minh bằng `craft.py` theo khúc 2 s (máy đứng, motion720, phần có cử động) và so với `craft-summary.json → motion`; ghi `proof/clip-compare.json` |
 | `learn clean <set>` | (đã có) xoá video và âm thanh. Chạy khi học xong, kể cả khi dừng hay lỗi | — |
 
 `check-names` (đã có) được gọi thêm trên `TEMPLATE.md`, `template.json`, `kit/REVIEW.md`.
@@ -24,7 +25,7 @@ Mã thoát theo quy ước của xưởng: 0 đạt, 1 có lỗi cần sửa, 2 
 |---|---|
 | `voice make <phim>` | viết `voices/.say.json` (thay `text` bằng `say` ở dòng có `say`), gọi `tts.py` của thư viện, ra `voices/<id>.wav` và `voices/dur.json` như cũ. Bọc được trong `job run … --step "Voice"` |
 | `qc voice <phim>` (sửa) | thêm luật `mispronounced`: từ nghe được khác chữ của dòng (sau khi gập dấu, so theo `asr` nếu có), báo mã dòng, chữ đúng, chữ nghe được, cách sửa "thêm `say` cho dòng <id>" |
-| `qc shots <phim>` (sửa) | chụp thêm 4 khung/cảnh vào `.check/shots/motion/`. Luật `still_person` (chặn): cảnh có người mà tỉ lệ khối cử động < `template.json → motion.person_active_share_min`, báo mã cảnh, thời điểm, "thêm `act`, `move` hoặc `talk`". Luật cảnh báo phong cách `style_depth`: `focused_share` của cảnh ngoài khoảng của cỡ cảnh đó |
+| `qc shots <phim>` (sửa) | chụp thêm 4 khung/cảnh (20, 40, 60, 80 %) vào `.check/shots/motion/`, vẽ với `CLEAN` và `SUBJECT` (không phụ đề, thẻ, đám đông). Luật `still_person` (chặn): cảnh có người (`window.CAST`, hoặc ước theo nhãn tầng 2), máy đứng, không khối nào cử động, dài ≥ `template.json → motion.still_person_min_s` (2 s); báo mã cảnh, thời điểm, "thêm `act`, `move` hoặc `talk`". Cảnh báo `style_person_motion`: thời lượng các cảnh đó > `motion.dead_share_max`. Cảnh báo `style_depth`: `focused_share` ngoài khoảng của cỡ cảnh ± một ô |
 | `qc <phim>` (sửa, tầng 4) | thêm cảnh báo phong cách `style_still_ratio`, `style_motion720`, `style_person_motion`, `style_transitions` theo `template.json`; chấp nhận bằng `qc accept-style` như cũ |
 | `page clip <phim> --from <s> --to <s> [--size WxH]` | ghi một đoạn ngắn (≤ 10 s) của trang phim bằng bộ ghi của specs/019, dùng GPU, cho bảng so. Ra `films/<phim>/.check/clips/<from>-<to>.mp4` |
 

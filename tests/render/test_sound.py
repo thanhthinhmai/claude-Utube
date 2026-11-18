@@ -35,6 +35,20 @@ class Timing(unittest.TestCase):
         self.assertAlmostEqual(end, at["e"] + 1, places=3)
 
 
+class Fit(unittest.TestCase):
+    def test_fits_the_silence_rule_and_keeps_the_order(self):
+        lines = [{"id": f"l{i}", "para": i // 3, "text": "Ten words." if i % 4 == 3 else "A short line."} for i in range(30)]
+        spoken = {f"l{i}": 0.9 for i in range(30)}
+        at, end, k = timing.fit(lines, spoken, TPL, silence_max=0.19, tail=1.45)
+        self.assertLess(k, 1.0)
+        self.assertLessEqual((end + 1.45 - 27) / (end + 1.45), 0.19 + 1e-9)
+        g = lambda a, b: at[b] - at[a] - 0.9
+        self.assertGreater(g("l2", "l3"), g("l0", "l1"))          # a paragraph pause stays longer than a sentence pause
+        six = lines[:6]
+        at2, end2, k2 = timing.fit(six, {ln["id"]: 3.0 for ln in six}, TPL)
+        self.assertEqual(k2, 1.0)                                   # long lines: no need to shrink
+
+
 HAVE_LIB = (Path.cwd() / "core" / "audio" / "sampler.py").exists()
 
 
@@ -63,7 +77,13 @@ class ScoreAndMix(unittest.TestCase):
                 w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr); w.writeframes((v * 32767).astype(np.int16).tobytes())
             ev = {"dur": 8.0, "ev": [{"type": "voice", "id": "l1", "t": t0} for t0 in (0.5, 2.5, 4.5, 6.2)] + [{"type": "pop", "t": 1.8}]}
             (d / "events.json").write_text(json.dumps(ev))
+            (d / "beats.json").write_text(json.dumps([["benefit", 0, 4], ["cost", 4, 8]]))
             out = mix.mix(str(d))
+            import soundfile as sf
+            y, sr2 = sf.read(out)
+            r = lambda a, b: float(np.sqrt(np.mean(y[int(a * sr2):int(b * sr2)] ** 2)))
+            # the pauses (1.6–2.4 s in the benefit, 5.6–6.1 s in the cost): the cost's score sits lower (T067)
+            self.assertGreater(20 * np.log10(r(1.6, 2.4) / r(5.6, 6.1)), 3.0)
             r = subprocess.run(["ffmpeg", "-hide_banner", "-i", out, "-af", "ebur128", "-f", "null", "-"], capture_output=True, text=True)
             lufs = float([l for l in r.stderr.splitlines() if l.strip().startswith("I:")][-1].split()[1])
             self.assertAlmostEqual(lufs, -14.0, delta=1.0)
