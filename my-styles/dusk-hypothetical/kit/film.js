@@ -166,7 +166,7 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
       const list = end.cast || ['#d9b23a', '#3f9a9a', '#c0423e', '#7a5cc0', '#4f8f4a', '#d9608c'];
       // each figure stands on the floor where the view through the bottom of the picture meets it, a third of the picture high
       const onFloor = (nx) => {
-        const p = new THREE.Vector3(nx, -0.72, 0.5).unproject(cam), dir = p.sub(cam.position).normalize();
+        const p = new THREE.Vector3(nx, -0.46, 0.5).unproject(cam), dir = p.sub(cam.position).normalize();   // feet above the subtitle band
         if (dir.y > -0.02) return null;
         return cam.position.clone().addScaledVector(dir, -cam.position.y / dir.y);
       };

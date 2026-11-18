@@ -275,18 +275,18 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
 
 **Independent Test**: xem phim mới, `compare/`, `before-after.json`.
 
-- [ ] T053 [US5] Chuẩn bị phim:
+- [X] T053 [US5] Chuẩn bị phim:
   - `kit use hundred-words --update`;
   - sửa `films/hundred-words/build_plan.py` cho bảng cảnh dùng `act`, `talk`, `move`, `frame`, `trans`, `icon`, và mốc dòng theo `K/sound/timing.py` (bỏ `GAP_IN`, `GAP_PARA` tự đặt);
   - thêm `say` cho dòng có "hurt" trong `lines.json`;
   - chạy `voice make`, `voice asr`, `qc voice`. Kịch bản đã duyệt không đổi.
-- [ ] T054 [US5] Chạy `qc plan`, `qc shots` (lượt gán nhãn tầng 2 tốn tiền: hỏi người dùng trước), sửa tới khi 0 `still_person`; tầng 1 vẫn kiểm phụ đề in trên hình (FR-015), ghi lại kết quả. Rồi `render hundred-words --fps 60` (GPU; phần mềm thì dừng và hỏi) và `qc hundred-words`; nhạc và tiếng bằng `K/sound/`. Ghi thời gian dựng (mục tiêu ≤ 10 phút) vào `compare/before-after.json`.
-- [ ] T055 [US5] Lập `films/hundred-words/compare/`:
+- [X] T054 [US5] Chạy `qc plan`, `qc shots` (lượt gán nhãn tầng 2 tốn tiền: hỏi người dùng trước), sửa tới khi 0 `still_person`; tầng 1 vẫn kiểm phụ đề in trên hình (FR-015), ghi lại kết quả. Rồi `render hundred-words --fps 60` (GPU; phần mềm thì dừng và hỏi) và `qc hundred-words`; nhạc và tiếng bằng `K/sound/`. Ghi thời gian dựng (mục tiêu ≤ 10 phút) vào `compare/before-after.json`.
+- [X] T055 [US5] Lập `films/hundred-words/compare/`:
   - bảng ba cột (cũ từ T034 | mới | khung mẫu cùng cỡ cảnh) cho từng loại cảnh, bằng `learn pairs` với cột thứ ba;
   - `before-after.json` gồm `still_ratio`, `motion720_p50`, số cảnh `still_person`, `style_*`, LUFS, LRA của cũ và mới.
 
   Mốc kiểm: SC-005 nửa sau.
-- [ ] T056 [US5] Xem phim mới bằng mắt theo thời gian (khung qua nhiều thời điểm, không chỉ ảnh tĩnh), so với khung mẫu cùng loại cảnh, trước khi giao.
+- [X] T056 [US5] Xem phim mới bằng mắt theo thời gian (khung qua nhiều thời điểm, không chỉ ảnh tĩnh), so với khung mẫu cùng loại cảnh, trước khi giao.
 - [ ] T057 [US5] Giao người dùng: phim, bảng ba cột, bảng số. Ghi quyết định chấp nhận (SC-006).
 
 ---

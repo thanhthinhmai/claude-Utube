@@ -127,10 +127,10 @@ export function drawGfx(c, g, lt, a, extra = {}) {
         c.fillStyle = g2; c.fillRect(0, a.y0, a.W, a.y1 - a.y0); grain(c, a);
       }
       if (g.icon && ICONS[g.icon]) {
-        c.save(); const sc = easeOut(lt / 0.25); c.translate(a.W / 2, a.H * 0.4); c.scale(0.7 + 0.3 * sc, 0.7 + 0.3 * sc);
+        c.save(); const sc = easeOut(lt / 0.25); c.translate(a.W / 2, a.H * 0.36); c.scale(0.7 + 0.3 * sc, 0.7 + 0.3 * sc);
         ICONS[g.icon](c, 0, 0, 380 * u, Math.max(0, lt - 0.1)); c.restore();   // a third of the picture high (visual §11)
-        title(c, g.text || '', a.W / 2, a.H * 0.72, 72 * u, CREAM, a, boxes, id, 0.14, true);
-        if (g.sub) title(c, g.sub, a.W / 2, a.H * 0.8, 36 * u, CREAM, a, boxes, id + '.sub', 0.14);
+        title(c, g.text || '', a.W / 2, a.H * 0.64, 72 * u, CREAM, a, boxes, id, 0.14, true);   // above the subtitle band (0.82)
+        if (g.sub) title(c, g.sub, a.W / 2, a.H * 0.72, 36 * u, CREAM, a, boxes, id + '.sub', 0.14);
       } else {
         title(c, g.text || '', a.W / 2, a.H * 0.45, 120 * u, GOLD, a, boxes, id, 0.18, true);
         if (g.sub) title(c, g.sub, a.W / 2, a.H * 0.6, 46 * u, CREAM, a, boxes, id + '.sub', 0.14);

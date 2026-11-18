@@ -9,6 +9,8 @@ import os
 import subprocess
 import sys
 
+sys.dont_write_bytecode = True        # no __pycache__ in the film's kit: it would change the film's fingerprint
+
 import numpy as np
 from scipy.io import wavfile
 from scipy.signal import resample_poly
