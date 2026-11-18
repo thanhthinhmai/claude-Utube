@@ -76,6 +76,23 @@ sh bin/studio learn label <set> --pass 2 --sample 40                            
 - Báo người dùng độ nhất quán (`profile/agreement.json`): cùng cỡ cảnh, lệch không quá một bậc, cùng góc máy.
 - Bảng ảnh có nhãn và nhãn được giữ lại sau `clean`; khung cỡ lớn thì bị xoá.
 
+### 1c. Tay nghề theo thời gian: máy, cử động, chuyển cảnh, âm thanh (specs/023)
+
+Số trung bình của từng khung không cho biết máy đẩy vào hay nhân vật có diễn không. Chạy khi video còn trên máy, sau `transcribe` và `shots`:
+
+```sh
+sh bin/studio job run $JOB --step "Craft" -- sh bin/studio learn craft <set> --strips 80   # máy (dời, phóng, bám), cử động sau khi bù máy, chuyển cảnh; 80 dải khung
+sh bin/studio job run $JOB --step "Sound" -- sh bin/studio learn sound <set>              # nhịp đọc, nhạc trong khoảng nghỉ, tiếng động, tempo
+sh bin/studio learn evidence <set> <vNN> <giây> --name <tên>                             # khung lẻ 640 px làm bằng chứng (máy, âm thanh, nhịp đọc)
+```
+
+- Xem dải khung (`profile/<v>/strips/`) bằng mắt và ghi bảng loại động tác (đổi nét mặt, động tác tay, đạo cụ tự diễn, đồ hoạ dựng lên…), mỗi dòng có bằng chứng `vNN/strips/Sxxx.jpg#k`.
+- `still_ratio` cũ chỉ thấy máy dời; số máy đứng thật (không dời, không phóng) lấy từ `craft-summary.json → motion`.
+- Diễn xuất chỉ đọc trên cảnh máy đứng: máy đi trong cảnh 3D để lại phần dư do thị sai.
+- Tempo có độ tin cậy thấp thì ghi như gợi ý; số tiếng động là mức trần (có lẫn phách nhạc).
+- Đo xong thì xoá video ngay (bước 10), trước khi làm bộ dựng; dải khung và khung bằng chứng được giữ.
+- Học thêm một bộ đã xoá video: `sh bin/studio learn refetch <set> --videos <URL…>` tải lại vào đúng `vNN` cũ (ghép theo độ dài và khung giữa cảnh), nên nhãn và bằng chứng cũ vẫn dùng được; `transcribe` chép lời lại cho video đã mất `words.json`.
+
 ## 2. Báo nhanh hồ sơ đo (không dừng)
 
 `sh bin/studio job step $JOB "Report measurements"` ở đầu bước.
@@ -137,9 +154,15 @@ Các lỗi đã từng gặp (từ claude-animated-shorts), cần kiểm riêng:
    - mục 11 (cấu trúc phim), specs/022: xem kênh mà phong cách được học cho (`sh bin/studio channel show <kênh>`):
      - kênh có quyết định **theo cấu trúc của kênh tham chiếu**: viết thêm `references/<set>/style/STRUCTURE.md` gồm các màn, tỉ lệ thời lượng, mốc chuyển, nhịp leo thang (đo từ bản chép lời và bảng cảnh), **không** câu chữ, nhân vật, câu chuyện hay tên nào của kênh tham chiếu; mục 11 trỏ tới `STRUCTURE.md`;
      - kênh không có quyết định đó, hoặc chưa gắn kênh: mục 11 gợi ý cấu trúc, cách mở đầu và cách kết **khác** kênh gốc (luật cũ), không viết `STRUCTURE.md`.
+   Mỗi luật (dòng bảng hoặc gạch đầu dòng ở mục 1–11) mang `[bằng chứng: <bảng#ô | tệp → khoá | báo cáo §n.m>]` hoặc `[xưởng]` (luật xưởng tự chọn, ví dụ phụ đề in trên hình). Luật không có bằng chứng và không phải của xưởng thì bỏ, ghi vào nhật ký sửa (specs/023 FR-001).
 3. **Viết `references/<set>/style/EVIDENCE.md`:** tóm tắt 3 báo cáo cùng nhật ký sửa, và lý do chọn `based_on`.
 4. **Viết `references/<set>/style/style.json`:** `{"line": "<một câu tiếng Anh>", "line_cn": "", "borrows": [], "size": "<WxH nếu không phải 1920x1080>"}`.
-5. Chạy kiểm tra tên:
+5. **Template tay nghề (specs/023):**
+   - chia nhịp từng video theo `STRUCTURE.md` vào `profile/beats.json`, rồi `sh bin/studio learn beats <set> --check`;
+   - `sh bin/studio learn craft-summary <set> --parts look time`;
+   - viết `TEMPLATE.md` (15 thành phần, 9 công thức nhịp) và `template.json` theo `specs/023-style-craft-template/contracts/template-format.md`, bằng lời của xưởng; mỗi thành phần ≥ 1 số đo kèm khoảng và ≥ 3 khung mẫu từ ≥ 2 video (hoặc "Ít bằng chứng: n khung");
+   - `sh bin/studio learn template-check <slug>` sau khi lưu (bước 9); trước đó có thể kiểm phần hình bằng `--partial 1-10`.
+6. Chạy kiểm tra tên:
    ```sh
    sh bin/studio learn check-names <set> references/<set>/style/STYLE.md references/<set>/style/EVIDENCE.md references/<set>/style/style.json [references/<set>/style/STRUCTURE.md]
    ```
@@ -183,6 +206,12 @@ sh bin/studio review wait $RID        # chặn tới 9 phút; mã 3 = chưa có 
    LIB="$PWD/lib/lemo-opuscar"; P="$PWD/references/<set>/proof"
    (cd "$LIB" && node core/render/still.mjs "$P" 0 --size <W>x<H> --out "$P/out" --prefix ours_r1_)
    sh bin/studio learn compare <set> --ref "$P/out/ref.jpg" --ours "$P/out/ours_r1_0.jpg" --round 1
+   ```
+   Rồi một **đoạn video ngắn** (3–10 s) của trang chứng minh có máy và cử động, so cả số đo chuyển động (specs/023 FR-007):
+   ```sh
+   (cd "$LIB" && node core/render/still.mjs "$P" --range 0:6:0.0333 --out "$P/out/clip" --prefix c_ --size <W>x<H>)
+   ffmpeg -framerate 30 -pattern_type glob -i "$P/out/clip/c_*.jpg" -pix_fmt yuv420p "$P/out/clip.mp4"
+   sh bin/studio learn compare <set> --clip "$P/out/clip.mp4"      # máy đứng, motion720, phần có cử động so với kênh mẫu
    ```
 4. **Chưa đạt:** sửa trang theo chỉ số lệch, chụp lại với `--prefix ours_r2_` và `--round 2`, rồi `ours_r3_` và `--round 3`. Tối đa **2 vòng sửa**.
 5. **Không chạy được `node`** hoặc `deps` của thư viện: dừng ở đây, báo rõ cho người dùng (bản nháp phong cách vẫn còn trong `references/<set>/style/`), và nói cách chạy tiếp trên máy của họ.

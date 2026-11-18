@@ -111,6 +111,10 @@ def cmd_check_names(a):
 
 def cmd_compare(a):
     from sl import compare
+    if a.clip:
+        return compare.clip_cli(a.set, a.clip)
+    if not (a.ref and a.ours):
+        raise UsageError("cần --ref và --ours (khung chứng minh), hoặc --clip (đoạn video, specs/023)")
     return compare.cli(a.set, a.ref, a.ours, a.round)
 
 
@@ -213,7 +217,8 @@ def main(argv=None) -> int:
     c.add_argument("set"); c.add_argument("files", nargs="+"); c.set_defaults(fn=cmd_check_names)
 
     k = sub.add_parser("compare", help="so khung chứng minh với khung gốc")
-    k.add_argument("set"); k.add_argument("--ref", required=True); k.add_argument("--ours", required=True)
+    k.add_argument("set"); k.add_argument("--ref"); k.add_argument("--ours")
+    k.add_argument("--clip", help="đoạn video của khung chứng minh: so số đo chuyển động với kênh mẫu (specs/023)")
     k.add_argument("--round", type=int, default=1); k.set_defaults(fn=cmd_compare)
 
     v = sub.add_parser("save", help="lưu phong cách vào my-styles/")

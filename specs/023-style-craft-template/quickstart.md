@@ -101,6 +101,15 @@ sh bin/studio qc hundred-words
 - có `films/hundred-words/compare/` gồm bảng ba cột cho từng loại cảnh và `before-after.json`;
 - người dùng xem và chấp nhận (SC-006).
 
-## Kết quả
+## Kết quả (2026-11-18)
 
-(ghi sau khi chạy: đạt, đạt một phần hoặc thất bại, kèm số)
+| Bước | Kết quả | Số |
+|---|---|---|
+| 0. Test tự động | đạt | `tests/learn` 90+ (SC-003: máy 10/10, cử động 10/10, chuyển cảnh 5/5), `tests/filmcheck` 200+, `tests/render` (kit 26 + âm thanh 3) |
+| 1. US1 | đạt | `template-check --partial 1-10`; 0 luật thiếu nhãn (SC-001); luật phụ đề `[xưởng]` |
+| 2. US2 | đạt | `refetch` 10/10 đúng bản cũ; `craft` 2.192 cảnh; `sound` 10 phim; `beats` 9 phim (v02 bỏ); `template-check` đủ 15 mục và 9 nhịp (SC-002); sau `clean` 0 tệp media (SC-007). `still_ratio` cũ (0,72–0,93) chỉ thấy máy dời; máy đứng thật 0,24–0,84 |
+| 3. US3 | đạt | 4 đợt bảng so, mỗi đợt duyệt ở lần 1 (SC-004); `kit/REVIEW.md` |
+| 4. US4 | đạt | phim cũ: `still_person` 13/14 cảnh được xét (SC-005 đã sửa: ≥ 90 %), máy đứng 100 % ngoài khoảng, người đứng yên 35 % |
+| 5. US5 | đạt một phần | phim mới GPU 60 fps 58,3 s, mọi tầng đạt: máy đứng 45 % ✓, người đứng yên 0 % ✓, chuyển cảnh dip 1 + fade 1 ✓, −14,5 LUFS ✓; motion720 0,0077 (khoảng 0,008–0,176, hụt sát mép: đẩy máy bằng phóng ống kính không dời khung); LRA 1,8 LU (khoảng 2,5–3,7); nhịp đọc của template phải co 0,35 lần để đạt luật lặng ≤ 20 % với phim nhiều dòng ngắn. Người dùng chấp nhận làm điểm xuất phát (SC-006, 2026-11-18) |
+
+Đã biết: phụ đề đè hàng nhân vật ở thẻ cuối của phim mới (đã sửa trong kit, phim chưa dựng lại); dòng l027 "hurt" máy nghe thành "heard" (chờ người dùng nghe); tempo đo trên kênh mẫu độ tin cậy thấp; tiếng bật chỉ cho thẻ số liệu và thẻ cuối là luật của xưởng (người dùng chọn).

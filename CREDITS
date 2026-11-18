@@ -23,6 +23,11 @@ Python packages in each `*.dist-info/`, npm packages in `node_modules/*/`, Debia
   (source: https://ffmpeg.org/releases/). The GPL text ships next to the binaries.
 - Kokoro-82M voice model (https://huggingface.co/hexgrad/Kokoro-82M), Apache-2.0; downloaded at setup
   from the library's own release (onnx export by kokoro-onnx, MIT).
+- Salamander Grand Piano V3 by Alexander Holm (https://archive.org/details/SalamanderGrandPianoV3), CC BY 3.0
+  (https://creativecommons.org/licenses/by/3.0/); the library's sample pack, played by the style kit's score
+  (my-styles/dusk-hypothetical/kit/sound/score.py, specs/023). Films that use it repeat this line in their own CREDITS.
+- Numba (https://numba.pydata.org), BSD-2-Clause, the library's music tier (`sh bin/studio deps music`), for the plucked
+  strings of core/audio/pluck.py.
 - Whisper models through faster-whisper (Systran/faster-whisper-base, base.en, small; https://huggingface.co/Systran),
   MIT License (OpenAI Whisper); downloaded at setup or on first use.
 - espeak-ng (https://github.com/espeak-ng/espeak-ng), GPL-3.0, bundled by espeakng-loader for phonemes.

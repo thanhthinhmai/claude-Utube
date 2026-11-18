@@ -287,26 +287,26 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
 
   Mốc kiểm: SC-005 nửa sau.
 - [X] T056 [US5] Xem phim mới bằng mắt theo thời gian (khung qua nhiều thời điểm, không chỉ ảnh tĩnh), so với khung mẫu cùng loại cảnh, trước khi giao.
-- [ ] T057 [US5] Giao người dùng: phim, bảng ba cột, bảng số. Ghi quyết định chấp nhận (SC-006).
+- [X] T057 [US5] Giao người dùng: phim, bảng ba cột, bảng số. Ghi quyết định chấp nhận (SC-006).
 
 ---
 
 ## Phase 8: Polish & Cross-Cutting
 
-- [ ] T064 [P] Thêm `learn compare --clip <mp4>` trong `SL/compare.py` và `learn.py` (FR-007): đo đoạn video của khung chứng minh bằng `SL/craft.py` (`still_ratio`, `motion720_p50`, tỉ lệ cảnh có cử động), so với `craft-summary.json`, in đạt hoặc ngoài khoảng cho từng số. Test trong `tests/learn/test_compare_clip.py` trên video của T002.
+- [X] T064 [P] Thêm `learn compare --clip <mp4>` trong `SL/compare.py` và `learn.py` (FR-007): đo đoạn video của khung chứng minh bằng `SL/craft.py` (`still_ratio`, `motion720_p50`, tỉ lệ cảnh có cử động), so với `craft-summary.json`, in đạt hoặc ngoài khoảng cho từng số. Test trong `tests/learn/test_compare_clip.py` trên video của T002.
 
-- [ ] T058 [P] Sửa `.claude/skills/style-learn/SKILL.md` (FR-007, dùng `learn compare --clip` của T064): thêm các bước `refetch` hoặc `fetch` có `url`, `craft`, `sound`, `beats`, `craft-summary`, viết `TEMPLATE.md` và `template.json`, `template-check`, khung chứng minh có đoạn video ngắn so cả số chuyển động (`page clip` và `pairs`); `clean` ngay sau phần đo.
-- [ ] T059 [P] Sửa `CLAUDE.md`:
+- [X] T058 [P] Sửa `.claude/skills/style-learn/SKILL.md` (FR-007, dùng `learn compare --clip` của T064): thêm các bước `refetch` hoặc `fetch` có `url`, `craft`, `sound`, `beats`, `craft-summary`, viết `TEMPLATE.md` và `template.json`, `template-check`, khung chứng minh có đoạn video ngắn so cả số chuyển động (`page clip` và `pairs`); `clean` ngay sau phần đo.
+- [X] T059 [P] Sửa `CLAUDE.md`:
   - luồng làm phim đọc `TEMPLATE.md` của phong cách (nếu có) trước khi lập bảng cảnh;
   - `voice make` thay việc gọi thẳng `tts.py`;
   - các luật mới của tầng 2 và tầng 4;
   - `page clip`.
 
   Sửa `S/STYLE.md` §10 trỏ tới `TEMPLATE.md`.
-- [ ] T060 [P] Ghi các bộ nhạc cụ được dùng vào `CREDITS` (giấy phép theo LICENSE của từng bộ trong thư viện); chạy `desktop/core-build/credits-check.py`.
-- [ ] T061 Chạy `check-names` trên mọi tệp chữ mới: `TEMPLATE.md`, `template.json`, `STYLE.md`, `EVIDENCE.md`, `K/REVIEW.md`, `K/**/*.js`, `K/sound/*.py`.
-- [ ] T062 Chạy đủ: `sh tests/run.sh`, `sh tests/learn/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/render/run.sh`, `sh tests/ui/run.sh`.
-- [ ] T063 Ghi kết quả vào mục "Kết quả" của `quickstart.md` (đạt, đạt một phần, thất bại, kèm số). Cập nhật bộ nhớ dự án. Commit sau mỗi phase, chỉ các tệp có tên.
+- [X] T060 [P] Ghi các bộ nhạc cụ được dùng vào `CREDITS` (giấy phép theo LICENSE của từng bộ trong thư viện); chạy `desktop/core-build/credits-check.py`.
+- [X] T061 Chạy `check-names` trên mọi tệp chữ mới: `TEMPLATE.md`, `template.json`, `STYLE.md`, `EVIDENCE.md`, `K/REVIEW.md`, `K/**/*.js`, `K/sound/*.py`.
+- [X] T062 Chạy đủ: `sh tests/run.sh`, `sh tests/learn/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/render/run.sh`, `sh tests/ui/run.sh`.
+- [X] T063 Ghi kết quả vào mục "Kết quả" của `quickstart.md` (đạt, đạt một phần, thất bại, kèm số). Cập nhật bộ nhớ dự án. Commit sau mỗi phase, chỉ các tệp có tên.
 
 ---
 
