@@ -60,6 +60,7 @@ export function check(scenes, catalog = CATALOG) {
         if (c.pose !== 'walk') bad('path needs pose "walk"');
         if (!(Array.isArray(c.path) && c.path.length >= 2 && c.path.every((p, k) => Array.isArray(p) && p.length === 3 && (k === 0 || p[0] > c.path[k - 1][0])))) bad('path is [[seconds, x, z], …] in time order');
       }
+      if (c.swap !== undefined && !(c.swap && typeof c.swap === 'object' && (c.act || []).some((a) => a[1] === 'swap'))) bad('swap is a look {hoodie, hair, hat, glasses} with an act "swap"');
       if (c.blink !== undefined && c.blink !== false && !(c.blink && Array.isArray(c.blink.every) && c.blink.every.length === 2 && c.blink.every[0] > 0 && c.blink.every[0] <= c.blink.every[1])) bad('blink is false or {every: [a, b]} seconds');
     }
     if (s.move !== undefined && s.move !== 'auto') {

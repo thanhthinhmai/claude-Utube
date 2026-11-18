@@ -67,6 +67,14 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
   const shoulder = makeFigure({ hoodie: '#5a4a9a', hair: 'short', hairColor: '#1c1420' }); scene.add(shoulder.group);
   const crowds = new Map();
   const endFigs = new Map();                 // the closing card's cast (specs/023)
+  const swaps = new Map();                   // people after a state swap, by their new look
+  const swapFig = (c) => {
+    const base = c.who === 'hero' ? { hoodie: hero.hoodie, strings: hero.strings, hair: hero.hair, hat: hero.hat, glasses: hero.glasses }
+      : { ...lookOf(Number(c.who.slice(6)), 0), ...Object.fromEntries(['hoodie', 'hair', 'hat', 'glasses'].filter((k) => c[k] != null).map((k) => [k, c[k]])) };
+    const look = { ...base, ...c.swap }, key = `${c.who}|${JSON.stringify(look)}`;
+    if (!swaps.has(key)) { const f = makeFigure(look); scene.add(f.group); swaps.set(key, f); }
+    return swaps.get(key);
+  };
 
   function castPlace(s, set, c, i, used) {
     const a = set.anchors; let slot;
@@ -99,9 +107,13 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
     }
 
     // cast
-    const used = [], shown = new Set(), heads = [];
+    const used = [], shown = new Set(), heads = [], streaks = [];
     (s.cast || []).forEach((c, i) => {
-      const f = c.who === 'hero' ? heroFig : extra(Number(c.who.slice(6)), c);
+      // a state swap (act 'swap', specs/023): from its time on the person wears cast[].swap; a light streak covers the change
+      const swapAt = ((c.act || []).find((a) => a[1] === 'swap') || [])[0];
+      const swapped = swapAt != null && c.swap && lt >= swapAt;
+      const f = swapped ? swapFig(c) : c.who === 'hero' ? heroFig : extra(Number(c.who.slice(6)), c);
+      if (swapAt != null) streaks.push({ at: swapAt, fig: f });
       const slot = castPlace(s, set, c, i, used); used.push(slot);
       f.group.visible = true; shown.add(f);
       f.group.position.set(slot.x, slot.y || 0, slot.z); f.group.rotation.y = slot.ry || 0;
@@ -130,6 +142,7 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
     });
     heroFig.group.visible = shown.has(heroFig);
     for (const f of extras.values()) f.group.visible = shown.has(f);
+    for (const f of swaps.values()) f.group.visible = shown.has(f);
 
     // camera on the subject (cast[subject] or the hero or the first cast member); empty shots frame the hero anchor
     const camOpts = typeof s.cam === 'object' ? s.cam : {};
@@ -205,6 +218,26 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
     if (s.fade) {
       const f = s.fade === 'out' ? Math.min(1, Math.max(0, (lt - (s.dur - 0.6)) / 0.6)) : Math.max(0, 1 - lt / 0.6);
       if (f > 0) { ctx.fillStyle = `rgba(0,0,0,${f})`; ctx.fillRect(0, 0, stage.W, stage.H); }
+    }
+    // transitions into and out of this scene (specs/023, TEMPLATE.md §13): a dip is ≈ 0.12 s of black across the cut,
+    // a fade goes to black and back over ≈ 0.27 s; the lengths come from template.json → transitions
+    const TR = (template && template.transitions) || {};
+    const dipH = ((TR.dip_s && TR.dip_s[0]) || 0.117) / 2, fadeH = ((TR.fade_s && TR.fade_s[1]) || 0.267) / 2;
+    const next = P.scenes[P.scenes.indexOf(s) + 1];
+    let black = 0;
+    if ((s.trans === 'dip' && lt < dipH) || (next && next.trans === 'dip' && s.dur - lt < dipH)) black = 1;
+    if (s.trans === 'fade' && lt < fadeH) black = Math.max(black, 1 - lt / fadeH);
+    if (next && next.trans === 'fade' && s.dur - lt < fadeH) black = Math.max(black, 1 - (s.dur - lt) / fadeH);
+    if (black > 0) { stage.ctx.fillStyle = `rgba(0,0,0,${black})`; stage.ctx.fillRect(0, 0, stage.W, stage.H); }
+    // the light-streak swap: a bright horizontal smear over the person for ≈ 0.15 s around the change (motion-depth §2.3)
+    const sH = (TR.streak_s || 0.15) / 2;
+    for (const st of streaks) {
+      const d = Math.abs(lt - st.at); if (d >= sH) continue;
+      const box = new THREE.Box3().setFromObject(st.fig.group), lo = box.min.clone().project(cam), hi = box.max.clone().project(cam);
+      const y0 = (1 - Math.max(lo.y, hi.y)) / 2 * stage.H, y1 = (1 - Math.min(lo.y, hi.y)) / 2 * stage.H, a = 1 - d / sH;
+      const gr = stage.ctx.createLinearGradient(0, y0, 0, y1);
+      gr.addColorStop(0, 'rgba(255,240,230,0)'); gr.addColorStop(0.5, `rgba(255,245,235,${0.95 * a})`); gr.addColorStop(1, 'rgba(255,240,230,0)');
+      stage.ctx.fillStyle = gr; stage.ctx.fillRect(0, y0, stage.W, y1 - y0);
     }
     // graphics and subtitles, unless the tools ask for a clean frame (thumbnails)
     boxes = [];

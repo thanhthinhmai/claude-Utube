@@ -248,8 +248,8 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
 
 ### Đợt 4: chuyển động và âm thanh (diễn xuất, máy, chuyển cảnh, tiếng động, nhạc)
 
-- [ ] T048 [US3] Thêm `trans` vào `K/stage.js` và `K/film.js`: `streak`, `dip`, `fade` với độ dài theo `transitions`, tất định theo `t`. Test trong `K/test/film.test.mjs`.
-- [ ] T049 [P] [US3] Viết `K/sound/`:
+- [X] T048 [US3] Thêm `trans` vào `K/stage.js` và `K/film.js`: `streak`, `dip`, `fade` với độ dài theo `transitions`, tất định theo `t`. Test trong `K/test/film.test.mjs`.
+- [X] T049 [P] [US3] Viết `K/sound/`:
   - `timing.py` (`schedule` theo `template.json → voice`);
   - `score.py` (`compose` bằng `core/audio/sampler.py` của thư viện theo `beats.<nhịp>`: tempo, độ dày, lên, lặng);
   - `sfx.py` (`place` theo sự kiện bằng `core/audio/sfx.py`);

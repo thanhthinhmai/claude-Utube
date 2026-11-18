@@ -15,5 +15,11 @@ if [ -n "$kits" ]; then
   # shellcheck disable=SC2086
   node --import ./tests/render/three-resolve.mjs --test --test-reporter=spec $kits || fail=1
 fi
+# the kit's sound (specs/023): numpy, scipy, the library's sampler and pluck, so the library's Python from its root
+if [ -x lib/lemo-opuscar/.venv/bin/python ]; then
+  (cd lib/lemo-opuscar && .venv/bin/python -m unittest discover -s "$HERE/tests/render" -p 'test_sound.py') || fail=1
+else
+  echo "! kit sound tests skipped: the library's Python is not installed (sh bin/studio deps music)"
+fi
 if [ "$fail" = 0 ]; then echo "✓ tests/render: all passed"; exit 0
 else echo "✗ tests/render: failures above"; exit 1; fi
