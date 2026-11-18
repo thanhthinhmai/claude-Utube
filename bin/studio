@@ -574,8 +574,11 @@ case ${1:-} in
   render) shift; cmd_render "$@" ;;
   voice)
     shift
-    [ "${1:-}" = asr ] && [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice asr <phim> [--lang L]" >&2; exit 2; }
-    shift; cmd_filmcheck voice-asr "$@" ;;
+    case ${1:-} in
+      asr) [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice asr <phim> [--lang L]" >&2; exit 2; }; shift; cmd_filmcheck voice-asr "$@" ;;
+      make) [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice make <phim>" >&2; exit 2; }; shift; cmd_filmcheck voice-make "$@" ;;
+      *) echo "dùng: sh bin/studio voice asr|make <phim>" >&2; exit 2 ;;
+    esac ;;
   page) shift; cmd_page "$@" ;;
   ui | job | review | admin | app) cmd_studio "$@" ;;
   script | web | qc | publish | channel | lesson | topics | config | kit) cmd_filmcheck "$@" ;;

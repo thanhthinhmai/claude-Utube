@@ -825,6 +825,40 @@ def asr_model(lang: str) -> str:
     return cfg.get(lang) or cfg["*"]
 
 
+def say_file(d: Path) -> Path:
+    """voices/.say.json: lines.json with "text" replaced by "say" where a line has one (specs/023 FR-017, research R7).
+    The library's tts.py reads only "text"; the script's text in lines.json stays as approved (qc checks it)."""
+    rows = json.loads((d / "lines.json").read_text(encoding="utf-8"))
+    out = [dict(r, text=r["say"]) if isinstance(r, dict) and r.get("say") else r for r in rows]
+    for r in out:
+        if isinstance(r, dict):
+            r.pop("say", None)
+    f = d / "voices" / ".say.json"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(out, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    return f
+
+
+def cmd_voice_make(a) -> int:
+    d = film_dir(a.film)
+    try:
+        f = say_file(d)
+    except (OSError, ValueError) as e:
+        print(f"✗ lines.json cannot be read: {e}", file=sys.stderr)
+        return 2
+    n = sum(1 for r in json.loads(f.read_text(encoding="utf-8")) if isinstance(r, dict))
+    said = [r["id"] for r in json.loads((d / "lines.json").read_text(encoding="utf-8")) if isinstance(r, dict) and r.get("say")]
+    lib = Path(lib_dir())
+    py = lib / ".venv" / "bin" / "python"
+    cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "tts.py"), str(f), str(d / "voices")]
+    print(f"voice: {n} lines" + (f"; spoken as written in \"say\": {', '.join(said)}" if said else ""))
+    if os.environ.get("STUDIO_TTS_DRY"):
+        print(" ".join(cmd))
+        return 0
+    import subprocess
+    return subprocess.run(cmd, cwd=str(lib)).returncode
+
+
 def cmd_voice_asr(a) -> int:
     d = film_dir(a.film)
     lang = film_lang(d, a.lang)
@@ -952,6 +986,8 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("qc-voice", help="tier 0: check the voice lines (specs/020)")
     s.add_argument("film")
     s.add_argument("--json", action="store_true")
+    s = sub.add_parser("voice-make", help="make the voice files, with each line's \"say\" spelling (specs/023)")
+    s.add_argument("film")
     s = sub.add_parser("voice-asr", help="word stamps with the studio's recogniser model (specs/020)")
     s.add_argument("film")
     s.add_argument("--lang", default=None)
@@ -1080,7 +1116,7 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("qc-plan", "qc-plan"): cmd_qc_plan, ("render-gate", "render-gate"): cmd_render_gate,
             ("qc-shots", "qc-shots"): cmd_qc_shots, ("qc-accept-style", "qc-accept-style"): cmd_qc_accept_style,
             ("qc-except", "qc-except"): cmd_qc_except, ("qc-voice", "qc-voice"): cmd_qc_voice,
-            ("voice-asr", "voice-asr"): cmd_voice_asr, ("qc-limits", "qc-limits"): cmd_qc_limits,
+            ("voice-asr", "voice-asr"): cmd_voice_asr, ("voice-make", "voice-make"): cmd_voice_make, ("qc-limits", "qc-limits"): cmd_qc_limits,
             ("render-done", "render-done"): cmd_render_done,
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,

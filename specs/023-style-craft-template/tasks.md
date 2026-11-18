@@ -256,7 +256,7 @@ Làm trước US3, vì phải đo phim cũ khi nó còn dùng kit cũ (plan, bư
   - `mix.py` (giảm nhạc khi có lời theo `music_under_voice_db`, −14 LUFS).
 
   Test trong `tests/render/test_sound.py` với nhạc cụ giả lập khi thiếu bộ mẫu: tempo, mức so với giọng, độ dài khớp. Thêm dòng chạy test Python này vào `tests/render/run.sh` (hiện chỉ chạy test Node).
-- [ ] T050 [P] [US3] Viết `voice make <phim>` trong `tools/filmcheck/cli.py` và `bin/studio` (research R7):
+- [X] T050 [P] [US3] Viết `voice make <phim>` trong `tools/filmcheck/cli.py` và `bin/studio` (research R7):
   - ghi `voices/.say.json` (thay `text` bằng `say` ở dòng có `say`) rồi gọi `tts.py` của thư viện;
   - sửa `tools/filmcheck/voicecheck.py` thêm luật `mispronounced` (mã dòng, chữ đúng, chữ nghe được, "thêm `say` cho dòng <id>").
 
