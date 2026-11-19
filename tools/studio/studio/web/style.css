@@ -515,3 +515,11 @@ table.lessons tr.l-draft td:nth-child(2) { color: var(--warn, #b26b00); font-wei
 .film-warn { border: 1px solid var(--warn); background: var(--warn-soft); border-radius: 10px; padding: 8px 12px; margin: 0 0 10px; display: grid; gap: 4px; }
 .film-warn p { margin: 0; } .film-warn .tag { font-size: 11px; border-radius: 4px; padding: 1px 6px; font-weight: 600; background: var(--panel); }
 .film-warn .reason { width: 100%; font-size: 12px; }
+.vlines { display: grid; gap: 6px; }
+.vline { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
+.vline.warnl { border-color: var(--warn); }
+.vline .vtxt { display: grid; gap: 3px; min-width: 0; font-size: 13.5px; }
+.vline .say-in { width: min(280px, 100%); font-size: 12px; }
+.vline .vact { display: flex; gap: 4px; flex-wrap: wrap; }
+.vline .tag.warn { background: var(--warn-soft); color: var(--warn); border-radius: 4px; padding: 1px 6px; justify-self: start; }
+@media (max-width: 560px) { .vline { grid-template-columns: 30px minmax(0, 1fr); } .vline .vact { grid-column: 2; } }

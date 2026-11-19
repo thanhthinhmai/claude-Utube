@@ -61,6 +61,50 @@ class VoiceMake(unittest.TestCase):
         self.assertEqual(points.approve(d, "script")[0], 0)
         self.assertEqual(run().returncode, 0)
 
+    def _film(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import samples
+        from filmcheck import points
+        d = samples.review_film(self.root, "night", kit=False)
+        points.set_on(d, "none")
+        return d
+
+    def _make(self, *x):
+        return subprocess.run(["sh", str(REPO / "bin" / "studio"), "voice", "make", "night", *x], capture_output=True, text=True,
+                              env={**os.environ, "STUDIO_ROOT": str(self.root), "STUDIO_TTS_FAKE": "1"})
+
+    def test_only_one_line(self):                                    # specs/026 T037
+        import time
+        d = self._film()
+        old = time.time() - 100
+        for w in (d / "voices").glob("*.wav"):
+            os.utime(w, (old, old))
+        dur = json.loads((d / "voices" / "dur.json").read_text())
+        r = self._make("--only", "L03")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        changed = sorted(w.name for w in (d / "voices").glob("*.wav") if w.stat().st_mtime > old + 50)
+        self.assertEqual(changed, ["L03.wav"])
+        self.assertEqual(set(json.loads((d / "voices" / "dur.json").read_text())), set(dur))       # other lines kept
+        self.assertFalse([p for p in (d / "voices").iterdir() if p.name.startswith("voice.")])     # no temp folder left
+        self.assertEqual(self._make("--only", "L99").returncode, 2)
+
+    def test_changed_lines_only(self):                               # specs/026 T038a, SC-004
+        import time
+        d = self._film()
+        self.assertEqual(self._make().returncode, 0)                 # all lines, remembered in .made.json
+        old = time.time() - 100
+        for w in (d / "voices").glob("*.wav"):
+            os.utime(w, (old, old))
+        self.assertIn("up to date", self._make("--changed").stdout)
+        rows = json.loads((d / "lines.json").read_text())
+        rows[1]["text"] = "The first day feels nearly fine."
+        rows[4]["say"] = "Bye day three"
+        (d / "lines.json").write_text(json.dumps(rows))
+        r = self._make("--changed")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        changed = sorted(w.name for w in (d / "voices").glob("*.wav") if w.stat().st_mtime > old + 50)
+        self.assertEqual(changed, [f"{rows[1]['id']}.wav", f"{rows[4]['id']}.wav"])
+
     def test_misheard(self):
         self.assertEqual(voicecheck.misheard("It does not hurt.", "It does not hut."), [("hurt", "hut")])
         self.assertEqual(voicecheck.misheard("Sixteen thousand words.", "16,000 words."), [])

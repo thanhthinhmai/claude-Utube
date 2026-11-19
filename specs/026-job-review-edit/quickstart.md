@@ -90,3 +90,9 @@ Thử thật (SC-006): làm một phim 5 phút bằng chat, có ít nhất một
   - trạng thái "waiting" che trạng thái thật của bước;
   - cảnh báo cho cả phim không có nút giữ;
   - mẫu tên ảnh của 025 không nhận mã cảnh 2 chữ số.
+
+### US3, 2026-11-19 (cùng phim, 39 dòng, Kokoro thật): **đạt**
+
+- Khung Voice mở thẳng khi đang chờ duyệt: chọn giọng, tốc độ, nghe từng dòng, ô `say`, "Save say", "Remake line".
+- Sửa `say` của l001 rồi "Remake line": chỉ `voices/l001.wav` đổi (l002 giữ giờ cũ), chữ của kịch bản giữ nguyên, mất **7,3 s**.
+- `voice make --changed`: đổi chữ 2 dòng thì đúng 2 tệp được làm lại (test, SC-004). `qc voice` báo `script_mismatch` khi lời đọc lệch kịch bản (FR-007).

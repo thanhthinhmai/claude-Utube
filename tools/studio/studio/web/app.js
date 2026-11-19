@@ -503,6 +503,7 @@ async function editPanel(body) {
   const pt = TAB_POINT[DONE.tab];
   if (!pt) return;
   const edit = { script: async () => { const sc = body.querySelector(".script"); if (sc) sc.remove(); await editScript(body); },
+    voice: async () => { body.querySelectorAll(".tbl, .done-actions").forEach((x) => x.remove()); await editVoice(body); },
     shots: async () => {
       body.querySelectorAll(".thumbs, .sheet-img, .done-actions.spread, .sheet-img + p, #done-more-shots").forEach((x) => x.remove());
       await editShots(body);
@@ -511,7 +512,7 @@ async function editPanel(body) {
   if (edit && canEdit(pt)) {                          // not waiting: the read-only view stays, with a way in
     const btn = document.createElement("button");
     btn.className = "btn"; btn.id = "open-edit";
-    btn.textContent = pt === "script" ? "Edit paragraphs" : "Change shots";
+    btn.textContent = { script: "Edit paragraphs", shots: "Change shots", voice: "Change the voice" }[pt];
     btn.onclick = () => { RAIL.open = pt; DONE.drawn = {}; doneRefresh(true); };
     body.prepend(btn);
   }
@@ -891,6 +892,83 @@ async function editShots(body) {
   };
   body.append(box);
   draw(); bar();
+}
+
+/** Voice panel: play each line, fix how a word is said ("say"), make one line again, or change the voice or speed
+ * of the whole film after a confirmation on the page (US3). The written words come from the script only. @param {HTMLElement} body */
+async function editVoice(body) {
+  const v = RAIL.data;
+  /** @type {any[]} */ let rows = [];
+  /** @type {any} */ let checks = {};
+  try { rows = await (await fetch(fileUrl("lines.json"), { cache: "no-store" })).json(); } catch { rows = []; }
+  try { checks = await (await fetch(fileUrl("checks.json"), { cache: "no-store" })).json(); } catch { checks = {}; }
+  const issues = (((checks.tiers || {}).voice || {}).issues) || [];
+  const first = rows.find((r) => r && r.id) || {};
+  RAIL.voiceAll = RAIL.voiceAll ?? rows.length <= 40;
+  const box = document.createElement("div");
+  box.className = "edit-voice";
+  const ed = canEdit("voice");
+  const draw = () => {
+    const shown = rows.filter((r) => r && r.id && (RAIL.voiceAll || r.say || issues.some((/** @type {any} */ i) => i.ref === r.id)));
+    const speeds = ["0.85", "0.9", "0.95", "1", "1.05", "1.1", "1.15"];
+    const sp = String(first.speed ?? 1);
+    box.innerHTML = `<div class="row done-actions"><label>Voice <select id="v-voice" ${ed ? "" : "disabled"}>${(v.voices.includes(first.voice) ? v.voices : [first.voice, ...v.voices]).map((x) =>
+        `<option${x === first.voice ? " selected" : ""}>${esc(x)}</option>`).join("")}</select></label>
+      <label>Speed <select id="v-speed" ${ed ? "" : "disabled"}>${(speeds.includes(sp) ? speeds : [sp, ...speeds]).map((x) => `<option${x === sp ? " selected" : ""}>${x}</option>`).join("")}</select></label>
+      <span class="muted small" id="v-confirm"></span>
+      <span class="seg"><button data-f="all" aria-pressed="${RAIL.voiceAll}">All lines</button><button data-f="some" aria-pressed="${!RAIL.voiceAll}">With say or warnings</button></span></div>
+      ${issues.filter((/** @type {any} */ i) => i.ref === "lines").map((/** @type {any} */ i) => `<p class="notice warn small">${esc(i.measure)}: ${esc(i.fix)}</p>`).join("")}
+      <div class="vlines">${shown.map((r) => {
+        const mine = issues.filter((/** @type {any} */ i) => i.ref === r.id);
+        return `<div class="vline ${mine.length ? "warnl" : ""}" data-id="${esc(r.id)}"><button class="play" data-a="${esc(r.id)}" aria-label="Play ${esc(r.id)}">▶</button>
+          <div class="vtxt"><div><code>${esc(r.id)}</code> ${esc(r.text)}</div>
+            <label class="small muted">say <input class="say-in" maxlength="400" value="${esc(r.say || "")}" placeholder="as written" ${ed ? "" : "disabled"}></label>
+            ${mine.map((/** @type {any} */ i) => `<span class="tag warn small">${esc(i.rule)}${i.text ? `: ${esc(i.text)}` : ""}</span>`).join(" ")}
+            <span class="msg small">${esc(RAIL.msg[r.id] || "")}</span></div>
+          <div class="vact">${ed ? `<button class="btn small" data-save>Save say</button><button class="btn small" data-remake>Remake line</button>` : ""}</div></div>`;
+      }).join("") || `<p class="muted">No line has a "say" or a warning.</p>`}</div>`;
+    box.querySelectorAll(".seg button").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => { RAIL.voiceAll = /** @type {HTMLElement} */ (el).dataset.f === "all"; draw(); }; });
+    box.querySelectorAll(".play[data-a]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = () => {
+      const was = DONE.playing === el; stopAudio(); if (was) return;
+      const a = new Audio(fileUrl(`voices/${/** @type {HTMLElement} */ (el).dataset.a}.wav`) + `?v=${Date.now()}`);
+      DONE.audio = a; DONE.playing = el; el.classList.add("on"); el.textContent = "❚❚";
+      a.onended = () => stopAudio(); a.play().catch(() => stopAudio());
+    }; });
+    const act = async (/** @type {Element} */ el, /** @type {string} */ op) => {
+      const line = /** @type {HTMLElement} */ (el.closest(".vline")), id = line.dataset.id;
+      RAIL.msg[id] = op === "voice-remake" ? "Making the line again…" : "Saving…";
+      /** @type {HTMLElement} */ (line.querySelector(".msg")).textContent = RAIL.msg[id];
+      try {
+        if (op === "voice-say") {
+          const x = await sendEdit("voice", "voice-say", { line: id, say: /** @type {HTMLInputElement} */ (line.querySelector(".say-in")).value });
+          RAIL.msg[id] = editMsg(x) + (x.status === "done" ? " Remake the line to hear it." : "");
+        } else {
+          const x = await sendEdit("voice", "voice-remake", { line: id });
+          RAIL.msg[id] = editMsg(x);
+        }
+      } catch (err) { RAIL.msg[id] = /** @type {Error} */ (err).message; }
+      DONE.drawn = {}; doneRefresh(true);
+    };
+    box.querySelectorAll("[data-save]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => act(el, "voice-say"); });
+    box.querySelectorAll("[data-remake]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => act(el, "voice-remake"); });
+    const ask = () => {                                // the whole film is made again: confirm on the page
+      const c = /** @type {HTMLElement} */ (box.querySelector("#v-confirm"));
+      const voice = /** @type {HTMLSelectElement} */ (box.querySelector("#v-voice")).value, speed = /** @type {HTMLSelectElement} */ (box.querySelector("#v-speed")).value;
+      c.innerHTML = `This makes all ${rows.length} lines again. <button class="btn small" id="v-go">Make all again</button> <button class="btn small" id="v-no">Cancel</button>`;
+      /** @type {HTMLElement} */ (c.querySelector("#v-no")).onclick = () => draw();
+      /** @type {HTMLElement} */ (c.querySelector("#v-go")).onclick = async () => {
+        c.textContent = "Making every line again…";
+        try { const x = await sendEdit("voice", "voice-set", { voice, speed, confirm: "all" }); RAIL.msg = { film: editMsg(x) }; }
+        catch (err) { RAIL.msg = { film: /** @type {Error} */ (err).message }; }
+        DONE.drawn = {}; doneRefresh(true);
+      };
+    };
+    /** @type {HTMLElement} */ (box.querySelector("#v-voice")).onchange = ask;
+    /** @type {HTMLElement} */ (box.querySelector("#v-speed")).onchange = ask;
+  };
+  body.append(box);
+  draw();
+  approveBar(body, "voice", issues.some((/** @type {any} */ i) => i.severity === "block") ? "The voice check has problems: make those lines again." : "");
 }
 
 /** Live updates on a job page: only what changed, so a playing line or the open section stays (specs/025 R5).

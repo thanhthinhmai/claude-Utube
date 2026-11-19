@@ -323,3 +323,118 @@ def accept_style(d: Path, a: dict) -> dict:
     except tiers.TierError as e:
         raise EditError(str(e)) from None
     return {"ref": "style", "new": (a.get("reason") or "").strip(), "ok": True}
+
+
+# ---------- voice (US3) ----------
+def studio_cli(*args) -> tuple:
+    """Run a filmcheck command of the studio (voice make, voice asr, qc voice); (code, output)."""
+    import subprocess
+    import sys
+    p = subprocess.run([sys.executable, str(Path(__file__).resolve().parent / "cli.py"), *args], capture_output=True,
+                       text=True, timeout=3600, env={**os.environ, "STUDIO_LIB": str(lib_path())})
+    return p.returncode, (p.stdout + p.stderr).strip()
+
+
+def read_lines(d: Path) -> list:
+    try:
+        rows = json.loads((d / "lines.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise EditError(f"lines.json cannot be read: {e}") from None
+    return rows
+
+
+def line_of(rows: list, lid: str) -> dict:
+    r = next((x for x in rows if isinstance(x, dict) and x.get("id") == lid), None)
+    if r is None:
+        raise EditError(f"lines.json has no line \"{lid}\"")
+    return r
+
+
+def voice_after(d: Path, ids=None) -> dict:
+    """Make the voice of these lines again (all when None), stamp them and run the voice check."""
+    if no_run():
+        return {"ok": True, "check": {"skipped": True}}
+    only = ["--only", ",".join(ids)] if ids else []
+    code, txt = studio_cli("voice-make", str(d), *only)
+    if code:
+        return {"ok": False, "error": txt.splitlines()[-1] if txt else "voice make failed"}
+    code, txt = studio_cli("voice-asr", str(d), *only)
+    if code == 2:
+        return {"ok": False, "error": txt.splitlines()[-1] if txt else "voice asr failed"}
+    code, txt = studio_cli("qc-voice", str(d), "--json")
+    try:
+        r = json.loads(txt.splitlines()[-1])
+        mine = [i for i in r.get("issues", []) if not ids or i.get("ref") in ids]
+        return {"ok": not mine, "check": {"pass": r.get("pass"), "issues": mine[:10]}}
+    except (ValueError, IndexError):
+        return {"ok": False, "error": txt[-300:]}
+
+
+@op("voice-say", "voice")
+def voice_say(d: Path, a: dict) -> dict:
+    lid = ref_of(a, "line")
+    say = str(a.get("say") or "").strip()
+    if len(say) > 400:
+        raise EditError("\"say\" is at most 400 characters")
+    rows = read_lines(d)
+    r = line_of(rows, lid)
+    old = r.get("say")
+    if say:
+        r["say"] = say
+    else:
+        r.pop("say", None)
+    write_atomic(d / "lines.json", json.dumps(rows, ensure_ascii=False, indent=1) + "\n")
+    return {"ref": lid, "old": old, "new": say or None, "ok": True}
+
+
+@op("voice-remake", "voice")
+def voice_remake(d: Path, a: dict) -> dict:
+    lid = ref_of(a, "line")
+    line_of(read_lines(d), lid)
+    out = voice_after(d, [lid])
+    out.update(ref=lid)
+    return out
+
+
+@op("voice-set", "voice")
+def voice_set(d: Path, a: dict) -> dict:
+    from filmcheck import channels
+    voice, speed = a.get("voice"), a.get("speed")
+    if a.get("confirm") != "all":
+        raise EditError("changing the voice or speed makes every line again: confirm with --confirm all")
+    if not voice and not speed:
+        raise EditError("say voice=… and/or speed=…")
+    if voice and not (channels.voice_ok(voice) and voice_known(voice)):
+        raise EditError(f"\"{voice}\" is not a voice of the library")
+    if speed is not None:
+        try:
+            speed = float(speed)
+        except ValueError:
+            raise EditError("speed: a number from 0.7 to 1.3") from None
+        if not 0.7 <= speed <= 1.3:
+            raise EditError("speed: a number from 0.7 to 1.3")
+    rows = read_lines(d)
+    first = next((r for r in rows if isinstance(r, dict)), {})
+    old = {"voice": first.get("voice"), "speed": first.get("speed")}
+    for r in rows:
+        if isinstance(r, dict):
+            if voice:
+                r["voice"] = voice
+            if speed is not None:
+                r["speed"] = speed
+    write_atomic(d / "lines.json", json.dumps(rows, ensure_ascii=False, indent=1) + "\n")
+    out = voice_after(d)
+    out.update(ref="all lines", old=old, new={"voice": voice or old["voice"], "speed": speed if speed is not None else old["speed"]})
+    return out
+
+
+def voice_known(v: str) -> bool:
+    """A Kokoro voice in the library's voices-v1.0.bin (a zip of .npy files); edge-tts names pass when they look right."""
+    import zipfile
+    if v.endswith("Neural"):
+        return True
+    try:
+        with zipfile.ZipFile(lib_path() / "core" / "tts" / "voices-v1.0.bin") as z:
+            return f"{v}.npy" in z.namelist()
+    except (OSError, zipfile.BadZipFile):
+        return True                                  # no model here: the name's form was checked

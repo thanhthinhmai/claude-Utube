@@ -91,15 +91,15 @@ description: "Tasks for 026 — review points and edits on the film job page"
 
 **Independent Test**: quickstart mục 5 (phần giọng).
 
-- [ ] T037 [P] [US3] Test trong `tests/filmcheck/test_voicemake.py`: `voice make --only L03` chỉ đổi `voices/L03.wav` (mtime các tệp khác giữ nguyên) và gộp `dur.json` (giữ khoá các dòng khác); `STUDIO_TTS_DRY` in lệnh với tệp tạm một dòng
-- [ ] T038 [US3] `voice make --only` trong `tools/filmcheck/cli.py` theo research R8 (thư mục tạm, chép `wav`, gộp `dur.json`); `voice asr --only` gộp mốc từ của dòng
-- [ ] T038a [US3] `voice make --changed` trong `tools/filmcheck/cli.py`: `voices/.made.json` ghi mỗi dòng `{text|say, voice, speed}` lúc tạo; `--changed` chỉ làm lại dòng khác hoặc thiếu `wav`; test trong `tests/filmcheck/test_voicemake.py`: đổi chữ 2 dòng → đúng 2 dòng làm lại (SC-004); `CLAUDE.md` dùng `voice make --changed` sau khi duyệt lại Script
-- [ ] T039 [P] [US3] Test trong `tests/filmcheck/test_edit.py`: `voice-say L03 --say "R. E. M."` ghi `say`, `text` giữ nguyên; > 400 ký tự → mã 2; `voice-set voice=xx_fake` → mã 2; `voice-set` thiếu `--confirm all` → mã 2; tốc độ 1.5 → mã 2
-- [ ] T040 [US3] Thao tác `voice-say`, `voice-remake`, `voice-set` trong `tools/filmcheck/edit.py` (giọng kiểm bằng `channels.voice_ok`, tốc độ [0.7, 1.3])
-- [ ] T041 [P] [US3] Test trong `tests/filmcheck/test_voice.py`: `qc voice` báo lỗi khi chữ một dòng `lines.json` khác `SCRIPT.md` (FR-007)
-- [ ] T042 [US3] Thêm phép so lời–kịch bản vào `tools/filmcheck/voicecheck.py` (dùng lại hàm so của `qc.py`)
-- [ ] T043 [US3] Khung Voice trên trang (`web/app.js`): giọng và tốc độ (ô chọn từ `voices`, đổi thì hỏi xác nhận ngay trên trang "remakes all N lines"), mỗi dòng có nút nghe (`/files/voices/…`), chữ (không sửa được), ô `say`, kết quả tầng 0 của dòng, "Remake line"; lọc "With say or warnings"
-- [ ] T044 [US3] Điểm voice trong `CLAUDE.md` (bước 3b, sau tầng 0) và `tools/runner/agent.py`
+- [X] T037 [P] [US3] Test trong `tests/filmcheck/test_voicemake.py`: `voice make --only L03` chỉ đổi `voices/L03.wav` (mtime các tệp khác giữ nguyên) và gộp `dur.json` (giữ khoá các dòng khác); `STUDIO_TTS_DRY` in lệnh với tệp tạm một dòng
+- [X] T038 [US3] `voice make --only` trong `tools/filmcheck/cli.py` theo research R8 (thư mục tạm, chép `wav`, gộp `dur.json`); `voice asr --only` gộp mốc từ của dòng
+- [X] T038a [US3] `voice make --changed` trong `tools/filmcheck/cli.py`: `voices/.made.json` ghi mỗi dòng `{text|say, voice, speed}` lúc tạo; `--changed` chỉ làm lại dòng khác hoặc thiếu `wav`; test trong `tests/filmcheck/test_voicemake.py`: đổi chữ 2 dòng → đúng 2 dòng làm lại (SC-004); `CLAUDE.md` dùng `voice make --changed` sau khi duyệt lại Script
+- [X] T039 [P] [US3] Test trong `tests/filmcheck/test_edit.py`: `voice-say L03 --say "R. E. M."` ghi `say`, `text` giữ nguyên; > 400 ký tự → mã 2; `voice-set voice=xx_fake` → mã 2; `voice-set` thiếu `--confirm all` → mã 2; tốc độ 1.5 → mã 2
+- [X] T040 [US3] Thao tác `voice-say`, `voice-remake`, `voice-set` trong `tools/filmcheck/edit.py` (giọng kiểm bằng `channels.voice_ok`, tốc độ [0.7, 1.3])
+- [X] T041 [P] [US3] Test trong `tests/filmcheck/test_voice.py`: `qc voice` báo lỗi khi chữ một dòng `lines.json` khác `SCRIPT.md` (FR-007)
+- [X] T042 [US3] Thêm phép so lời–kịch bản vào `tools/filmcheck/voicecheck.py` (dùng lại hàm so của `qc.py`)
+- [X] T043 [US3] Khung Voice trên trang (`web/app.js`): giọng và tốc độ (ô chọn từ `voices`, đổi thì hỏi xác nhận ngay trên trang "remakes all N lines"), mỗi dòng có nút nghe (`/files/voices/…`), chữ (không sửa được), ô `say`, kết quả tầng 0 của dòng, "Remake line"; lọc "With say or warnings"
+- [X] T044 [US3] Điểm voice trong `CLAUDE.md` (bước 3b, sau tầng 0) và `tools/runner/agent.py`
 
 ---
 

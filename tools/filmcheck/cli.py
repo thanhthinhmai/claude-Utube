@@ -3,6 +3,7 @@
 Runs the same way locally and inside an online job container. Only `script review` calls Claude (contracts/cli.md)."""
 import argparse
 import json
+import tempfile
 import os
 import shutil
 import sys
@@ -865,6 +866,44 @@ def say_file(d: Path) -> Path:
     return f
 
 
+def made_key(r: dict) -> dict:
+    """What a voice file was made from (specs/026 R7): the spoken text, voice and speed."""
+    return {"text": r.get("say") or r.get("text", ""), "voice": r.get("voice"), "speed": r.get("speed")}
+
+
+def lines_to_make(d: Path, rows: list, only=None, changed=False) -> list:
+    """The line ids to make: --only ids, --changed (spoken text, voice or speed differ from voices/.made.json, or no
+    file yet), else all."""
+    ids = [r["id"] for r in rows if isinstance(r, dict) and r.get("id")]
+    if only:
+        want = [x for x in only.split(",") if x]
+        bad = [x for x in want if x not in ids]
+        if bad:
+            raise ValueError(f"lines.json has no line {', '.join(bad)}")
+        return want
+    if changed:
+        try:
+            made = json.loads((d / "voices" / ".made.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            made = {}
+        return [r["id"] for r in rows if isinstance(r, dict) and r.get("id") and
+                (made.get(r["id"]) != made_key(r) or not (d / "voices" / f"{r['id']}.wav").is_file())]
+    return ids
+
+
+def fake_tts(lines_file: Path, out: Path) -> int:
+    """Tests (STUDIO_TTS_FAKE): one second of silence per line, as tts.py lays its files out."""
+    import wave
+    out.mkdir(parents=True, exist_ok=True)
+    dur = {}
+    for r in json.loads(lines_file.read_text(encoding="utf-8")):
+        with wave.open(str(out / f"{r['id']}.wav"), "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(24000); w.writeframes(b"\0\0" * 24000)
+        dur[r["id"]] = 1.0
+    (out / "dur.json").write_text(json.dumps(dur), encoding="utf-8")
+    return 0
+
+
 def cmd_voice_make(a) -> int:
     d = film_dir(a.film)
     from filmcheck import points                   # specs/026: the voice is made from an approved script
@@ -881,21 +920,59 @@ def cmd_voice_make(a) -> int:
     if why:
         return 1
     try:
+        rows = json.loads((d / "lines.json").read_text(encoding="utf-8"))
+        ids = lines_to_make(d, rows, a.only, a.changed)
         f = say_file(d)
     except (OSError, ValueError) as e:
         print(f"✗ lines.json cannot be read: {e}", file=sys.stderr)
         return 2
-    n = sum(1 for r in json.loads(f.read_text(encoding="utf-8")) if isinstance(r, dict))
-    said = [r["id"] for r in json.loads((d / "lines.json").read_text(encoding="utf-8")) if isinstance(r, dict) and r.get("say")]
+    if not ids:
+        print("voice: every line is up to date")
+        return 0
+    part = bool(a.only or a.changed) and len(ids) < sum(1 for r in rows if isinstance(r, dict))
+    said = [r["id"] for r in rows if isinstance(r, dict) and r.get("say") and r["id"] in ids]
     lib = Path(lib_dir())
     py = lib / ".venv" / "bin" / "python"
-    cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "tts.py"), str(f), str(d / "voices")]
-    print(f"voice: {n} lines" + (f"; spoken as written in \"say\": {', '.join(said)}" if said else ""))
+    import subprocess
+    import shutil
+    tmp = Path(tempfile.mkdtemp(prefix="voice.", dir=d / "voices")) if part else None
+    if part:                                       # tts.py rewrites dur.json with the lines it gets: make them aside
+        sub = [r for r in json.loads(f.read_text(encoding="utf-8")) if isinstance(r, dict) and r.get("id") in ids]
+        f = tmp / ".say.json"
+        f.write_text(json.dumps(sub, ensure_ascii=False, indent=1), encoding="utf-8")
+    out_dir = tmp if part else d / "voices"
+    cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "tts.py"), str(f), str(out_dir)]
+    print(f"voice: {len(ids)} line(s)" + (f" ({', '.join(ids[:12])}{' …' if len(ids) > 12 else ''})" if part else "")
+          + (f"; spoken as written in \"say\": {', '.join(said)}" if said else ""))
     if os.environ.get("STUDIO_TTS_DRY"):
         print(" ".join(cmd))
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
         return 0
-    import subprocess
-    return subprocess.run(cmd, cwd=str(lib)).returncode
+    try:
+        rc = fake_tts(f, out_dir) if os.environ.get("STUDIO_TTS_FAKE") else subprocess.run(cmd, cwd=str(lib)).returncode
+        if rc == 0 and part:
+            dur_f = d / "voices" / "dur.json"
+            try:
+                dur = json.loads(dur_f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                dur = {}
+            dur.update(json.loads((tmp / "dur.json").read_text(encoding="utf-8")))
+            for i in ids:
+                os.replace(tmp / f"{i}.wav", d / "voices" / f"{i}.wav")
+            dur_f.write_text(json.dumps(dur, indent=1), encoding="utf-8")
+    finally:
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
+    if rc == 0:                                    # remember what each file was made from (--changed)
+        mf = d / "voices" / ".made.json"
+        try:
+            made = json.loads(mf.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            made = {}
+        made.update({r["id"]: made_key(r) for r in rows if isinstance(r, dict) and r.get("id") in ids})
+        mf.write_text(json.dumps(made, ensure_ascii=False, indent=1), encoding="utf-8")
+    return rc
 
 
 def cmd_voice_asr(a) -> int:
@@ -904,14 +981,41 @@ def cmd_voice_asr(a) -> int:
     model = asr_model(lang)
     lib = Path(lib_dir())
     py = lib / ".venv" / "bin" / "python"
-    cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "asr_check.py"), str(d / "lines.json"),
-           str(d / "voices"), "--lang", lang, "--model", model]
+    lines_f, vdir, tmp = d / "lines.json", d / "voices", None
+    if a.only:                                     # specs/026: stamps of a few lines, merged into words.json
+        import shutil
+        want = [x for x in a.only.split(",") if x]
+        rows = [r for r in json.loads(lines_f.read_text(encoding="utf-8")) if isinstance(r, dict) and r.get("id") in want]
+        tmp = Path(tempfile.mkdtemp(prefix="asr.", dir=d / "voices"))
+        lines_f, vdir = tmp / "lines.json", tmp
+        lines_f.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+        for r in rows:
+            shutil.copy2(d / "voices" / f"{r['id']}.wav", tmp / f"{r['id']}.wav")
+    cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "asr_check.py"), str(lines_f),
+           str(vdir), "--lang", lang, "--model", model]
     print(f"model: {model} ({lang})")
     if os.environ.get("STUDIO_ASR_DRY"):
         print(" ".join(cmd))
+        if tmp:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
         return 0
     import subprocess
-    return subprocess.run(cmd).returncode
+    try:
+        rc = subprocess.run(cmd).returncode
+        if tmp and (tmp / "words.json").is_file():
+            wf = d / "voices" / "words.json"
+            try:
+                words = json.loads(wf.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                words = {}
+            words.update(json.loads((tmp / "words.json").read_text(encoding="utf-8")))
+            wf.write_text(json.dumps(words, indent=0, ensure_ascii=False), encoding="utf-8")
+    finally:
+        if tmp:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+    return rc
 
 
 def cmd_qc_voice(a) -> int:
@@ -1114,8 +1218,11 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("voice-make", help="make the voice files, with each line's \"say\" spelling (specs/023)")
     s.add_argument("film")
     s.add_argument("--skip-review", default=None, help="make the voice without an approved script review (recorded)")
+    s.add_argument("--only", default=None, help="L03,L07: make only these lines (specs/026)")
+    s.add_argument("--changed", action="store_true", help="make only the lines whose text, say, voice or speed changed (specs/026)")
     s = sub.add_parser("voice-asr", help="word stamps with the studio's recogniser model (specs/020)")
     s.add_argument("film")
+    s.add_argument("--only", default=None, help="L03,L07: stamp only these lines, merged into words.json (specs/026)")
     s.add_argument("--lang", default=None)
     for name in ("qc-limits", "render-done"):
         s = sub.add_parser(name, help="used by sh bin/studio render (specs/020)")

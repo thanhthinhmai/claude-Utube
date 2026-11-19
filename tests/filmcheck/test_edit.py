@@ -166,3 +166,39 @@ class Shots(unittest.TestCase):                                    # specs/026 T
         self.assertEqual(edit.run(self.d, "accept-style", {"reason": " "}, base=base)["code"], 2)
         self.assertEqual(edit.run(self.d, "accept-style", {"reason": "deliberate dark beat"}, base=base)["code"], 0)
         self.assertEqual(tiers.load_tier(self.d, "shots")["style_accept"]["reason"], "deliberate dark beat")
+
+
+class Voice(unittest.TestCase):                                    # specs/026 T039
+    def setUp(self):
+        TMP.mkdir(exist_ok=True)
+        os.environ["STUDIO_EDIT_NO_RUN"] = "1"
+        self.d = samples.review_film(Path(tempfile.mkdtemp(dir=TMP)), kit=False)
+
+    def tearDown(self):
+        os.environ.pop("STUDIO_EDIT_NO_RUN", None)
+
+    def run_op(self, op, **a):
+        return edit.run(self.d, op, a, base=points.fingerprint(self.d, "voice"))
+
+    def rows(self):
+        return json.loads((self.d / "lines.json").read_text())
+
+    def test_say_keeps_the_text(self):
+        text = self.rows()[2]["text"]
+        r = self.run_op("voice-say", ref=["L03"], say="R. E. M.")
+        self.assertEqual(r["code"], 0, r)
+        self.assertEqual((self.rows()[2]["text"], self.rows()[2]["say"]), (text, "R. E. M."))
+        self.assertEqual(self.run_op("voice-say", ref=["L03"], say="")["code"], 0)
+        self.assertNotIn("say", self.rows()[2])
+        self.assertEqual(self.run_op("voice-say", ref=["L03"], say="x" * 401)["code"], 2)
+        self.assertEqual(self.run_op("voice-say", ref=["L99"], say="x")["code"], 2)
+
+    def test_voice_set_is_checked(self):
+        before = (self.d / "lines.json").read_bytes()
+        for a in ({"voice": "xx_fake", "confirm": "all"}, {"voice": "am_adam"}, {"speed": "1.5", "confirm": "all"},
+                  {"speed": "fast", "confirm": "all"}, {"confirm": "all"}):
+            self.assertEqual(self.run_op("voice-set", **a)["code"], 2, a)
+        self.assertEqual((self.d / "lines.json").read_bytes(), before)
+        r = self.run_op("voice-set", speed="0.95", confirm="all")
+        self.assertEqual(r["code"], 0, r)
+        self.assertTrue(all(x["speed"] == 0.95 for x in self.rows()))
