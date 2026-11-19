@@ -79,12 +79,14 @@ def cmd_ui(a):
 # ---------- job ----------
 def cmd_job(a):
     if a.action == "start":
+        # specs/025: where the film is made, so the job page can show the parts already done
+        extra = {"film_dir": str((PROJECT / "films" / a.film).resolve())} if a.film and a.kind == "film" else {}
         if HOST:                                 # into the host's job book, as the owner (specs/014 FR-017)
             from studio import host
             j = jobs.create(a.kind, a.name, {"set": a.set, "film": a.film}, owner=host.owner_id(Path(HOST["data"])) or "local",
-                            extra={"source": "chat"})
+                            extra={"source": "chat", **extra})
         else:
-            j = jobs.create(a.kind, a.name, {"set": a.set, "film": a.film})
+            j = jobs.create(a.kind, a.name, {"set": a.set, "film": a.film}, extra=extra)
         out(j["id"])
         u = ui_url(f"/#/jobs/{j['id']}")
         if u:

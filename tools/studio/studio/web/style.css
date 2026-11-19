@@ -420,3 +420,57 @@ select { padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; b
 table.lessons td, table.lessons th { padding: 6px 10px; text-align: left; vertical-align: top; }
 table.lessons tr.l-retired { opacity: .55; }
 table.lessons tr.l-draft td:nth-child(2) { color: var(--warn, #b26b00); font-weight: 600; }
+
+/* ---------- Done so far on the job page (specs/025; layout from the approved mockup) ---------- */
+.step-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.step-name { font-size: 16px; font-weight: 600; margin: 0; }
+.num { font-variant-numeric: tabular-nums; }
+.done { display: grid; gap: 0; min-width: 0; }
+.done .stages { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; padding: 0; list-style: none; }
+.done .stages button { font: inherit; font-size: 12.5px; padding: 4px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink); display: inline-flex; gap: 6px; align-items: center; }
+.done .stages .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.done .stages .st-done .dot { background: var(--ok); }
+.done .stages .st-running .dot { background: var(--info); animation: pulse 1.2s ease-in-out infinite; }
+.done .stages button[disabled] { color: var(--muted); cursor: default; }
+.done .stages button[aria-selected="true"] { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent-ink); font-weight: 600; }
+.done .stages button:focus-visible, .done .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.done .facts { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 0 14px; font-size: 13px; }
+.done .facts b { font-variant-numeric: tabular-nums; }
+.done .script { max-height: 340px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; background: var(--bg); font-size: 13.5px; }
+.done .script p { margin: 0 0 8px; max-width: 70ch; }
+.done .script .script-title { font-weight: 600; margin-bottom: 10px; }
+.done .script .dir { color: var(--muted); font-style: italic; font-size: 12.5px; margin-top: 12px; }
+.done .pid { font-family: ui-monospace, Menlo, monospace; font-size: 11.5px; color: var(--accent-ink); margin-right: 6px; }
+.done .done-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+.done .done-actions.spread { justify-content: space-between; }
+.done .btn { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+.done .btn:hover { background: var(--hover); }
+.done .doc { white-space: pre-wrap; max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; background: var(--bg); font-size: 13px; }
+.done .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.done .seg button { font: inherit; font-size: 12.5px; padding: 4px 10px; border: 0; background: var(--panel); color: var(--muted); cursor: pointer; }
+.done .seg button[aria-pressed="true"] { background: var(--hover); color: var(--ink); font-weight: 600; }
+.done .tbl { overflow-x: auto; }
+.done table.lines { width: 100%; border-collapse: collapse; font-size: 13px; }
+.done table.lines th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.done table.lines td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.done table.lines td.num { color: var(--muted); white-space: nowrap; }
+.done .play { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--accent-line); background: var(--accent-soft); color: var(--accent-ink); cursor: pointer; font-size: 11px; }
+.done .play.on { background: var(--accent); color: var(--panel); }
+.done .play[disabled] { opacity: .4; cursor: default; }
+.done .say { display: block; font-size: 12px; color: var(--warn); }
+.done audio { width: 100%; margin: 4px 0 6px; }
+.done .sheet-img { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; cursor: zoom-in; }
+.done .small { font-size: 12.5px; margin: 6px 0 0; }
+.done .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.done .thumb { margin: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--bg); font-size: 12px; }
+.done .thumb img { display: block; width: 100%; aspect-ratio: 16/9; object-fit: cover; cursor: zoom-in; }
+.done .thumb figcaption { padding: 5px 8px; display: flex; justify-content: space-between; gap: 6px; }
+.done .thumb code { font-size: 11.5px; color: var(--accent-ink); }
+.done .chunks { display: grid; grid-template-columns: repeat(auto-fill, minmax(14px, 1fr)); gap: 3px; margin-top: 4px; }
+.done .chunks i { height: 14px; border-radius: 3px; background: var(--hover); border: 1px solid var(--line); }
+.done .chunks i.d { background: var(--ok); border-color: var(--ok); }
+.done .chunks i.r { background: var(--info); border-color: var(--info); animation: pulse 1.2s ease-in-out infinite; }
+.done-zoom { position: fixed; inset: 0; background: rgba(0, 0, 0, .82); display: grid; place-items: center; padding: 20px; z-index: 50; cursor: zoom-out; }
+.done-zoom img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+@media (prefers-reduced-motion: reduce) { .done .stages .st-running .dot, .done .chunks i.r { animation: none; } }
