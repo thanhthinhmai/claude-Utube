@@ -34,6 +34,10 @@ class Tiers(unittest.TestCase):
         for f in ("qc-exceptions.json", "checks.json", "CHECKS.md", "render.log"):
             (self.d / f).write_text("x")
         (self.d / ".check" / "more.json").write_text("{}")
+        (self.d / ".job").write_text("j-1\n")                                   # specs/023: job ids, pyc, compare sheets
+        (self.d / "kit" / "sound" / "__pycache__").mkdir(parents=True)
+        (self.d / "kit" / "sound" / "__pycache__" / "timing.cpython-312.pyc").write_bytes(b"pyc")
+        (self.d / "compare").mkdir(); (self.d / "compare" / "sheet.jpg").write_bytes(b"jpg")
         self.assertEqual(tiers.fingerprint(self.d), a)
         (self.d / "index.html").write_text("<p>b</p>")
         self.assertNotEqual(tiers.fingerprint(self.d), a)

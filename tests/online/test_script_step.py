@@ -51,13 +51,13 @@ class ScriptStep(unittest.TestCase):
         self.assertGreaterEqual(n, 1)
         self.assertGreater(j.get("tokens") or 0, 0)
 
-    def test_editor_model_from_settings(self):                   # FR-007b
-        from studio import quotas
-        quotas.update_settings({"editor_model": "sonnet"})
+    def test_editor_uses_the_one_model(self):                    # specs/024 FR-002 (was 010 FR-007b)
+        from studio import db
+        db.save_settings({**db.settings(), "editor_model": "sonnet"})     # an old setting: ignored
         _, j = self.run_job("A fox [narration]")
         self.assertEqual(j["status"], "done", j["log"][-6:])
         args = json.loads((self.film_dir(j) / ".check" / "editor-args.json").read_text())
-        self.assertEqual(args[args.index("--model") + 1], "sonnet")
+        self.assertEqual(args[args.index("--model") + 1], "claude-opus-5-5")
 
     def test_treatment_review_shows_the_script(self):           # FR-019
         from studio import jobs, reviews

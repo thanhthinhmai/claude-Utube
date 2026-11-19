@@ -281,13 +281,15 @@ def cmd_qc(a) -> int:
     from filmcheck import tiers
     fin = [{"tier": "final", "ref": "film", "at": None, "rule": "qc", "severity": "block", "measure": p, "limit": "",
             "text": "", "fix": "", "excepted": None} for p in r["problems"]]
-    fin += [{"tier": "final", "ref": "film", "at": None, "rule": "loudness_range", "severity": "warn", "measure": w,
-             "limit": "", "text": "", "fix": "", "excepted": None} for w in r.get("warnings", [])]
+    warns = [w if isinstance(w, dict) else {"rule": "loudness_range", "text": w, "measure": w, "limit": ""}
+             for w in r.get("warnings", [])]
+    fin += [{"tier": "final", "ref": "film", "at": None, "rule": w["rule"], "severity": "warn", "measure": w.get("measure"),
+             "limit": w.get("limit", ""), "text": w.get("text", ""), "fix": "", "excepted": None} for w in warns]
     tiers.save_tier(d, "final", tiers.result("final", fin, {k: r["measures"].get(k) for k in
-                                                           ("silence_ratio", "tail_s", "av_sync", "loudness_range")},
+                                                           ("silence_ratio", "tail_s", "av_sync", "loudness_range", "motion")},
                                              [], 0.0, tiers.fingerprint(d)))
     m = r["measures"]
-    lines = [f"  ✗ {p}" for p in r["problems"]] + [f"  ! {w}" for w in r.get("warnings", [])]
+    lines = [f"  ✗ {p}" for p in r["problems"]] + [f"  ! {w['text']}" for w in warns]
     shots = tiers.load_tier(d, "shots") or {}
     open_style = [i for i in shots.get("issues", []) if i["severity"] == "warn"]
     acc = (shots.get("style_accept") or {}).get("reason")
@@ -409,6 +411,21 @@ def cmd_channel_set(a, channels):
         ch[f] = float(vals[0])
     elif f in ("name", "niche", "audience", "language", "style", "voice", "title_rules", "thumbnail_rules"):
         ch[f] = " ".join(vals)
+    elif f == "hero":                                            # specs/022: hero hoodie=#d9b23a hair=bald …
+        hero = dict(ch.get("hero") or {})
+        for v in vals:
+            k, eq, x = v.partition("=")
+            if not eq or k not in channels.HERO_KEYS:
+                raise channels.ChannelError(f"hero: use key=value with keys {', '.join(channels.HERO_KEYS)}")
+            if k == "glasses":
+                if x not in ("yes", "no"):
+                    raise channels.ChannelError("hero.glasses: yes or no")
+                hero[k] = x == "yes"
+            elif k == "hat" and x in ("none", ""):
+                hero[k] = None
+            else:
+                hero[k] = x
+        ch[f] = hero
     else:
         raise channels.ChannelError(f"unknown field {f}")
     channels.save(root(), ch, lib_dir())
@@ -429,6 +446,25 @@ def cmd_channel_attach(a, channels):
     if r["warning"]:
         print(f"! {r['warning']}")
     print(f"✓ films/{a.film}: channel {a.slug} attached; read films/{a.film}/CHANNEL_BRIEF.md before the treatment")
+
+
+def cmd_kit_use(a):
+    """Copy the style's film kit into the film folder (specs/022 R1)."""
+    from filmcheck import kit
+    d = Path(root()) / "films" / a.film
+    if not d.is_dir():
+        d = film_dir(a.film)
+    try:
+        r = kit.use(root(), d, a.style, a.update)
+    except kit.KitError as e:
+        print(f"✗ kit: {e}", file=sys.stderr)
+        return 2
+    lines = ["kit: up to date" if r["status"] == "up_to_date" else
+             f"✓ kit: {r['style']} ({r['sha256'][:8]}) → films/{d.name}/kit/"]
+    if r["hint"]:
+        lines.append(f"hint: {r['hint']}")
+    out(a, r, lines)
+    return 0
 
 
 def scope_path(channels, scope):
@@ -648,9 +684,18 @@ def cmd_youtube_key(a, topics, channels):
 
 
 # ---------- config ----------
-def cmd_editor_model(a) -> int:
-    editor.set_editor_model(a.value)
-    print(f"✓ script editor model: {a.value}" + (" (same as the film)" if a.value == "inherit" else ""))
+def cmd_model(a) -> int:
+    """specs/024: the studio's one Claude model; no value prints it."""
+    from filmcheck import models
+    if a.value is None:
+        print(models.current())
+        return 0
+    try:
+        models.set_model(a.value)
+    except ValueError as e:
+        print(str(e), file=sys.stderr)
+        return 2
+    print(f"model: {a.value}")
     return 0
 
 
@@ -789,6 +834,40 @@ def asr_model(lang: str) -> str:
     return cfg.get(lang) or cfg["*"]
 
 
+def say_file(d: Path) -> Path:
+    """voices/.say.json: lines.json with "text" replaced by "say" where a line has one (specs/023 FR-017, research R7).
+    The library's tts.py reads only "text"; the script's text in lines.json stays as approved (qc checks it)."""
+    rows = json.loads((d / "lines.json").read_text(encoding="utf-8"))
+    out = [dict(r, text=r["say"]) if isinstance(r, dict) and r.get("say") else r for r in rows]
+    for r in out:
+        if isinstance(r, dict):
+            r.pop("say", None)
+    f = d / "voices" / ".say.json"
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(json.dumps(out, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    return f
+
+
+def cmd_voice_make(a) -> int:
+    d = film_dir(a.film)
+    try:
+        f = say_file(d)
+    except (OSError, ValueError) as e:
+        print(f"✗ lines.json cannot be read: {e}", file=sys.stderr)
+        return 2
+    n = sum(1 for r in json.loads(f.read_text(encoding="utf-8")) if isinstance(r, dict))
+    said = [r["id"] for r in json.loads((d / "lines.json").read_text(encoding="utf-8")) if isinstance(r, dict) and r.get("say")]
+    lib = Path(lib_dir())
+    py = lib / ".venv" / "bin" / "python"
+    cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "tts.py"), str(f), str(d / "voices")]
+    print(f"voice: {n} lines" + (f"; spoken as written in \"say\": {', '.join(said)}" if said else ""))
+    if os.environ.get("STUDIO_TTS_DRY"):
+        print(" ".join(cmd))
+        return 0
+    import subprocess
+    return subprocess.run(cmd, cwd=str(lib)).returncode
+
+
 def cmd_voice_asr(a) -> int:
     d = film_dir(a.film)
     lang = film_lang(d, a.lang)
@@ -916,6 +995,8 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("qc-voice", help="tier 0: check the voice lines (specs/020)")
     s.add_argument("film")
     s.add_argument("--json", action="store_true")
+    s = sub.add_parser("voice-make", help="make the voice files, with each line's \"say\" spelling (specs/023)")
+    s.add_argument("film")
     s = sub.add_parser("voice-asr", help="word stamps with the studio's recogniser model (specs/020)")
     s.add_argument("film")
     s.add_argument("--lang", default=None)
@@ -966,6 +1047,13 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--speed", type=float)
     s.add_argument("--new", action="store_true", help="the film folder does not exist yet")
     s.add_argument("--topic", type=int, help="the topic this film makes (specs/013)")
+
+    kt = sub.add_parser("kit", help="the film kit of a learned style (specs/022)").add_subparsers(dest="cmd", required=True)
+    s = kt.add_parser("use", help="copy my-styles/<style>/kit/ into films/<film>/kit/")
+    s.add_argument("film")
+    s.add_argument("--style")
+    s.add_argument("--update", action="store_true", help="replace a kit copied from an older version")
+    s.add_argument("--json", action="store_true")
 
     tp = sub.add_parser("topics", help="score topics with YouTube numbers (specs/013)").add_subparsers(dest="cmd", required=True)
     s = tp.add_parser("score")
@@ -1024,24 +1112,24 @@ def parser() -> argparse.ArgumentParser:
 
     c = sub.add_parser("config", help="local settings").add_subparsers(dest="cmd", required=True)
     c.add_parser("youtube-key", help="save your YouTube Data API key (typed in, not shown)")
-    s = c.add_parser("editor-model")
-    s.add_argument("value", choices=list(editor.MODELS))
+    s = c.add_parser("model", help="the studio's one Claude model (specs/024); no value prints it")
+    s.add_argument("value", nargs="?")
     s = c.add_parser("render", help="auto: GPU when the machine can (specs/019); software: never the GPU")
     s.add_argument("value", choices=list(editor.RENDER_SETTINGS))
     return p
 
 
 COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("script", "status"): cmd_status,
-            ("script", "skip"): cmd_skip, ("web", "fetch"): cmd_fetch, ("config", "editor-model"): cmd_editor_model, ("config", "render"): cmd_render_setting,
+            ("script", "skip"): cmd_skip, ("web", "fetch"): cmd_fetch, ("config", "model"): cmd_model, ("config", "render"): cmd_render_setting,
             ("qc", "qc"): cmd_qc, ("publish", "publish"): cmd_publish,
             ("qc-plan", "qc-plan"): cmd_qc_plan, ("render-gate", "render-gate"): cmd_render_gate,
             ("qc-shots", "qc-shots"): cmd_qc_shots, ("qc-accept-style", "qc-accept-style"): cmd_qc_accept_style,
             ("qc-except", "qc-except"): cmd_qc_except, ("qc-voice", "qc-voice"): cmd_qc_voice,
-            ("voice-asr", "voice-asr"): cmd_voice_asr, ("qc-limits", "qc-limits"): cmd_qc_limits,
+            ("voice-asr", "voice-asr"): cmd_voice_asr, ("voice-make", "voice-make"): cmd_voice_make, ("qc-limits", "qc-limits"): cmd_qc_limits,
             ("render-done", "render-done"): cmd_render_done,
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
-            ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach,
+            ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach, ("kit", "use"): cmd_kit_use,
             ("lesson", "list"): cmd_lesson_list, ("lesson", "draft"): cmd_lesson_draft, ("lesson", "add"): cmd_lesson_add,
             ("lesson", "approve"): cmd_lesson_approve, ("lesson", "retire"): cmd_lesson_retire,
             ("topics", "score"): cmd_topics_score, ("topics", "recheck"): cmd_topics_recheck,

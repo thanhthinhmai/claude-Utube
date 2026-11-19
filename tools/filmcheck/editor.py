@@ -5,7 +5,8 @@ import json
 import os
 from pathlib import Path
 
-MODELS = ("inherit", "opus", "sonnet", "haiku")
+from filmcheck import models
+
 EDITOR_PAGES = 3          # pages the editor may open per round (first live run, 2026-11-10)
 
 
@@ -24,16 +25,6 @@ def read_config() -> dict:
         return {}
 
 
-def set_editor_model(value: str) -> None:
-    if value not in MODELS:
-        raise ValueError(f"editor model must be one of {', '.join(MODELS)}")
-    p = config_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    data = read_config()
-    data["editor_model"] = value
-    p.write_text(json.dumps(data, indent=1), encoding="utf-8")
-
-
 RENDER_SETTINGS = ("auto", "software")   # specs/019: how pages are rendered (auto = GPU when the machine can)
 
 
@@ -50,12 +41,6 @@ def set_render_setting(value: str) -> None:
 def render_setting() -> str:
     v = read_config().get("render") or "auto"
     return v if v in RENDER_SETTINGS else "auto"
-
-
-def editor_model() -> str:
-    """STUDIO_EDITOR_MODEL (online: set by the worker from Settings), else .studio/config.json, else inherit."""
-    v = os.environ.get("STUDIO_EDITOR_MODEL") or read_config().get("editor_model") or "inherit"
-    return v if v in MODELS else "inherit"
 
 
 SCHEMA = {
@@ -178,7 +163,8 @@ def run(film_dir: Path, paras: set, timeout: int = 900) -> dict:
             env["ANTHROPIC_BASE_URL"] = env["STUDIO_PROXY"]
         env.setdefault("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "1")
         env.pop("ANTHROPIC_API_KEY", None)
-    model = editor_model()
+    want = model_args()[1]
+    models.helper_env(env, want)
     budget = Path(tempfile.mkdtemp(prefix="editor-fetch.")) / "left"
     env["STUDIO_FETCH_BUDGET_FILE"] = str(budget)             # `web fetch` opens at most 3 pages per round
     for _ in range(2):
@@ -196,20 +182,12 @@ def run(film_dir: Path, paras: set, timeout: int = 900) -> dict:
             raise EditorError(f"the editor could not run: {(p.stderr or '').strip()[-300:]}")
         got = valid(out.get("structured_output"), paras)
         if got:
-            used = list((out.get("modelUsage") or {}).keys())
-            got["model"] = used[0] if used else (model if model != "inherit" else "same as the film")
+            got["model"] = models.main_model(out, want)
             got["usage"] = out.get("usage") or {}
             return got
-    return {"bad": True, "model": model}
-
-
-DEFAULT_MODEL = "claude-opus-5-5"
+    return {"bad": True, "model": want}
 
 
 def model_args() -> list:
-    """`--model` for claude -p: the setting, else the job's model (STUDIO_MODEL), else Opus. Never the CLI's own
-    default, which can be a smaller model on the user's machine."""
-    m = editor_model()
-    if m != "inherit":
-        return ["--model", m]
-    return ["--model", os.environ.get("STUDIO_MODEL") or DEFAULT_MODEL]
+    """`--model` for claude -p: always the studio's one model (specs/024), never the CLI's own default."""
+    return ["--model", models.current()]

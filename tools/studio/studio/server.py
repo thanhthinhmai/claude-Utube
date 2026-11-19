@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import APP_ID, VERSION, gate, jobs, resources, reviews, store
+from . import APP_ID, VERSION, donesofar, gate, jobs, resources, reviews, store
 from urllib.parse import urlsplit
 from .store import StudioError
 
@@ -210,6 +210,27 @@ def create_app() -> FastAPI:
             j = reviews.job_view(jobs.load(job_id))
         j["reviews"] = [_review_out(reviews.load(r)) for r in j["review_ids"]]
         return j
+
+    # ---------- the parts of a film already done (specs/025) ----------
+    def _film_job(job_id: str, request: Request) -> dict:
+        """The job as get_job allows it (online: its owner or the studio owner); only film jobs."""
+        if online:
+            a = request.state.account
+            j = jobs.load(job_id, None if a["role"] == "admin" else a["id"])
+        else:
+            j = jobs.load(job_id)
+        if j.get("kind") != "film":
+            raise StudioError("not_found", "không phải việc làm phim", 404)
+        return j
+
+    @app.get(api + "/jobs/{job_id}/done")
+    def job_done(job_id: str, request: Request):
+        return donesofar.summary(_film_job(job_id, request))
+
+    @app.get(api + "/jobs/{job_id}/files/{path:path}")
+    def job_file(job_id: str, path: str, request: Request):
+        p = donesofar.file(_film_job(job_id, request), path)
+        return FileResponse(p, media_type=donesofar.content_type(path), headers={"Cache-Control": "no-cache"})
 
     # ---------- reviews ----------
     def _review_out(r: dict) -> dict:

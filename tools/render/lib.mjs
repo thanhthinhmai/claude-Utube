@@ -44,8 +44,8 @@ export async function readRenderer(/** @type {any} */ page) {
   });
 }
 
-const SKIP_DIRS = new Set(['out', 'stills', 'publish', '.check', 'node_modules']);
-const SKIP_FILE = /\.(mp4|log)$|^(checks\.json|CHECKS\.md|qc-exceptions\.json)$/;   // 020: exceptions never re-record chunks
+const SKIP_DIRS = new Set(['out', 'stills', 'publish', '.check', 'node_modules', 'compare']);   // compare/: specs/023 sheets
+const SKIP_FILE = /\.(mp4|log|pyc)$|^(checks\.json|CHECKS\.md|qc-exceptions\.json|\.job|\.job\.out)$/;   // 020: exceptions never re-record chunks; 023: job ids, pyc
 
 /** SHA-256 over the film's source files (sorted relative path + bytes) and the output shape (data-model.md). */
 export function fingerprint(/** @type {string} */ dir, /** @type {number} */ w, /** @type {number} */ h, /** @type {number} */ fps, /** @type {number|null} */ until = null) {
@@ -53,7 +53,7 @@ export function fingerprint(/** @type {string} */ dir, /** @type {number} */ w, 
   const walk = (/** @type {string} */ d, /** @type {string} */ rel) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
       const r = rel ? `${rel}/${e.name}` : e.name;
-      if (e.isDirectory()) { if (!(rel === '' && SKIP_DIRS.has(e.name))) walk(path.join(d, e.name), r); }
+      if (e.isDirectory()) { if (!(rel === '' && SKIP_DIRS.has(e.name)) && e.name !== '__pycache__') walk(path.join(d, e.name), r); }
       else if (e.isFile() && !SKIP_FILE.test(e.name)) files.push(r);
     }
   };

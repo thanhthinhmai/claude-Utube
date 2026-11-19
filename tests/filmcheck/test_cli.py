@@ -102,12 +102,12 @@ class Flow(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertIn("changed after the editor passed it", outp)
 
-    def test_editor_model_setting(self):
+    def test_editor_uses_the_one_model(self):                     # specs/024: the old setting is ignored
         self.env["STUDIO_EDITOR_MODEL"] = "sonnet"
         self.studio("script", "review", "baker")
         args = json.loads(self.log.read_text().splitlines()[-1])
-        self.assertEqual(args[args.index("--model") + 1], "sonnet")
-        self.assertEqual(self.checks()["script"]["editor"][0]["model"], "sonnet")
+        self.assertEqual(args[args.index("--model") + 1], "claude-opus-5-5")
+        self.assertEqual(self.checks()["script"]["editor"][0]["model"], "claude-opus-5-5")
 
     def test_skip_only_without_narration(self):
         rc, _ = self.studio("script", "skip", "baker", "--reason", "no narration")

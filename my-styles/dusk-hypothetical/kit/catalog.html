@@ -1,0 +1,76 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<title>Dusk Hypothetical kit: catalogue</title>
+<!-- The kit's catalogue (specs/022 FR-008): every set, pose, face, look, graphic and camera placement as a 1.2 s shot.
+     Copy into a film folder with "sh bin/studio kit use <film> --style dusk-hypothetical" (index.html = this file),
+     then "sh bin/studio qc shots <film>". -->
+<link rel="stylesheet" href="/core/fonts/fonts.css">
+<style>html,body{margin:0;background:#000;overflow:hidden}</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+import { film } from './kit/film.js';
+const SCENES = [
+  {"id": "C001", "dur": 1.2, "set": "classroom", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "point", "face": "wow", "turn": 25}], "crowd": {"n": 40, "seed": 2}},
+  {"id": "C002", "dur": 1.2, "set": "lockers", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "point", "face": "wow", "turn": 25}], "crowd": {"n": 40, "seed": 2}},
+  {"id": "C003", "dur": 1.2, "set": "gym", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "point", "face": "wow", "turn": 25}], "crowd": {"n": 120, "seed": 2}},
+  {"id": "C004", "dur": 1.2, "set": "street", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "point", "face": "wow", "turn": 25}], "crowd": {"n": 30, "seed": 2}},
+  {"id": "C005", "dur": 1.2, "set": "bedroom", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "point", "face": "wow", "turn": 25}], "crowd": {"n": 2, "seed": 2}},
+  {"id": "C006", "dur": 1.2, "set": "cafeteria", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "point", "face": "wow", "turn": 25}], "crowd": {"n": 40, "seed": 2}},
+  {"id": "C007", "dur": 1.2, "set": "stadium", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "point", "face": "wow", "turn": 25}], "crowd": {"n": 1000, "seed": 2}},
+  {"id": "C008", "dur": 1.2, "set": "void", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "point", "face": "wow", "turn": 25}], "crowd": {"n": 24, "seed": 2}},
+  // specs/027: the outdoor dusk sets, wide and medium
+  {"id": "C100", "dur": 1.2, "set": "court", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "stand", "face": "happy"}]},
+  {"id": "C101", "dur": 1.2, "set": "court", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "stand", "face": "happy"}]},
+  {"id": "C102", "dur": 1.2, "set": "rooftop", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "stand", "face": "happy"}]},
+  {"id": "C103", "dur": 1.2, "set": "rooftop", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "stand", "face": "happy"}]},
+  {"id": "C104", "dur": 1.2, "set": "parking", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "stand", "face": "happy"}]},
+  {"id": "C105", "dur": 1.2, "set": "parking", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "stand", "face": "happy"}]},
+  {"id": "C106", "dur": 1.2, "set": "street-dusk", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "stand", "face": "happy"}]},
+  {"id": "C107", "dur": 1.2, "set": "street-dusk", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "stand", "face": "half"}, {"who": "extra:3", "pose": "hold-phone", "face": "dot"}, {"who": "extra:5", "pose": "stand", "face": "happy"}]},
+  {"id": "C009", "dur": 1.2, "set": "void", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "stand", "face": "dot"}]},
+  {"id": "C010", "dur": 1.2, "set": "void", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "sit", "face": "dot"}]},
+  {"id": "C011", "dur": 1.2, "set": "void", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "walk", "face": "dot"}]},
+  {"id": "C012", "dur": 1.2, "set": "void", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "hold-phone", "face": "dot"}]},
+  {"id": "C013", "dur": 1.2, "set": "void", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "hold-book", "face": "dot"}]},
+  {"id": "C014", "dur": 1.2, "set": "void", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "hold-bag", "face": "dot"}]},
+  {"id": "C015", "dur": 1.2, "set": "void", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "hold-cup", "face": "dot"}]},
+  {"id": "C016", "dur": 1.2, "set": "void", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "hold-paper", "face": "dot"}]},
+  {"id": "C017", "dur": 1.2, "set": "void", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "point", "face": "dot"}]},
+  {"id": "C018", "dur": 1.2, "set": "void", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "cheer", "face": "dot"}]},
+  {"id": "C019", "dur": 1.2, "set": "void", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "shrug", "face": "dot"}]},
+  {"id": "C020", "dur": 1.2, "set": "void", "cam": "close", "cast": [{"who": "hero", "pose": "stand", "face": "dot"}]},
+  {"id": "C021", "dur": 1.2, "set": "void", "cam": "close", "cast": [{"who": "hero", "pose": "stand", "face": "half"}]},
+  {"id": "C022", "dur": 1.2, "set": "void", "cam": "close", "cast": [{"who": "hero", "pose": "stand", "face": "wow"}]},
+  {"id": "C023", "dur": 1.2, "set": "void", "cam": "close", "cast": [{"who": "hero", "pose": "stand", "face": "happy"}]},
+  {"id": "C024", "dur": 1.2, "set": "void", "cam": "close", "cast": [{"who": "hero", "pose": "stand", "face": "blank"}]},
+  {"id": "C025", "dur": 1.2, "set": "void", "cam": "close", "cast": [{"who": "hero", "pose": "stand", "face": "angry"}]},
+  {"id": "C026", "dur": 1.2, "set": "void", "cam": "close", "cast": [{"who": "hero", "pose": "stand", "face": "sad"}]},
+  {"id": "C027", "dur": 1.2, "set": "void", "cam": "close", "cast": [{"who": "hero", "pose": "stand", "face": "sweat"}]},
+  {"id": "C028", "dur": 1.2, "set": "void", "cam": "close", "cast": [{"who": "extra:40", "pose": "stand", "face": "happy", "hair": "short"}]},
+  {"id": "C029", "dur": 1.2, "set": "void", "cam": "close", "cast": [{"who": "extra:41", "pose": "stand", "face": "happy", "hair": "bun"}]},
+  {"id": "C030", "dur": 1.2, "set": "void", "cam": "close", "cast": [{"who": "extra:42", "pose": "stand", "face": "happy", "hair": "curly"}]},
+  {"id": "C031", "dur": 1.2, "set": "void", "cam": "close", "cast": [{"who": "extra:43", "pose": "stand", "face": "happy", "hair": "bald", "hat": "cap"}]},
+  {"id": "C032", "dur": 1.2, "set": "void", "cam": "close", "cast": [{"who": "extra:44", "pose": "stand", "face": "happy", "hair": "bald", "hat": "beanie", "glasses": true}]},
+  {"id": "C033", "dur": 1.2, "set": "classroom", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "sit", "face": "half"}, {"who": "extra:7", "pose": "sit", "face": "wow"}], "crowd": {"n": 14, "seed": 4}, "gfx": [{"type": "counter", "prefix": "$", "from": 0, "to": 20, "icon": "coin", "at": 0.05}]},
+  {"id": "C034", "dur": 1.2, "set": "classroom", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "sit", "face": "half"}, {"who": "extra:7", "pose": "sit", "face": "wow"}], "crowd": {"n": 14, "seed": 4}, "gfx": [{"type": "menu", "title": "POWERS", "items": ["FLIGHT", "SPEED", "X-RAY", "TIME STOP"], "locked": [2, 3], "active": 0, "at": 0.05}]},
+  {"id": "C035", "dur": 1.2, "set": "classroom", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "sit", "face": "half"}, {"who": "extra:7", "pose": "sit", "face": "wow"}], "crowd": {"n": 14, "seed": 4}, "gfx": [{"type": "diagram", "kind": "bars", "title": "HOURS OF SLEEP", "values": [8, 0], "labels": ["YOU", "NOW"], "at": 0.05}]},
+  {"id": "C036", "dur": 1.2, "set": "classroom", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "sit", "face": "half"}, {"who": "extra:7", "pose": "sit", "face": "wow"}], "crowd": {"n": 14, "seed": 4}, "gfx": [{"type": "bubble", "text": "Wait, how?", "who": 1, "at": 0.05}]},
+  {"id": "C037", "dur": 1.2, "set": "classroom", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "sit", "face": "half"}, {"who": "extra:7", "pose": "sit", "face": "wow"}], "crowd": {"n": 14, "seed": 4}, "gfx": [{"type": "stat", "text": "ONE IN TEN", "sub": "PEOPLE NEVER NOTICE", "at": 0.05}]},
+  {"id": "C038", "dur": 1.2, "set": "classroom", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "sit", "face": "half"}, {"who": "extra:7", "pose": "sit", "face": "wow"}], "crowd": {"n": 14, "seed": 4}, "gfx": [{"type": "title", "text": "WHAT IF", "sub": "YOU NEVER SLEPT", "at": 0.05}]},
+  {"id": "C039", "dur": 1.2, "set": "classroom", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "sit", "face": "half"}, {"who": "extra:7", "pose": "sit", "face": "wow"}], "crowd": {"n": 14, "seed": 4}, "gfx": [{"type": "chapter", "text": "LEVEL TWO", "at": 0.05}]},
+  {"id": "C040", "dur": 1.2, "set": "classroom", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "sit", "face": "half"}, {"who": "extra:7", "pose": "sit", "face": "wow"}], "crowd": {"n": 14, "seed": 4}, "gfx": [{"type": "end-choice", "text": "WOULD YOU DO IT?", "options": ["YES", "NO"], "at": 0.05}]},
+  {"id": "C041", "dur": 1.2, "set": "cafeteria", "cam": "ecu", "cast": [{"who": "hero", "pose": "sit", "face": "dot"}], "crowd": {"n": 60, "seed": 6}},
+  {"id": "C042", "dur": 1.2, "set": "cafeteria", "cam": "close", "cast": [{"who": "hero", "pose": "sit", "face": "dot"}], "crowd": {"n": 60, "seed": 6}},
+  {"id": "C043", "dur": 1.2, "set": "cafeteria", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "sit", "face": "dot"}], "crowd": {"n": 60, "seed": 6}},
+  {"id": "C044", "dur": 1.2, "set": "cafeteria", "cam": "mid-low", "cast": [{"who": "hero", "pose": "sit", "face": "dot"}], "crowd": {"n": 60, "seed": 6}},
+  {"id": "C045", "dur": 1.2, "set": "cafeteria", "cam": "ots", "cast": [{"who": "hero", "pose": "sit", "face": "dot"}], "crowd": {"n": 60, "seed": 6}},
+  {"id": "C046", "dur": 1.2, "set": "cafeteria", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "sit", "face": "dot"}], "crowd": {"n": 60, "seed": 6}},
+  {"id": "C047", "dur": 1.2, "set": "cafeteria", "cam": "wide-high", "cast": [{"who": "hero", "pose": "sit", "face": "dot"}], "crowd": {"n": 60, "seed": 6}},
+  {"id": "C048", "dur": 1.2, "set": "cafeteria", "cam": "very-wide", "cast": [{"who": "hero", "pose": "sit", "face": "dot"}], "crowd": {"n": 60, "seed": 6}},
+  {"id": "C049", "dur": 1.2, "set": "cafeteria", "cam": "huge-high", "cast": [{"who": "hero", "pose": "sit", "face": "dot"}], "crowd": {"n": 60, "seed": 6}},
+  {"id": "C050", "dur": 1.2, "set": "cafeteria", "cam": "top", "cast": [{"who": "hero", "pose": "sit", "face": "dot"}], "crowd": {"n": 60, "seed": 6}},
+  {"id": "C051", "dur": 1.2, "set": "cafeteria", "cam": "insert", "cast": [{"who": "hero", "pose": "sit", "face": "dot"}], "crowd": {"n": 60, "seed": 6}}
+];
+await film({ scenes: SCENES, cues: [] });
+</script></body></html>

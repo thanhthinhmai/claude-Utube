@@ -26,7 +26,6 @@ SETTINGS_DEFAULT = {
     "concurrency": 2,
     "review_timeout_days": 7,
     "model": "claude-opus-5-5",
-    "editor_model": "inherit",
     "youtube_daily_units": 9000,          # specs/013: the studio's YouTube units a day (YouTube gives 10000)
     "topics_per_day": 40,                 # specs/013: topics one person may score a day (0 = off)            # specs/010 FR-007b: inherit | opus | sonnet | haiku
     # USD per million tokens: input, output, cache write, cache read
@@ -291,7 +290,8 @@ def read():
         con.close()
 
 
-REMOVED_SETTINGS = ("signup_open", "daily_cost_cap_usd", "job_cost_cap_usd")   # specs/008: no sign-up, tokens not money
+REMOVED_SETTINGS = ("signup_open", "daily_cost_cap_usd", "job_cost_cap_usd",   # specs/008: no sign-up, tokens not money
+                    "editor_model")                                            # specs/024: one model for every call
 
 
 def settings() -> dict:

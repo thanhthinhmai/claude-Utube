@@ -25,6 +25,11 @@ def cmd_fetch(a):
     return 0
 
 
+def cmd_refetch(a):
+    from sl import fetch
+    return fetch.refetch(a.set, a.videos)
+
+
 def cmd_measure(a):
     from sl import measure
     done = measure.measure_set(a.set, a.only)
@@ -39,9 +44,11 @@ def cmd_transcribe(a):
     data = refset.load(a.set)
     n = 0
     for v in data["videos"]:
-        if v.get("state") != "measured":
-            continue
         path = refset.video_path(a.set, v)
+        again = v.get("state") == "transcribed" and path.exists() and \
+            not (refset.profile_dir(a.set, v["id"]) / "words.json").exists()      # refetched after clean (specs/023)
+        if v.get("state") != "measured" and not again:
+            continue
         meta = probe.probe(path)
         print(f"… chép lời {v['id']}")
         tr = speech.transcribe(path, meta, v["segments"], a.model, None if a.lang == "auto" else a.lang)
@@ -90,6 +97,25 @@ def cmd_label(a):
     return 0
 
 
+def cmd_craft_label(a):
+    from sl import craftset
+    from filmcheck import craftlabel
+    skip = [x for x in (a.skip or "").split(",") if x]
+    try:
+        tot = craftset.label_set(a.set, a.force)
+    except craftlabel.CraftLabelError as e:
+        raise StepError(str(e)) from None
+    print(f"Craft labels: {tot['shots']} shot(s) labelled now in {tot['videos']} video(s), {tot['calls']} call(s).")
+    sm = craftset.summary(a.set, skip)
+    if not sm["per_video"]:
+        raise StepError("chưa có nhãn nào: bộ chưa có shots.json (chạy learn shots và learn label trước)")
+    print("\n".join(craftset.table(sm)))
+    if a.write:
+        c = craftset.write_style(a.set, a.write, sm, skip)
+        print(f"✓ my-styles/{a.write}/template.json → craft (action min {c['action']['min']}), EVIDENCE.md")
+    return 0
+
+
 def cmd_summary(a):
     from sl import summary
     s = summary.build(a.set)
@@ -104,12 +130,62 @@ def cmd_check_names(a):
 
 def cmd_compare(a):
     from sl import compare
+    if a.clip:
+        return compare.clip_cli(a.set, a.clip)
+    if not (a.ref and a.ours):
+        raise UsageError("cần --ref và --ours (khung chứng minh), hoặc --clip (đoạn video, specs/023)")
     return compare.cli(a.set, a.ref, a.ours, a.round)
 
 
 def cmd_save(a):
     from sl import save
     return save.save(a.set, a.slug, a.en, a.cn, a.based_on, a.accept_proof, a.update)
+
+
+def cmd_template_check(a):
+    from sl import template
+    return template.cli(a.slug, a.partial)
+
+
+def cmd_craft_summary(a):
+    from sl import template
+    s = template.craft_summary(a.set, a.parts)
+    template.print_summary(s)
+    return 0
+
+
+def cmd_craft(a):
+    from sl import craft
+    try:
+        return craft.craft_set(a.set, a.only, a.strips)
+    except craft.CraftError as e:
+        raise StepError(str(e))
+
+
+def cmd_evidence(a):
+    from sl import craft
+    print(craft.evidence(a.set, a.vid, a.t, a.name))
+    return 0
+
+
+def cmd_sound(a):
+    from sl import soundcraft
+    return soundcraft.sound_set(a.set, a.only)
+
+
+def cmd_beats(a):
+    from sl import timesummary
+    probs = timesummary.check_beats(a.set)
+    for x in probs:
+        print(f"✗ {x}")
+    if not probs:
+        print("✓ beats.json đạt")
+    return 1 if probs else 0
+
+
+def cmd_pairs(a):
+    from sl import pairs
+    return pairs.cli(a.set, a.batch, a.component, a.ours, a.ref, a.notes, a.clip, a.ref_strip, a.ref_seconds)
 
 
 def cmd_clean(a):
@@ -132,6 +208,9 @@ def main(argv=None) -> int:
     f.add_argument("--deny", nargs="*")
     f.set_defaults(fn=cmd_fetch)
 
+    rf = sub.add_parser("refetch", help="tải lại video của một bộ đã học, vào đúng vNN cũ (specs/023)")
+    rf.add_argument("set"); rf.add_argument("--videos", nargs="+", required=True); rf.set_defaults(fn=cmd_refetch)
+
     m = sub.add_parser("measure", help="đo mọi khung của phần được đo")
     m.add_argument("set"); m.add_argument("--only", nargs="*")
     m.set_defaults(fn=cmd_measure)
@@ -150,6 +229,12 @@ def main(argv=None) -> int:
                     help="sửa tay một nhãn, ví dụ --set 'v03:S014 scale=huge angle=top'")
     lb.set_defaults(fn=cmd_label)
 
+    cl = sub.add_parser("craft-label", help="gán nhãn hành động, ngoài trời, đồ trong tay cho mọi cảnh (specs/027)")
+    cl.add_argument("set"); cl.add_argument("--force", action="store_true", help="gán lại tất cả")
+    cl.add_argument("--skip", help="video không tính vào tỉ lệ, ví dụ v03,v08 (video 2D phẳng)")
+    cl.add_argument("--write", metavar="STYLE", help="ghi craft vào my-styles/STYLE/template.json và EVIDENCE.md")
+    cl.set_defaults(fn=cmd_craft_label)
+
     s = sub.add_parser("summary", help="tổng hợp cả bộ")
     s.add_argument("set"); s.set_defaults(fn=cmd_summary)
 
@@ -157,7 +242,8 @@ def main(argv=None) -> int:
     c.add_argument("set"); c.add_argument("files", nargs="+"); c.set_defaults(fn=cmd_check_names)
 
     k = sub.add_parser("compare", help="so khung chứng minh với khung gốc")
-    k.add_argument("set"); k.add_argument("--ref", required=True); k.add_argument("--ours", required=True)
+    k.add_argument("set"); k.add_argument("--ref"); k.add_argument("--ours")
+    k.add_argument("--clip", help="đoạn video của khung chứng minh: so số đo chuyển động với kênh mẫu (specs/023)")
     k.add_argument("--round", type=int, default=1); k.set_defaults(fn=cmd_compare)
 
     v = sub.add_parser("save", help="lưu phong cách vào my-styles/")
@@ -166,6 +252,35 @@ def main(argv=None) -> int:
     v.add_argument("--accept-proof", action="store_true", help="người dùng đã chấp nhận khung chứng minh chưa đạt ngưỡng")
     v.add_argument("--update", action="store_true", help="học lại một phong cách riêng đã có (giữ nhật ký sửa và phim mẫu)")
     v.set_defaults(fn=cmd_save)
+
+    tc = sub.add_parser("template-check", help="kiểm TEMPLATE.md, template.json và nhãn luật của STYLE.md (specs/023)")
+    tc.add_argument("slug"); tc.add_argument("--partial", metavar="a-b", help="chỉ kiểm mục a–b, bỏ công thức nhịp")
+    tc.set_defaults(fn=cmd_template_check)
+
+    cr = sub.add_parser("craft", help="đo máy, cử động trong cảnh, chuyển cảnh; cắt dải khung (specs/023)")
+    cr.add_argument("set"); cr.add_argument("--only", nargs="*"); cr.add_argument("--strips", type=int, default=80)
+    cr.set_defaults(fn=cmd_craft)
+
+    ev = sub.add_parser("evidence", help="trích một khung 640 px làm bằng chứng (video phải còn)")
+    ev.add_argument("set"); ev.add_argument("vid"); ev.add_argument("t", type=float); ev.add_argument("--name", required=True)
+    ev.set_defaults(fn=cmd_evidence)
+
+    so = sub.add_parser("sound", help="nhịp đọc, nhạc, tiếng động (cần learn transcribe trước; specs/023)")
+    so.add_argument("set"); so.add_argument("--only", nargs="*"); so.set_defaults(fn=cmd_sound)
+
+    bt = sub.add_parser("beats", help="kiểm profile/beats.json (specs/023)")
+    bt.add_argument("set"); bt.add_argument("--check", action="store_true", required=True); bt.set_defaults(fn=cmd_beats)
+
+    pr = sub.add_parser("pairs", help="bảng so bộ dựng | kênh mẫu (specs/023)")
+    pr.add_argument("set"); pr.add_argument("--batch", type=int, required=True, choices=(1, 2, 3, 4))
+    pr.add_argument("--component", required=True); pr.add_argument("--ours", nargs="+", required=True)
+    pr.add_argument("--ref", nargs="+", required=True); pr.add_argument("--notes", default="")
+    pr.add_argument("--clip"); pr.add_argument("--ref-strip"); pr.add_argument("--ref-seconds", type=float)
+    pr.set_defaults(fn=cmd_pairs)
+
+    cs = sub.add_parser("craft-summary", help="gom số tay nghề của bộ: bố cục, độ sâu, ánh sáng; theo thời gian (specs/023)")
+    cs.add_argument("set"); cs.add_argument("--parts", nargs="+", default=["look"], choices=("look", "time"))
+    cs.set_defaults(fn=cmd_craft_summary)
 
     d = sub.add_parser("clean", help="xoá video và âm thanh tham chiếu của bộ")
     d.add_argument("set"); d.add_argument("--keep", action="store_true"); d.set_defaults(fn=cmd_clean)

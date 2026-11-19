@@ -79,12 +79,14 @@ def cmd_ui(a):
 # ---------- job ----------
 def cmd_job(a):
     if a.action == "start":
+        # specs/025: where the film is made, so the job page can show the parts already done
+        extra = {"film_dir": str((PROJECT / "films" / a.film).resolve())} if a.film and a.kind == "film" else {}
         if HOST:                                 # into the host's job book, as the owner (specs/014 FR-017)
             from studio import host
             j = jobs.create(a.kind, a.name, {"set": a.set, "film": a.film}, owner=host.owner_id(Path(HOST["data"])) or "local",
-                            extra={"source": "chat"})
+                            extra={"source": "chat", **extra})
         else:
-            j = jobs.create(a.kind, a.name, {"set": a.set, "film": a.film})
+            j = jobs.create(a.kind, a.name, {"set": a.set, "film": a.film}, extra=extra)
         out(j["id"])
         u = ui_url(f"/#/jobs/{j['id']}")
         if u:
@@ -143,7 +145,9 @@ def job_run(a, remote: bool = False) -> int:
     if remote:
         step = lambda text: proxy_call("POST", f"/internal/jobs/{a.id}/step", {"text": text})   # noqa: E731
         add_log = lambda *lines: proxy_call("POST", f"/internal/jobs/{a.id}/log", {"lines": list(lines)})  # noqa: E731
-        beat_fn = (lambda: step(a.step)) if a.step else (lambda: None)   # same step again only marks it alive  # noqa: E731
+        # same step again only marks it alive; it carries the progress so far, or the page would lose it
+        beat_fn = (lambda: proxy_call("POST", f"/internal/jobs/{a.id}/step",                      # noqa: E731
+                                      {"text": a.step, "progress": state["sent"]})) if a.step else (lambda: None)
     else:
         jobs.load(a.id)
         step = lambda text: jobs.step(a.id, text)     # noqa: E731
@@ -153,15 +157,42 @@ def job_run(a, remote: bool = False) -> int:
         step(a.step)
     tail = collections.deque(maxlen=50)
     beat = float(os.environ.get("STUDIO_HEARTBEAT", "30"))
+    every = float(os.environ.get("STUDIO_LOG_FLUSH", "3"))     # the job page sees new lines within a few seconds
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, env=CHILD_ENV)
-    done = threading.Event()
+    # locally a run with a step is remembered, so a shorter one alongside (Mix during Render) hands the step back
+    run_key = jobs.run_begin(a.id, a.step, p.pid) if a.step and not remote else None
+    done, lock = threading.Event(), threading.Lock()
+    pending, state = [], {"flushed": time.monotonic(), "progress": None, "sent": None}
+
+    def flush():
+        """Write the lines and the latest N/M progress seen since the last flush (both best effort)."""
+        with lock:
+            lines, pending[:] = list(pending), []
+            prog = state["progress"]
+            state["flushed"] = time.monotonic()
+        try:
+            if lines:
+                add_log(*lines[-jobs.LOG_KEEP:])          # the job keeps 50 lines; the proxy takes at most 60 a call
+            if a.step and prog and prog != state["sent"]:
+                if run_key:
+                    jobs.run_progress(a.id, run_key, prog)
+                else:                                   # online: the proxy's step call carries the progress
+                    proxy_call("POST", f"/internal/jobs/{a.id}/step", {"text": a.step, "progress": prog})
+                state["sent"] = prog
+        except StudioError:
+            pass
 
     def heartbeat():
-        while not done.wait(beat):
-            try:
-                beat_fn()
-            except StudioError:
-                pass
+        while not done.wait(min(beat, every)):
+            if pending or (state["progress"] and state["progress"] != state["sent"]):
+                flush()
+            if time.monotonic() - state.get("beat", 0) >= beat:
+                state["beat"] = time.monotonic()
+                try:
+                    beat_fn()
+                except StudioError:
+                    pass
+    state["beat"] = time.monotonic()
     threading.Thread(target=heartbeat, daemon=True).start()
     # online, the agent reads only the end (every line it reads is paid again on every later turn); locally all of it
     quiet = remote
@@ -174,6 +205,13 @@ def job_run(a, remote: bool = False) -> int:
         if text.startswith("[note] ") or (tail and tail[-1] == text):
             continue
         tail.append(text)
+        got = jobs.progress_in(text)
+        with lock:
+            pending.append(text)
+            if got:
+                state["progress"] = got
+        if time.monotonic() - state["flushed"] >= every:
+            flush()
     rc = p.wait()
     done.set()
     if quiet:
@@ -181,7 +219,13 @@ def job_run(a, remote: bool = False) -> int:
         if len(tail) > 20:
             print(f"… ({len(tail) - 20}+ earlier lines are in the job log)")
         print("\n".join(shown), flush=True)
-    add_log(*tail, f"(command exited with code {rc})")
+    flush()
+    add_log(f"(command exited with code {rc})")
+    if run_key:
+        try:
+            jobs.run_end(a.id, run_key)
+        except StudioError:
+            pass
     return rc
 
 

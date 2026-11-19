@@ -323,9 +323,55 @@ def measure(d: Path, lib=None) -> dict:
             measures["loudness_range"] = lra
             rng = style.get("loudness_range")
             if rng and not (rng[0] <= lra <= rng[1]):
-                warnings.append(f"style: the loudness range is {lra:.1f} LU; the style's is {rng[0]:g}–{rng[1]:g} LU")
+                warnings.append({"rule": "loudness_range", "measure": lra, "limit": f"{rng[0]:g}–{rng[1]:g}",
+                                 "text": f"style: the loudness range is {lra:.1f} LU; the style's is {rng[0]:g}–{rng[1]:g} LU"})
+    warnings += motion_warnings(d, mp4, shots, duration, measures)
     return {"pass": not problems, "narration": bool(nar), "duration": round(duration, 2), "measures": measures,
             "problems": problems, "warnings": warnings}
+
+
+def motion_warnings(d: Path, mp4: Path, shots, duration: float, measures: dict) -> list:
+    """specs/023 FR-011: the film's camera, dead time and transitions against the style's template (warnings).
+    Each warning is {rule, text, measure, limit}; a style without template.json is skipped."""
+    from filmcheck import motioncheck
+    tpl = motioncheck.template_of(d)
+    if not tpl or not shots:
+        measures["motion"] = {"skipped": "no template.json" if not tpl else "no shot list"}
+        return []
+    try:
+        rows = motioncheck.film_motion(mp4, shots, d / ".check")
+    except motioncheck.MotionError as e:
+        measures["motion"] = {"error": str(e)}
+        return [{"rule": "motion_unchecked", "text": str(e), "measure": "not measured", "limit": "craft.py"}]
+    fm = motioncheck.film_measures(rows, duration)
+    mo, tr = tpl.get("motion") or {}, tpl.get("transitions") or {}
+    min_s = float(mo.get("still_person_min_s") or 2.0)
+    cast = {}
+    try:
+        cast = (json.loads((d / ".check" / "plan-input.json").read_text(encoding="utf-8")).get("cast") or {})
+    except (OSError, ValueError):
+        pass
+    dead_t = sum(r["t1"] - r["t0"] for r in rows if cast.get(r["id"], 1 if r.get("scale") != "insert" else 0)
+                 and r["cam"]["type"] == "still" and not r["inner"]["spans"] and r["t1"] - r["t0"] >= min_s)
+    fm["dead_share"] = round(dead_t / duration, 3) if duration else None
+    measures["motion"] = fm
+    out = []
+
+    def rng(rule, v, r, text):
+        if r and v is not None and not (r[0] <= v <= r[1]):
+            out.append({"rule": rule, "text": text, "measure": v, "limit": f"{r[0]:g}–{r[1]:g}"})
+    rng("style_still_ratio", fm["still_ratio"], mo.get("still_ratio"),
+        f"style: a still camera covers {fm['still_ratio']:.0%} of the film; give shots a slow push-in (move)")
+    rng("style_motion720", fm["motion720_p50"], mo.get("motion720_p50"),
+        f"style: the camera's median shift is {fm['motion720_p50']:g} px/frame at 720")
+    if mo.get("dead_share_max") is not None and fm["dead_share"] is not None and fm["dead_share"] > mo["dead_share_max"]:
+        out.append({"rule": "style_person_motion", "text": f"style: shots with people where nothing moves cover "
+                    f"{fm['dead_share']:.0%} of the film", "measure": fm["dead_share"], "limit": f"≤ {mo['dead_share_max']:g}"})
+    soft = sum(c for k, c in fm["transitions"].items() if k not in ("fade", "dip"))
+    if fm["transitions"].get("fade", 0) > tr.get("fade_max_per_film", 2) or soft > 2:
+        out.append({"rule": "style_transitions", "text": f"style: transitions {fm['transitions']} (the style cuts; at most "
+                    f"{tr.get('fade_max_per_film', 2)} fades)", "measure": fm["transitions"], "limit": "cuts"})
+    return out
 
 
 AV_SYNC = 0.1

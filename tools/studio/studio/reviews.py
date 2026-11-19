@@ -129,6 +129,7 @@ def all_reviews(status: str = None, owner: str = None) -> list:
 def job_view(j: dict) -> dict:
     """A job as shown: inactive when stale; waiting_resume when its last review is decided but nobody picked it up."""
     v = dict(j)
+    v.pop("film_dir", None)                      # specs/025: a server path, never shown
     v["status"] = jobs.shown_status(j)
     if j["status"] == "waiting_review" and j["review_ids"]:
         try:

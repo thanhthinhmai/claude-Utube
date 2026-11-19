@@ -21,9 +21,10 @@ const [base, email, password, jobId] = process.argv.slice(2);
   const quality = await page.locator("#quality").innerText();
   await page.goto(`${base}/#/settings/general`);
   await page.waitForSelector("text=Save settings");
-  await page.selectOption("#s-editor_model", "sonnet");
+  const models = await page.locator("#s-model option").allTextContents();     // specs/024: one select, server list
+  const editorSelect = await page.locator("#s-editor_model").count();
   await page.click("text=Save settings");
   await page.waitForSelector("#msg >> text=Saved.");
   await browser.close();
-  console.log(JSON.stringify({ errors, quality }));
+  console.log(JSON.stringify({ errors, quality, models, editorSelect }));
 })().catch((e) => { console.error(e); process.exit(1); });

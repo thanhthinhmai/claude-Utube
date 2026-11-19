@@ -93,9 +93,9 @@ def env(slot: int) -> dict:
 
 
 def run(slot: int, args: list, timeout: float = 60, input: str = None, cwd: str = None,
-        wait: float = None) -> subprocess.CompletedProcess:
+        wait: float = None, env_extra: dict = None) -> subprocess.CompletedProcess:
     with lock(slot, wait):
-        return subprocess.run([claude_bin(), *args], env=env(slot), capture_output=True, text=True, timeout=timeout,
+        return subprocess.run([claude_bin(), *args], env={**env(slot), **(env_extra or {})}, capture_output=True, text=True, timeout=timeout,
                               input=input, stdin=None if input is not None else subprocess.DEVNULL, cwd=cwd)
 
 

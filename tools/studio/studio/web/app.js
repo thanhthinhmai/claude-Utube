@@ -435,6 +435,208 @@ async function fillPublish(film, sum) {
   });
 }
 
+// ---------- the parts of a film already done (specs/025) ----------
+/** @param {any} j */
+function stepHtml(j) {
+  const pct = j.progress && j.progress.total ? Math.round((100 * j.progress.done) / j.progress.total) : null;
+  return `<p class="section-title">Current step</p>
+    <div class="step-row"><p class="step-name">${esc(j.step)}</p>${pct !== null ? `<span class="muted num">${j.progress.done}/${j.progress.total}</span>` : ""}</div>
+    ${pct !== null ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ""}`;
+}
+/** @type {any} */
+const DONE = { job: null, data: null, tab: null, group: 0, respelled: false, sheet: 1, shotMode: "sheet", shotCount: 24,
+  lines: null, dur: null, labels: null, audio: null, playing: null, drawn: {} };
+const fileUrl = (/** @type {string} */ path) => `${API}/jobs/${encodeURIComponent(DONE.job.id)}/files/${path.split("/").map(encodeURIComponent).join("/")}`;
+const mmss = (/** @type {number} */ s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+const shotFile = (/** @type {string} */ id) => `.check/shots/${id}.jpg`;
+
+/** @param {any} j */
+async function doneOpen(j) {
+  if (!DONE.job || DONE.job.id !== j.id) Object.assign(DONE, { tab: null, group: 0, respelled: false, sheet: 1, shotMode: "sheet",
+    shotCount: 24, lines: null, dur: null, labels: null, drawn: {} });
+  DONE.job = j;
+  DONE.drawn = {};
+  await doneRefresh();
+}
+/** @param {boolean} [clicked] a click on a step: always draw it (live updates leave a playing section alone) */
+async function doneRefresh(clicked = false) {
+  const slot = document.getElementById("done-slot");
+  if (!slot || !DONE.job) return;
+  let d;
+  try { d = await get(`/jobs/${encodeURIComponent(DONE.job.id)}/done`); } catch { return; }
+  DONE.data = d;
+  if (!d.film) { slot.hidden = true; return; }
+  slot.hidden = false;
+  const usable = d.steps.filter((/** @type {any} */ s) => d.sections[s.key]);
+  if (!DONE.tab || !d.sections[DONE.tab]) DONE.tab = usable.length ? usable[0].key : null;
+  if (!slot.querySelector("#done-steps")) {
+    slot.innerHTML = `<p class="section-title">Done so far</p><ul class="stages" id="done-steps" role="tablist"></ul><div id="done-body"></div>`;
+  }
+  slot.querySelector("#done-steps").innerHTML = d.steps.map((/** @type {any} */ s) => {
+    const can = !!d.sections[s.key];
+    const pct = s.progress ? ` ${Math.round((100 * s.progress.done) / s.progress.total)}%` : "";
+    return `<li><button role="tab" data-t="${s.key}" class="st-${s.state}" ${can ? "" : "disabled"} aria-selected="${DONE.tab === s.key}">
+      <span class="dot"></span>${esc(s.label)}${pct}</button></li>`;
+  }).join("");
+  slot.querySelectorAll("#done-steps button:not([disabled])").forEach((b) => {
+    /** @type {HTMLElement} */ (b).onclick = () => { DONE.tab = /** @type {HTMLElement} */ (b).dataset.t; doneRefresh(true); };
+  });
+  const sec = DONE.tab && d.sections[DONE.tab];
+  const body = /** @type {HTMLElement} */ (slot.querySelector("#done-body"));
+  if (!sec) { body.innerHTML = `<p class="muted">Nothing done yet.</p>`; return; }
+  const key = `${DONE.tab}:${sec.version}`;
+  if (DONE.drawn.key === key) return;                 // same content: keep what is open (and what is playing)
+  if (!clicked && DONE.playing && body.contains(DONE.playing)) return;
+  DONE.drawn.key = key;
+  stopAudio();
+  await ({ script: doneScript, voice: doneVoice, shots: doneShots, mix: doneMix, render: doneRender }[DONE.tab] || (() => {}))(body, sec);
+}
+function stopAudio() {
+  if (DONE.audio) { DONE.audio.pause(); DONE.audio = null; }
+  if (DONE.playing) { DONE.playing.classList.remove("on"); DONE.playing.textContent = "▶"; DONE.playing = null; }
+}
+const facts = (/** @type {string[]} */ xs) => `<div class="facts">${xs.filter(Boolean).map((x) => `<span>${x}</span>`).join("")}</div>`;
+const b = (/** @type {any} */ v) => `<b>${v ?? "—"}</b>`;
+
+/** @param {HTMLElement} body @param {any} s */
+function doneScript(body, s) {
+  const ed = s.editor;
+  body.innerHTML = facts([s.machine != null ? `Machine ${b(s.machine)}/10` : "",
+    ed ? `Editor ${b(ed.score)}/10 after ${b(ed.fix_rounds)} fix round${ed.fix_rounds === 1 ? "" : "s"}` : "",
+    `${b(num(s.words, 0))} words`, `${b(s.paragraphs)} paragraphs`, s.target_seconds ? `Target ${b(mmss(s.target_seconds))}` : "",
+    `${b(s.sources)} sources`])
+    + `<div class="script">${s.title ? `<p class="script-title">${esc(s.title)}</p>` : ""}
+      ${s.excerpt.map((/** @type {any} */ x) => x.kind === "dir" ? `<p class="dir">${esc(x.text)}</p>`
+        : `<p><span class="pid">${esc(x.id)}</span>${esc(x.text)}</p>`).join("")}
+      ${s.paragraphs > 9 ? `<p class="muted">… ${s.paragraphs - 9} more paragraphs</p>` : ""}</div>
+    <div class="row done-actions"><button class="btn" data-open="SCRIPT.md">Open the full script</button>
+      <button class="btn" data-open="SOURCES.md">Sources (${s.sources})</button>
+      ${s.rounds.map((/** @type {number} */ n) => `<button class="btn" data-review="${n}">Editor notes, round ${n}</button>`).join("")}</div>
+    <div id="done-more"></div>`;
+  body.querySelectorAll("[data-open]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = async () => {
+    const r = await fetch(fileUrl(/** @type {HTMLElement} */ (el).dataset.open), { credentials: "same-origin" });
+    document.getElementById("done-more").innerHTML = `<pre class="doc">${esc(await r.text())}</pre>`;
+  }; });
+  body.querySelectorAll("[data-review]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = async () => {
+    const n = /** @type {HTMLElement} */ (el).dataset.review;
+    const r = await (await fetch(fileUrl(`.check/review-r${n}.json`), { credentials: "same-origin" })).json();
+    document.getElementById("done-more").innerHTML = `<div class="doc"><p><b>Round ${esc(n)}</b> · score ${esc(r.score)}/10${r.model ? ` · ${esc(r.model)}` : ""}</p>
+      <ul>${(r.issues || []).map((/** @type {any} */ i) => `<li><b>${esc(i.level)}</b> ${esc(i.para)}: ${esc(i.reason)}</li>`).join("") || "<li>No issues.</li>"}</ul></div>`;
+  }; });
+}
+
+/** @param {HTMLElement} body @param {any} s */
+async function doneVoice(body, s) {
+  if (!DONE.lines || DONE.drawn.linesVersion !== s.version) {
+    try {
+      DONE.lines = await (await fetch(fileUrl("lines.json"), { credentials: "same-origin" })).json();
+      DONE.dur = await (await fetch(fileUrl("voices/dur.json"), { credentials: "same-origin" })).json().catch(() => ({}));
+    } catch { DONE.lines = []; DONE.dur = {}; }
+    DONE.drawn.linesVersion = s.version;
+  }
+  const paras = s.paras || [];
+  const groups = [];
+  for (let i = 0; i < paras.length; i += 10) groups.push(paras.slice(i, i + 10));
+  if (DONE.group >= groups.length) DONE.group = 0;
+  const inGroup = new Set(groups[DONE.group] || []);
+  const rows = (DONE.lines || []).filter((/** @type {any} */ l) => DONE.respelled ? l.say : inGroup.has(l.para));
+  const has = new Set(Object.keys(DONE.dur || {}));
+  body.innerHTML = facts([`${b(s.lines)} lines`, s.voice ? `Voice ${b(esc(s.voice))} · speed ${b(s.speed)}` : "",
+    `Voice check: ${b(s.pass ? "pass" : s.pass === false ? "not yet" : "—")}`, `${b(s.respelled)} lines read with a respelling`])
+    + `<div class="row done-actions"><span class="seg"><button data-f="all" aria-pressed="${!DONE.respelled}">All lines</button>
+        <button data-f="say" aria-pressed="${DONE.respelled}">Respelled only</button></span>
+      ${DONE.respelled ? "" : `<label class="muted">Paragraphs <select id="done-group">${groups.map((g, i) =>
+        `<option value="${i}"${i === DONE.group ? " selected" : ""}>${esc(g[0])}–${esc(g[g.length - 1])}</option>`).join("")}</select></label>`}</div>
+    <div class="tbl"><table class="lines"><thead><tr><th></th><th>Line</th><th>Text</th><th>Length</th></tr></thead><tbody>
+    ${rows.map((/** @type {any} */ l) => `<tr><td><button class="play" data-a="${esc(l.id)}" aria-label="Play ${esc(l.id)}" ${has.size && !has.has(l.id) ? "disabled" : ""}>▶</button></td>
+      <td class="num">${esc(l.id)} · ${esc(l.para || "")}</td><td>${esc(l.text)}${l.say ? `<span class="say">Read as: “${esc(l.say)}”</span>` : ""}</td>
+      <td class="num">${DONE.dur && DONE.dur[l.id] != null ? `${Number(DONE.dur[l.id]).toFixed(1)} s` : "—"}</td></tr>`).join("") || `<tr><td colspan="4" class="muted">No lines.</td></tr>`}
+    </tbody></table></div>`;
+  body.querySelectorAll(".seg button").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+    DONE.respelled = /** @type {HTMLElement} */ (el).dataset.f === "say"; doneVoice(body, s);
+  }; });
+  const g = /** @type {HTMLSelectElement | null} */ (body.querySelector("#done-group"));
+  if (g) g.onchange = () => { DONE.group = Number(g.value); doneVoice(body, s); };
+  body.querySelectorAll(".play[data-a]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = () => {
+    const was = DONE.playing === el;
+    stopAudio();
+    if (was) return;
+    const a = new Audio(fileUrl(`voices/${/** @type {HTMLElement} */ (el).dataset.a}.wav`));
+    DONE.audio = a; DONE.playing = el; el.classList.add("on"); el.textContent = "❚❚";
+    a.onended = () => stopAudio();
+    a.play().catch(() => stopAudio());
+  }; });
+}
+
+/** @param {HTMLElement} body @param {any} s */
+async function doneShots(body, s) {
+  if (s.labels && !DONE.labels) {
+    try { DONE.labels = (await (await fetch(fileUrl(".check/labels.json"), { credentials: "same-origin" })).json()).labels || {}; }
+    catch { DONE.labels = {}; }
+  }
+  const ids = Array.from({ length: s.shots }, (_, i) => `S${String(i + 1).padStart(3, "0")}`);
+  if (DONE.sheet > s.sheets) DONE.sheet = 1;
+  const grid = DONE.shotMode === "grid";
+  body.innerHTML = facts([`${b(s.shots)} shots`, `Plan check ${b(s.plan_pass ? "pass" : s.plan_pass === false ? "not yet" : "—")}`,
+    `Shot check ${b(s.shots_pass ? "pass" : s.shots_pass === false ? "not yet" : "—")}${s.warnings ? ` · ${s.warnings} style warning${s.warnings === 1 ? "" : "s"}${s.accepted ? " accepted" : ""}` : ""}`,
+    s.extras ? `${b(s.extras)} extra frames (speech bubbles, cards)` : ""])
+    + `<div class="row done-actions spread"><span class="seg" id="done-mode"><button data-m="sheet" aria-pressed="${!grid}">Contact sheets</button>
+        <button data-m="grid" aria-pressed="${grid}">Shot by shot</button></span>
+      ${grid ? "" : `<span class="seg">${Array.from({ length: s.sheets }, (_, i) => `<button data-s="${i + 1}" aria-pressed="${DONE.sheet === i + 1}">${i + 1}</button>`).join("")}</span>`}</div>
+    ${grid ? `<div class="thumbs">${ids.slice(0, DONE.shotCount).map((id) => {
+        const l = (DONE.labels || {})[id] || {};
+        return `<figure class="thumb"><img src="${fileUrl(shotFile(id))}" alt="${id}" loading="lazy"><figcaption><code>${id}</code><span class="muted">${esc([l.scale, l.place].filter(Boolean).join(" · "))}</span></figcaption></figure>`;
+      }).join("")}</div>${DONE.shotCount < ids.length ? `<p><button class="btn" id="done-more-shots">Show more (${ids.length - DONE.shotCount} left)</button></p>` : ""}`
+      : `<img class="sheet-img" src="${fileUrl(`.check/shots/sheet-${DONE.sheet}.jpg`)}" alt="Contact sheet ${DONE.sheet}">
+         <p class="muted small">Sheet ${DONE.sheet} of ${s.sheets} · click to enlarge</p>`}
+    ${s.accepted ? `<p class="muted small">Accepted: ${esc(s.accepted)}</p>` : ""}`;
+  body.querySelectorAll("#done-mode button").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+    DONE.shotMode = /** @type {HTMLElement} */ (el).dataset.m; doneShots(body, s);
+  }; });
+  body.querySelectorAll("[data-s]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+    DONE.sheet = Number(/** @type {HTMLElement} */ (el).dataset.s); doneShots(body, s);
+  }; });
+  const more = document.getElementById("done-more-shots");
+  if (more) more.onclick = () => { DONE.shotCount += 24; doneShots(body, s); };
+  body.querySelectorAll(".sheet-img, .thumb img").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+    const lb = document.createElement("div"); lb.className = "done-zoom"; lb.setAttribute("role", "dialog");
+    lb.innerHTML = `<img src="${/** @type {HTMLImageElement} */ (el).src}" alt="">`;
+    lb.onclick = () => lb.remove(); document.body.append(lb);
+  }; });
+}
+
+/** @param {HTMLElement} body @param {any} s */
+function doneMix(body, s) {
+  body.innerHTML = facts([s.seconds ? `Length ${b(mmss(s.seconds))}` : "", "Voice + music + sound"])
+    + `<audio controls preload="metadata" src="${fileUrl("out/mix.wav")}"></audio>`;
+  const a = body.querySelector("audio");
+  a.onplay = () => { DONE.playing = a; };
+  a.onpause = () => { if (DONE.playing === a) DONE.playing = null; };
+}
+
+/** @param {HTMLElement} body @param {any} s */
+function doneRender(body, s) {
+  const total = s.chunks_total || 0, done = s.chunks_done || 0, w = s.workers || 1;
+  body.innerHTML = facts([`${b(done)} of ${b(total)} chunks`, s.mode ? `${b(s.mode === "gpu" ? "GPU" : "Software")}${s.workers ? ` · ${s.workers} workers` : ""}` : ""])
+    + `<div class="chunks" aria-label="${done} of ${total} chunks done">${Array.from({ length: total }, (_, i) =>
+      `<i class="${i < done ? "d" : i < done + w && done < total ? "r" : ""}"></i>`).join("")}</div>`;
+}
+
+/** Live updates on a job page: only what changed, so a playing line or the open section stays (specs/025 R5).
+ * @param {string} id */
+async function refreshJob(id) {
+  let j;
+  try { j = await get(`/jobs/${encodeURIComponent(id)}`); } catch { return route(); }
+  const old = DONE.job;
+  if (!old || old.id !== id || old.status !== j.status || (old.review_ids || []).length !== (j.review_ids || []).length) return route();
+  DONE.job = j;
+  const sp = document.getElementById("step-panel"); if (sp) sp.innerHTML = stepHtml(j);
+  const pr = document.getElementById("job-progress"); if (pr) pr.textContent = j.progress ? `${j.progress.done}/${j.progress.total}` : "—";
+  const lg = document.getElementById("job-log");
+  if (lg) lg.textContent = j.log.map((/** @type {any} */ l) => `${new Date(l.t).toLocaleTimeString("en-GB")}  ${l.line}`).join("\n") || "No lines yet.";
+  await doneRefresh();
+}
+
 async function pageJob(id) {
   const j = await get(`/jobs/${encodeURIComponent(id)}`);
   const pct = j.progress ? Math.round((100 * j.progress.done) / j.progress.total) : null;
@@ -466,18 +668,18 @@ async function pageJob(id) {
     ${j.status === "waiting_resume" ? `<p class="notice">You decided, but the Claude session is no longer waiting. Open Claude Code again and say “continue job ${esc(j.name)}”.</p>` : ""}
     ${j.status === "inactive" ? `<p class="notice">No updates for over 10 minutes: the Claude session may have closed or stopped.</p>` : ""}
     ${j.error ? `<p class="error">${esc(j.error)}</p>` : ""}
-    <div class="panel"><p class="section-title">Current step</p><p style="font-size:16px;font-weight:600">${esc(j.step)}</p>
-      ${pct !== null ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ""}</div>
+    <div class="panel" id="step-panel">${stepHtml(j)}</div>
+    ${j.kind === "film" ? `<div class="panel done" id="done-slot" hidden></div>` : ""}
     ${qualityHtml(j.qa)}
     ${j.links.film ? `<div id="tiers-slot"></div>` : ""}
     ${j.lesson_draft ? `<p class="notice">A draft lesson (#${j.lesson_draft.n}) is waiting on the <a href="#/channels/${esc(j.lesson_draft.scope)}">channel page</a>: approve it there.</p>` : ""}
     ${j.status === "done" && j.links.film && j.qa && j.qa.publish ? `<div class="panel" id="publish"><p class="section-title">Publish</p><p class="muted">Loading…</p></div>` : ""}
     ${revs ? `<h2>Reviews</h2><ul class="reviews">${revs}</ul>` : ""}
-    <h2>Log</h2><pre class="log">${j.log.map((l) => `${new Date(l.t).toLocaleTimeString("en-GB")}  ${esc(l.line)}`).join("\n") || "No lines yet."}</pre>
+    <h2>Log</h2><pre class="log" id="job-log">${j.log.map((l) => `${new Date(l.t).toLocaleTimeString("en-GB")}  ${esc(l.line)}`).join("\n") || "No lines yet."}</pre>
     </div><aside class="aside panel"><p class="section-title">Summary</p><dl class="kv">
       <dt>Type</dt><dd>${esc(KIND[j.kind] || j.kind)}</dd>
       <dt>Status</dt><dd>${esc(STATUS[j.status] || j.status)}</dd>
-      <dt>Progress</dt><dd>${pct !== null ? `${j.progress.done}/${j.progress.total}` : "—"}</dd>
+      <dt>Progress</dt><dd id="job-progress">${pct !== null ? `${j.progress.done}/${j.progress.total}` : "—"}</dd>
       <dt>Started</dt><dd>${when(j.started_at)}</dd>
       <dt>Updated</dt><dd>${when(j.updated_at)}</dd></dl>
       ${MODE === "online" && !["done", "failed", "stopped"].includes(j.status) ? `<p style="margin-top:14px"><button class="danger" id="stop">Stop this job</button></p>
@@ -485,6 +687,7 @@ async function pageJob(id) {
       ${links ? `<p class="section-title" style="margin-top:18px">Results</p><p style="display:grid;gap:4px;margin:0">${links.replaceAll(" · ", "")}</p>` : ""}
     </aside></div>`;
   if (j.status === "done" && j.links.film && j.qa && j.qa.publish) fillPublish(j.links.film, j.qa.publish);
+  if (j.kind === "film") doneOpen(j);
   if (j.links.film) get(`/films/${encodeURIComponent(j.links.film)}`).then((/** @type {any} */ f) => {
     const slot = document.getElementById("tiers-slot"); if (slot) slot.innerHTML = tiersHtml(f.tiers);
   }).catch(() => {});
@@ -1011,8 +1214,7 @@ const SETTING = [
   ["learn_max_videos", "Videos per learn", "int"], ["upload_max_mb", "Upload size (MB)", "int"],
   ["upload_max_minutes", "Upload length (minutes)", "int"], ["job_token_cap", "Token limit per job", "int"],
   ["concurrency", "Jobs at the same time", "int"],
-  ["review_timeout_days", "Stop a job after waiting (days)", "int"], ["model", "Claude model", "text"],
-  ["editor_model", "Script editor model", "choice", [["inherit", "Same as jobs"], ["opus", "Opus"], ["sonnet", "Sonnet"], ["haiku", "Haiku"]]],
+  ["review_timeout_days", "Stop a job after waiting (days)", "int"], ["model", "Claude model (every Claude call of the studio)", "model"],
 ];
 const SETTINGS_TABS = [["general", "General"], ["users", "Users"], ["usage", "Usage"], ["worker", "Worker"], ["tokens", "API tokens"], ["lessons", "Shared lessons"]];
 const ROLE = { admin: "Owner", customer: "Member" };
@@ -1032,8 +1234,11 @@ async function pageSettings(tab = "general") {
   if (tab === "usage") return settingsUsage(top);
   if (tab === "lessons") return settingsLessons(top);
   const st = await get("/admin/settings");
-  const input = ([k, label, t, choices]) => t === "choice"
-    ? `<label>${label}<select id="s-${k}">${/** @type {string[][]} */ (choices).map(([v, l]) => `<option value="${v}"${st[k] === v ? " selected" : ""}>${l}</option>`).join("")}</select></label>`
+  // specs/024: the model list comes from the server (tools/models.json), never typed
+  const pick = (/** @type {string} */ k, /** @type {string} */ label, /** @type {string[][]} */ choices) =>
+    `<label>${label}<select id="s-${k}">${choices.map(([v, l]) => `<option value="${esc(v)}"${st[k] === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label>`;
+  const input = ([k, label, t, choices]) => t === "model" ? pick(k, label, (st.models || []).map((m) => [m.id, m.name]))
+    : t === "choice" ? pick(k, label, choices)
     : `<label>${label}<input id="s-${k}" type="${t === "text" ? "text" : "number"}" ${t === "num" ? 'step="0.01"' : ""} value="${esc(st[k])}"></label>`;
   const ytKey = `<section class="panel card-pad" id="yt-key"><h2>YouTube key</h2>
     <p class="muted">For scoring topics with YouTube numbers (specs/013). The key is kept on the server and never shown again.
@@ -1055,7 +1260,7 @@ async function pageSettings(tab = "general") {
     const data = {};
     for (const [k, , t] of SETTING) {
       const el = field(`s-${k}`);
-      data[k] = t === "text" || t === "choice" ? el.value.trim() : Number(el.value);
+      data[k] = t === "text" || t === "choice" || t === "model" ? el.value.trim() : Number(el.value);
     }
     await send("PUT", "/admin/settings", data);
     return "Saved.";
@@ -1625,7 +1830,9 @@ function onChange() {           // coalesce bursts of events into one refresh
     const h = location.hash || "#/";
     const editing = document.activeElement && ["note", "answer", "change-note"].includes(document.activeElement.id)
       || /** @type {HTMLDetailsElement | null} */ (document.getElementById("changes"))?.open;
-    if (!editing && !/^#\/(films\/|sets|styles|library)/.test(h)) route();   // the Films list follows jobs live
+    const jobPage = h.match(/^#\/jobs\/([^/]+)$/);
+    if (!editing && jobPage && document.getElementById("done-slot")) refreshJob(decodeURIComponent(jobPage[1]));   // specs/025
+    else if (!editing && !/^#\/(films\/|sets|styles|library)/.test(h)) route();   // the Films list follows jobs live
   }, 300);
 }
 function connect() {

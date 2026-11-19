@@ -1,5 +1,6 @@
 """Jobs: one style-learning run or one film (data-model.md: Job)."""
 import datetime as dt
+import os
 import re
 import secrets
 import time
@@ -126,6 +127,66 @@ def publish_cut(job_id: str, reason: str) -> bool:
 
 def log(job_id: str, *lines: str) -> dict:
     return update(job_id, lambda j: j["log"].extend(_line(x) for x in lines if x is not None))
+
+
+PROGRESS_LINE = re.compile(r"^\s*\[?\s*(\d+)\s*/\s*(\d+)\b")    # "21/61 chunks  1723s", "[12/339] …"
+
+
+def progress_in(line: str):
+    """{done, total} when a command's output line starts with N/M (0 ≤ N ≤ M, M ≥ 1), else None."""
+    m = PROGRESS_LINE.match(line or "")
+    if not m or int(m.group(2)) < 1 or int(m.group(1)) > int(m.group(2)):
+        return None
+    return {"done": int(m.group(1)), "total": int(m.group(2))}
+
+
+def _alive(pid) -> bool:
+    try:
+        os.kill(int(pid), 0)
+        return True
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def run_begin(job_id: str, step_name: str, pid: int) -> str:
+    """`job run --step S` started: remember it, so a shorter command run alongside (Mix during Render) hands the
+    step back when it ends. Runs of processes that are gone are dropped."""
+    key = f"{pid}-{time.time_ns()}"
+
+    def f(j):
+        runs = {k: r for k, r in (j.get("runs") or {}).items() if _alive(r.get("pid"))}
+        runs[key] = {"step": step_name, "pid": pid, "progress": None, "since": store.now_iso()}
+        j["runs"] = runs
+    update(job_id, f)
+    return key
+
+
+def run_progress(job_id: str, key: str, progress: dict) -> dict:
+    def f(j):
+        r = (j.get("runs") or {}).get(key)
+        if r is None:
+            return
+        r["progress"] = progress
+        if j["step"] == r["step"] and j["status"] not in FINAL:
+            j["progress"] = progress
+    return update(job_id, f)
+
+
+def run_end(job_id: str, key: str) -> dict:
+    def f(j):
+        runs = {k: r for k, r in (j.get("runs") or {}).items() if k != key and _alive(r.get("pid"))}
+        mine = (j.get("runs") or {}).get(key)
+        if mine and j["step"] == mine["step"] and j["status"] not in FINAL:
+            others = [r for r in runs.values() if r["step"] != mine["step"]]
+            if others and not any(r["step"] == mine["step"] for r in runs.values()):
+                back = max(others, key=lambda r: r["since"])          # the latest one still running
+                j["step"], j["progress"] = back["step"], back["progress"]
+                j["log"].append(_line(f"{back['step']} (still running)"))
+        if runs:
+            j["runs"] = runs
+        else:
+            j.pop("runs", None)
+    return update(job_id, f)
 
 
 def heartbeat(job_id: str) -> dict:

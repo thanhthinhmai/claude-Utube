@@ -93,3 +93,53 @@ def cli(name: str, ref: str, ours: str, rnd: int = 1) -> int:
     print("✓ đạt ngưỡng SC-004" if res["pass"] else "✗ chưa đạt ngưỡng SC-004")
     print(f"Ảnh ghép: {d / 'proof' / 'compare.jpg'}")
     return 0 if res["pass"] else 1
+
+
+# ---------------------------------------------------------------- the proof clip (specs/023 FR-007, T064)
+
+WINDOW = 2.0          # the clip is read as 2-second pieces, like short shots
+
+
+def clip_measures(path: Path) -> dict:
+    """still_ratio, motion720 (median camera shift, px/frame at 720 wide, 60 fps) and the share of pieces where something
+    moves, measured by learn craft's code on 2-second pieces of the clip."""
+    import subprocess
+    from . import craft
+    dur = float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+                               capture_output=True, text=True).stdout.strip() or 0)
+    if dur < 1.0:
+        raise refset.UsageError(f"đoạn quá ngắn ({dur:.1f} s)")
+    pieces, t = [], 0.0
+    while t + 1.0 <= dur:
+        b = min(dur, t + WINDOW)
+        pieces.append(craft.measure_frames(craft.sample(path, t, b), t))
+        t = b
+    still = sum(p["cam"]["type"] == "still" for p in pieces) / len(pieces)
+    px = sorted(p["cam"]["px_s"] * 720 / 1280 / 60 for p in pieces)
+    moving = sum(bool(p["inner"]["spans"]) for p in pieces) / len(pieces)
+    return {"pieces": len(pieces), "still_ratio": round(still, 3), "motion720_p50": round(px[len(px) // 2], 4),
+            "moving_share": round(moving, 3)}
+
+
+def clip_cli(name: str, clip: str) -> int:
+    """Compare a proof clip's motion with the reference set's (craft-summary.json → motion)."""
+    p = Path(clip).resolve()
+    if not p.exists():
+        raise refset.UsageError(f"không thấy đoạn: {p}")
+    f = refset.set_dir(name) / "profile" / "craft-summary.json"
+    cs = (refset.read_json(f).get("motion") or {}) if f.exists() else {}
+    if not cs:
+        raise refset.StepError("chưa có craft-summary.json → motion (chạy learn craft rồi learn craft-summary --parts time)")
+    m = clip_measures(p)
+    none = (cs.get("person_still_cam") or {}).get("none_share")
+    # pieces where something moves: at least 1 − 2 × the reference's share of still-camera person shots with no movement
+    # (twice, so one quiet piece in a short clip does not fail it)
+    rows = [("still_ratio", m["still_ratio"], cs.get("still_ratio")), ("motion720_p50", m["motion720_p50"], cs.get("motion720_p50")),
+            ("moving_share", m["moving_share"], [round(1 - 2 * none, 3), 1.0] if none is not None else None)]
+    ok = True
+    for key, v, r in rows:
+        inside = r is None or r[0] - 1e-9 <= v <= r[1] + 1e-9
+        ok &= inside
+        print(f"{'✓' if inside else '✗'} {key} {v}" + (f" (kênh mẫu {r[0]:g}–{r[1]:g})" if r else ""))
+    refset.write_json(refset.set_dir(name) / "proof" / "clip-compare.json", {**m, "clip": str(p), "pass": ok})
+    return 0 if ok else 1

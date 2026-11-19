@@ -137,7 +137,9 @@ def read_input(d: Path, lib, fp: str) -> dict:
     else:
         cards, cards_from = readcheck_cards(d, lib), "readcheck"
     c = {"fingerprint": fp, "dur": dur, "shots": shots, "cues": cues, "cues_from": cues_from, "cards": cards,
-         "cards_from": cards_from, "warnings": warns}
+         "cards_from": cards_from, "warnings": warns,
+         "cast": {str(c[2]): int(c[3]) for c in (page.get("cast") or []) if isinstance(c, list) and len(c) >= 4},
+         "craft": page.get("craft")}
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps(c, ensure_ascii=False), encoding="utf-8")
     return c
@@ -186,6 +188,12 @@ def run(film_dir: Path, lib) -> dict:
         (d / ".check" / "plan-input.json").write_text(json.dumps(inp, ensure_ascii=False), encoding="utf-8")
     m["narration"] = bool(nar)
     exc = tiers.load_exceptions(d)
+    # specs/027: craft shares from window.CRAFT against the style's template.json → craft
+    from filmcheck import craftcheck, motioncheck
+    c_issues, c_meas, c_skipped = craftcheck.rules(motioncheck.template_of(d), inp.get("craft"), exc)
+    issues += c_issues
+    m.update(c_meas)
+    skipped += c_skipped
     tiers.apply_exceptions(issues, exc)
     res = tiers.result("plan", issues, m, skipped, time.time() - t0, fp, exceptions=exc,
                        sources={"cues": inp["cues_from"], "cards": inp["cards_from"]})

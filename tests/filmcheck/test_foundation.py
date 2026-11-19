@@ -148,26 +148,12 @@ class EditorModel(unittest.TestCase):
             else:
                 os.environ[k] = v
 
-    def test_default_is_inherit(self):
-        self.assertEqual((editor.editor_model(), editor.model_args()), ("inherit", ["--model", "claude-opus-5-5"]))
-        os.environ["STUDIO_MODEL"] = "claude-opus-5-5"
+    def test_always_the_one_model(self):                          # specs/024: old editor settings are ignored
         self.assertEqual(editor.model_args(), ["--model", "claude-opus-5-5"])
-
-    def test_local_config_command(self):
-        env = {**os.environ, "STUDIO_ROOT": str(self.root)}
-        p = subprocess.run(["sh", str(REPO / "bin/studio"), "config", "editor-model", "sonnet"], env=env,
-                           capture_output=True, text=True)
-        self.assertEqual(p.returncode, 0, p.stderr)
-        self.assertEqual(json.loads((self.root / ".studio/config.json").read_text())["editor_model"], "sonnet")
-        self.assertEqual(editor.model_args(), ["--model", "sonnet"])
-        bad = subprocess.run(["sh", str(REPO / "bin/studio"), "config", "editor-model", "gpt"], env=env,
-                             capture_output=True, text=True)
-        self.assertEqual(bad.returncode, 2)
-
-    def test_online_setting_wins(self):
-        editor.set_editor_model("sonnet")
         os.environ["STUDIO_EDITOR_MODEL"] = "haiku"
-        self.assertEqual(editor.model_args(), ["--model", "haiku"])
+        (self.root / ".studio").mkdir(parents=True, exist_ok=True)
+        (self.root / ".studio/config.json").write_text('{"editor_model": "sonnet"}')
+        self.assertEqual(editor.model_args(), ["--model", "claude-opus-5-5"])
 
 
 class FakeEditor(unittest.TestCase):

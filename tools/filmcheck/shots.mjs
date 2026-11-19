@@ -1,7 +1,8 @@
 // @ts-check
 // Tier 2: one frame per shot, measured in the page (specs/020 T024, research R5).
 //   node tools/filmcheck/shots.mjs <film dir> <job.json>
-// job.json = {frames: [{key, shot, t, label?}], out: <dir>, w, h, sheet?: {marks: {key: true}, cols, per, prefix?}}
+// job.json = {frames: [{key, shot, t, label?}], out: <dir>, w, h, sheet?: {marks: {key: true}, cols, per, prefix?},
+//             motion?: [{key, shot, t}] (specs/023: extra frames inside each shot, saved under out/motion/)}
 // Uses the studio's renderer like tools/render/record.mjs (STUDIO_RENDER_MODE / PLAYWRIGHT_CHROME, set by
 // `sh bin/studio qc …`), so GPU when the machine can. Nothing in the library is changed.
 // Prints one JSON line {mode, renderer, frames: [{key, shot, t, file, texts, m: {...}}]} or, with a sheet, {sheets: [..]}.
@@ -109,7 +110,19 @@ if (job.sheet) {
     const m = await ctx.p.evaluate(measure, { url: dataURL(file), boxes: texts, W, H });
     res.push({ ...f, file, texts, m });
   }
-  console.log(JSON.stringify({ mode, renderer: ctx.r, frames: res }));
+  // specs/023: frames inside each shot for the motion check (no measure, no sheet), 320×180
+  const motion = [];
+  // window.CLEAN (contracts/film-page.md) leaves subtitles, cards and overlays out: the motion rule reads the scene,
+  // so a ticking counter or a new subtitle line does not count as the figures moving; window.SUBJECT leaves the crowd out
+  // (the style's crowds stay frozen while the cast acts, specs/023 2026-11-17)
+  for (const f of job.motion || []) {
+    await ctx.p.evaluate((/** @type {number} */ t) => { const w = /** @type {any} */ (window); w.CLEAN = w.SUBJECT = true; w.render(t); w.CLEAN = w.SUBJECT = false; }, f.t);
+    const file = path.join(job.out, 'motion', f.key + '.jpg');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, await ctx.p.screenshot({ type: 'jpeg', quality: 92 }));
+    motion.push({ ...f, file });
+  }
+  console.log(JSON.stringify({ mode, renderer: ctx.r, frames: res, motion }));
 }
 await ctx.b.close();
 closeServer();

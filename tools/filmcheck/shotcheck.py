@@ -9,7 +9,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from filmcheck import focus, labeler, plancheck, qc, rhythm, stylerefs, tiers
+from filmcheck import focus, labeler, motioncheck, plancheck, qc, rhythm, stylerefs, tiers
 
 HERE = Path(__file__).resolve().parent
 FLAT_SHARE, FLAT_SD, TEXT_AREA = 0.60, 0.04, 0.02
@@ -148,8 +148,13 @@ def run(film_dir: Path, lib, say=print) -> dict:
     out.mkdir(parents=True, exist_ok=True)
     for f in out.glob("*.jpg"):
         f.unlink()
+    tpl = motioncheck.template_of(d)                 # specs/023: frames inside each shot for the motion rules
+    mframes = motion_frames(shots) if tpl else []
+    if (out / "motion").is_dir():
+        for f in (out / "motion").glob("*.jpg"):
+            f.unlink()
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
-        json.dump({"frames": frames, "out": str(out), "w": 960, "h": 540}, fh)
+        json.dump({"frames": frames, "out": str(out), "w": 960, "h": 540, "motion": mframes}, fh)
         job = fh.name
     try:
         got = _node([HERE / "shots.mjs", d, job], timeout=7200)
@@ -166,6 +171,11 @@ def run(film_dir: Path, lib, say=print) -> dict:
         issues += g_issues
         skipped += g_skipped
         meas.update(g_meas)
+        m_issues, m_meas, m_skipped = motion_rules(tpl, shots, got.get("motion") or [], inp.get("cast") or {}, labels,
+                                                   {f["shot"]: f.get("focus") for f in mids}, dur)
+        issues += m_issues
+        skipped += m_skipped
+        meas.update(m_meas)
         exc = tiers.load_exceptions(d)
         tiers.apply_exceptions(issues, exc)
         bad = {i["ref"] for i in issues if i["severity"] == "block" and not i.get("excepted")}
@@ -185,6 +195,66 @@ def run(film_dir: Path, lib, say=print) -> dict:
     res = tiers.result("shots", issues, meas, skipped, time.time() - t0, fp, exceptions=exc)
     tiers.save_tier(d, "shots", res)
     return tiers.load_tier(d, "shots")
+
+
+MOTION_AT = (0.2, 0.4, 0.6, 0.8)
+
+
+def motion_frames(shots: list) -> list:
+    """[{key, shot, t}]: four frames inside each shot (specs/023 FR-012), for the motion rules."""
+    return [{"key": f"{s['id'].replace('/', '_')}-m{k}", "shot": s["id"], "t": round(s["t0"] + (s["t1"] - s["t0"]) * a, 3)}
+            for s in shots for k, a in enumerate(MOTION_AT)]
+
+
+def motion_rules(tpl, shots: list, mframes: list, cast: dict, labels: dict, focus_of: dict, dur: float) -> tuple:
+    """still_person (block): people, a still camera, nothing moving, at least still_person_min_s long;
+    style_person_motion (warn): the film's dead time over the style's; style_depth (warn): a shot's sharp share outside
+    its scale's range. (issues, measures, skipped)"""
+    if not tpl:
+        return [], {}, ["motion: the style has no template.json, skipped"]
+    mo = tpl.get("motion") or {}
+    min_s = float(mo.get("still_person_min_s") or 2.0)
+    by = {}
+    for f in mframes:
+        by.setdefault(f["shot"], []).append(f["file"])
+    issues, rows, skipped = [], [], []
+    estimated = not cast
+    if estimated:
+        skipped.append("motion: the page has no window.CAST; people estimated from the labels (every shot but insert)")
+    for s in shots:
+        files = by.get(s["id"]) or []
+        if len(files) < 2:
+            continue
+        try:
+            m = motioncheck.shot_motion(files, gap=(s["t1"] - s["t0"]) * (MOTION_AT[1] - MOTION_AT[0]))
+        except motioncheck.MotionError as e:
+            return [_issue("motion_unchecked", "film", None, "not measured", "craft.py", fix=str(e))], {}, skipped
+        n = cast.get(s["id"]) if not estimated else (0 if (labels.get(s["id"]) or {}).get("scale") in ("insert", None) else 1)
+        row = {"id": s["id"], "t0": s["t0"], "t1": s["t1"], "cast": n or 0, **m}
+        rows.append(row)
+        if motioncheck.dead(row, min_s):
+            issues.append(_issue("still_person", s["id"], s["t0"], "nothing moves", f"a shot ≥ {min_s:g} s with people moves",
+                                 text=f"{s['t1'] - s['t0']:.1f} s, still camera",
+                                 fix="add an act (gesture, expression, head tilt), talk, or a camera move (move)"))
+    dead_t = sum(r["t1"] - r["t0"] for r in rows if motioncheck.dead(r, min_s))
+    meas = {"motion": {"shots": rows, "dead_share": round(dead_t / dur, 3) if dur else None, "people": "estimated" if estimated else "CAST"}}
+    mx = mo.get("dead_share_max")
+    if mx is not None and dur and dead_t / dur > mx:
+        issues.append(_issue("style_person_motion", "film", None, round(dead_t / dur, 3), f"≤ {mx:g}", severity="warn",
+                             fix="give the still shots with people something to do"))
+    fr = (tpl.get("framing") or {}).get("by_scale") or {}
+    for s in shots:
+        sc = (labels.get(s["id"]) or {}).get("scale")
+        f = focus_of.get(s["id"])
+        rng = (fr.get(sc) or {}).get("focused_share")
+        if not (sc and f and rng):
+            continue
+        v = f["focused_share"]
+        if v < rng[0] - 0.17 or v > rng[1] + 0.17:      # one tile of twelve either side of the style's p25–p75
+            issues.append(_issue("style_depth", s["id"], s["t0"], v, f"{rng[0]:g}–{rng[1]:g} for {sc}", severity="warn",
+                                 fix="blur more of the frame (a wider aperture, focus on the face)" if v > rng[1]
+                                 else "keep more of the frame sharp"))
+    return issues, meas, skipped
 
 
 def _gissue(rule, ref, measure, limit, ids=(), fix="", severity="warn"):

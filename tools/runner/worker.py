@@ -473,9 +473,12 @@ class Worker:
     def start(self, j: dict) -> None:
         work = self.work_dir(j["id"])
         (work / ".home").mkdir(parents=True, exist_ok=True)
+        film = (j.get("input") or {}).get("film")
+        if j["kind"] == "film" and film and not j.get("film_dir"):     # specs/025: the job page reads the parts done
+            jobs.update(j["id"], lambda x: x.__setitem__("film_dir", str((work / "films" / film).resolve())))
         for f in (".result.json", ".review_pending"):
             (work / f).unlink(missing_ok=True)
-        s = quotas.settings()
+        s = quotas.settings()                                    # s["model"]: the studio's one model (specs/024)
         store.write_json(work / ".input.json", {"job": j["id"], "model": s["model"], **(j.get("input") or {})})
         resume = j.get("resume")
         if resume:
@@ -488,9 +491,9 @@ class Worker:
         env = {"ANTHROPIC_BASE_URL": self.proxy_url, "CLAUDE_CODE_OAUTH_TOKEN": token, "STUDIO_JOB_TOKEN": token,
                "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1", "STUDIO_MODE": "online",
                "STUDIO_JOB": j["id"], "STUDIO_PROXY": self.proxy_url, "STUDIO_MODEL": s["model"],
-               "STUDIO_ROOT": self.runner.root(work)}          # `learn …` and the film tools work in the job folder
-        if s.get("editor_model", "inherit") != "inherit":        # the script editor's model (specs/010 FR-007b)
-            env["STUDIO_EDITOR_MODEL"] = s["editor_model"]
+               "STUDIO_ROOT": self.runner.root(work),          # `learn …` and the film tools work in the job folder
+               # Claude Code's helper calls (WebSearch, summaries) on the job's model too, not a small one
+               "ANTHROPIC_DEFAULT_HAIKU_MODEL": s["model"], "ANTHROPIC_SMALL_FAST_MODEL": s["model"]}
         mounts, network = self.prepare(j, work)
         if network:
             env.update(HTTPS_PROXY=os.environ.get("STUDIO_EGRESS", "http://egress:8888"),

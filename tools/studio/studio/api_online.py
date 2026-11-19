@@ -626,6 +626,7 @@ def view(j: dict, account, positions: dict = None) -> dict:
     if account["role"] != "admin":
         v.pop("cost_usd", None)                   # only the API-key part costs money; the owner sees it
         v.pop("agent_runs", None)                 # what the agent read: for the owner only
+    v.pop("runs", None)                           # local process ids of `job run` (specs/025 task A)
     return v
 
 
@@ -924,7 +925,8 @@ def get_settings(request: Request):
     admin(request)
     s = quotas.settings()
     key = yt_topics.read_online_key(db.data_dir())        # specs/013: never the key itself
-    return {**s, "youtube_key_set": bool(key), "youtube_key_last4": key[-4:] if key else None,
+    return {**s, "models": [{"id": k, "name": v} for k, v in quotas.models()["allowed"].items()],   # specs/024
+            "youtube_key_set": bool(key), "youtube_key_last4": key[-4:] if key else None,
             "youtube_units_today": yt_topics.online_usage(db.data_dir(), s.get("youtube_daily_units", 9000)).today()}
 
 

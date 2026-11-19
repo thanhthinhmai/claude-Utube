@@ -6,6 +6,7 @@ recogniser gap over a word it missed is not a pause). Text agreement: word simil
 and written in digits count as the same. Does not run speech recognition itself."""
 import json
 import re
+import unicodedata
 import shutil
 import subprocess
 import time
@@ -30,6 +31,7 @@ def _tokens(text: str, digits_as_number: bool) -> list:
     """Normalised words; a run of number words, or a written number, becomes one "#" (twenty-three thousand ↔ 23,000)."""
     out = []
     text = re.sub(r"(\d)\s*%", r"\1 percent", text)                 # the recogniser writes "eleven percent" as "11%"
+    text = "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c))   # café = cafe
     for raw in re.split(r"[\s\-–—]+", text.lower()):
         w = rhythm.norm(raw)
         if not w:
@@ -51,6 +53,18 @@ def similar(want: str, got: str) -> float:
     return difflib.SequenceMatcher(None, _tokens(want, True), _tokens(got, True), autojunk=False).ratio()
 
 
+def misheard(want: str, got: str) -> list:
+    """[(script word, heard word)] where the recogniser heard one word as another (specs/023 FR-017). Numbers and
+    accents are folded first (_tokens), so "16,000" = "sixteen thousand" and café = cafe are not flagged."""
+    import difflib
+    a, b = _tokens(want, True), _tokens(got, True)
+    out = []
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+        if op == "replace" and i2 - i1 == j2 - j1:
+            out += [(x, y) for x, y in zip(a[i1:i2], b[j1:j2]) if x != "#" and y != "#"]
+    return out
+
+
 def silences(wav: Path) -> list:
     """[(start, end)] of silences ≥ 0.3 s in a voice file (ffmpeg silencedetect at −40 dB)."""
     p = subprocess.run(["ffmpeg", "-nostats", "-hide_banner", "-i", str(wav), "-af",
@@ -60,8 +74,8 @@ def silences(wav: Path) -> list:
     return [(max(0.0, s), e) for s, e in zip(st, en)]
 
 
-def _issue(rule, ref, at, measure, limit, text="", fix=""):
-    return {"tier": "voice", "ref": ref, "at": round(at, 2) if at is not None else None, "rule": rule, "severity": "block",
+def _issue(rule, ref, at, measure, limit, text="", fix="", severity="block"):
+    return {"tier": "voice", "ref": ref, "at": round(at, 2) if at is not None else None, "rule": rule, "severity": severity,
             "measure": measure, "limit": limit, "text": text, "fix": fix, "excepted": None}
 
 
@@ -90,10 +104,14 @@ def run(film_dir: Path, lib=None, lang="en") -> dict:
         length = float(durs.get(lid, 0)) or None
         ws = rhythm.clamp_words(words[lid], length)                                  # FR-004
         said = re.sub(r"\s+([,.!?;:%])", r"\1", " ".join(w for w, _, _ in ws))   # "23 ,000" → "23,000"
-        sim = round(similar(text, said), 3)
+        sim = round(similar(r.get("asr") or text, said), 3)   # the line's own "asr" text, as asr_check.py reads it
         m["similarity_min"] = min(m.get("similarity_min", 1.0), sim)
         if sim < SIMILAR:
             issues.append(_issue("asr_mismatch", lid, 0.0, sim, SIMILAR, text=said[:40], fix=redo))
+        for want_w, heard_w in misheard(r.get("asr") or text, said):             # FR-017: a word read wrongly
+            issues.append(_issue("mispronounced", lid, 0.0, heard_w, want_w, text=f"\"{want_w}\" heard as \"{heard_w}\"",
+                                 fix=f"add \"say\" to line {lid} with a spelling the voice reads right, then: sh bin/studio voice make <film>",
+                                 severity="warn"))
         if length is not None:
             diff = abs(float(words[lid][-1][2]) - length)
             if diff > TAIL_DIFF:
