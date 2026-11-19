@@ -192,7 +192,8 @@ code { font: 12.5px ui-monospace, "SF Mono", Consolas, monospace; background: va
 .card .use-row { margin: 8px 4px 0; }
 
 /* ---------- màn hình hẹp: thanh bên thành thanh trên ---------- */
-@media (max-width: 980px) { .split { grid-template-columns: 1fr; } .aside { position: static; } }
+@media (max-width: 980px) { .split { grid-template-columns: minmax(0, 1fr); } .aside { position: static; } }
+.split > * { min-width: 0; }                     /* specs/026: a wide step rail scrolls inside its panel */
 @media (max-width: 760px) {
   .shell { grid-template-columns: 1fr; background: var(--bg); }
   .side { position: sticky; top: 0; z-index: 5; height: auto; flex-direction: row; align-items: center; gap: 8px;
@@ -476,8 +477,9 @@ table.lessons tr.l-draft td:nth-child(2) { color: var(--warn, #b26b00); font-wei
 @media (prefers-reduced-motion: reduce) { .done .stages .st-running .dot, .done .chunks i.r { animation: none; } }
 
 /* specs/026: step rail, review gates, edits */
+.rail-panel { min-width: 0; max-width: 100%; }
 .rail-panel .rail-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
-.rail { list-style: none; display: flex; gap: 6px; overflow-x: auto; margin: 8px 0 0; padding: 0 0 4px; }
+.rail { list-style: none; display: flex; gap: 6px; overflow-x: auto; margin: 8px 0 0; padding: 0 0 4px; max-width: 100%; min-width: 0; }
 .rail li { flex: 0 0 auto; }
 .rail .rs { min-width: 100px; text-align: left; display: grid; gap: 1px; padding: 7px 10px; border-radius: 10px;
   border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
@@ -490,7 +492,7 @@ table.lessons tr.l-draft td:nth-child(2) { color: var(--warn, #b26b00); font-wei
 .rail .st-done .s { color: var(--ok); } .rail .st-waiting .s { color: var(--warn); } .rail .st-running .s { color: var(--info); }
 .rail .st-stale .s { color: var(--bad); }
 .rail .gate { font-size: 10px; font-weight: 700; color: var(--accent-ink); background: var(--accent-soft); border-radius: 4px; padding: 0 5px; }
-.impact { margin: 10px 0 0; font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.impact { margin: 10px 0 0; font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
 .impact .chip { background: var(--bad-soft); color: var(--bad); border-radius: 6px; padding: 1px 7px; font-size: 12px; font-weight: 600; }
 .approve-bar { border: 1px solid var(--accent-line); background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; }
 .approve-bar .spread { justify-content: space-between; }

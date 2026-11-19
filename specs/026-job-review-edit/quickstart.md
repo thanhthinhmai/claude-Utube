@@ -107,3 +107,9 @@ Thử thật (SC-006): làm một phim 5 phút bằng chat, có ít nhất một
 
 - `edit … publish chosen=2`: lưu trong 0,3 s; `PUBLISH.md` xếp tiêu đề 2 lên đầu, ghi "(chosen)"; kiểm gói đăng chạy lại (ở bản chép báo phụ đề cũ, đúng là "lưu được, kiểm chưa đạt", mã 1).
 - Test: `chosen` ngoài 1–3 bị từ chối; hashtag phải có 3–5 cái; đổi gói đăng không làm bước nào phải làm lại.
+
+### Toàn bộ, 2026-11-19
+
+- `tests/run.sh` 87/87 · `tests/render` đạt (gồm 30 test bộ dựng) · `tests/filmcheck` 253 đạt · `tests/ui` 56 + 33 test trình duyệt đạt · `tests/online` 199 đạt (sau khi sửa lỗi tràn ngang ở 360 px do thanh tiến trình).
+- `test_api.test_fifty_jobs_under_two_seconds` đôi khi trượt (49/50), vì mã việc trùng khi tạo 50 việc trong một giây. Lỗi này có từ trước 026.
+- SC-006 (một phim 5 phút làm thật, có sửa ở Script và Shots): **chưa chạy**. Cần một lượt làm phim thật bằng Claude, tốn lượt gọi.

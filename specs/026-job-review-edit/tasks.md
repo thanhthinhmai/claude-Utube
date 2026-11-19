@@ -138,7 +138,7 @@ description: "Tasks for 026 — review points and edits on the film job page"
 - [X] T057 [P] Test Playwright trong `tests/ui/` (theo cách test 025): mở trang việc của phim mẫu, thanh có 10 bước và 2 nhãn `REVIEW`, sửa đoạn P3 → nhật ký có `Edit script-para P3`, cột "If you change this" có 7 bước, nút duyệt khoá rồi mở
 - [X] T058 [P] MCP `answer_review` nhận `base` tuỳ chọn (`tools/studio/studio/mcp_server.py`); công cụ MCP `film_steps(job_id)` gọi `/steps`
 - [X] T059 Cập nhật `CLAUDE.md` (mục 5 "Ghi việc lên giao diện": điểm duyệt, `point`, `edit`; mục Cấu trúc: `points.py`, `steps.py`, `edit.py`, `actions.py`) và `specs/003-studio-ui/contracts/skill-integration.md` (năm loại duyệt mới)
-- [ ] T060 Chạy năm bộ test (`sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/online/run.sh`) và `node --test desktop/test/*.test.js`; ghi kết quả
+- [X] T060 Chạy năm bộ test (`sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/online/run.sh`) và `node --test desktop/test/*.test.js`; ghi kết quả
 - [ ] T061 Thử thật SC-006: một phim 5 phút bằng chat với ít nhất một lần sửa ở Script và một lần ở Shots trên trang, không dựng hình lại; đo SC-001 (thời gian điểm mới, ảnh mới); ghi kết quả vào `quickstart.md`
 
 ---
