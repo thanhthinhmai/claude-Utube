@@ -139,9 +139,41 @@ def read_input(d: Path, lib, fp: str) -> dict:
     c = {"fingerprint": fp, "dur": dur, "shots": shots, "cues": cues, "cues_from": cues_from, "cards": cards,
          "cards_from": cards_from, "warnings": warns,
          "cast": {str(c[2]): int(c[3]) for c in (page.get("cast") or []) if isinstance(c, list) and len(c) >= 4}}
+    for k in ("kit_errors", "people", "bubbles"):             # pages built with the Sketch Explainer kit (specs/028)
+        if page.get(k) is not None:
+            c[k] = page[k]
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps(c, ensure_ascii=False), encoding="utf-8")
     return c
+
+
+def kit_issues(d: Path, inp: dict, root=None) -> list:
+    """Kit pages only (specs/028 R3): names outside the kit's catalogue, real people not approved in the people library
+    (read fresh, not cached: approval can change without the film changing), words in real people's bubbles that are not
+    a quote in SOURCES.md. A page without these exports gives no issue (FR-024)."""
+    from filmcheck import people
+    out = []
+    starts = {s["id"]: s["t0"] for s in (inp.get("shots") or [])}
+    for e in inp.get("kit_errors") or []:
+        hint = f"; did you mean {e['hint']!r}?" if e.get("hint") else ""
+        out.append(rhythm._issue("kit_name", e.get("shot", "?"), starts.get(e.get("shot"), 0.0), e.get("name"), None,
+                                 f"{e.get('kind')}: {e.get('name')!r} is not in the kit's catalogue", f"use a name from kit/catalog.json{hint}"))
+    if inp.get("people") is not None:
+        for p in people.check_film(d, inp.get("people"), root or people.ROOT):
+            out.append(rhythm._issue("person_unapproved", f"person:{p['slug']}", 0.0, p["problem"], "approved",
+                                     f"{p['slug']}: {p['problem']}", "draw the model sheet (people sheet), get the user's approval, then people use"))
+    qs = None
+    for b in inp.get("bubbles") or []:
+        t0, _t1, shot, who, text, is_person = (list(b) + [None] * 6)[:6]
+        if not is_person:
+            continue
+        if qs is None:
+            qs = people.quotes(d)
+        if not people.words_ok(str(text), qs):
+            out.append(rhythm._issue("person_words", shot, float(t0 or 0), str(text), "a sourced quote",
+                                     f"{who} says words that are not a quote in SOURCES.md: {text!r}",
+                                     "give the real person a symbol (! ? $) or a verbatim quote from SOURCES.md"))
+    return out
 
 
 def run(film_dir: Path, lib) -> dict:
@@ -186,6 +218,7 @@ def run(film_dir: Path, lib) -> dict:
         inp["shots"] = shots
         (d / ".check" / "plan-input.json").write_text(json.dumps(inp, ensure_ascii=False), encoding="utf-8")
     m["narration"] = bool(nar)
+    issues += kit_issues(d, inp)
     exc = tiers.load_exceptions(d)
     tiers.apply_exceptions(issues, exc)
     res = tiers.result("plan", issues, m, skipped, time.time() - t0, fp, exceptions=exc,

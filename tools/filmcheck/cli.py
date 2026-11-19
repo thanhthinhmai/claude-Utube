@@ -467,6 +467,71 @@ def cmd_kit_use(a):
     return 0
 
 
+# ---------- people library (specs/028 US3) ----------
+def _people_root():
+    from filmcheck import people
+    return people, Path(root())
+
+
+def cmd_people_list(a):
+    people, r = _people_root()
+    rows = people.listing(r)
+    out(a, rows, [f"{x['slug']:22s} {x['status']:24s} {x['name']} — {x['role']}" for x in rows] or ["(no people yet)"])
+    return 0
+
+
+def cmd_people_new(a):
+    people, r = _people_root()
+    try:
+        d = people.new(a.slug, a.name, a.role or "", a.ref_url or "", a.license or "", a.author or "", a.from_file or "", r,
+                       fetch=not a.ref_file, ref_file=a.ref_file or "")
+    except (people.PeopleError, OSError) as e:
+        print(f"✗ people: {e}", file=sys.stderr)
+        return 1
+    out(a, {"dir": str(d)}, [f"✓ people/{a.slug}/ (not approved): draw it, run people sheet, then ask the user"])
+    return 0
+
+
+def cmd_people_sheet(a):
+    people, r = _people_root()
+    try:
+        p = people.sheet(a.slug, lib_dir(), r)
+    except people.PeopleError as e:
+        print(f"✗ people: {e}", file=sys.stderr)
+        return 1
+    out(a, {"sheet": str(p)}, [f"✓ sheet: {p}"])
+    return 0
+
+
+def cmd_people_approve(a):
+    people, r = _people_root()
+    try:
+        ap = people.approve(a.slug, a.note or "", a.source, r)
+    except people.PeopleError as e:
+        print(f"✗ people: {e}", file=sys.stderr)
+        return 2
+    out(a, ap, [f"✓ {a.slug}: approved ({ap['hash']})"])
+    return 0
+
+
+def cmd_people_use(a):
+    people, r = _people_root()
+    try:
+        d = people.use(a.film, a.slugs, r)
+    except people.PeopleError as e:
+        print(f"✗ people: {e}", file=sys.stderr)
+        return 3 if "not approved" in str(e) else 2
+    out(a, {"dir": str(d)}, [f"✓ films/{a.film}/people/: " + ", ".join(a.slugs)])
+    return 0
+
+
+def cmd_people_check(a):
+    people, r = _people_root()
+    probs = people.check_film(Path(r) / "films" / a.film, None, r)
+    out(a, probs, [f"✗ {p['slug']}: {p['problem']}" for p in probs] or ["✓ every real person in the film is approved"])
+    return 3 if probs else 0
+
+
 def scope_path(channels, scope):
     if scope != "shared":
         channels.load(root(), scope)               # the channel must exist
@@ -1055,6 +1120,17 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--update", action="store_true", help="replace a kit copied from an older version")
     s.add_argument("--json", action="store_true")
 
+    pe = sub.add_parser("people", help="the real-person library (specs/028)").add_subparsers(dest="cmd", required=True)
+    s = pe.add_parser("list"); s.add_argument("--json", action="store_true")
+    s = pe.add_parser("new"); s.add_argument("slug"); s.add_argument("--name", required=True); s.add_argument("--role")
+    s.add_argument("--ref-url"); s.add_argument("--license"); s.add_argument("--author"); s.add_argument("--from", dest="from_file")
+    s.add_argument("--ref-file", help="a reference photo already on the machine"); s.add_argument("--json", action="store_true")
+    s = pe.add_parser("sheet"); s.add_argument("slug"); s.add_argument("--json", action="store_true")
+    s = pe.add_parser("approve", help="only after the user approved the model sheet"); s.add_argument("slug"); s.add_argument("--note")
+    s.add_argument("--source", choices=["chat", "ui"], default="chat"); s.add_argument("--json", action="store_true")
+    s = pe.add_parser("use"); s.add_argument("film"); s.add_argument("slugs", nargs="+"); s.add_argument("--json", action="store_true")
+    s = pe.add_parser("check"); s.add_argument("film"); s.add_argument("--json", action="store_true")
+
     tp = sub.add_parser("topics", help="score topics with YouTube numbers (specs/013)").add_subparsers(dest="cmd", required=True)
     s = tp.add_parser("score")
     s.add_argument("channel")
@@ -1130,6 +1206,8 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach, ("kit", "use"): cmd_kit_use,
+            ("people", "list"): cmd_people_list, ("people", "new"): cmd_people_new, ("people", "sheet"): cmd_people_sheet,
+            ("people", "approve"): cmd_people_approve, ("people", "use"): cmd_people_use, ("people", "check"): cmd_people_check,
             ("lesson", "list"): cmd_lesson_list, ("lesson", "draft"): cmd_lesson_draft, ("lesson", "add"): cmd_lesson_add,
             ("lesson", "approve"): cmd_lesson_approve, ("lesson", "retire"): cmd_lesson_retire,
             ("topics", "score"): cmd_topics_score, ("topics", "recheck"): cmd_topics_recheck,
