@@ -1,0 +1,5 @@
+{
+ "_note": "The studio's Claude models (specs/024). Every Claude call of the studio uses the one chosen model, helper calls included. Add a model here together with its price in tools/studio/studio/db.py price_table.",
+ "default": "claude-opus-5-5",
+ "allowed": {"claude-opus-5-5": "Opus 5.5"}
+}

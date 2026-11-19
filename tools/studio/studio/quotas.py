@@ -1,13 +1,15 @@
 """Settings, monthly quotas and cost (specs/007 FR-005, FR-006, FR-006a, FR-008a, research R3)."""
 import datetime as dt
 import json
+import sys
+from pathlib import Path
 
 from . import db, jobs, store
 from .store import StudioError
 
 VN = dt.timezone(dt.timedelta(hours=7))
 KIND_FIELD = {"film": ("quota_films", "quota_films_default"), "learn": ("quota_learns", "quota_learns_default")}
-EDITOR_MODELS = ("inherit", "opus", "sonnet", "haiku")     # specs/010 FR-007b
+MODELS_FILE = Path(__file__).resolve().parents[2] / "models.json"     # specs/024: the one list of allowed models
 MAX_OPEN = 3            # jobs not finished yet, per customer
 OPEN = ("queued", "running", "waiting_review", "waiting_resume")
 
@@ -24,15 +26,37 @@ RANGES = {
     "concurrency": (int, 1, 16),
     "review_timeout_days": (int, 1, 90),
     "model": (str, None, None),
-    "editor_model": (str, None, None),
     "youtube_daily_units": (int, 100, 10000),
     "topics_per_day": (int, 0, 500),
 }
 
 
 # ---------- settings ----------
+def models() -> dict:
+    """tools/models.json: {"default": id, "allowed": {id: name}} (specs/024)."""
+    return json.loads(MODELS_FILE.read_text(encoding="utf-8"))
+
+
+def _model_ok(value) -> str:
+    m = models()
+    if value in m["allowed"]:
+        return value
+    if value:
+        print(f"model {value} is not allowed; using {m['default']}", file=sys.stderr)
+    return m["default"]
+
+
 def settings() -> dict:
-    return db.settings()
+    """The settings; `model` is always an allowed one, the old editor_model is left out (specs/024 FR-009, FR-010)."""
+    s = db.settings()
+    s.pop("editor_model", None)
+    s["model"] = _model_ok(s.get("model"))
+    return s
+
+
+def model() -> str:
+    """The model of every Claude call of the studio (specs/024)."""
+    return settings()["model"]
 
 
 def update_settings(changes: dict) -> dict:
@@ -55,8 +79,8 @@ def update_settings(changes: dict) -> dict:
         if not ok or (lo is not None and not lo <= v <= hi):
             raise StudioError("invalid", f"giá trị của {k} ngoài khoảng cho phép", 422)
         s[k] = typ(v)
-    if s.get("editor_model", "inherit") not in EDITOR_MODELS:
-        raise StudioError("invalid", "editor_model phải là " + ", ".join(EDITOR_MODELS), 422)
+    if s["model"] not in models()["allowed"]:
+        raise StudioError("invalid", "model must be one of: " + ", ".join(models()["allowed"]), 422)
     if s.get("claude_order", "auto") not in ("auto", "manual"):
         raise StudioError("invalid", "claude_order phải là auto hoặc manual", 422)
     if s["model"] not in s["price_table"]:

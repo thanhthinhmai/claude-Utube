@@ -5,7 +5,7 @@ import os
 import subprocess
 import tempfile
 
-from filmcheck import editor
+from filmcheck import editor, models
 
 TYPES = ["explainer", "comparison", "list", "true story", "q&a", "other"]
 SCHEMA = {"type": "object", "required": ["fit", "suggested"], "properties": {
@@ -69,6 +69,7 @@ def run(channel_md: str, topics: list, suggest: bool = False, videos: dict = Non
             env["ANTHROPIC_BASE_URL"] = env["STUDIO_PROXY"]
         env.setdefault("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", "1")
         env.pop("ANTHROPIC_API_KEY", None)
+    models.helper_env(env, editor.model_args()[1])
     for _ in range(2):
         try:
             p = subprocess.run(args, input=prompt(channel_md, topics, suggest, videos), capture_output=True, text=True,

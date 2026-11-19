@@ -58,4 +58,4 @@ Chạy giống nhau ở local và trong container; chi tiết, điểm và ngư�
 | `script skip <phim> --reason "…"` | phim không có lời đọc | 0 · 1 nếu phim có lời đọc |
 | `web fetch <url> [--film F]` | mở một trang (online: qua bộ chuyển tiếp, tối đa 60 trang mỗi việc), ghi vào `.check/opened.json` | 0 · 1 bị chặn hoặc lỗi |
 | `qc <phim> [--json]` | đo phim xong: nhịp lời, cắt cảnh, hình đứng im, ký tự thiếu phông | 0 đạt · 1 có lỗi · 2 không đo được |
-| `config editor-model <inherit\|opus\|sonnet\|haiku>` | model của biên tập ở local (`.studio/config.json`); online: Settings → General | 0 |
+| ~~`config editor-model`~~ (thay bởi `config model [<id>]`, specs/024) | model của biên tập ở local (`.studio/config.json`); online: Settings → General | 0 |

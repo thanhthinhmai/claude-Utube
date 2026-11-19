@@ -77,4 +77,6 @@ Mở một trang (R4) và in chữ của trang (tối đa 8 000 ký tự; biên 
 
 ## `sh bin/studio config editor-model <inherit|opus|sonnet|haiku>` (local)
 
+> Thay bởi specs/024: `sh bin/studio config model [<id>]`, một model cho mọi lượt gọi; `editor_model` bị bỏ qua.
+
 Lưu vào `.studio/config.json` (R6). Online: Settings → General, trường `editor_model`.

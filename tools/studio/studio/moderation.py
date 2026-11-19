@@ -8,7 +8,7 @@ import os
 import subprocess
 import tempfile
 
-from . import claude_plan, db, quotas
+from . import claude_plan, quotas
 from .store import StudioError
 
 POLICY = """You check film ideas for an online film studio. Answer whether the idea may be made.
@@ -56,11 +56,13 @@ def _verdict(data) -> tuple:
 def _through_plan(slot: int, prompt: str):
     """(ok, reason), or None when this account could not answer (limit, sign-in, timeout): try the next one.
     The idea goes in on stdin (not visible in the process list) and no session is written (T001)."""
-    args = ["-p", "--model", db.settings()["model"], "--system-prompt", POLICY, "--tools", "",
+    model = quotas.model()                  # specs/024: the studio's one model, helper calls too
+    args = ["-p", "--model", model, "--system-prompt", POLICY, "--tools", "",
             "--json-schema", json.dumps(SCHEMA), "--output-format", "json", "--no-session-persistence"]
     try:
         with tempfile.TemporaryDirectory(prefix="moderation.") as cwd:      # no project files around it
-            p = claude_plan.run(slot, args, timeout=120, input=prompt, cwd=cwd, wait=30)
+            p = claude_plan.run(slot, args, timeout=120, input=prompt, cwd=cwd, wait=30,
+                                env_extra={"ANTHROPIC_DEFAULT_HAIKU_MODEL": model, "ANTHROPIC_SMALL_FAST_MODEL": model})
         out = json.loads(p.stdout or "{}")
     except (subprocess.TimeoutExpired, claude_plan.Busy, ValueError):
         return None
@@ -71,7 +73,7 @@ def _through_plan(slot: int, prompt: str):
         elif status == 401:
             claude_plan.mark_needs_signin(slot)
         return None
-    quotas.record_call(None, f"plan:{slot}", db.settings()["model"], out.get("usage") or {})
+    quotas.record_call(None, f"plan:{slot}", model, out.get("usage") or {})
     if out.get("stop_reason") == "refusal":
         return False, "The idea cannot be made by the studio."
     return _verdict(out.get("structured_output"))
@@ -81,7 +83,7 @@ def _through_key(prompt: str):
     import anthropic
     client = anthropic.Anthropic()          # ANTHROPIC_API_KEY of the studio (never a customer's)
     r = client.messages.create(
-        model=db.settings()["model"],
+        model=quotas.model(),
         max_tokens=1024,
         system=POLICY,
         output_config={"effort": "low", "format": {"type": "json_schema", "schema": SCHEMA}},

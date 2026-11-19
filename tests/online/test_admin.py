@@ -47,14 +47,23 @@ class US3(unittest.TestCase):
             self.assertEqual(r.status_code, 422, bad)
         self.assertEqual(self.admin.get("/api/v1/admin/settings").json()["concurrency"], 2)
 
-    def test_editor_model_setting(self):                         # specs/010 FR-007b
+    def test_one_model_setting(self):                            # specs/024 FR-006–FR-010, SC-003
         s = self.admin.get("/api/v1/admin/settings").json()
-        self.assertEqual(s["editor_model"], "inherit")
-        r = self.admin.put("/api/v1/admin/settings", json={"editor_model": "gpt"}, headers=W)
-        self.assertEqual(r.status_code, 422)
-        r = self.admin.put("/api/v1/admin/settings", json={"editor_model": "sonnet"}, headers=W)
-        self.assertEqual((r.status_code, r.json()["editor_model"]), (200, "sonnet"))
-        self.assertEqual(self.c.put("/api/v1/admin/settings", json={"editor_model": "opus"}, headers=W).status_code, 403)
+        self.assertEqual((s["model"], s["models"]), ("claude-opus-5-5", [{"id": "claude-opus-5-5", "name": "Opus 5.5"}]))
+        self.assertNotIn("editor_model", s)
+        for bad in ({"model": "claude-haiku-5-5"}, {"model": "gpt"}, {"editor_model": "sonnet"}):
+            r = self.admin.put("/api/v1/admin/settings", json=bad, headers=W)
+            self.assertEqual(r.status_code, 422, bad)
+        self.assertIn("claude-opus-5-5", self.admin.put("/api/v1/admin/settings", json={"model": "x"}, headers=W).text)
+        self.assertEqual(self.admin.get("/api/v1/admin/settings").json()["model"], "claude-opus-5-5")
+        r = self.admin.put("/api/v1/admin/settings", json={"model": "claude-opus-5-5"}, headers=W)
+        self.assertEqual((r.status_code, r.json()["model"]), (200, "claude-opus-5-5"))
+        self.assertEqual(self.c.put("/api/v1/admin/settings", json={"model": "claude-opus-5-5"}, headers=W).status_code, 403)
+        # an old stored value: an old editor_model and a model typed into the old text box are ignored
+        from studio import db, quotas
+        db.save_settings({**db.settings(), "editor_model": "haiku", "model": "claude-haiku-5-5"})
+        self.assertEqual(quotas.model(), "claude-opus-5-5")
+        self.assertNotIn("editor_model", self.admin.get("/api/v1/admin/settings").json())
 
     def test_us3_signup_closed(self):
         r = self.admin.put("/api/v1/admin/settings", json={"signup_open": True}, headers=W)
