@@ -297,9 +297,10 @@ def create_app() -> FastAPI:
     @app.post(api + "/reviews/{rid}/decision", status_code=201)
     def post_decision(rid: str, body: DecisionIn, request: Request):
         r = reviews.load(rid, owner(request))         # another customer's review is not found
-        if r["kind"] in reviews.POINT_KINDS and body.value == "approve" and not body.base:
+        via_token = getattr(request.state, "token", None) is not None      # specs/009: an API token or MCP
+        if r["kind"] in reviews.POINT_KINDS and body.value == "approve" and not body.base and not via_token:
             raise StudioError("invalid", "approving a review point needs base (the fingerprint shown)", 422)
-        return reviews.decide(rid, body.value, body.note, "ui", body.base, owner(request) or "local")
+        return reviews.decide(rid, body.value, body.note, "api" if via_token else "ui", body.base, owner(request) or "local")
 
     # ---------- films ----------
     @app.get(api + "/films")

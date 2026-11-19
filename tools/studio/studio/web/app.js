@@ -280,6 +280,12 @@ async function pageChannels() {
   });
 }
 
+const POINTS = [["script", "Script"], ["voice", "Voice"], ["shots", "Shots (before render)"], ["mix", "Mix"], ["publish", "Publish"]];
+/** Five boxes: where a film stops for this person's review (specs/026). @param {string} id @param {string[]} on */
+const pointBoxes = (id, on) => `<fieldset class="points" id="${id}"><legend>Stop for my review at <span class="hint">You can change and approve each one on the job page</span></legend>
+  ${POINTS.map(([k, l]) => `<label class="check"><input type="checkbox" value="${k}" ${on.includes(k) ? "checked" : ""}> <span>${l}</span></label>`).join("")}</fieldset>`;
+const pointsOf = (/** @type {string} */ id) => Array.from(document.querySelectorAll(`#${id} input:checked`)).map((x) => /** @type {HTMLInputElement} */ (x).value);
+
 async function pageChannel(slug) {
   const c = await get(`/channels/${encodeURIComponent(slug)}`);
   const base = `/channels/${encodeURIComponent(slug)}/lessons`;
@@ -294,6 +300,7 @@ async function pageChannel(slug) {
       ${a("title_rules", "Title rules", "In your own words")}${t("title_max", "Longest title", "20–100 characters, or empty")}
       ${a("thumbnail_rules", "Thumbnail rules", "In your own words")}
       ${a("hashtags", "Hashtags always used", "One per line, like #science; at most 5")}${a("banned", "Words never used", "One per line")}
+      ${pointBoxes("p-reviews", c.reviews || ["script", "shots"])}
       <div><button class="primary" type="submit">Save the profile</button></div></form><p id="msg" class="muted" role="status"></p>
     <div class="panel"><p class="section-title">Decisions</p>
       ${(c.decisions || []).length ? `<ul>${c.decisions.map((/** @type {any} */ d) => `<li>${esc(d.date)}: ${esc(d.text)}</li>`).join("")}</ul>` : `<p class="muted">None yet.</p>`}
@@ -309,7 +316,7 @@ async function pageChannel(slug) {
       language: field("p-language").value.trim(), seconds: num("seconds"), style: field("p-style").value.trim(),
       voice: field("p-voice").value.trim() || null, speed: num("speed") ?? 1, title_rules: field("p-title_rules").value.trim(),
       title_max: num("title_max"), thumbnail_rules: field("p-thumbnail_rules").value.trim(),
-      hashtags: lines(field("p-hashtags").value), banned: lines(field("p-banned").value) });
+      hashtags: lines(field("p-hashtags").value), banned: lines(field("p-banned").value), reviews: pointsOf("p-reviews") });
     return "Saved.";
   });
   /** @type {HTMLButtonElement} */ (document.getElementById("d-add")).onclick = async () => {
@@ -1541,6 +1548,7 @@ async function pageNew() {
       <label>Length in seconds <span class="hint">Up to ${max} seconds.</span>
         <input id="seconds" type="number" min="5" max="${max}" value="${Math.min(30, max)}" required></label>
       <label class="check"><input id="treat" type="checkbox"> <span>Let me review the treatment (the written plan) before the picture is made</span></label>
+      ${pointBoxes("f-reviews", ["script", "shots"])}
       <div><button class="primary" type="submit" ${left === 0 || !ME.verified ? "disabled" : ""}>Make the film (uses 1 credit)</button></div>
     </form><p id="msg" class="muted" role="status"></p>`;
   $app.querySelector("input[name=style]:checked")?.closest("label")?.scrollIntoView({ block: "nearest" });
@@ -1551,13 +1559,16 @@ async function pageNew() {
     const r = /** @type {HTMLInputElement | null} */ ($app.querySelector(`input[name=style][value="${CSS.escape(c.style)}"]`));
     if (r) { r.checked = true; r.closest("label")?.scrollIntoView({ block: "nearest" }); }
     field("seconds").value = String(Math.min(c.seconds, max));
+    const on = c.reviews || ["script", "shots"];        // the channel's review points, changeable for this film
+    document.querySelectorAll("#f-reviews input").forEach((x) => { /** @type {HTMLInputElement} */ (x).checked = on.includes(/** @type {HTMLInputElement} */ (x).value); });
   };
   if (chSel) { chSel.onchange = fillFromChannel; if (chSel.value) fillFromChannel(); }
   onSubmit(async () => {
     const style = /** @type {HTMLInputElement | null} */ ($app.querySelector("input[name=style]:checked"));
     if (!style) throw new Error("Pick a style first.");
     const j = await post("/jobs", { kind: "film", style: style.value, idea: field("idea").value.trim(),
-      seconds: Number(field("seconds").value), review_treatment: field("treat").checked, ...(chSel && chSel.value ? { channel: chSel.value } : {}),
+      seconds: Number(field("seconds").value), review_treatment: field("treat").checked, reviews: pointsOf("f-reviews"),
+      ...(chSel && chSel.value ? { channel: chSel.value } : {}),
       ...(topic && chSel && chSel.value === params.get("channel") ? { topic: topic.n } : {}) });
     await loadMe();
     location.hash = `#/jobs/${j.id}`;

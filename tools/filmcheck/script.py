@@ -193,6 +193,22 @@ def last_review(film_dir: Path):
     return n, chk / f"script-r{n}.md", flagged
 
 
+def owner_edits(film_dir: Path) -> set:
+    """Paragraphs the film's owner changed with `edit script-para` (.check/edits.jsonl, specs/026)."""
+    out = set()
+    try:
+        for line in (Path(film_dir) / ".check" / "edits.jsonl").read_text(encoding="utf-8").splitlines():
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if e.get("op") == "script-para" and e.get("ref"):
+                out.add(e["ref"])
+    except OSError:
+        pass
+    return out
+
+
 def unchanged_issues(film_dir: Path, sc: dict) -> list:
     lr = last_review(film_dir)
     if not lr or not lr[1].is_file():
@@ -202,9 +218,10 @@ def unchanged_issues(film_dir: Path, sc: dict) -> list:
     except ScriptError:
         return []
     now = para_map(sc)
+    owner = owner_edits(film_dir)                        # specs/026: the owner changed these on the job page
     out = []
     for pid in sorted(set(before) | set(now)):
-        if before.get(pid) != now.get(pid) and pid not in lr[2]:
+        if before.get(pid) != now.get(pid) and pid not in lr[2] and pid not in owner:
             what = "was added" if pid not in before else "was removed" if pid not in now else "changed"
             out.append({"para": pid, "sentence": 0, "rule": "unchanged",
                         "detail": f"{pid} {what} but the editor did not flag it (P1 or P2)"})

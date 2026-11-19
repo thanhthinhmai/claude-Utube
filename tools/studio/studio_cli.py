@@ -87,6 +87,13 @@ def cmd_job(a):
                             extra={"source": "chat", **extra})
         else:
             j = jobs.create(a.kind, a.name, {"set": a.set, "film": a.film}, extra=extra)
+        if a.points is not None and a.kind == "film" and a.film:     # specs/026: this film's review points
+            sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+            from filmcheck import points
+            try:
+                points.set_on(PROJECT / "films" / a.film, a.points, origin="this film")
+            except points.PointError as e:
+                raise StudioError("invalid", str(e), 422) from None
         out(j["id"])
         u = ui_url(f"/#/jobs/{j['id']}")
         if u:
@@ -467,6 +474,7 @@ def main(argv=None) -> int:
     js = j.add_subparsers(dest="action", required=True)
     s = js.add_parser("start"); s.add_argument("--kind", required=True, choices=sorted(jobs.KINDS))
     s.add_argument("--name", required=True); s.add_argument("--set"); s.add_argument("--film")
+    s.add_argument("--points", help="script,shots,… or none: this film's review points (specs/026)")
     s = js.add_parser("step"); s.add_argument("id"); s.add_argument("text"); s.add_argument("--progress")
     s = js.add_parser("log"); s.add_argument("id"); s.add_argument("text")
     s = js.add_parser("run"); s.add_argument("id"); s.add_argument("--step")

@@ -16,6 +16,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -530,6 +531,12 @@ class Worker:
                 from studio import resources
                 channels.attach(acct, work / "films" / inp["film"], inp["channel"],
                                 shared_path=db.data_dir() / "shared" / "lessons.json", lib=resources.lib_dir())
+            if j["kind"] == "film" and inp.get("reviews") is not None and inp.get("film"):     # specs/026: this film's points
+                from filmcheck import points
+                try:
+                    points.set_on(work / "films" / inp["film"], inp["reviews"], origin="this film")
+                except points.PointError:
+                    pass
             return {}, None
         ref = acct / "references" / inp["set"]
         ref.mkdir(parents=True, exist_ok=True)
@@ -865,10 +872,53 @@ class Worker:
         with db.tx() as con:
             con.execute("DELETE FROM worker_beat WHERE id = ?", (self.beat_id,))
 
+    def run_actions(self) -> None:
+        """Edits from the job page (specs/026 R12): for a film job waiting for a review, each queued edit runs as
+        `sh /studio/bin/studio edit …` in a throw-away container of the job (no network, no Claude proxy, no quota),
+        one at a time per job, in a thread so the worker loop goes on."""
+        from studio import actions
+        busy = getattr(self, "edit_threads", None)
+        if busy is None:
+            busy = self.edit_threads = {}
+        for jid in {a["job_id"] for a in store.doc_list("action") if a["status"] == "queued"}:
+            t = busy.get(jid)
+            if (t and t.is_alive()) or jid in self.runs:
+                continue
+            try:
+                j = jobs.load(jid)
+            except store.StudioError:
+                continue
+            if j["status"] != "waiting_review" or j.get("kind") != "film":
+                continue
+            t = threading.Thread(target=self.edit_queue, args=(j,), daemon=True, name=f"edits-{jid}")
+            busy[jid] = t
+            t.start()
+
+    def edit_queue(self, j: dict) -> None:
+        from studio import actions
+        work = self.work_dir(j["id"])
+        film = (j.get("input") or {}).get("film")
+        for a in actions.queued(j["id"]):
+            if not film or not (work / "films" / film).is_dir():
+                actions.finish(a, 2, json.dumps({"code": 2, "error": "the film folder of this job is gone"}))
+                continue
+            store.doc_update("action", a["id"], lambda x: x.update(status="running", started_at=store.now_iso()))
+            tmp = work / ".edits" / a["id"]
+            tmp.mkdir(parents=True, exist_ok=True)
+            os.chmod(tmp, 0o777)
+            try:
+                rc, out = self.runner.exec(work, lambda root, lib: actions.command(
+                    a, f"{root}/films/{film}", str(tmp), studio_bin(self.runner), f"{root}/.edits/{a['id']}"), timeout=3600)
+            except Exception as e:   # noqa: BLE001 - the studio's fault, shown on the edit
+                rc, out = 1, json.dumps({"code": 1, "error": f"the edit could not run ({type(e).__name__})"})
+            shutil.rmtree(tmp, ignore_errors=True)
+            actions.finish(a, rc, out)
+
     def tick(self) -> None:
         self.beat()
         self.check_runs()
         self.resume_answered()
+        self.run_actions()
         while True:
             j = self.claim()
             if not j:

@@ -79,10 +79,12 @@ def queued(job_id: str) -> list:
                   key=lambda a: a["created_at"] + a["id"])
 
 
-def command(a: dict, film: str, tmpdir: str) -> list:
-    """`sh bin/studio edit <film> <op> <ref…> key=value … --base F --by X --source ui --json`; long text goes in a file."""
+def command(a: dict, film: str, tmpdir: str, studio: str = None, seen: str = None) -> list:
+    """`sh bin/studio edit <film> <op> <ref…> key=value … --base F --by X --source ui --json`; long text goes in a file
+    written to `tmpdir` (`seen` is that folder as the command sees it, inside a job container online)."""
     args = dict(a["args"])
-    cmd = ["sh", str(ROOT / "bin" / "studio"), "edit", film, a["op"]]
+    seen = seen or tmpdir
+    cmd = ["sh", studio or str(ROOT / "bin" / "studio"), "edit", film, a["op"]]
     for k in ("ref", "para", "line", "shot", "rule"):
         if args.get(k):
             cmd += [x for x in args.pop(k).split(",") if x]
@@ -91,9 +93,9 @@ def command(a: dict, film: str, tmpdir: str) -> list:
             f = Path(tmpdir) / f"{k}.txt"
             f.write_text(args.pop(k), encoding="utf-8")
             if k == "text":
-                cmd += ["--text-file", str(f)]
+                cmd += ["--text-file", f"{seen}/{k}.txt"]
             else:
-                cmd.append(f"description-file={f}")
+                cmd.append(f"description-file={seen}/{k}.txt")
     for k in ("say", "reason", "confirm"):
         if k in args:
             cmd += [f"--{k}", args.pop(k)]

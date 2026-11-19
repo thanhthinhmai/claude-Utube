@@ -225,3 +225,20 @@ class Mix(unittest.TestCase):                                      # specs/026 T
         self.assertEqual(json.loads((self.d / "mix.json").read_text()), {"music": "seed:3", "music_under_voice_db": -6.0})
         self.assertEqual(r["stale"], ["Self-check", "Publish"])
         self.assertEqual(tiers.fingerprint(self.d), pic)                 # the picture is not touched
+
+
+class OwnerEditsKeepTheScriptPassing(unittest.TestCase):           # found online: the agent's own check after an edit
+    def test_unchanged_rule_skips_owner_paragraphs(self):
+        from filmcheck import script
+        TMP.mkdir(exist_ok=True)
+        d = samples.review_film(Path(tempfile.mkdtemp(dir=TMP)), kit=False)
+        (d / ".check").mkdir(exist_ok=True)
+        (d / ".check" / "script-r1.md").write_text((d / "SCRIPT.md").read_text())          # an editor round on this text
+        (d / ".check" / "review-r1.json").write_text(json.dumps({"score": 9, "issues": []}))
+        r = edit.run(d, "script-para", {"para": "P03", "text": "By day three, you begin to see things that are not there."},
+                     base=points.fingerprint(d, "script"))
+        self.assertEqual(r["code"], 0, r)
+        self.assertTrue(script.check(d)["hard"]["unchanged"])                     # the normal check passes too
+        p = d / "SCRIPT.md"
+        p.write_text(p.read_text().replace("nothing happens", "the night goes on"))  # the agent changed P01 alone
+        self.assertFalse(script.check(d)["hard"]["unchanged"])

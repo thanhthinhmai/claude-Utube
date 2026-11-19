@@ -132,12 +132,12 @@ description: "Tasks for 026 — review points and edits on the film job page"
 
 ## Phase 8: Online, app và hoàn thiện
 
-- [ ] T054 Worker chạy thao tác online (`tools/runner/worker.py`): lấy `action` `queued` của việc `waiting_review`, chạy `sh bin/studio edit … --json` trong container của việc (cùng ảnh, cùng thư mục phim, không proxy Claude, không trừ hạn mức), ghi trạng thái và nhật ký; container dừng khi hết thao tác; `actions.create` online không chạy luồng local
-- [ ] T055 [P] Test `tests/online/test_actions.py` (phần còn lại): thao tác online chạy bằng `RUNNER=local` không có biến proxy; lượt gọi Claude của việc không tăng; hai thao tác cùng việc chạy tuần tự
-- [ ] T056 [P] `job start --points script,shots` trong `tools/studio/studio_cli.py` (ghi `reviews.on` khi có thư mục phim); trang "Make a film" (online) có 5 ô đánh dấu theo mặc định kênh; trang kênh trên giao diện có 5 ô `reviews` (`tools/studio/studio/api_online.py` và `web/app.js`)
-- [ ] T057 [P] Test Playwright trong `tests/ui/` (theo cách test 025): mở trang việc của phim mẫu, thanh có 10 bước và 2 nhãn `REVIEW`, sửa đoạn P3 → nhật ký có `Edit script-para P3`, cột "If you change this" có 7 bước, nút duyệt khoá rồi mở
-- [ ] T058 [P] MCP `answer_review` nhận `base` tuỳ chọn (`tools/studio/studio/mcp_server.py`); công cụ MCP `film_steps(job_id)` gọi `/steps`
-- [ ] T059 Cập nhật `CLAUDE.md` (mục 5 "Ghi việc lên giao diện": điểm duyệt, `point`, `edit`; mục Cấu trúc: `points.py`, `steps.py`, `edit.py`, `actions.py`) và `specs/003-studio-ui/contracts/skill-integration.md` (năm loại duyệt mới)
+- [X] T054 Worker chạy thao tác online (`tools/runner/worker.py`): lấy `action` `queued` của việc `waiting_review`, chạy `sh bin/studio edit … --json` trong container của việc (cùng ảnh, cùng thư mục phim, không proxy Claude, không trừ hạn mức), ghi trạng thái và nhật ký; container dừng khi hết thao tác; `actions.create` online không chạy luồng local
+- [X] T055 [P] Test `tests/online/test_actions.py` (phần còn lại): thao tác online chạy bằng `RUNNER=local` không có biến proxy; lượt gọi Claude của việc không tăng; hai thao tác cùng việc chạy tuần tự
+- [X] T056 [P] `job start --points script,shots` trong `tools/studio/studio_cli.py` (ghi `reviews.on` khi có thư mục phim); trang "Make a film" (online) có 5 ô đánh dấu theo mặc định kênh; trang kênh trên giao diện có 5 ô `reviews` (`tools/studio/studio/api_online.py` và `web/app.js`)
+- [X] T057 [P] Test Playwright trong `tests/ui/` (theo cách test 025): mở trang việc của phim mẫu, thanh có 10 bước và 2 nhãn `REVIEW`, sửa đoạn P3 → nhật ký có `Edit script-para P3`, cột "If you change this" có 7 bước, nút duyệt khoá rồi mở
+- [X] T058 [P] MCP `answer_review` nhận `base` tuỳ chọn (`tools/studio/studio/mcp_server.py`); công cụ MCP `film_steps(job_id)` gọi `/steps`
+- [X] T059 Cập nhật `CLAUDE.md` (mục 5 "Ghi việc lên giao diện": điểm duyệt, `point`, `edit`; mục Cấu trúc: `points.py`, `steps.py`, `edit.py`, `actions.py`) và `specs/003-studio-ui/contracts/skill-integration.md` (năm loại duyệt mới)
 - [ ] T060 Chạy năm bộ test (`sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/online/run.sh`) và `node --test desktop/test/*.test.js`; ghi kết quả
 - [ ] T061 Thử thật SC-006: một phim 5 phút bằng chat với ít nhất một lần sửa ở Script và một lần ở Shots trên trang, không dựng hình lại; đo SC-001 (thời gian điểm mới, ảnh mới); ghi kết quả vào `quickstart.md`
 

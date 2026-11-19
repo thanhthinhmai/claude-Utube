@@ -467,11 +467,12 @@ def attach(root: Path, film_dir: Path, slug: str, shared_path: Path = None, lib:
     film_dir.mkdir(parents=True, exist_ok=True)
     _write(film_dir / "channel.json", json.dumps(snap, ensure_ascii=False, indent=1) + "\n")
     _write(film_dir / "CHANNEL_BRIEF.md", text)
-    from filmcheck import points                                    # specs/026: the film's review points (checks.json)
-    try:
-        points.set_on(film_dir, reviews_of(ch), origin=f"channel {slug}")
-    except points.PointError:
-        pass                                                        # a point already approved or waiting keeps its state
+    from filmcheck import points, report                            # specs/026: the film's review points (checks.json)
+    if (report.load(film_dir).get("reviews") or {}).get("from") != "this film":   # chosen for this film: kept
+        try:
+            points.set_on(film_dir, reviews_of(ch), origin=f"channel {slug}")
+        except points.PointError:
+            pass                                                    # a point already approved or waiting keeps its state
     warn = f"{left} lessons did not fit in CHANNEL_BRIEF.md ({BRIEF_MAX} characters): merge or retire some" if left else None
     return {"snapshot": snap, "warning": warn}
 

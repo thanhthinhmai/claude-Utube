@@ -1,5 +1,8 @@
 """specs/026: review points and edits on the film job page (local mode, API)."""
 import json
+import os
+import shutil
+import subprocess
 import sys
 import time
 import unittest
@@ -19,6 +22,7 @@ class ReviewPoints(unittest.TestCase):
         out = self.p.cli("job", "start", "--kind", "film", "--name", "night", "--film", "night")
         self.assertEqual(out.returncode, 0, out.stderr)
         self.jid = out.stdout.splitlines()[0]
+        self.url = out.stdout.splitlines()[1] if len(out.stdout.splitlines()) > 1 else ""
         self.c = client()
 
     def tearDown(self):
@@ -111,6 +115,28 @@ class ReviewPoints(unittest.TestCase):
         self.assertFalse(lock.exists())
         v = self.steps()
         self.assertIsNone(v["busy"])
+
+    @unittest.skipUnless(shutil.which("node") and (REPO / "lib" / "lemo-opuscar" / "node_modules" / "playwright-core").is_dir(),
+                         "no node / playwright-core")
+    def test_in_browser(self):                                       # T057
+        summary = self.p.dir / "s.md"
+        summary.write_text("Script ready")
+        self.p.cli("review", "request", self.jid, "--kind", "script", "--film", "night", "--summary", str(summary))
+        base = self.url.split("URL: ", 1)[1].split("/#", 1)[0]
+        r = subprocess.run(["node", str(Path(__file__).with_name("browser_points.cjs")), base, self.jid], capture_output=True,
+                           text=True, timeout=120, env={**os.environ, "NODE_PATH": str(REPO / "lib" / "lemo-opuscar" / "node_modules")})
+        if r.returncode == 77:
+            self.skipTest("no browser")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        o = json.loads(r.stdout.strip().splitlines()[-1])
+        self.assertEqual(o["errors"], [])
+        self.assertEqual((o["steps"], o["gates"]), (10, 2))
+        self.assertIn("Waiting for you: Script", o["waiting"])
+        self.assertTrue(o["lockedWhileEditing"])
+        self.assertIn("Saved", o["result"])
+        self.assertEqual(o["impact"], 7)
+        self.assertFalse(o["lockedAfter"])
+        self.assertTrue(o["logged"])
 
     def test_revise_records_rejection(self):
         summary = self.p.dir / "s.md"
