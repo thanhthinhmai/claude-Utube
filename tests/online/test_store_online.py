@@ -99,7 +99,7 @@ class Upgrade(unittest.TestCase):
         con.close()
         from studio import db
         with db.read() as c:
-            self.assertEqual(c.execute("SELECT value FROM meta WHERE key = 'schema'").fetchone()[0], "3")
+            self.assertEqual(c.execute("SELECT value FROM meta WHERE key = 'schema'").fetchone()[0], "4")
             tables = {r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
             self.assertLessEqual({"api_token", "token_request", "idempotency", "worker_beat", "ticket"}, tables)   # 009
             a = c.execute("SELECT * FROM accounts WHERE id = 'a-1'").fetchone()
@@ -113,6 +113,7 @@ class Upgrade(unittest.TestCase):
             c.execute("INSERT INTO tokens VALUES ('t-2', 'a-2', 'invite', '2099-01-01', NULL)")
             c.execute("""INSERT INTO outbox ("to", template, data, created_at) VALUES ('a@x.test', 'claude_signin', '{}', 't')""")
             c.execute("INSERT INTO call (via, at) VALUES ('plan:1', 't')")
+            c.execute("INSERT INTO docs VALUES ('action', 'a-1', 'a-1', 'queued', '{}', 't', 1)")   # 026: action documents
         with db.tx() as c:            # foreign keys still cascade after the rebuild
             c.execute("DELETE FROM accounts WHERE id = 'a-1'")
         with db.read() as c:

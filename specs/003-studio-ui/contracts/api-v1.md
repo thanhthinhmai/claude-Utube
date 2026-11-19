@@ -14,9 +14,13 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 | `GET /jobs/{id}` | `Job` kèm `reviews: [Review]` | `404 not_found` |
 | `GET /jobs/{id}/done` | việc làm phim: `{film, steps: [{key, label, state, progress?}], sections: {script, voice, shots, mix, render}}` (specs/025) | `404` (không phải việc làm phim, không có quyền) |
 | `GET /jobs/{id}/files/{path}` | một tệp của thư mục phim trong danh sách cho phép (`SCRIPT.md`, `SOURCES.md`, `lines.json`, `voices/l…wav`, `out/mix.wav`, `.check/review-r…json`, `.check/labels.json`, `.check/shots/…jpg`, `checks.json`, `CHECKS.md`), `Range` cho âm thanh (025) | `400 bad_name` (`..`, tuyệt đối, liên kết ra ngoài) · `404` |
+| `GET /jobs/{id}/steps` | việc làm phim: `{film, steps, points, impact, busy, editable, catalog, voices, mix_ranges, review}`, có `ETag` (specs/026) | `404` |
+| `POST /jobs/{id}/actions` body `{point, op, args, base}` | `202 {id, status: queued}`: một thao tác sửa, chạy bằng `sh bin/studio edit` (026) | `422 invalid` · `409 finished` · `429 too_many` · `404` |
+| `GET /jobs/{id}/actions/{aid}` | thao tác: `{status: queued\|running\|done\|failed\|invalid\|conflict\|busy, result}` (026) | `404` |
+| `PUT /jobs/{id}/points` body `{on: [điểm]}` | `{on}`: điểm duyệt của phim (026) | `409 point_locked` · `404` |
 | `GET /reviews?status=pending` | `{reviews: [Review]}` | |
 | `GET /reviews/{id}` | `Review` kèm `summary_html`, `decision\|null` | `404` |
-| `POST /reviews/{id}/decision` body `{value, note?}` | `201 Decision` (`source: ui`) | `409 already_decided` · `422 note_required` · `422 value_not_allowed` · `404` |
+| `POST /reviews/{id}/decision` body `{value, note?, base?}` | `201 Decision` (`source: ui`); điểm duyệt (026): `approve` cần `base` | `409 already_decided` · `409 changed` · `422 checks_not_passed` · `422 note_required` · `422 value_not_allowed` · `404` |
 | `GET /films` | `{films: [{name, has_video, has_poster, has_subtitles, rendering}]}` | |
 | `GET /films/{name}` | `{name, credits, treatment_html, …}` | `404` |
 | `GET /films/{name}/video` | `video/mp4`, hỗ trợ `Range` (206) | `404` |

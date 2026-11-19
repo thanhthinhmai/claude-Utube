@@ -87,6 +87,13 @@ def cmd_job(a):
                             extra={"source": "chat", **extra})
         else:
             j = jobs.create(a.kind, a.name, {"set": a.set, "film": a.film}, extra=extra)
+        if a.points is not None and a.kind == "film" and a.film:     # specs/026: this film's review points
+            sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+            from filmcheck import points
+            try:
+                points.set_on(PROJECT / "films" / a.film, a.points, origin="this film")
+            except points.PointError as e:
+                raise StudioError("invalid", str(e), 422) from None
         out(j["id"])
         u = ui_url(f"/#/jobs/{j['id']}")
         if u:
@@ -138,6 +145,33 @@ def link_film(film: str) -> None:
         shutil.copytree(src, dest, copy_function=link_or_copy, symlinks=True)
 
 
+def busy_take(a, remote: bool, pid: int):
+    """Write the film's busy lock (.check/busy.json) for a run with a step (specs/026 R13); the film folder comes
+    from the job (local) or STUDIO_FILM_DIR (a job container). Returns the folder, or None."""
+    if not a.step:
+        return None
+    try:
+        d = os.environ.get("STUDIO_FILM_DIR") if remote else jobs.load(a.id).get("film_dir")
+    except StudioError:
+        d = None
+    if not d or not Path(d).is_dir():
+        return None
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from filmcheck import edit
+    lk = {"step": a.step, "pid": pid, "host": edit.host(), "since": edit.now(), "by": "job run"}
+    try:
+        edit.write_atomic(edit.lock_file(Path(d)), json.dumps(lk))
+    except OSError:
+        return None
+    return Path(d)
+
+
+def busy_drop(d, pid: int) -> None:
+    if d is not None:
+        from filmcheck import edit
+        edit.drop_lock(d, pid)
+
+
 def job_run(a, remote: bool = False) -> int:
     cmd = a.cmd
     if not cmd:
@@ -159,6 +193,7 @@ def job_run(a, remote: bool = False) -> int:
     beat = float(os.environ.get("STUDIO_HEARTBEAT", "30"))
     every = float(os.environ.get("STUDIO_LOG_FLUSH", "3"))     # the job page sees new lines within a few seconds
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, env=CHILD_ENV)
+    busy = busy_take(a, remote, p.pid)                # specs/026: the film is busy with this step (edits wait)
     # locally a run with a step is remembered, so a shorter one alongside (Mix during Render) hands the step back
     run_key = jobs.run_begin(a.id, a.step, p.pid) if a.step and not remote else None
     done, lock = threading.Event(), threading.Lock()
@@ -220,6 +255,7 @@ def job_run(a, remote: bool = False) -> int:
             print(f"… ({len(tail) - 20}+ earlier lines are in the job log)")
         print("\n".join(shown), flush=True)
     flush()
+    busy_drop(busy, p.pid)
     add_log(f"(command exited with code {rc})")
     if run_key:
         try:
@@ -438,6 +474,7 @@ def main(argv=None) -> int:
     js = j.add_subparsers(dest="action", required=True)
     s = js.add_parser("start"); s.add_argument("--kind", required=True, choices=sorted(jobs.KINDS))
     s.add_argument("--name", required=True); s.add_argument("--set"); s.add_argument("--film")
+    s.add_argument("--points", help="script,shots,… or none: this film's review points (specs/026)")
     s = js.add_parser("step"); s.add_argument("id"); s.add_argument("text"); s.add_argument("--progress")
     s = js.add_parser("log"); s.add_argument("id"); s.add_argument("text")
     s = js.add_parser("run"); s.add_argument("id"); s.add_argument("--step")
@@ -452,7 +489,7 @@ def main(argv=None) -> int:
     rs = r.add_subparsers(dest="action", required=True)
     s = rs.add_parser("request"); s.add_argument("job"); s.add_argument("--kind", required=True, choices=sorted(reviews.KINDS))
     s.add_argument("--set", help="reference set (style-1, style-2)"); s.add_argument("--summary", required=True); s.add_argument("--final-round", action="store_true")
-    s.add_argument("--film", help="treatment review: add the film's SCRIPT.md and its scores (specs/010)")
+    s.add_argument("--film", help="treatment review: add the film's SCRIPT.md and its scores (specs/010); review points: the film (026)")
     s = rs.add_parser("wait"); s.add_argument("id"); s.add_argument("--timeout", type=float, default=540)
     s = rs.add_parser("decide"); s.add_argument("id"); s.add_argument("--value", required=True)
     s.add_argument("--note"); s.add_argument("--source", default="chat", choices=sorted(reviews.SOURCES))

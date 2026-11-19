@@ -3,6 +3,7 @@
 Runs the same way locally and inside an online job container. Only `script review` calls Claude (contracts/cli.md)."""
 import argparse
 import json
+import tempfile
 import os
 import shutil
 import sys
@@ -285,11 +286,14 @@ def cmd_qc(a) -> int:
              for w in r.get("warnings", [])]
     fin += [{"tier": "final", "ref": "film", "at": None, "rule": w["rule"], "severity": "warn", "measure": w.get("measure"),
              "limit": w.get("limit", ""), "text": w.get("text", ""), "fix": "", "excepted": None} for w in warns]
+    fin += [{"tier": "final", "ref": x["ref"], "at": None, "rule": x["rule"], "severity": "block", "measure": x["text"],
+             "limit": "", "text": "", "fix": "", "excepted": {"reason": x["reason"]}} for x in r["measures"].get("excepted", [])]
     tiers.save_tier(d, "final", tiers.result("final", fin, {k: r["measures"].get(k) for k in
                                                            ("silence_ratio", "tail_s", "av_sync", "loudness_range", "motion")},
                                              [], 0.0, tiers.fingerprint(d)))
     m = r["measures"]
     lines = [f"  ✗ {p}" for p in r["problems"]] + [f"  ! {w['text']}" for w in warns]
+    lines += [f"  · {x['text']}  (excepted: {x['reason']})" for x in m.get("excepted", [])]
     shots = tiers.load_tier(d, "shots") or {}
     open_style = [i for i in shots.get("issues", []) if i["severity"] == "warn"]
     acc = (shots.get("style_accept") or {}).get("reason")
@@ -411,6 +415,12 @@ def cmd_channel_set(a, channels):
         ch[f] = float(vals[0])
     elif f in ("name", "niche", "audience", "language", "style", "voice", "title_rules", "thumbnail_rules"):
         ch[f] = " ".join(vals)
+    elif f == "reviews":                                         # specs/026: reviews script,shots | none
+        from filmcheck import points
+        try:
+            ch[f] = points.parse_list(",".join(vals))
+        except points.PointError as e:
+            raise channels.ChannelError(str(e)) from None
     elif f == "hero":                                            # specs/022: hero hoodie=#d9b23a hair=bald …
         hero = dict(ch.get("hero") or {})
         for v in vals:
@@ -744,6 +754,14 @@ def cmd_qc_plan(a) -> int:
 def cmd_qc_shots(a) -> int:
     from filmcheck import shotcheck
     d = film_dir(a.film)
+    if a.only:                                     # specs/026: frames of a few shots, no tier result
+        try:
+            files = shotcheck.preview(d, lib_dir(), [x for x in a.only.split(",") if x])
+        except shotcheck.ShotError as e:
+            print(f"✗ {e}", file=sys.stderr)
+            return 2
+        out(a, {"files": files}, [f"✓ {f}" for f in files] + ["  (no tier result: run qc shots on the whole film before the review)"])
+        return 0
     try:
         r = shotcheck.run(d, lib_dir(), say=(lambda x: None) if a.json else print)
     except shotcheck.ShotError as e:
@@ -848,24 +866,113 @@ def say_file(d: Path) -> Path:
     return f
 
 
+def made_key(r: dict) -> dict:
+    """What a voice file was made from (specs/026 R7): the spoken text, voice and speed."""
+    return {"text": r.get("say") or r.get("text", ""), "voice": r.get("voice"), "speed": r.get("speed")}
+
+
+def lines_to_make(d: Path, rows: list, only=None, changed=False) -> list:
+    """The line ids to make: --only ids, --changed (spoken text, voice or speed differ from voices/.made.json, or no
+    file yet), else all."""
+    ids = [r["id"] for r in rows if isinstance(r, dict) and r.get("id")]
+    if only:
+        want = [x for x in only.split(",") if x]
+        bad = [x for x in want if x not in ids]
+        if bad:
+            raise ValueError(f"lines.json has no line {', '.join(bad)}")
+        return want
+    if changed:
+        try:
+            made = json.loads((d / "voices" / ".made.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            made = {}
+        return [r["id"] for r in rows if isinstance(r, dict) and r.get("id") and
+                (made.get(r["id"]) != made_key(r) or not (d / "voices" / f"{r['id']}.wav").is_file())]
+    return ids
+
+
+def fake_tts(lines_file: Path, out: Path) -> int:
+    """Tests (STUDIO_TTS_FAKE): one second of silence per line, as tts.py lays its files out."""
+    import wave
+    out.mkdir(parents=True, exist_ok=True)
+    dur = {}
+    for r in json.loads(lines_file.read_text(encoding="utf-8")):
+        with wave.open(str(out / f"{r['id']}.wav"), "wb") as w:
+            w.setnchannels(1); w.setsampwidth(2); w.setframerate(24000); w.writeframes(b"\0\0" * 24000)
+        dur[r["id"]] = 1.0
+    (out / "dur.json").write_text(json.dumps(dur), encoding="utf-8")
+    return 0
+
+
 def cmd_voice_make(a) -> int:
     d = film_dir(a.film)
+    from filmcheck import points                   # specs/026: the voice is made from an approved script
+    if a.skip_review is not None:
+        try:
+            points.skip(d, "script", a.skip_review)
+        except points.PointError as e:
+            print(f"✗ voice make: --skip-review {e}", file=sys.stderr)
+            return 2
+        print(f"! voice make: script review skipped — {a.skip_review.strip()}")
+    why = points.gate(d, "script")
+    for w in why:
+        print(f"✗ voice make: {w}", file=sys.stderr)
+    if why:
+        return 1
     try:
+        rows = json.loads((d / "lines.json").read_text(encoding="utf-8"))
+        ids = lines_to_make(d, rows, a.only, a.changed)
         f = say_file(d)
     except (OSError, ValueError) as e:
         print(f"✗ lines.json cannot be read: {e}", file=sys.stderr)
         return 2
-    n = sum(1 for r in json.loads(f.read_text(encoding="utf-8")) if isinstance(r, dict))
-    said = [r["id"] for r in json.loads((d / "lines.json").read_text(encoding="utf-8")) if isinstance(r, dict) and r.get("say")]
+    if not ids:
+        print("voice: every line is up to date")
+        return 0
+    part = bool(a.only or a.changed) and len(ids) < sum(1 for r in rows if isinstance(r, dict))
+    said = [r["id"] for r in rows if isinstance(r, dict) and r.get("say") and r["id"] in ids]
     lib = Path(lib_dir())
     py = lib / ".venv" / "bin" / "python"
-    cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "tts.py"), str(f), str(d / "voices")]
-    print(f"voice: {n} lines" + (f"; spoken as written in \"say\": {', '.join(said)}" if said else ""))
+    import subprocess
+    import shutil
+    tmp = Path(tempfile.mkdtemp(prefix="voice.", dir=d / "voices")) if part else None
+    if part:                                       # tts.py rewrites dur.json with the lines it gets: make them aside
+        sub = [r for r in json.loads(f.read_text(encoding="utf-8")) if isinstance(r, dict) and r.get("id") in ids]
+        f = tmp / ".say.json"
+        f.write_text(json.dumps(sub, ensure_ascii=False, indent=1), encoding="utf-8")
+    out_dir = tmp if part else d / "voices"
+    cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "tts.py"), str(f), str(out_dir)]
+    print(f"voice: {len(ids)} line(s)" + (f" ({', '.join(ids[:12])}{' …' if len(ids) > 12 else ''})" if part else "")
+          + (f"; spoken as written in \"say\": {', '.join(said)}" if said else ""))
     if os.environ.get("STUDIO_TTS_DRY"):
         print(" ".join(cmd))
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
         return 0
-    import subprocess
-    return subprocess.run(cmd, cwd=str(lib)).returncode
+    try:
+        rc = fake_tts(f, out_dir) if os.environ.get("STUDIO_TTS_FAKE") else subprocess.run(cmd, cwd=str(lib)).returncode
+        if rc == 0 and part:
+            dur_f = d / "voices" / "dur.json"
+            try:
+                dur = json.loads(dur_f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                dur = {}
+            dur.update(json.loads((tmp / "dur.json").read_text(encoding="utf-8")))
+            for i in ids:
+                os.replace(tmp / f"{i}.wav", d / "voices" / f"{i}.wav")
+            dur_f.write_text(json.dumps(dur, indent=1), encoding="utf-8")
+    finally:
+        if tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
+    if rc == 0:                                    # remember what each file was made from (--changed)
+        mf = d / "voices" / ".made.json"
+        try:
+            made = json.loads(mf.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            made = {}
+        made.update({r["id"]: made_key(r) for r in rows if isinstance(r, dict) and r.get("id") in ids})
+        mf.write_text(json.dumps(made, ensure_ascii=False, indent=1), encoding="utf-8")
+    return rc
 
 
 def cmd_voice_asr(a) -> int:
@@ -874,14 +981,41 @@ def cmd_voice_asr(a) -> int:
     model = asr_model(lang)
     lib = Path(lib_dir())
     py = lib / ".venv" / "bin" / "python"
-    cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "asr_check.py"), str(d / "lines.json"),
-           str(d / "voices"), "--lang", lang, "--model", model]
+    lines_f, vdir, tmp = d / "lines.json", d / "voices", None
+    if a.only:                                     # specs/026: stamps of a few lines, merged into words.json
+        import shutil
+        want = [x for x in a.only.split(",") if x]
+        rows = [r for r in json.loads(lines_f.read_text(encoding="utf-8")) if isinstance(r, dict) and r.get("id") in want]
+        tmp = Path(tempfile.mkdtemp(prefix="asr.", dir=d / "voices"))
+        lines_f, vdir = tmp / "lines.json", tmp
+        lines_f.write_text(json.dumps(rows, ensure_ascii=False), encoding="utf-8")
+        for r in rows:
+            shutil.copy2(d / "voices" / f"{r['id']}.wav", tmp / f"{r['id']}.wav")
+    cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "asr_check.py"), str(lines_f),
+           str(vdir), "--lang", lang, "--model", model]
     print(f"model: {model} ({lang})")
     if os.environ.get("STUDIO_ASR_DRY"):
         print(" ".join(cmd))
+        if tmp:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
         return 0
     import subprocess
-    return subprocess.run(cmd).returncode
+    try:
+        rc = subprocess.run(cmd).returncode
+        if tmp and (tmp / "words.json").is_file():
+            wf = d / "voices" / "words.json"
+            try:
+                words = json.loads(wf.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                words = {}
+            words.update(json.loads((tmp / "words.json").read_text(encoding="utf-8")))
+            wf.write_text(json.dumps(words, indent=0, ensure_ascii=False), encoding="utf-8")
+    finally:
+        if tmp:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+    return rc
 
 
 def cmd_qc_voice(a) -> int:
@@ -940,9 +1074,94 @@ def cmd_render_gate(a) -> int:
         print(f"! render: checks skipped — {a.skip_checks.strip()}")
         return 0
     why = tiers.gate(d)
+    from filmcheck import points                   # specs/026: the shots review point, after the tier checks
+    why += points.gate(d, "shots") if not why else []
     for w in why:
         print(f"✗ render: {w}", file=sys.stderr)
     return 1 if why else 0
+
+
+# ---------- review points and edits (specs/026) ----------
+def cmd_point_status(a) -> int:
+    from filmcheck import points, steps
+    d = film_dir(a.film)
+    st, rail = points.status(d), steps.status(d)
+    data = {"film": d.name, "points": st, "steps": rail, "impact": {p: steps.impact(p) for p in points.POINTS}}
+    lines = [f"{p:8} {'on ' if v['on'] else 'off'} {v['state']}" + (f" · approved {v['approved_at']} ({v['source']})"
+                                                                    if v["approved_at"] else "") for p, v in st.items()]
+    lines += ["", "  ".join(f"{s['name']}: {s['state']}" for s in rail)]
+    out(a, data, lines)
+    return 0
+
+
+def cmd_point_set(a) -> int:
+    from filmcheck import points
+    try:
+        on = points.set_on(film_dir(a.film), a.points)
+    except points.PointError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    print(f"✓ review points: {', '.join(on) or 'none'}")
+    return 0
+
+
+def cmd_point_approve(a) -> int:
+    from filmcheck import points
+    d = film_dir(a.film)
+    try:
+        code, why = points.approve(d, a.point, a.base, a.source, a.by, a.review)
+    except points.PointError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    if a.json:
+        print(json.dumps({"code": code, "reasons": why, "fingerprint": points.fingerprint(d, a.point)}))
+    elif code:
+        for w in why:
+            print(f"✗ {a.point}: {w}", file=sys.stderr)
+    else:
+        print(f"✓ {a.point} approved ({a.source})")
+    return code
+
+
+def cmd_point_gate(a) -> int:
+    from filmcheck import points
+    try:
+        why = points.gate(film_dir(a.film), a.point)
+    except points.PointError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    for w in why:
+        print(w)
+    return 1 if why else 0
+
+
+def edit_args(a) -> dict:
+    args = {"ref": []}
+    for t in a.args:
+        k, eq, v = t.partition("=")
+        if eq and k:
+            args[k.replace("-", "_")] = v
+        else:
+            args["ref"].append(t)
+    for k in ("text_file", "say", "reason", "confirm"):
+        if getattr(a, k) is not None:
+            args[k] = getattr(a, k)
+    return args
+
+
+def cmd_edit(a) -> int:
+    from filmcheck import edit
+    d = film_dir(a.film)
+    r = edit.run(d, a.op, edit_args(a), a.base, a.by, a.source)
+    if a.json:
+        print(json.dumps(r, ensure_ascii=False))
+    else:
+        mark = {0: "✓", 1: "!"}.get(r["code"], "✗")
+        print(f"{mark} edit {a.op} {r.get('ref') or ''}".rstrip() + (f": {r['error']}" if r.get("error") else "")
+              + (f" · check {json.dumps(r['check'], ensure_ascii=False)[:300]}" if r.get("check") else ""))
+        if r["code"] in (0, 1) and r["stale"]:
+            print(f"  run again: {', '.join(r['stale'])}")
+    return r["code"]
 
 
 def not_yet(a) -> int:
@@ -978,6 +1197,7 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("film")
     s.add_argument("--json", action="store_true")
     s = sub.add_parser("qc-shots", help="tier 2: one frame per shot, frame faults and the style (specs/020)")
+    s.add_argument("--only", default=None, help="S012,S013: draw these shots again, write no tier result (specs/026)")
     s.add_argument("film")
     s.add_argument("--json", action="store_true")
     s = sub.add_parser("qc-accept-style", help="accept the style warnings with a reason (specs/020)")
@@ -997,8 +1217,12 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--json", action="store_true")
     s = sub.add_parser("voice-make", help="make the voice files, with each line's \"say\" spelling (specs/023)")
     s.add_argument("film")
+    s.add_argument("--skip-review", default=None, help="make the voice without an approved script review (recorded)")
+    s.add_argument("--only", default=None, help="L03,L07: make only these lines (specs/026)")
+    s.add_argument("--changed", action="store_true", help="make only the lines whose text, say, voice or speed changed (specs/026)")
     s = sub.add_parser("voice-asr", help="word stamps with the studio's recogniser model (specs/020)")
     s.add_argument("film")
+    s.add_argument("--only", default=None, help="L03,L07: stamp only these lines, merged into words.json (specs/026)")
     s.add_argument("--lang", default=None)
     for name in ("qc-limits", "render-done"):
         s = sub.add_parser(name, help="used by sh bin/studio render (specs/020)")
@@ -1006,6 +1230,38 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("render-gate", help="may this film be rendered? (specs/020)")
     s.add_argument("film")
     s.add_argument("--skip-checks", default=None)
+
+    pt = sub.add_parser("point", help="review points of a film (specs/026)").add_subparsers(dest="cmd", required=True)
+    s = pt.add_parser("status")
+    s.add_argument("film")
+    s.add_argument("--json", action="store_true")
+    s = pt.add_parser("set")
+    s.add_argument("film")
+    s.add_argument("points", help="script,shots,… or none")
+    s = pt.add_parser("approve")
+    s.add_argument("film")
+    s.add_argument("point")
+    s.add_argument("--base")
+    s.add_argument("--source", default="chat", choices=["ui", "chat", "api"])
+    s.add_argument("--by", default="local")
+    s.add_argument("--review", default=None)
+    s.add_argument("--json", action="store_true")
+    s = pt.add_parser("gate")
+    s.add_argument("film")
+    s.add_argument("point")
+
+    s = sub.add_parser("edit", help="change one part of a film from the job page, the chat or the API (specs/026)")
+    s.add_argument("film")
+    s.add_argument("op")
+    s.add_argument("args", nargs="*", help="a reference (P03, L17, S012, a rule) and key=value pairs")
+    s.add_argument("--base")
+    s.add_argument("--by", default="local")
+    s.add_argument("--source", default="chat", choices=["ui", "chat", "api"])
+    s.add_argument("--text-file")
+    s.add_argument("--say")
+    s.add_argument("--reason")
+    s.add_argument("--confirm")
+    s.add_argument("--json", action="store_true")
 
     pb = sub.add_parser("publish", help="make and check a film's publish pack (specs/011)")
     pb.add_argument("film")
@@ -1127,6 +1383,8 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("qc-except", "qc-except"): cmd_qc_except, ("qc-voice", "qc-voice"): cmd_qc_voice,
             ("voice-asr", "voice-asr"): cmd_voice_asr, ("voice-make", "voice-make"): cmd_voice_make, ("qc-limits", "qc-limits"): cmd_qc_limits,
             ("render-done", "render-done"): cmd_render_done,
+            ("point", "status"): cmd_point_status, ("point", "set"): cmd_point_set, ("point", "approve"): cmd_point_approve,
+            ("point", "gate"): cmd_point_gate, ("edit", "edit"): cmd_edit,
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach, ("kit", "use"): cmd_kit_use,

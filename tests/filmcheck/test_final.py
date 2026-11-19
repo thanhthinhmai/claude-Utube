@@ -76,6 +76,21 @@ class Final(unittest.TestCase):
         (d / "TREATMENT.md").write_text("Style: test-style\nchanged\n")      # stale input: not used
         self.assertNotEqual(qc.measure(d)["measures"]["cuts_from"], "shot list (tier 1)")
 
+    def test_shot_exceptions_hold_in_tier4(self):                      # a `qc except` from tier 1 is not raised again
+        d = samples.make_film(self.root, "excfinal")
+        dur = qc.probe_duration(d / "excfinal.mp4")
+        shots = [{"id": "S1", "t0": 0.0, "t1": dur, "set": ""}]          # one shot over the whole film: shot_long
+        fp = tiers.fingerprint(d)
+        (d / ".check").mkdir(exist_ok=True)
+        (d / ".check" / "plan-input.json").write_text(json.dumps({"fingerprint": fp, "dur": dur, "shots": shots, "cues": None}))
+        r = qc.measure(d)
+        self.assertTrue(any("shot S1 lasts" in p for p in r["problems"]), r["problems"])
+        tiers.add_exception(d, "S1", "shot_long", "one long take by design")
+        (d / ".check" / "plan-input.json").write_text(json.dumps({"fingerprint": tiers.fingerprint(d), "dur": dur, "shots": shots, "cues": None}))
+        r = qc.measure(d)
+        self.assertFalse(any("shot S1 lasts" in p for p in r["problems"]), r["problems"])
+        self.assertEqual([(x["ref"], x["rule"], x["reason"]) for x in r["measures"]["excepted"]], [("S1", "shot_long", "one long take by design")])
+
 
 class PublishSubtitles(unittest.TestCase):
     @classmethod

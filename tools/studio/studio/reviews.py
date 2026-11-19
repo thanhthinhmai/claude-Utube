@@ -1,14 +1,21 @@
 """Review requests and decisions: first decision wins (data-model.md: Review, Decision)."""
 import re
+import sys
+from pathlib import Path
 
 from . import jobs, resources, store
 from .store import StudioError
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))     # tools/: filmcheck (review points, specs/026)
+
 # job log text is English (005); question and treatment are for online film jobs (007 FR-014)
-KINDS = {"style-1": "review 1", "style-2": "review 2", "question": "question", "treatment": "treatment review"}
+KINDS = {"style-1": "review 1", "style-2": "review 2", "question": "question", "treatment": "treatment review",
+         "script": "script review", "voice": "voice review", "shots": "shots review", "mix": "mix review",
+         "publish": "publish review"}
+POINT_KINDS = ("script", "voice", "shots", "mix", "publish")     # review points of a film (specs/026)
 VALUES = {"approve", "revise", "accept_anyway", "stop"}
 LABEL = {"approve": "Approve", "revise": "Request changes", "accept_anyway": "Accept anyway", "stop": "Stop"}   # = DECISION in web/app.js
-SOURCES = {"ui", "chat"}
+SOURCES = {"ui", "chat", "api"}
 ID = re.compile(r"^r-\d{8}-\d{6}-[0-9a-f]{4}$")
 RESUME_AFTER = 60       # decided, but nobody waited for this long → the job waits to be resumed
 MAX_SUMMARY = 200_000
@@ -35,6 +42,8 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
         raise StudioError("invalid", "loại duyệt phải là " + ", ".join(sorted(KINDS)), 422)
     if len(summary_md.encode()) > MAX_SUMMARY:
         raise StudioError("invalid", "bản tóm tắt quá dài (tối đa 200 KB)", 422)
+    if kind in POINT_KINDS and (job.get("kind") != "film" or film_folder(job) is None):
+        raise StudioError("invalid", f"a {KINDS[kind]} needs a film job whose film folder exists", 422)
     if kind.startswith("style-") or set_name:         # question and treatment reviews have no reference set
         resources.check_name(set_name)
     if kind == "question" and sum(1 for x in job["review_ids"] if (store.doc_get("review", x) or {}).get("kind") == "question") >= MAX_QUESTIONS:
@@ -64,13 +73,37 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
     return r
 
 
-def decide(rid: str, value: str, note: str = None, source: str = "ui") -> dict:
+def film_folder(job: dict):
+    from . import donesofar
+    return donesofar.film_dir(job)
+
+
+def point_decision(r: dict, value: str, note: str, source: str, base, by) -> None:
+    """A review point (specs/026 R3): approve records the approval in the film's checks.json, on the content shown
+    (base) and only when the point's checks pass; revise records the rejection. Raises StudioError otherwise."""
+    from filmcheck import points
+    d = film_folder(jobs.load(r["job_id"]))
+    if d is None:
+        raise StudioError("not_found", "the film folder of this job is gone", 404)
+    if value == "revise":
+        points.reject(d, r["kind"], note, by or r.get("owner") or "local")
+        return
+    code, why = points.approve(d, r["kind"], base, "api" if source == "api" else source, by or r.get("owner") or "local", r["id"])
+    if code == 4:
+        raise StudioError("changed", "the film changed since you opened it: reload the page", 409)
+    if code:
+        raise StudioError("checks_not_passed", "; ".join(why), 422)
+
+
+def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str = None, by: str = None) -> dict:
     r = load(rid)
     note = (note or "").strip()
     if value not in VALUES:
         raise StudioError("value_not_allowed", "quyết định không hợp lệ", 422)
     if source not in SOURCES:
-        raise StudioError("invalid", "nguồn phải là ui hoặc chat", 422)
+        raise StudioError("invalid", "nguồn phải là ui, chat hoặc api", 422)
+    if r["kind"] in POINT_KINDS and value not in ("approve", "revise"):
+        raise StudioError("value_not_allowed", "a review point is approved or sent back with a note", 422)
     if value in ("accept_anyway", "stop") and not (r["kind"] == "style-2" and r["final_round"]):
         raise StudioError("value_not_allowed", "chỉ chọn được khi đã hết vòng sửa ở lần duyệt 2", 422)
     if r["kind"] == "question" and value != "approve":
@@ -81,6 +114,10 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui") -> dict:
         raise StudioError("note_required", "hãy ghi góp ý (ít nhất 3 ký tự) khi yêu cầu sửa", 422)
     if len(note) > 4000:
         raise StudioError("invalid", "góp ý tối đa 4000 ký tự", 422)
+    if r["kind"] in POINT_KINDS:
+        if store.doc_get("decision", rid):
+            raise StudioError("already_decided", "yêu cầu này đã được duyệt", 409)
+        point_decision(r, value, note, source, base, by)
     d = {"value": value, "note": note, "source": source, "at": store.now_iso()}
     if not store.doc_create("decision", rid, {**d, "owner": r.get("owner", "local")}):
         raise StudioError("already_decided", "yêu cầu này đã được duyệt", 409)

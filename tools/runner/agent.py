@@ -36,7 +36,7 @@ building the studio, and everything you read is paid again on every later turn. 
   Do not run `job start`. Report each stage with `sh {STUDIO}/bin/studio job step {job} "<stage>"` and wrap
   long commands with `job run {job} --step "<stage>" -- <command…>`.
 - Do not install system software and do not run `deps` or `setup`: everything is installed.
-- You have no direct internet. To find facts for the script, use WebSearch (at most 5 searches in all; each one
+- You have no direct internet. To find facts for the script, use WebSearch (at most 10 searches in all; each one
   is costly) and open a page with `sh {STUDIO}/bin/studio web fetch <url> --film <name>`, which records it as
   opened for SOURCES.md. Do not try to reach the internet any other way.
 - Never name a YouTube channel, creator or real brand in the film.
@@ -45,6 +45,11 @@ building the studio, and everything you read is paid again on every later turn. 
 - To ask the customer something, write a short Markdown file and run
   `sh {STUDIO}/bin/studio review request {job} --kind question --summary <file>`; then end your turn at once.
   You are resumed later with their answer. Never use `review wait`.
+- Review points (the customer edits and approves on the job page): run `sh {STUDIO}/bin/studio point status <name>`
+  once the film folder exists. At each point that is on (script: after `script review` passes, before the voice;
+  voice: after the voice check; shots: after the shot check, before render; mix: after the mix; publish: after the
+  pack), write a short summary file and run `sh {STUDIO}/bin/studio review request {job} --kind <point> --film <name>
+  --summary <file>`, then end your turn at once. `voice make` and `render` refuse until their point is approved.
 - When the film is finished and checked, make its publish pack (JOB.md, Publish step: `job step {job} Publish`,
   write publish/pack.json, `sh {STUDIO}/bin/studio publish <name>`), then run `sh {STUDIO}/bin/studio job done {job} --film <name>`.
   The studio then checks loudness (−14 ± 1 LUFS, true peak ≤ −1 dB) and reading time before it is delivered.

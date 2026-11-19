@@ -197,6 +197,33 @@ def run(film_dir: Path, lib, say=print) -> dict:
     return tiers.load_tier(d, "shots")
 
 
+def preview(film_dir: Path, lib, ids: list) -> list:
+    """specs/026 R10: draw the frames of a few shots again into .check/shots/ (to look at after an edit). No tier
+    result is written: the shots review still needs a full `qc shots` on the current film. Returns the files."""
+    d = Path(film_dir)
+    try:
+        inp = plancheck.read_input(d, lib, tiers.fingerprint(d))
+    except plancheck.PlanError as e:
+        raise ShotError(str(e)) from None
+    want = set(ids)
+    shots = [s for s in inp["shots"] if s["id"] in want]
+    missing = want - {s["id"] for s in shots}
+    if missing:
+        raise ShotError(f"no shot {', '.join(sorted(missing))} in the film's shot list")
+    inside = lambda k: any(s["t0"] <= (k["t0"] + max(k["t0"], k.get("t1", k["t0"]))) / 2 < s["t1"] for s in shots)  # noqa: E731
+    frames = frames_for(shots, [k for k in inp.get("cards") or [] if inside(k)])   # only the cards of these shots
+    out = d / ".check" / "shots"
+    out.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+        json.dump({"frames": frames, "out": str(out), "w": 960, "h": 540}, fh)
+        job = fh.name
+    try:
+        got = _node([HERE / "shots.mjs", d, job], timeout=1800)
+    finally:
+        os.unlink(job)
+    return [str(Path(f["file"]).relative_to(d)) for f in got["frames"]]
+
+
 MOTION_AT = (0.2, 0.4, 0.6, 0.8)
 
 

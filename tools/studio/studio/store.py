@@ -125,7 +125,8 @@ def lock(name: str):
 
 
 # ---------- documents: jobs, reviews, decisions (same JSON in both modes) ----------
-_DIRS = {"job": ("jobs", ".json"), "review": ("reviews", ".json"), "decision": ("reviews", ".decision.json")}
+_DIRS = {"job": ("jobs", ".json"), "review": ("reviews", ".json"), "decision": ("reviews", ".decision.json"),
+         "action": ("actions", ".json")}                       # action: an edit from the job page (specs/026)
 
 
 def _doc_path(kind: str, ident: str) -> Path:
@@ -202,7 +203,7 @@ def doc_list(kind: str, owner: str = None) -> list:
     if mode() == "local":
         sub, ext = _DIRS[kind]
         out = []
-        for p in (state_dir() / sub).glob(f"[jr]-*{ext}"):
+        for p in (state_dir() / sub).glob(f"[jra]-*{ext}"):
             if kind == "review" and p.name.endswith(".decision.json"):
                 continue
             d = read_json(p)

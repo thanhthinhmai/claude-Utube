@@ -12,7 +12,7 @@ EXCEPTABLE = ("flat", "dark", "blown", "still", "shot_long", "text_over_subtitle
               "craft_action")   # specs/027: the shot leaves the action share at the next qc plan
 SKIP_DIRS = {"out", "stills", "publish", ".check", "node_modules", "compare"}   # as tools/render/lib.mjs; compare/: specs/023 sheets
 SKIP_SUFFIX = (".mp4", ".log", ".pyc")
-SKIP_NAMES = {"checks.json", "CHECKS.md", "qc-exceptions.json", ".job", ".job.out"}   # .job: the job id is not the film (specs/023)
+SKIP_NAMES = {"checks.json", "CHECKS.md", "qc-exceptions.json", ".job", ".job.out", "mix.json"}   # .job: the job id is not the film (specs/023); mix.json: the mix is not the picture (specs/026)
 EXC_FILE = "qc-exceptions.json"
 REASON_MAX = 200
 
@@ -41,14 +41,24 @@ def _files(d: Path, part: str) -> list:
     return out
 
 
+_FP_CACHE: dict = {}
+
+
 def fingerprint(film_dir: Path, part: str = "all") -> str:
     """SHA-256 (16 hex) over the film's source files: sorted relative path + bytes (data-model "Tier result")."""
     d = Path(film_dir)
+    files = sorted(_files(d, part), key=lambda p: p.relative_to(d).as_posix())
+    key = (str(d.resolve()), part, tuple((p.relative_to(d).as_posix(), st.st_mtime_ns, st.st_size)
+                                         for p in files for st in (p.stat(),)))
+    hit = _FP_CACHE.get(key[:2])
+    if hit and hit[0] == key[2]:            # same files, times and sizes: same bytes (specs/026: /steps < 300 ms)
+        return hit[1]
     h = hashlib.sha256()
-    for p in sorted(_files(d, part), key=lambda p: p.relative_to(d).as_posix()):
+    for p in files:
         h.update(p.relative_to(d).as_posix().encode() + b"\0")
         h.update(p.read_bytes())
         h.update(b"\0")
+    _FP_CACHE[key[:2]] = (key[2], h.hexdigest()[:16])
     return h.hexdigest()[:16]
 
 

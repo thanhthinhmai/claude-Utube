@@ -41,7 +41,7 @@ Report each stage with `job step` before you start it, using exactly these names
    `[P02] …`. Short sentences (at most 25 words), a hook in the first 30 seconds (a question, a number or a twist),
    no greeting, numbers written the way they are read ("four forty-five", not "4:45"), few brackets or dashes.
 2. Write `films/<name>/SOURCES.md`: one line per fact or number, `- [Pnn] "quote": source name, year, link`.
-   Find facts with WebSearch (at most 5 searches) and open every link you cite with
+   Find facts with WebSearch (at most 10 searches) and open every link you cite with
    `sh STUDIO/bin/studio web fetch <url> --film <name>`. An invented detail of a story: `- [Pnn] "quote": fiction`.
    No facts at all: the single line `no factual claims`.
 3. `sh STUDIO/bin/studio script check <name>` until it exits 0. Then `sh STUDIO/bin/studio script review <name>`:

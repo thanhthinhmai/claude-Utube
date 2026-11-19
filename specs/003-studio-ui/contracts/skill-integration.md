@@ -43,3 +43,15 @@ Bước và nhật ký bằng tiếng Anh, khớp phần còn lại của giao d
 - Học phong cách: `Fetch videos`, `Measure videos`, `Transcribe`, `Summarize`, `Report measurements`, `Analysis (3 agents)`, `Cross-check`, `Write style`, `Proof frame round <n>`, `Save style`.
 
 Xưởng không ép danh sách; đây là chỉ dẫn. Không đổi: tóm tắt duyệt (ngôn ngữ người dùng), thông báo terminal, dòng lệnh con in ra, việc cũ đã lưu.
+
+
+## Điểm duyệt của phim (specs/026)
+
+| Khi | Lệnh |
+|---|---|
+| Tới một điểm duyệt đang bật (`sh bin/studio point status <phim> --json`) | `RID=$(sh bin/studio review request $JOB --kind script\|voice\|shots\|mix\|publish --film <phim> --summary <tệp> \| head -1)`; lặp `sh bin/studio review wait $RID` tới khi mã 0 |
+| Người dùng trả lời trong chat (không có giao diện) | `sh bin/studio point approve <phim> <điểm> --source chat` |
+| Sau khi duyệt | `sh bin/studio point status <phim>`; làm lại các bước "stale" theo thứ tự; gửi lại yêu cầu cho điểm đang bật mà "stale" |
+| Bị gửi lại (`revise`) | sửa theo ghi chú, gửi lại yêu cầu của cùng điểm |
+
+Duyệt điểm ghi vào `checks.json` → `reviews` của phim; `voice make` và `render` từ chối khi điểm Script hay Shots chưa được duyệt.
