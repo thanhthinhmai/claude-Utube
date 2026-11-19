@@ -18,7 +18,7 @@ export function boardShape(/** @type {any} */ b) {
   if (look === 'tv') return `<path d="M${x + w / 2 - 40} ${y + h + 22} L${x + w / 2 - 30} ${y + h + 60} L${x + w / 2 + 30} ${y + h + 60} L${x + w / 2 + 40} ${y + h + 22} Z" fill="#3a3d44" stroke="none"/><path d="${rrect(x - 22, y - 22, w + 44, h + 44, 18)}" fill="#1b1d22" stroke="none"/>` + segOutline([[x - 22, y - 22], [x + w + 22, y - 22], [x + w + 22, y + h + 22], [x - 22, y + h + 22]], LW * .6) + `<path d="${box(x, y, w, h)}" fill="#151a26" stroke="none"/>`;
   if (look === 'paper') return `<g transform="rotate(-2 ${x + w / 2} ${y + h / 2})"><path d="${box(x + 14, y + 16, w, h)}" fill="#000" opacity=".2" stroke="none"/><path d="${box(x, y, w, h)}" fill="#f4f1ea" stroke="none"/>${segOutline([[x, y], [x + w, y], [x + w, y + h], [x, y + h]], LW * .5)}</g>`;
   return `<path d="M${x + 60} ${y + h} L${x + 30} ${y + h + 230} M${x + w - 60} ${y + h} L${x + w - 30} ${y + h + 230}" fill="none" stroke="#6a5a48" stroke-width="12"/>` +
-    `<path d="${box(x - 14, y - 14, w + 28, h + 28)}" fill="#b9bcc2" stroke="none"/>` + segOutline([[x - 14, y - 14], [x + w + 14, y - 14], [x + w + 14, y + h + 14], [x - 14, y + h + 14]], LW * .6) + `<path d="${box(x, y, w, h)}" fill="#fbfaf6" stroke="none"/>`;
+    `<path d="${box(x - 14, y - 14, w + 28, h + 28)}" fill="#b9bcc2" stroke="none"/>` + segOutline([[x - 14, y - 14], [x + w + 14, y - 14], [x + w + 14, y + h + 14], [x - 14, y + h + 14]], LW * .6) + `<path d="${box(x, y, w, h)}" fill="#e9e8e2" stroke="none"/>`;
 }
 
 /** text that shrinks to fit maxW (screen pixels) */

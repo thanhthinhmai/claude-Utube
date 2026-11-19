@@ -46,10 +46,10 @@ test('inserts and cards are locked', () => {
   assert.equal(pickMove({ id: 'S9', card: { big: 'x' } }, null), 'still');
 });
 
-test('medium shot: a head fills about a quarter of the frame height', () => {
+test('medium shot: cut at the waist, a head fills about a third of the frame height', () => {
   const c = camFor({ id: 'S010', dur: 3, cam: { size: 'med', move: 'still' } }, null, focus, null);
   const head = 330 * focus.s * c.z / 1080;
-  assert.ok(head > 0.2 && head < 0.28, `head share ${head}`);
+  assert.ok(head > 0.28 && head < 0.36, `head share ${head}`);
 });
 
 test('suggested sizes: about half medium, at most 4 in a row, changes on most cuts', () => {

@@ -154,7 +154,10 @@ export async function film(opts) {
     const crowd = (sc.crowd || []).map((/** @type {any[]} */ q) => crowdMan(q[0], q[1], q[2], q[3])).join('');
     const props = (sc.props || []).map((/** @type {any[]} */ p) => propAt(p[0], p[1], p[2], p[3], p[4], lt)).join('');
     const propsF = (sc.propsF || []).map((/** @type {any[]} */ p) => propAt(p[0], p[1], p[2], p[3], p[4], lt)).join('');
-    G.innerHTML = set.html + (o.board ? boardShape(o.board) : '') + props + crowd + shadows + '<g class="cast" stroke-linejoin="round" stroke-linecap="round"></g>' + set.fg + propsF +
+    // over-the-shoulder: the back of a dark head and shoulder in the near corner, cut by the frame (style §2, §6)
+    const vx = cam.cx - 960 / cam.z, vy = cam.cy + 540 / cam.z, u = 1 / cam.z;
+    const ots = o.cam.size === 'ots' ? `<path d="${oval(vx + 250 * u, vy + 120 * u, 330 * u, 260 * u)}" fill="#1b1c20" stroke="none"/><path d="${circ(vx + 300 * u, vy - 210 * u, 190 * u)}" fill="#1b1c20" stroke="none"/>` : '';
+    G.innerHTML = set.html + (o.board ? boardShape(o.board) : '') + props + crowd + shadows + '<g class="cast" stroke-linejoin="round" stroke-linecap="round"></g>' + set.fg + propsF + ots +
       (sc.vig === 0 ? '' : `<path d="${box(-120, -120, 2160, 1320)}" fill="url(#vig)" stroke="none"/>`);
     const castG = /** @type {Element} */ (G.querySelector('.cast'));
     o.cast.forEach((/** @type {any} */ c, /** @type {number} */ i) => {

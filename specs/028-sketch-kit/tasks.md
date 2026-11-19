@@ -83,9 +83,9 @@ Nguồn mã khởi đầu (đọc, không sửa): `films/anthropic-ipo-15/{kit.j
 **Goal**: phim mẫu 30–60 s làm bằng bộ dựng, đi đủ luồng làm phim.
 **Independent Test**: tầng 1–4 đạt, `qc shots` không cảnh báo cách quay ngoài khoảng (SC-007).
 
-- [ ] T033 [US5] Làm phim mẫu theo luồng làm phim của `CLAUDE.md` trong `films/sketch-demo/` (câu chuyện riêng, không người thật hoặc chỉ người đã duyệt, kịch bản qua `script check/review`, giọng, tầng 0–4, render GPU), không làm gói đăng; kiểm SC-001: trong `films/sketch-demo/` ngoài `index.html` (bảng cảnh), mốc lời và `people/` không có tệp mã nào khác (đếm = 0)
-- [ ] T034 [US5] Lưu vào `my-styles/sketch-explainer/`: `DEMO.md` (theo `lib/lemo-opuscar/styles/_template/DEMO.md`), `demo/` (mã nguồn, `CREDITS`, `build.sh` có `LIB=` ở đầu, ghi ra `${OUT:-…}` ngoài `demo/`), `demo-checks.json`, `test.jpg`; `test.mp4` không vào git
-- [ ] T035 [US5] Sửa mục 10 của `my-styles/sketch-explainer/STYLE.md`: trỏ tới `kit/` và `demo/`, bỏ câu "until the kit is packaged"; chạy `sh bin/studio learn check-names` trên mọi tệp chữ của `kit/` và `demo/` (FR-023)
+- [X] T033 [US5] Làm phim mẫu theo luồng làm phim của `CLAUDE.md` trong `films/sketch-demo/` (câu chuyện riêng, không người thật hoặc chỉ người đã duyệt, kịch bản qua `script check/review`, giọng, tầng 0–4, render GPU), không làm gói đăng; kiểm SC-001: trong `films/sketch-demo/` ngoài `index.html` (bảng cảnh), mốc lời và `people/` không có tệp mã nào khác (đếm = 0)
+- [X] T034 [US5] Lưu vào `my-styles/sketch-explainer/`: `DEMO.md` (theo `lib/lemo-opuscar/styles/_template/DEMO.md`), `demo/` (mã nguồn, `CREDITS`, `build.sh` có `LIB=` ở đầu, ghi ra `${OUT:-…}` ngoài `demo/`), `demo-checks.json`, `test.jpg`; `test.mp4` không vào git
+- [X] T035 [US5] Sửa mục 10 của `my-styles/sketch-explainer/STYLE.md`: trỏ tới `kit/` và `demo/`, bỏ câu "until the kit is packaged"; chạy `sh bin/studio learn check-names` trên mọi tệp chữ của `kit/` và `demo/` (FR-023)
 
 ## Phase 8: User Story 6 — Đo tiếng động đúng (P3)
 

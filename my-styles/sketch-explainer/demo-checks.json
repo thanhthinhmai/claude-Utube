@@ -1,0 +1,884 @@
+{
+ "narration": true,
+ "script": {
+  "verdict": "pass",
+  "skip_reason": null,
+  "machine": [
+   {
+    "round": 1,
+    "score": 10.0,
+    "hard": {
+     "format": true,
+     "sources": true,
+     "length": false,
+     "unchanged": true
+    },
+    "issues": [
+     {
+      "para": "P01",
+      "sentence": 0,
+      "rule": "length",
+      "detail": "reads in about 38 s; the target is 45 s (allowed 38–52 s)"
+     }
+    ],
+    "est_seconds": 38.0,
+    "at": "2026-11-19T14:28:16Z"
+   },
+   {
+    "round": 2,
+    "score": 10.0,
+    "hard": {
+     "format": true,
+     "sources": true,
+     "length": true,
+     "unchanged": true
+    },
+    "issues": [],
+    "est_seconds": 46.8,
+    "at": "2026-11-19T14:28:34Z"
+   },
+   {
+    "round": 3,
+    "score": 10.0,
+    "hard": {
+     "format": true,
+     "sources": true,
+     "length": true,
+     "unchanged": true
+    },
+    "issues": [],
+    "est_seconds": 46.8,
+    "at": "2026-11-19T14:28:38Z"
+   },
+   {
+    "round": 4,
+    "score": 10.0,
+    "hard": {
+     "format": true,
+     "sources": true,
+     "length": true,
+     "unchanged": true
+    },
+    "issues": [],
+    "est_seconds": 51.2,
+    "at": "2026-11-19T14:29:15Z"
+   },
+   {
+    "round": 5,
+    "score": 10.0,
+    "hard": {
+     "format": true,
+     "sources": true,
+     "length": true,
+     "unchanged": true
+    },
+    "issues": [],
+    "est_seconds": 51.2,
+    "at": "2026-11-19T14:29:15Z"
+   }
+  ],
+  "editor": [
+   {
+    "round": 1,
+    "model": "claude-opus-5-5",
+    "score": 7.5,
+    "p1": 0,
+    "p2": 2,
+    "p3": 2,
+    "issues": [
+     {
+      "level": "P2",
+      "para": "P07",
+      "reason": "The ending is muddled: it calls a five-dollar latte 'the cheap drink' and says it is not where the money is, though the source gives it a 76% margin; the volume claim has no number."
+     },
+     {
+      "level": "P2",
+      "para": "P06",
+      "reason": "The hook asks about the four dollars per cup but never closes it; saying what nineteen percent means per latte (about ninety-five cents) would pay off the question."
+     },
+     {
+      "level": "P3",
+      "para": "P06",
+      "reason": "'That is a good month' suggests one lucky month; the source shows a typical P&L for a well-run café, so 'a well-run café' fits better."
+     },
+     {
+      "level": "P3",
+      "para": "P05",
+      "reason": "'Take a little more' is vague just before the payoff; saying 'about nine percent more' lets viewers follow the sum to nineteen."
+     }
+    ],
+    "passed": false,
+    "bad_answer": false,
+    "customer_round": false,
+    "at": "2026-11-19T14:29:02Z"
+   },
+   {
+    "round": 2,
+    "model": "claude-opus-5-5",
+    "score": 8.0,
+    "p1": 0,
+    "p2": 2,
+    "p3": 3,
+    "issues": [
+     {
+      "level": "P2",
+      "para": "P07",
+      "reason": "The volume payoff doesn't follow from what came before: every cost was given as a percentage of sales, so the script never shows why selling more cups raises profit."
+     },
+     {
+      "level": "P2",
+      "para": "P06",
+      "reason": "Three numbers in a row (19%, 95 cents, 10–15%) are too much to take in by ear, and the example beating the usual target is never explained, so the answer beat feels muddled."
+     },
+     {
+      "level": "P3",
+      "para": "P05",
+      "reason": "'Take a little more' is vague next to the exact figures around it; saying 'about nine percent' would let the board's slices add up to 100."
+     },
+     {
+      "level": "P3",
+      "para": "P01",
+      "reason": "The brief asks why a cheap drink still makes money, but five dollars is framed as pricey; one line tying it back to 'cheap to make' would match the brief better."
+     },
+     {
+      "level": "P3",
+      "para": "P06",
+      "reason": "At about 130 words and speed 150, the read runs around 52 s, past the 45 s target; trimming P06 or P07 would bring it closer to the treatment's timing."
+     }
+    ],
+    "passed": true,
+    "bad_answer": false,
+    "customer_round": false,
+    "at": "2026-11-19T14:29:42Z"
+   }
+  ],
+  "fix_rounds": 1
+ },
+ "film": {
+  "pass": true,
+  "measures": {
+   "silence_ratio": 0.2,
+   "long_pauses_bad": [],
+   "cuts_bad": [],
+   "key_shots_bad": [],
+   "tail_s": 0.77,
+   "shots_short": [],
+   "shots_long": [],
+   "cues_short": [],
+   "cards_short": [],
+   "cuts": [
+    2.31,
+    6.52,
+    10.68,
+    12.54,
+    16.84,
+    19.91,
+    24.45,
+    28.42,
+    32.69,
+    36.81,
+    39.73,
+    43.72
+   ],
+   "cuts_from": "shot list (tier 1)",
+   "voice_matches_script": true,
+   "stills_bad": [],
+   "missing_glyphs": [],
+   "texts_checked": true,
+   "fonts_checked": true,
+   "render": {
+    "mode": "gpu",
+    "renderer": "ANGLE (Microsoft Corporation, D3D12 (Intel(R) UHD Graphics 730), OpenGL 4.1)"
+   },
+   "av_sync": 0.001,
+   "loudness_range": 2.0,
+   "motion": {
+    "skipped": "no template.json"
+   }
+  },
+  "problems": [],
+  "warnings": [
+   {
+    "rule": "loudness_range",
+    "measure": 2.0,
+    "limit": "2.8–4.7",
+    "text": "style: the loudness range is 2.0 LU; the style's is 2.8–4.7 LU"
+   }
+  ],
+  "at": "2026-11-19T14:48:53Z"
+ },
+ "publish": null,
+ "tiers": {
+  "voice": {
+   "pass": true,
+   "fingerprint": "44b90b6a18921701",
+   "at": "2026-11-19T14:34:30Z",
+   "issues": [],
+   "measures": {
+    "lines": 17,
+    "pauses": [],
+    "similarity_min": 0.947
+   },
+   "skipped": [],
+   "seconds": 0.0
+  },
+  "plan": {
+   "pass": true,
+   "fingerprint": "0abbc1a75e534d54",
+   "at": "2026-11-19T14:48:47Z",
+   "issues": [],
+   "measures": {
+    "silence_ratio": 0.2,
+    "long_pauses_bad": [],
+    "cuts_bad": [],
+    "key_shots_bad": [],
+    "tail_s": 0.75,
+    "shots_short": [],
+    "shots_long": [],
+    "cues_short": [],
+    "cards_short": [],
+    "sentences": [
+     {
+      "para": "P01",
+      "line": "l001",
+      "n": 0,
+      "start": 0.2,
+      "end": 2.09,
+      "text": "A latte costs five dollars."
+     },
+     {
+      "para": "P01",
+      "line": "l002",
+      "n": 0,
+      "start": 2.31,
+      "end": 6.097,
+      "text": "The coffee, the milk and the c"
+     },
+     {
+      "para": "P02",
+      "line": "l003",
+      "n": 0,
+      "start": 6.517,
+      "end": 8.969,
+      "text": "So the café keeps almost four "
+     },
+     {
+      "para": "P02",
+      "line": "l004",
+      "n": 0,
+      "start": 9.119,
+      "end": 9.919,
+      "text": "Not even close."
+     },
+     {
+      "para": "P03",
+      "line": "l005",
+      "n": 0,
+      "start": 10.682,
+      "end": 12.002,
+      "text": "Picture a well-run café."
+     },
+     {
+      "para": "P03",
+      "line": "l006",
+      "n": 0,
+      "start": 12.541,
+      "end": 16.181,
+      "text": "Every month, it sells thirty t"
+     },
+     {
+      "para": "P04",
+      "line": "l007",
+      "n": 0,
+      "start": 16.845,
+      "end": 19.485,
+      "text": "Thirty percent goes to coffee,"
+     },
+     {
+      "para": "P04",
+      "line": "l008",
+      "n": 0,
+      "start": 19.907,
+      "end": 21.907,
+      "text": "Another thirty percent pays th"
+     },
+     {
+      "para": "P04",
+      "line": "l009",
+      "n": 0,
+      "start": 22.284,
+      "end": 23.844,
+      "text": "Twelve percent pays the rent."
+     },
+     {
+      "para": "P05",
+      "line": "l010",
+      "n": 0,
+      "start": 24.445,
+      "end": 27.925,
+      "text": "Power, marketing, insurance an"
+     },
+     {
+      "para": "P06",
+      "line": "l011",
+      "n": 0,
+      "start": 28.416,
+      "end": 29.116,
+      "text": "What is left?"
+     },
+     {
+      "para": "P06",
+      "line": "l012",
+      "n": 0,
+      "start": 29.536,
+      "end": 32.156,
+      "text": "About nineteen percent, in a w"
+     },
+     {
+      "para": "P06",
+      "line": "l013",
+      "n": 0,
+      "start": 32.688,
+      "end": 36.587,
+      "text": "On a five-dollar latte, that i"
+     },
+     {
+      "para": "P06",
+      "line": "l014",
+      "n": 0,
+      "start": 36.807,
+      "end": 39.267,
+      "text": "Most cafés aim for ten to fift"
+     },
+     {
+      "para": "P07",
+      "line": "l015",
+      "n": 0,
+      "start": 39.732,
+      "end": 43.212,
+      "text": "Every cup pays a little toward"
+     },
+     {
+      "para": "P07",
+      "line": "l016",
+      "n": 0,
+      "start": 43.722,
+      "end": 45.702,
+      "text": "So the profit is not in one dr"
+     },
+     {
+      "para": "P07",
+      "line": "l017",
+      "n": 0,
+      "start": 46.053,
+      "end": 48.193,
+      "text": "It is in selling two hundred o"
+     }
+    ],
+    "shots": 13,
+    "narration": true
+   },
+   "skipped": [],
+   "seconds": 0.01,
+   "exceptions": [],
+   "sources": {
+    "cues": null,
+    "cards": "window.CARDS"
+   }
+  },
+  "shots": {
+   "pass": true,
+   "fingerprint": "0abbc1a75e534d54",
+   "at": "2026-11-19T14:47:30Z",
+   "issues": [],
+   "measures": {
+    "frames": 24,
+    "luma_p50": 0.575,
+    "saturation_p50": 0.192,
+    "cuts_per_min": 14.7,
+    "style_source": "EVIDENCE.md + shots.json",
+    "render": {
+     "mode": "gpu",
+     "renderer": "ANGLE (Microsoft Corporation, D3D12 (Intel(R) UHD Graphics 730), OpenGL 4.1)"
+    },
+    "labels": {
+     "reused": false,
+     "model": "claude-opus-5-5",
+     "calls": 1,
+     "usage": {
+      "input_tokens": 4,
+      "output_tokens": 1774
+     }
+    },
+    "shot_grammar": {
+     "shots": 13,
+     "labelled": 12,
+     "inserts": 1,
+     "short": 0,
+     "unknown": 0,
+     "scale_share": {
+      "ecu": 0.0,
+      "cu": 0.083,
+      "med": 0.5,
+      "wide": 0.333,
+      "huge": 0.083
+     },
+     "angle_share": {
+      "eye": 0.833,
+      "low": 0.0,
+      "high": 0.0,
+      "top": 0.0,
+      "ots": 0.167
+     },
+     "scale_change_share": 0.6,
+     "longest_same_scale": 4,
+     "focused_share_p50": 0.917,
+     "subject_sharp_share": 1.0,
+     "foreground_blur_share": 0.167,
+     "sets": 10,
+     "top_set_share": 0.231,
+     "set_change_s_p50": 4.14
+    },
+    "sheets": [
+     ".check/shots/sheet-1.jpg"
+    ],
+    "per_frame": [
+     {
+      "key": "S001",
+      "shot": "S001",
+      "t": 1.155,
+      "luma_mean": 0.6341,
+      "sat_p50": 0.1927,
+      "dominant_share": 0.334,
+      "luma_sd": 0.208,
+      "content_p50": 0.6494,
+      "blown_share": 0.0006,
+      "text_share": 0.046,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S002",
+      "shot": "S002",
+      "t": 4.413,
+      "luma_mean": 0.7343,
+      "sat_p50": 0.0258,
+      "dominant_share": 0.2988,
+      "luma_sd": 0.2203,
+      "content_p50": 0.8216,
+      "blown_share": 0,
+      "text_share": 0.0326,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S003",
+      "shot": "S003",
+      "t": 8.6,
+      "luma_mean": 0.625,
+      "sat_p50": 0.3099,
+      "dominant_share": 0.3106,
+      "luma_sd": 0.2038,
+      "content_p50": 0.7582,
+      "blown_share": 0.0071,
+      "text_share": 0.0086,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S004",
+      "shot": "S004",
+      "t": 11.611,
+      "luma_mean": 0.7375,
+      "sat_p50": 0.1914,
+      "dominant_share": 0.3303,
+      "luma_sd": 0.1268,
+      "content_p50": 0.7582,
+      "blown_share": 0,
+      "text_share": 0,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S005",
+      "shot": "S005",
+      "t": 14.693,
+      "luma_mean": 0.6152,
+      "sat_p50": 0.1498,
+      "dominant_share": 0.4896,
+      "luma_sd": 0.2086,
+      "content_p50": 0.7721,
+      "blown_share": 0,
+      "text_share": 0.0203,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S006",
+      "shot": "S006",
+      "t": 18.376,
+      "luma_mean": 0.4571,
+      "sat_p50": 0.2656,
+      "dominant_share": 0.3747,
+      "luma_sd": 0.2117,
+      "content_p50": 0.3623,
+      "blown_share": 0,
+      "text_share": 0.0376,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S007",
+      "shot": "S007",
+      "t": 22.176,
+      "luma_mean": 0.3939,
+      "sat_p50": 0.2656,
+      "dominant_share": 0.4535,
+      "luma_sd": 0.2097,
+      "content_p50": 0.2345,
+      "blown_share": 0,
+      "text_share": 0.0765,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S008",
+      "shot": "S008",
+      "t": 26.431,
+      "luma_mean": 0.5754,
+      "sat_p50": 0.1333,
+      "dominant_share": 0.2822,
+      "luma_sd": 0.2255,
+      "content_p50": 0.715,
+      "blown_share": 0.0001,
+      "text_share": 0.032,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S009",
+      "shot": "S009",
+      "t": 30.552,
+      "luma_mean": 0.4255,
+      "sat_p50": 0.3208,
+      "dominant_share": 0.3547,
+      "luma_sd": 0.3144,
+      "content_p50": 0.362,
+      "blown_share": 0,
+      "text_share": 0.0685,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S010",
+      "shot": "S010",
+      "t": 34.748,
+      "luma_mean": 0.5694,
+      "sat_p50": 0.1268,
+      "dominant_share": 0.4617,
+      "luma_sd": 0.2803,
+      "content_p50": 0.7713,
+      "blown_share": 0,
+      "text_share": 0.041,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S011",
+      "shot": "S011",
+      "t": 38.27,
+      "luma_mean": 0.6005,
+      "sat_p50": 0.0227,
+      "dominant_share": 0.4133,
+      "luma_sd": 0.2562,
+      "content_p50": 0.7946,
+      "blown_share": 0.0001,
+      "text_share": 0.0222,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S012",
+      "shot": "S012",
+      "t": 41.727,
+      "luma_mean": 0.6617,
+      "sat_p50": 0.1921,
+      "dominant_share": 0.2431,
+      "luma_sd": 0.1885,
+      "content_p50": 0.7582,
+      "blown_share": 0,
+      "text_share": 0,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S013",
+      "shot": "S013",
+      "t": 46.332,
+      "luma_mean": 0.4771,
+      "sat_p50": 0.2213,
+      "dominant_share": 0.5034,
+      "luma_sd": 0.1721,
+      "content_p50": 0.3885,
+      "blown_share": 0,
+      "text_share": 0.0268,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S001~S001",
+      "shot": "S001",
+      "t": 1.255,
+      "luma_mean": 0.635,
+      "sat_p50": 0.1928,
+      "dominant_share": 0.3334,
+      "luma_sd": 0.208,
+      "content_p50": 0.6731,
+      "blown_share": 0.0006,
+      "text_share": 0.0454,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S002~S002",
+      "shot": "S002",
+      "t": 4.564,
+      "luma_mean": 0.7339,
+      "sat_p50": 0.0258,
+      "dominant_share": 0.3032,
+      "luma_sd": 0.2209,
+      "content_p50": 0.8216,
+      "blown_share": 0,
+      "text_share": 0.0326,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S003~S003",
+      "shot": "S003",
+      "t": 8.75,
+      "luma_mean": 0.6252,
+      "sat_p50": 0.3099,
+      "dominant_share": 0.3117,
+      "luma_sd": 0.2045,
+      "content_p50": 0.7582,
+      "blown_share": 0.0078,
+      "text_share": 0.0083,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S005~S005",
+      "shot": "S005",
+      "t": 14.793,
+      "luma_mean": 0.615,
+      "sat_p50": 0.1498,
+      "dominant_share": 0.4864,
+      "luma_sd": 0.2083,
+      "content_p50": 0.7721,
+      "blown_share": 0,
+      "text_share": 0.0203,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S006~S006",
+      "shot": "S006",
+      "t": 18.476,
+      "luma_mean": 0.4571,
+      "sat_p50": 0.2656,
+      "dominant_share": 0.3746,
+      "luma_sd": 0.2117,
+      "content_p50": 0.3623,
+      "blown_share": 0,
+      "text_share": 0.0376,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S007~S007",
+      "shot": "S007",
+      "t": 21.176,
+      "luma_mean": 0.3939,
+      "sat_p50": 0.2656,
+      "dominant_share": 0.4535,
+      "luma_sd": 0.2097,
+      "content_p50": 0.2345,
+      "blown_share": 0,
+      "text_share": 0.0765,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S008~S008",
+      "shot": "S008",
+      "t": 26.581,
+      "luma_mean": 0.5734,
+      "sat_p50": 0.1348,
+      "dominant_share": 0.2823,
+      "luma_sd": 0.2265,
+      "content_p50": 0.715,
+      "blown_share": 0.0001,
+      "text_share": 0.032,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S009~S009",
+      "shot": "S009",
+      "t": 30.702,
+      "luma_mean": 0.4252,
+      "sat_p50": 0.3208,
+      "dominant_share": 0.3547,
+      "luma_sd": 0.3143,
+      "content_p50": 0.362,
+      "blown_share": 0,
+      "text_share": 0.0685,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S010~S010",
+      "shot": "S010",
+      "t": 34.847,
+      "luma_mean": 0.5686,
+      "sat_p50": 0.1268,
+      "dominant_share": 0.4631,
+      "luma_sd": 0.2805,
+      "content_p50": 0.7713,
+      "blown_share": 0,
+      "text_share": 0.0404,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S011~S011",
+      "shot": "S011",
+      "t": 38.419,
+      "luma_mean": 0.5993,
+      "sat_p50": 0.0251,
+      "dominant_share": 0.4063,
+      "luma_sd": 0.257,
+      "content_p50": 0.7941,
+      "blown_share": 0.0001,
+      "text_share": 0.0222,
+      "letterbox": [
+       0,
+       0
+      ]
+     },
+     {
+      "key": "S013~S013",
+      "shot": "S013",
+      "t": 46.432,
+      "luma_mean": 0.4774,
+      "sat_p50": 0.2213,
+      "dominant_share": 0.5113,
+      "luma_sd": 0.1727,
+      "content_p50": 0.3885,
+      "blown_share": 0,
+      "text_share": 0.0281,
+      "letterbox": [
+       0,
+       0
+      ]
+     }
+    ]
+   },
+   "skipped": [
+    "motion: the style has no template.json, skipped"
+   ],
+   "seconds": 32.93,
+   "exceptions": [],
+   "style_accept": null
+  },
+  "render": {
+   "pass": true,
+   "fingerprint": "0abbc1a75e534d54",
+   "at": "2026-11-19T14:48:29Z",
+   "issues": [],
+   "measures": {
+    "no_stop": false
+   },
+   "skipped": [],
+   "seconds": 0.0,
+   "stopped": null,
+   "reused_chunks": 0,
+   "skipped_checks": null
+  },
+  "final": {
+   "pass": true,
+   "fingerprint": "0abbc1a75e534d54",
+   "at": "2026-11-19T14:48:53Z",
+   "issues": [
+    {
+     "tier": "final",
+     "ref": "film",
+     "at": null,
+     "rule": "loudness_range",
+     "severity": "warn",
+     "measure": 2.0,
+     "limit": "2.8–4.7",
+     "text": "style: the loudness range is 2.0 LU; the style's is 2.8–4.7 LU",
+     "fix": "",
+     "excepted": null
+    }
+   ],
+   "measures": {
+    "silence_ratio": 0.2,
+    "tail_s": 0.77,
+    "av_sync": 0.001,
+    "loudness_range": 2.0,
+    "motion": {
+     "skipped": "no template.json"
+    }
+   },
+   "skipped": [],
+   "seconds": 0.0
+  }
+ }
+}

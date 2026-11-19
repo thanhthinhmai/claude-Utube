@@ -1,0 +1,127 @@
+[
+ {
+  "id": "l001",
+  "para": "P01",
+  "text": "A latte costs five dollars.",
+  "voice": "am_michael",
+  "speed": 1.0,
+  "asr": "A latte costs $5."
+ },
+ {
+  "id": "l002",
+  "para": "P01",
+  "text": "The coffee, the milk and the cup cost about one dollar twenty.",
+  "voice": "am_michael",
+  "speed": 1.0,
+  "asr": "The coffee, the milk, and the cup cost about $1.20."
+ },
+ {
+  "id": "l003",
+  "para": "P02",
+  "text": "So the café keeps almost four dollars?",
+  "voice": "am_michael",
+  "speed": 1.0,
+  "asr": "So the cafe keeps almost $4?"
+ },
+ {
+  "id": "l004",
+  "para": "P02",
+  "text": "Not even close.",
+  "voice": "am_michael",
+  "speed": 1.0
+ },
+ {
+  "id": "l005",
+  "para": "P03",
+  "text": "Picture a well-run café.",
+  "voice": "am_michael",
+  "speed": 1.0
+ },
+ {
+  "id": "l006",
+  "para": "P03",
+  "text": "Every month, it sells thirty thousand dollars of drinks and food.",
+  "voice": "am_michael",
+  "speed": 1.0
+ },
+ {
+  "id": "l007",
+  "para": "P04",
+  "text": "Thirty percent goes to coffee, milk and cups.",
+  "voice": "am_michael",
+  "speed": 1.0
+ },
+ {
+  "id": "l008",
+  "para": "P04",
+  "text": "Another thirty percent pays the staff.",
+  "voice": "am_michael",
+  "speed": 1.0
+ },
+ {
+  "id": "l009",
+  "para": "P04",
+  "text": "Twelve percent pays the rent.",
+  "voice": "am_michael",
+  "speed": 1.0
+ },
+ {
+  "id": "l010",
+  "para": "P05",
+  "text": "Power, marketing, insurance and supplies take a little more.",
+  "voice": "am_michael",
+  "speed": 1.0,
+  "say": "Power marketing insurance and supplies take a little more."
+ },
+ {
+  "id": "l011",
+  "para": "P06",
+  "text": "What is left?",
+  "voice": "am_michael",
+  "speed": 1.0
+ },
+ {
+  "id": "l012",
+  "para": "P06",
+  "text": "About nineteen percent, in a well-run café.",
+  "voice": "am_michael",
+  "speed": 1.0
+ },
+ {
+  "id": "l013",
+  "para": "P06",
+  "text": "On a five-dollar latte, that is roughly ninety-five cents.",
+  "voice": "am_michael",
+  "speed": 1.0,
+  "asr": "On a $5 latte, that is roughly $0.95."
+ },
+ {
+  "id": "l014",
+  "para": "P06",
+  "text": "Most cafés aim for ten to fifteen percent.",
+  "voice": "am_michael",
+  "speed": 1.0,
+  "asr": "Most cafes aim for 10-15%."
+ },
+ {
+  "id": "l015",
+  "para": "P07",
+  "text": "Every cup pays a little toward the staff, the rent and the lights.",
+  "voice": "am_michael",
+  "speed": 1.0
+ },
+ {
+  "id": "l016",
+  "para": "P07",
+  "text": "So the profit is not in one drink.",
+  "voice": "am_michael",
+  "speed": 1.0
+ },
+ {
+  "id": "l017",
+  "para": "P07",
+  "text": "It is in selling two hundred of them a day.",
+  "voice": "am_michael",
+  "speed": 1.0
+ }
+]

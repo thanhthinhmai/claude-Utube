@@ -10,7 +10,8 @@ export const DEFAULTS = { push: 3.3, pull: 8.6, pullCap: 0.3, hold: 0.2, drift: 
 export const SIZES = ['ecu', 'cu', 'med', 'wide', 'huge', 'insert', 'ots'];
 export const MOVES = ['push', 'pull', 'still', 'follow', 'drift'];
 /** share of the frame height a head fills, by shot size (head diameter = 330 × s world units) */
-const HEAD_SHARE = { ecu: 0.62, cu: 0.45, med: 0.24, ots: 0.24, wide: 0.12 };
+const HEAD_SHARE = { ecu: 0.7, cu: 0.5, med: 0.32, ots: 0.3, wide: 0.14 };
+// medium = cut at the waist: with a head one third of the figure, the head fills about a third of the frame height
 
 function hash01(/** @type {string} */ s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return ((h >>> 0) % 100000) / 100000; }
 
@@ -42,7 +43,7 @@ export function camFor(scene, prevMove, focus, board) {
   else if (size === 'insert' && board) { z = Math.min(1920 / (board.w * 1.2), 1080 / (board.h * 1.3)); cx = board.x + board.w / 2; cy = board.y + board.h / 2 + 20; }
   else if (focus && size in HEAD_SHARE) {
     z = HEAD_SHARE[/** @type {keyof typeof HEAD_SHARE} */ (size)] * 1080 / (330 * focus.s);
-    cx = focus.x; cy = focus.y + (size === 'ecu' ? 0 : size === 'cu' ? 60 : size === 'wide' ? 300 : 160) * focus.s;
+    cx = focus.x + (size === 'ots' ? -120 * focus.s : 0); cy = focus.y + (size === 'ecu' ? 0 : size === 'cu' ? 60 : size === 'wide' ? 300 : 140) * focus.s;
     if (board && (size === 'med' || size === 'wide')) {
       // a person beside a board: frame both (board and the person from head to waist)
       const x0 = Math.min(board.x, focus.x - 260 * focus.s), x1 = Math.max(board.x + board.w, focus.x + 260 * focus.s);
@@ -59,6 +60,7 @@ export function camFor(scene, prevMove, focus, board) {
   else if (move === 'pull') { z0 = z * (1 + Math.min(DEFAULTS.pullCap, DEFAULTS.pull / 100 * run)); z1 = z; cx1 = cx + dir * DEFAULTS.drift * run / z; }
   else if (move === 'follow') { cx1 = cx + dir * DEFAULTS.follow * run / z; }
   else if (move === 'drift') { cx1 = cx + dir * DEFAULTS.drift * 0.6 * run / z; cy1 = cy + DEFAULTS.drift * 0.3 * run / z; }
+  if (board && size !== 'insert') { cx1 = cx; cy1 = cy; z1 = Math.min(z1, z * 1.03); z0 = Math.min(z0, z * 1.03); }   // keep the board's words in frame
   return { size, move, cx, cy, z: z0, cx1, cy1, z1, hold };
 }
 
