@@ -2,6 +2,7 @@
 the content shown, the job goes back in the queue and the agent goes on (T024, SC-005)."""
 import time
 import unittest
+from pathlib import Path
 
 from helpers import W, Studio, film_job
 
@@ -62,6 +63,31 @@ class ReviewPointsOnline(unittest.TestCase):
         j = self.s.wait(jid, timeout=90)
         self.assertEqual(j["status"], "done", j["log"])
         self.assertTrue(any("answer: The customer approved the script review" in x["line"] for x in j["log"]), j["log"])
+
+    def test_edit_waits_while_the_job_runs(self):                  # T063, FR-024
+        import sys
+        from studio import jobs
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "filmcheck"))
+        import samples
+        c = self.s.signup_verified("rp-run@example.com")
+        jid = film_job(c, idea="A fox and a lantern").json()["id"]
+        film = jobs.load(jid)["input"]["film"]
+        d = samples.review_film(self.s.worker.work_dir(jid), film, kit=False)
+        jobs.update(jid, lambda j: j.update(film_dir=str(d), status="running", step="Voice"))
+        base = c.get(f"/api/v1/jobs/{jid}/steps").json()["points"]["script"]["fingerprint"]
+        aid = c.post(f"/api/v1/jobs/{jid}/actions", headers=W, json={"point": "script", "op": "script-para",
+                     "args": {"para": "P03", "text": "By day three, you begin to see things that are not there."},
+                     "base": base}).json()["id"]
+        self.s.worker.run_actions()
+        time.sleep(0.5)
+        self.assertEqual(c.get(f"/api/v1/jobs/{jid}/actions/{aid}").json()["status"], "queued")   # not while it runs
+        jobs.update(jid, lambda j: j.update(status="waiting_review"))
+        self.s.worker.run_actions()
+        end = time.time() + 30
+        while time.time() < end and c.get(f"/api/v1/jobs/{jid}/actions/{aid}").json()["status"] in ("queued", "running"):
+            time.sleep(0.1)
+        self.assertEqual(c.get(f"/api/v1/jobs/{jid}/actions/{aid}").json()["status"], "done")
+        self.assertIn("you begin to see", (d / "SCRIPT.md").read_text())
 
 
 if __name__ == "__main__":

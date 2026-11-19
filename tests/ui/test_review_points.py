@@ -137,6 +137,8 @@ class ReviewPoints(unittest.TestCase):
         self.assertEqual(o["impact"], 7)
         self.assertFalse(o["lockedAfter"])
         self.assertTrue(o["logged"])
+        self.assertEqual((o["toggles"], o["scriptLocked"], o["gatesAfter"]), (5, True, 3))       # T062
+        self.assertIn("mix", json.loads((self.film / "checks.json").read_text())["reviews"]["on"])
 
     def test_revise_records_rejection(self):
         summary = self.p.dir / "s.md"

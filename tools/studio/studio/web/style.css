@@ -541,3 +541,5 @@ table.lessons tr.l-draft td:nth-child(2) { color: var(--warn, #b26b00); font-wei
 @media (max-width: 560px) { .edit-publish .title-pick { grid-template-columns: auto minmax(0, 1fr); } .edit-publish .title-pick img { grid-column: 2; width: 100%; } }
 fieldset.points { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 6px 16px; }
 fieldset.points legend { font-size: 13px; padding: 0 4px; }
+.point-toggles { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin-top: 10px; }
+.point-toggles .check { margin: 0; }

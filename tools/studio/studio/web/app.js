@@ -509,6 +509,10 @@ async function editPanel(body) {
   if (!RAIL.data) return;
   const pt = TAB_POINT[DONE.tab];
   if (!pt) return;
+  if (MODE === "online" && ["running", "queued"].includes(DONE.job.status)) {
+    const n = document.createElement("p"); n.className = "muted small"; n.textContent = "Edits open when the film stops for your review.";
+    body.prepend(n);
+  }
   const edit = { script: async () => { const sc = body.querySelector(".script"); if (sc) sc.remove(); await editScript(body); },
     voice: async () => { body.querySelectorAll(".tbl, .done-actions").forEach((x) => x.remove()); await editVoice(body); },
     mix: async () => editMix(body),
@@ -683,7 +687,17 @@ async function railRefresh() {
         <span class="t">${esc(s.name)}</span><span class="s">${esc(s.state === "stale" ? STATE_LABEL.stale : s.approved_at
           ? `Approved ${new Date(s.approved_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
           : s.note || STATE_LABEL[s.state] || s.state)}</span></button></li>`).join("")}</ol>
-    <div id="impact"></div>`;
+    <div id="impact"></div>
+    <div class="point-toggles" id="point-toggles"><span class="muted small">Stop for my review at:</span>
+      ${POINTS.map(([k, l]) => {
+        const pt = v.points[k], locked = ["approved", "waiting", "skipped"].includes(pt.state) || ["done", "failed", "stopped"].includes(DONE.job.status);
+        return `<label class="check small" title="${locked ? esc(`${l}: ${pt.state}`) : ""}"><input type="checkbox" value="${k}" ${pt.on ? "checked" : ""} ${locked ? "disabled" : ""}> <span>${esc(l.replace(" (before render)", ""))}</span></label>`;
+      }).join("")}<span class="msg small" id="points-msg"></span></div>`;
+  slot.querySelectorAll("#point-toggles input").forEach((el) => { /** @type {HTMLInputElement} */ (el).onchange = async () => {
+    const on = Array.from(slot.querySelectorAll("#point-toggles input:checked")).map((x) => /** @type {HTMLInputElement} */ (x).value);
+    try { await send("PUT", `/jobs/${encodeURIComponent(DONE.job.id)}/points`, { on }); await railRefresh(); }
+    catch (err) { const m = document.getElementById("points-msg"); if (m) m.textContent = /** @type {Error} */ (err).message; }
+  }; });
   slot.querySelectorAll("button[data-step]:not([disabled])").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
     const tab = STEP_TAB[/** @type {HTMLElement} */ (el).dataset.step];
     if (DONE.data && DONE.data.sections[tab]) { DONE.tab = tab; DONE.drawn = {}; doneRefresh(true); railMarks(); }
@@ -707,6 +721,7 @@ const pendingFor = (pt) => RAIL.data && RAIL.data.review && !RAIL.data.review.de
 function canEdit(pt) {
   const v = RAIL.data;
   if (!v || !DONE.job || ["done", "failed", "stopped"].includes(DONE.job.status)) return false;
+  if (MODE === "online" && !["waiting_review", "waiting_resume"].includes(DONE.job.status)) return false;   // edits run while it waits
   if (v.busy && (v.busy.step === POINT_STEP[pt] || (v.impact[pt] || []).includes(v.busy.step))) return false;
   return v.points[pt] && v.points[pt].state !== "skipped";
 }

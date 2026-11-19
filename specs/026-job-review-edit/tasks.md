@@ -163,3 +163,10 @@ description: "Tasks for 026 — review points and edits on the film job page"
 2. US2 (lợi nhất sau MVP: chặn dựng hình khi cảnh chưa duyệt) → commit.
 3. US3, US4, US5 theo thứ tự → commit sau mỗi story.
 4. Phase 8 (online, app, test trình duyệt, thử thật) → `/speckit-converge`.
+
+---
+
+## Phase 9: Convergence
+
+- [X] T062 Add on/off boxes for the review points that are not reached yet to the step rail of the job page (`tools/studio/studio/web/app.js`, calling `PUT /jobs/{id}/points`; approved or waiting points shown locked), with a browser check in `tests/ui/browser_points.cjs` per FR-002 (partial)
+- [X] T063 Online: while a film job is running and not waiting for a review, lock the edit buttons and say "Edits open when the film stops for your review" (`canEdit` in `tools/studio/studio/web/app.js` reads the job status); test in `tests/online/test_review_points_online.py` that an edit sent while the job runs stays queued and runs once the job waits per FR-024, research R12 (partial)

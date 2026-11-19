@@ -26,6 +26,11 @@ const [base, jid] = process.argv.slice(2);
   out.lockedAfter = await p.$eval("#approve", (x) => x.disabled);
   await p.waitForFunction(() => /Edit script-para P03/.test(document.getElementById("job-log")?.textContent || ""), null, { timeout: 15000 });
   out.logged = true;
+  out.toggles = await p.locator("#point-toggles input").count();
+  out.scriptLocked = await p.$eval("#point-toggles input[value='script']", (x) => x.disabled);   // waiting: locked
+  await p.check("#point-toggles input[value='mix']");
+  await p.waitForFunction(() => document.querySelectorAll("#rail-slot .gate").length === 3, null, { timeout: 15000 });
+  out.gatesAfter = await p.locator("#rail-slot .gate").count();
   console.log(JSON.stringify(out));
   await browser.close();
 })().catch((e) => { console.error(String(e)); process.exit(1); });
