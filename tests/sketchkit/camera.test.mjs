@@ -5,13 +5,13 @@ import { camFor, camAt, pickMove, suggestSizes } from '../../my-styles/sketch-ex
 
 const focus = { x: 1200, y: 520, s: 0.6 };
 
-test('constant speed while running, then held for the last 20%', () => {
+test('constant speed while running, then held for the last 25%', () => {
   const cam = camFor({ id: 'S001', dur: 5, cam: { move: 'push' } }, null, focus, null);
   const z = [0, 1, 2, 3].map(t => camAt(cam, t, 5).z);
   const steps = z.slice(1).map((v, i) => v - z[i]);
   for (const s of steps) assert.ok(Math.abs(s - steps[0]) < 1e-9, 'push speed is constant');
-  assert.equal(camAt(cam, 4.1, 5).z, camAt(cam, 5, 5).z, 'held at the end');
-  assert.ok(camAt(cam, 3.9, 5).z < camAt(cam, 4.0, 5).z, 'still moving before the hold');
+  assert.equal(camAt(cam, 3.8, 5).z, camAt(cam, 5, 5).z, 'held at the end');
+  assert.ok(camAt(cam, 3.6, 5).z < camAt(cam, 3.7, 5).z, 'still moving before the hold');
   assert.ok(camAt(cam, 5, 5).z > cam.z, 'push ends closer');
 });
 

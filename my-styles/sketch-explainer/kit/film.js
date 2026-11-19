@@ -128,7 +128,7 @@ export async function film(opts) {
     for (const b of sc.bub || []) { const who = (sc.cast || [])[b[0]] || {}; bubbles.push([+(o.t0 + (b[2] ?? 0.3)).toFixed(3), +o.t1.toFixed(3), id, String(who.who), b[1], String(who.who).startsWith('person:')]); if (!SYMBOLS.test(b[1])) add(b[2] ?? 0.3, b[1]); }
   }
   w.CARDS = cards; w.BUBBLES = bubbles;
-  w.SCENE_INFO = S.map(o => ({ id: o.sc.id, set: o.sc.card ? 'card' : String(o.sc.set), size: o.sc.card ? 'card' : o.cam.size, move: o.sc.card ? 'still' : o.cam.move, dur: o.sc.dur, events: o.sc.card ? 0 : o.events.length }));
+  w.SCENE_INFO = S.map(o => ({ id: o.sc.id, set: o.sc.card ? 'card' : String(o.sc.set), size: o.sc.card ? 'card' : o.cam.size, move: o.sc.card ? 'still' : o.cam.move, dur: o.sc.dur, events: o.sc.card ? 0 : o.events.length, cam: o.sc.card ? null : o.cam }));
 
   // DOM
   document.body.style.margin = '0'; document.body.style.background = '#000'; document.body.style.overflow = 'hidden';

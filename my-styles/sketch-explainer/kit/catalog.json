@@ -186,7 +186,7 @@
    "push": 3.3,
    "pull": 8.6,
    "pullCap": 0.3,
-   "hold": 0.2,
+   "hold": 0.25,
    "drift": 60,
    "follow": 110,
    "mix": {

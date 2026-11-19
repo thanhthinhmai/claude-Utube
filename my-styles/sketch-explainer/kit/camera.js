@@ -6,7 +6,7 @@
 // The proof frame passed with a linear move, a small drift and a hold at the end of the shot; on a whole film the
 // hold is 20% so that locked shots plus holds stay inside the measured still_ratio (0.10–0.44).
 
-export const DEFAULTS = { push: 3.3, pull: 8.6, pullCap: 0.3, hold: 0.2, drift: 60, follow: 110, mix: { push: 0.33, pull: 0.23, still: 0.22, follow: 0.2, drift: 0.02 } };
+export const DEFAULTS = { push: 3.3, pull: 8.6, pullCap: 0.3, hold: 0.25, drift: 60, follow: 110, mix: { push: 0.33, pull: 0.23, still: 0.22, follow: 0.2, drift: 0.02 } };
 export const SIZES = ['ecu', 'cu', 'med', 'wide', 'huge', 'insert', 'ots'];
 export const MOVES = ['push', 'pull', 'still', 'follow', 'drift'];
 /** share of the frame height a head fills, by shot size (head diameter = 330 × s world units) */
@@ -60,14 +60,21 @@ export function camFor(scene, prevMove, focus, board) {
   else if (move === 'pull') { z0 = z * (1 + Math.min(DEFAULTS.pullCap, DEFAULTS.pull / 100 * run)); z1 = z; cx1 = cx + dir * DEFAULTS.drift * run / z; }
   else if (move === 'follow') { cx1 = cx + dir * DEFAULTS.follow * run / z; }
   else if (move === 'drift') { cx1 = cx + dir * DEFAULTS.drift * 0.6 * run / z; cy1 = cy + DEFAULTS.drift * 0.3 * run / z; }
-  if (board && size !== 'insert') { cx1 = cx; cy1 = cy; z1 = Math.min(z1, z * 1.03); z0 = Math.min(z0, z * 1.03); }   // keep the board's words in frame
+  // a board's words stay in frame: no sideways drift and at most a 3% creep, but a slow vertical drift keeps the frame
+  // alive (the reference moves in 78% of shots)
+  if (board && size !== 'insert') { cx1 = cx; cy1 = cy + 30 * run / z; z1 = Math.min(z1, z * 1.03); z0 = Math.min(z0, z * 1.03); }
+  if (z0 <= 1.01 && z1 <= 1.01 && move !== 'still') {       // the full set: drift inside the drawn margin instead of being clamped
+    cx = 960 - dir * 70; cx1 = 960 + dir * 70; cy = 540; cy1 = 560;
+  }
   return { size, move, cx, cy, z: z0, cx1, cy1, z1, hold };
 }
 
-/** keep the view inside the drawn world (0..1920 × 0..1080) */
+/** keep the view inside the drawn world: sets are drawn 120 px past the frame on every side (sets/index.js), so even
+ * a wide shot at z = 1 has room to drift */
+export const MARGIN = 100;
 export function clampView(/** @type {number} */ cx, /** @type {number} */ cy, /** @type {number} */ z) {
   const hw = 960 / z, hh = 540 / z;
-  return [Math.max(hw, Math.min(1920 - hw, cx)), Math.max(hh, Math.min(1080 - hh, cy))];
+  return [Math.max(hw - MARGIN, Math.min(1920 + MARGIN - hw, cx)), Math.max(hh - MARGIN, Math.min(1080 + MARGIN - hh, cy))];
 }
 
 /** camera at lt seconds into a shot of d seconds: constant speed, then held for the last `hold` share */

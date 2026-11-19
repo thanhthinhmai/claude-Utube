@@ -98,10 +98,10 @@ Nguồn mã khởi đầu (đọc, không sửa): `films/anthropic-ipo-15/{kit.j
 
 ## Phase 9: Polish
 
-- [ ] T039 Ghi luồng dùng bộ dựng SVG và lệnh `people` vào `CLAUDE.md` (mục luồng làm phim, mục Cấu trúc), theo `contracts/people-cli.md`
-- [ ] T040 [P] Cập nhật `my-styles/README.md` (cột bộ dựng của `sketch-explainer`) và `specs/028-sketch-kit/contracts/kit-api.md` nếu tên thay đổi khi làm
-- [ ] T041 Chạy đủ 5 bộ test: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh` (SC-009)
-- [ ] T042 Chạy `quickstart.md` từ đầu tới cuối và đối chiếu SC-001…SC-010
+- [X] T039 Ghi luồng dùng bộ dựng SVG và lệnh `people` vào `CLAUDE.md` (mục luồng làm phim, mục Cấu trúc), theo `contracts/people-cli.md`
+- [X] T040 [P] Cập nhật `my-styles/README.md` (cột bộ dựng của `sketch-explainer`) và `specs/028-sketch-kit/contracts/kit-api.md` nếu tên thay đổi khi làm
+- [X] T041 Chạy đủ 5 bộ test: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh` (SC-009)
+- [X] T042 Chạy `quickstart.md` từ đầu tới cuối và đối chiếu SC-001…SC-010
 
 ## Dependencies & Execution Order
 
