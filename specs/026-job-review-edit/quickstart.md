@@ -113,3 +113,14 @@ Thử thật (SC-006): làm một phim 5 phút bằng chat, có ít nhất một
 - `tests/run.sh` 87/87 · `tests/render` đạt (gồm 30 test bộ dựng) · `tests/filmcheck` 253 đạt · `tests/ui` 56 + 33 test trình duyệt đạt · `tests/online` 199 đạt (sau khi sửa lỗi tràn ngang ở 360 px do thanh tiến trình).
 - `test_api.test_fifty_jobs_under_two_seconds` đôi khi trượt (49/50), vì mã việc trùng khi tạo 50 việc trong một giây. Lỗi này có từ trước 026.
 - SC-006 (một phim 5 phút làm thật, có sửa ở Script và Shots): **chưa chạy**. Cần một lượt làm phim thật bằng Claude, tốn lượt gọi.
+
+### T061 / SC-006, 2026-11-19–20 (`films/internet-down-week`, 243 s, 69 cảnh, GPU 60 fps): **đạt một phần**
+
+- **Script:** biên tập viên Claude hết 2 vòng sửa ở 7,5/10, không còn P1. Chủ phim (qua chat) sửa 6 đoạn bằng `edit script-para` rồi duyệt. Agent làm tiếp; luật "unchanged" không đánh trượt các đoạn chủ phim đã sửa.
+- **Shots:** tầng 2 tìm 7 cảnh cận bị mờ trước khi dựng hình. Đổi máy sang `mid-eye` bằng `edit shot`, kiểm lại thì hết mờ (cảnh báo độ sâu 17 → 1). Giữ S022 tối kèm lý do, chấp nhận phong cách, duyệt. Dựng hình không phải làm lại vì các lỗi này.
+- **Lọt qua điểm duyệt:** S059 (hội trường "212 người" mà trống, vì máy `wide-high` không thấy khán đài). Lỗi có trên bảng ảnh nhưng người duyệt chỉ đọc số đo mà không xem ảnh. Sửa lỗi này phải dựng hình lại.
+- **Chỗ yếu của xưởng tìm thấy:**
+  - `CREDITS` nằm trong dấu `all` nên làm mất duyệt Shots;
+  - trộn tiếng mất 260 phút khi chạy cùng lúc với dựng hình (52 phút);
+  - lời phụ đề khoảng 84 ký tự làm gói đăng báo "line over 42";
+  - lần duyệt của agent thay chủ phim bị bộ kiểm tra an toàn chặn, đúng như mong muốn.
