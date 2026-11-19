@@ -85,6 +85,47 @@ class SaveClean(unittest.TestCase):
         rows = [l for l in (self.p.dir / "my-styles" / "README.md").read_text().splitlines() if l.startswith("| night-ink ")]
         self.assertEqual(len(rows), 1)
 
+    def test_update_keeps_corrections_and_demo(self):  # specs/021 T014; FR-008, FR-015
+        ev_old = ("# Evidence\n\n## Corrections log\n\n| # | Before | After | Evidence | Found by |\n|---|---|---|---|---|\n"
+                  "| 1 | cuts 5.8/min | cuts 16–26/min | v01 re-run | both |\n")
+        (self.d / "style" / "EVIDENCE.md").write_text(ev_old)
+        self.assertEqual(self.call(), 0)
+        s = self.p.dir / "my-styles" / "night-ink"
+        created = json.loads((s / "style.json").read_text())["created"]
+        (s / "DEMO.md").write_text("# demo")
+        (s / "demo").mkdir()
+        (s / "demo" / "build.sh").write_text("echo hi")
+        self.assertEqual(self.call(), 1)                                   # without --update the slug is taken
+        # a re-learn that drops the old correction is refused
+        (self.d / "style" / "EVIDENCE.md").write_text("# Evidence\n\n## Corrections log\n\n| # | Before | After | Evidence | Found by |\n|---|---|---|---|---|\n")
+        with self.assertRaises(refset.StepError):
+            save.save("learned-set", "night-ink", "Night Ink", "", "ink-wash", False, True)
+        # keeping it and adding a row is fine; summary with shot grammar gives shots.json
+        (self.d / "style" / "EVIDENCE.md").write_text(ev_old + "| 2 | no shot numbers | huge wide 12–28 % | shots | numbers |\n")
+        summ = json.loads((self.d / "profile" / "summary.json").read_text())
+        summ["majority_orientation"] = "landscape"
+        summ["by_orientation"] = {"landscape": {"videos": 2, "metrics": {}, "palette": [], "shot_grammar": {
+            "scale_huge": {"median": 0.2, "min": 0.12, "max": 0.28, "n": 2},
+            "angle_eye": {"median": 0.5, "min": 0.4, "max": 0.6, "n": 2},
+            "scale_change_share": {"median": 0.85, "min": 0.8, "max": 0.9, "n": 2},
+            "longest_same_scale": {"median": 2, "min": 2, "max": 3, "n": 2},
+            "focused_share_p50": {"median": 0.4, "min": 0.3, "max": 0.5, "n": 2},
+            "top_set_share": {"median": 0.3, "min": 0.2, "max": 0.35, "n": 2}}}}
+        refset.write_json(self.d / "profile" / "summary.json", summ)
+        self.assertEqual(save.save("learned-set", "night-ink", "Night Ink", "", "ink-wash", False, True), 0)
+        meta = json.loads((s / "style.json").read_text())
+        self.assertEqual(meta["created"], created)
+        self.assertIn("updated", meta)
+        self.assertTrue((s / "DEMO.md").exists() and (s / "demo" / "build.sh").exists())
+        refs = json.loads((s / "shots.json").read_text())
+        self.assertEqual(refs["scale_share"]["huge"], [0.12, 0.28])
+        self.assertEqual(refs["angle_share"]["eye"], [0.4, 0.6])
+        self.assertEqual(refs["longest_same_scale_max"], 3)
+        self.assertEqual(refs["top_set_share_max"], 0.35)
+        self.assertIn("focus_t", refs)
+        rows = [l for l in (self.p.dir / "my-styles" / "README.md").read_text().splitlines() if l.startswith("| night-ink ")]
+        self.assertEqual(len(rows), 1)                                     # the catalog row is replaced, not added
+
     def test_clean(self):  # FR-004a, SC-006
         self.assertEqual(save.clean("learned-set", keep=False), 0)
         self.assertFalse((self.d / "videos").exists())

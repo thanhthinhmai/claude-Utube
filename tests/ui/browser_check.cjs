@@ -47,7 +47,7 @@ const [base, jid, rid] = process.argv.slice(2);
   await lp.goto(`${base}/#/styles/demo-style`);
   await lp.click('a[href="#/library/art-deco"]');
   await lp.waitForSelector("text=Style rules");
-  // My styles list: the card opens the style; "based on" on the card opens the base style in the Library
+  // My styles list: the card opens the style; "engine from" / "based on" on the card opens the base style in the Library
   await lp.goto(`${base}/#/styles`);
   if (await lp.locator(".my-card a.card, a.my-card").count()) throw new Error("my style card is a link (nested button)");
   await lp.click(".my-card a.base-link");

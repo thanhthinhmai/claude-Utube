@@ -1,7 +1,7 @@
 // @ts-check
 // Tier 2: one frame per shot, measured in the page (specs/020 T024, research R5).
 //   node tools/filmcheck/shots.mjs <film dir> <job.json>
-// job.json = {frames: [{key, shot, t}], out: <dir>, w, h, sheet?: {marks: {key: true}, cols, per}}
+// job.json = {frames: [{key, shot, t, label?}], out: <dir>, w, h, sheet?: {marks: {key: true}, cols, per, prefix?}}
 // Uses the studio's renderer like tools/render/record.mjs (STUDIO_RENDER_MODE / PLAYWRIGHT_CHROME, set by
 // `sh bin/studio qc …`), so GPU when the machine can. Nothing in the library is changed.
 // Prints one JSON line {mode, renderer, frames: [{key, shot, t, file, texts, m: {...}}]} or, with a sheet, {sheets: [..]}.
@@ -92,7 +92,7 @@ if (job.sheet) {
     const cells = job.frames.slice(s * per, (s + 1) * per).map((/** @type {any} */ f) => ({
       url: dataURL(path.join(job.out, f.key + '.jpg')), label: f.label || f.shot, bad: !!job.sheet.marks[f.key] }));
     const url = await ctx.p.evaluate(sheet, { cells, cols });
-    const file = path.join(job.out, `sheet-${s + 1}.jpg`);
+    const file = path.join(job.out, `${job.sheet.prefix || 'sheet'}-${s + 1}.jpg`);   // label-sheet: unmarked, for the labeler (specs/021)
     fs.writeFileSync(file, Buffer.from(url.split(',')[1], 'base64'));
     out.push(file);
   }

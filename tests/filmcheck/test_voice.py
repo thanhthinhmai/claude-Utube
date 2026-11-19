@@ -100,6 +100,10 @@ class VoiceCheck(unittest.TestCase):
         self.assertIn("check the recording", r["issues"][0]["fix"])
         self.assertFalse(r["pass"])
 
+    def test_percent_sign_is_a_word(self):
+        self.assertGreaterEqual(voicecheck.similar("Your jumps go eleven percent higher.", "Your jumps go 11% higher."), 0.99)
+        self.assertLess(voicecheck.similar("Your jumps go eleven percent higher.", "Your jumps go 11 higher."), 0.92)
+
     def test_cli(self):
         voice_film(self.root, "voice-cli", n=2)
         env = {**os.environ, "STUDIO_LIB": str(LIB), "STUDIO_ROOT": str(self.root)}

@@ -60,6 +60,22 @@ sh bin/studio job run $JOB --step "Summarize" -- sh bin/studio learn summary <se
 - Nếu tải bị chặn (mã 1): báo người dùng đặt video vào `references/<set>/videos/`, rồi chạy `fetch <set> --files references/<set>/videos/*`.
 - Lỗi khác: đọc thông báo, sửa nguyên nhân, chạy lại. `measure` tự tiếp tục từ chỗ dừng.
 
+### 1b. Cách quay: cỡ cảnh, góc máy, độ nét, bối cảnh (specs/021)
+
+Chạy khi video còn trên máy, trước `summary`:
+
+```sh
+sh bin/studio job run $JOB --step "Shots" -- sh bin/studio learn shots <set>       # tách cảnh, khung giữa cảnh, độ nét
+sh bin/studio job run $JOB --step "Label shots" -- sh bin/studio learn label <set>  # một lượt Claude Opus độc lập mỗi video
+sh bin/studio learn label <set> --pass 2 --sample 40                                # lượt thứ hai, đo độ nhất quán
+```
+
+- Video nào in `!` (số cắt mỗi phút lạ): mở bảng ảnh `profile/<vid>/shot-sheets/` và xem có cắt giả không.
+- Cảnh in `!` (nhãn mâu thuẫn với số đo độ nét): mở đúng ô trên bảng ảnh; nhãn sai thì sửa bằng
+  `sh bin/studio learn label <set> --set 'vNN:Sxxx scale=… angle=… place=…'`.
+- Báo người dùng độ nhất quán (`profile/agreement.json`): cùng cỡ cảnh, lệch không quá một bậc, cùng góc máy.
+- Bảng ảnh có nhãn và nhãn được giữ lại sau `clean`; khung cỡ lớn thì bị xoá.
+
 ## 2. Báo nhanh hồ sơ đo (không dừng)
 
 `sh bin/studio job step $JOB "Report measurements"` ở đầu bước.
@@ -115,6 +131,7 @@ Các lỗi đã từng gặp (từ claude-animated-shorts), cần kiểm riêng:
 1. **Chọn `based_on`:** phong cách thư viện có **kỹ thuật** gần nhất (2D Canvas, nét cọ, 3D three.js…). Đọc `lib/lemo-opuscar/styles/README.md` rồi chỉ đọc `STYLE.md` của 2–3 ứng viên. Lấy kỹ thuật dựng (engine), **không lấy luật**.
 2. **Viết `references/<set>/style/STYLE.md`** theo đúng 11 mục của `lib/lemo-opuscar/styles/_template/STYLE.md` (đọc template đó, kể cả phần hướng dẫn trong comment):
    - mỗi luật kèm `(evidence: …)` trỏ tới số đo hoặc `sheet#ô`;
+   - mục 6 (Camera grammar) và phần chiều sâu ở mục 2 ghi **bằng số** từ mục "Shot grammar" của `summary.md`: tỉ lệ từng cỡ cảnh và góc máy, tỉ lệ đổi cỡ giữa hai cảnh liền nhau, chuỗi cùng cỡ dài nhất, phần khung nét, bối cảnh; thêm các hàng đó vào "Key numbers" của `EVIDENCE.md`;
    - chỉ ghi những gì đúng cho **mọi** phim theo phong cách này; không ghi câu chuyện;
    - mục 10 (Engine) mô tả cách dựng bằng bộ máy `render(t)` dựa trên `based_on`;
    - mục 11 gợi ý cấu trúc, cách mở đầu và cách kết **khác** kênh gốc.
@@ -196,6 +213,8 @@ sh bin/studio learn save <set> --slug <slug> --en "<English Name>" [--cn "<中�
 
 Lệnh tự chặn: slug trùng, tên kênh, media hay bản chép lời trong gói. Lỗi thì sửa theo thông báo rồi chạy lại.
 
+Lệnh ghi thêm `shots.json` (số đo cách quay mà `qc shots` so với). **Học lại một phong cách đã có**: bắt đầu từ bản `STYLE.md`, `EVIDENCE.md`, `style.json` hiện có của nó, giữ mọi dòng nhật ký sửa (sửa luật nào thì thêm dòng), rồi lưu với `--update`. Lệnh từ chối nếu mất một dòng nhật ký sửa, và giữ phim mẫu đã có.
+
 ## 10. Giữ hay xoá video tham chiếu
 
 Hỏi đúng một câu: *"Giữ video tham chiếu của bộ <set> trên máy không? Mặc định là xoá; số liệu đo vẫn được giữ."*
@@ -206,6 +225,14 @@ sh bin/studio learn clean <set> --keep   # chỉ khi người dùng nói giữ
 ```
 
 Đóng việc: `sh bin/studio job done $JOB --style <slug>`. Lỗi không tự sửa được ở bất kỳ bước nào: `sh bin/studio job fail $JOB "<lỗi ngắn>"` rồi báo người dùng.
+
+## 11. Phim mẫu (specs/021)
+
+Sau khi lưu, làm một phim mẫu 15–30 s theo phong cách vừa học, như phong cách của thư viện (`lib/lemo-opuscar/MY-STYLES.md` §5). Phim mẫu nên làm trong một phiên mới:
+- đi đủ luồng làm phim của `CLAUDE.md` (kịch bản được chấm, giọng của kênh nếu có, các tầng kiểm của specs/020), câu chuyện riêng, không làm gói đăng;
+- bảng cảnh lập theo `shots.json` của phong cách; `qc shots` phải không có `blurred` và không có cảnh báo cách quay nào ngoài khoảng;
+- lưu vào `my-styles/<slug>/`: `DEMO.md` (theo `lib/lemo-opuscar/styles/_template/DEMO.md`), `demo/` (mã nguồn, `CREDITS`, `build.sh` có `LIB=` ở đầu, ghi ra `${OUT:-…}` ngoài `demo/`), `test.jpg`, `test.mp4` (không vào git), `demo-checks.json`;
+- mục 10 (Engine) của `STYLE.md` chỉ tới `demo/` trước phong cách gốc.
 
 Cuối cùng báo cho người dùng:
 - phong cách nằm ở `my-styles/<slug>/` và đã có trong danh mục `my-styles/README.md`; xem trên giao diện ở mục **Phong cách**;

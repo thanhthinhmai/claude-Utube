@@ -693,11 +693,14 @@ async function pageSet(name) {
   zoomable($app);
 }
 
+/** A learned style takes only the rendering engine (camera, character rig, focus set-up) from a library style. */
+const ENGINE_TIP = "The look and rules come from the measured videos; only the rendering engine (camera, character rig, focus set-up) is taken from this library style.";
+
 async function pageStyles() {
   const { styles } = await get("/styles");
   $app.innerHTML = `${head("Browse", "My styles", "Styles you learned and saved in my-styles/, ready for making films.")}${styles.length ? `<div class="grid">${styles.map((s) => `<article class="panel card my-card" data-slug="${esc(s.slug)}" tabindex="0">
       ${s.has_styleframe ? `<img src="${API}/styles/${esc(s.slug)}/styleframe" alt="">` : ""}
-      <p><strong>${esc(s.en || s.slug)}</strong><br><span class="muted">based on ${s.based_on_in_library
+      <p><strong>${esc(s.en || s.slug)}</strong><br><span class="muted"${s.source === "learned" ? ` title="${ENGINE_TIP}"` : ""}>${s.source === "learned" ? "engine from" : "based on"} ${s.based_on_in_library
         ? `<a class="base-link" href="#/library/${esc(s.based_on)}">${esc(s.based_on)}</a>` : esc(s.based_on || "–")}${s.source === "learned" ? " · learned from videos" : ""}</span></p>
       <div class="use-row">${useBtn(s.en || s.slug, s.slug)}</div></article>`).join("")}</div>`
     : `<p class="panel muted">No styles yet. Learn one by telling Claude: “Learn the style of the channel …”.</p>`}`;
@@ -712,7 +715,7 @@ async function pageStyles() {
 async function pageStyle(slug) {
   const s = await get(`/styles/${encodeURIComponent(slug)}`);
   const ref = s.reference || {};
-  $app.innerHTML = `${back("#/styles", "My styles")}${head(esc(slug), esc(s.en || slug), `Base technique ${s.based_on_in_library ? `<a href="#/library/${esc(s.based_on)}">${esc(s.based_on)}</a>` : esc(s.based_on || "–")} · ${s.source === "learned" ? `learned from ${ref.videos ?? "?"} videos, ${num(ref.measured_seconds, 0)} seconds measured` : "custom style"}${s.created ? ` · saved ${esc(s.created)}` : ""}`)}
+  $app.innerHTML = `${back("#/styles", "My styles")}${head(esc(slug), esc(s.en || slug), `<span${s.source === "learned" ? ` title="${ENGINE_TIP}"` : ""}>${s.source === "learned" ? "Engine from" : "Based on"}</span> ${s.based_on_in_library ? `<a href="#/library/${esc(s.based_on)}">${esc(s.based_on)}</a>` : esc(s.based_on || "–")} · ${s.source === "learned" ? `learned from ${ref.videos ?? "?"} videos, ${num(ref.measured_seconds, 0)} seconds measured` : "custom style"}${s.created ? ` · saved ${esc(s.created)}` : ""}`)}
     <div class="use-row">${useBtn(s.en || slug, slug)}</div>
     ${s.has_styleframe ? `<p><img class="shot" data-zoom src="${API}/styles/${esc(slug)}/styleframe" alt="Proof frame"></p>` : ""}
     <h2>STYLE.md</h2><div class="panel md">${s.style_html}</div>

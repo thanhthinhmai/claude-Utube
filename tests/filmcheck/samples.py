@@ -337,11 +337,16 @@ function look(s, t) {
     const x = R() * W + Math.sin(lt * 2 + i) * 40, y = R() * H, w = 40 + R() * 220, h = 40 + R() * 220;
     g.fillStyle = `hsl(${Math.round(R() * 360)},${30 + R() * 40}%,${(15 + R() * 55) * dim}%)`; g.fillRect(x, y, w, h);
   }
+  for (let i = 0; i < 900; i++) {          // fine detail (edges in every part of the frame), like a rendered set in focus
+    g.fillStyle = `hsl(${Math.round(R() * 360)},40%,${(20 + R() * 60) * dim}%)`;
+    g.fillRect(R() * W + Math.sin(lt + i) * 6, R() * H, 2 + R() * 6, 2 + R() * 6);
+  }
 }
 window.render = (t) => {
   if (window.CLEAN_SEEN !== undefined) window.CLEAN_SEEN = !!window.CLEAN;
   const s = F.shots.find(s => t >= s.t0 && t < s.t1) || F.shots[F.shots.length - 1];
   look(s, t);
+  c.style.filter = s.look === 'blur' ? 'blur(14px)' : 'none';      // specs/021: a shot with nothing in focus
   const card = document.getElementById('card'), k = (F.cards || []).find(k => t >= k.t0 && t < k.t1);
   card.textContent = k ? k.text : '';
   card.style.opacity = k && !window.CLEAN ? 1 : 0;

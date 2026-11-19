@@ -1,0 +1,46 @@
+Dusk Hypothetical demo film — credits and licences
+
+Code
+- index.html, mix.py, build.sh: written for claude-Utube (the studio's own demo of its learned style).
+  They follow the page, mixer and build contracts of the lemo-opuscar library (TECHNIQUE.md) and call its
+  files at run time: /core/lib.js, /core/three/post.js, core/audio/sfx.py, core/tts/tts.py,
+  core/render/video.mjs, core/render/mux.sh. The mixer's structure (bed, foley, ducking, compress, limit)
+  is adapted from the library's examples. Licence of that code:
+
+  MIT License
+
+  Copyright (c) 2026 LemoLab
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+- three.js (MIT), loaded from the library's node_modules.
+
+Voice
+- Kokoro TTS (Apache-2.0), voice am_michael at speed 1.1, generated offline by core/tts/tts.py.
+
+Music and sound
+- Synthesized in mix.py (pads, plucks, beeps, tones) and core/audio/sfx.py; no samples, no recordings.
+
+Type
+- Fredoka (SIL Open Font License 1.1), from the library's core/fonts.
+
+Facts
+- Moon surface gravity 1.62 m/s² vs Earth 9.80 m/s² (ratio 0.165 ≈ 1/6): NASA Goddard, Moon Fact Sheet,
+  https://nssdc.gsfc.nasa.gov/planetary/factsheet/moonfact.html
+- Scale −10 %, jump +11 %: arithmetic for g × 0.9.

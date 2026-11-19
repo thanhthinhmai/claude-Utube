@@ -59,15 +59,25 @@ def build(name: str) -> dict:
     data = refset.load(name)
     d = refset.set_dir(name)
     profs = []
+    from . import shots as shotmod
+    shotmod.refocus(name)                                     # specs/021: shares at the current focus threshold
     for v in data["videos"]:
         f = d / "profile" / v["id"] / "video.json"
         if v.get("state") in ("measured", "transcribed") and f.exists():
-            profs.append(refset.read_json(f))
+            prof = refset.read_json(f)
+            sf = shotmod.shots_file(name, v["id"])            # specs/021: the shot grammar of this video
+            if sf.exists():
+                prof["shot_grammar"] = shotmod.grammar(refset.read_json(sf)["shots"])
+                refset.write_json(f, prof)
+            profs.append(prof)
     by = {}
     for o in sorted({p["orientation"] for p in profs}):
         group = [p for p in profs if p["orientation"] == o]
         by[o] = {"videos": len(group), "metrics": {k: stat(fn(p) for p in group) for k, fn in METRICS.items()},
                  "palette": set_palette(group)}
+        sg = [shotmod.flatten(p["shot_grammar"]) for p in group if p.get("shot_grammar")]
+        if sg:
+            by[o]["shot_grammar"] = {k: stat(g.get(k) for g in sg) for k in sg[0]}
     disp = []
     for k, fn in METRICS.items():
         v = [x for x in (fn(p) for p in profs) if x is not None]
@@ -110,6 +120,9 @@ def to_markdown(s: dict) -> str:
         for k, m in g["metrics"].items():
             out.append(f"| {k} | {m['median']} | {m['min']} | {m['max']} |")
         out += ["", "Bảng màu: " + " ".join(f"{c['hex']} ({c['share']:.0%})" for c in g["palette"]), ""]
+        if g.get("shot_grammar"):
+            out += ["### Shot grammar (specs/021)", "", "| Chỉ số | Trung vị | Thấp nhất | Cao nhất |", "|---|---|---|---|"]
+            out += [f"| {k} | {m['median']} | {m['min']} | {m['max']} |" for k, m in g["shot_grammar"].items()] + [""]
     if s["skipped"]:
         out += ["## Bỏ qua", ""] + [f"- {x['id']}: {x['reason']}" for x in s["skipped"]]
     return "\n".join(out) + "\n"

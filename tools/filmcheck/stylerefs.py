@@ -76,6 +76,13 @@ def load(film_dir: Path, slug=None) -> dict:
         if got:
             out.update(got)
             sources.append(p.name)
+    try:                                     # specs/021: the learned shot grammar, kept nested
+        sg = json.loads((d / "shots.json").read_text(encoding="utf-8"))
+        if isinstance(sg, dict) and sg:
+            out["shot_grammar"] = sg
+            sources.append("shots.json")
+    except (OSError, ValueError):
+        pass
     if out:
         out["source"] = " + ".join(sources)
     return out
@@ -83,3 +90,8 @@ def load(film_dir: Path, slug=None) -> dict:
 
 def has_ranges(refs: dict) -> bool:
     return any(k in refs for k in ("luma_p50", "saturation_p50", "cuts_per_min", "loudness_range"))
+
+
+def has_shot_grammar(refs: dict) -> bool:
+    sg = refs.get("shot_grammar") or {}
+    return bool(sg.get("scale_share") or sg.get("angle_share"))

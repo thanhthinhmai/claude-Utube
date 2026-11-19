@@ -8,7 +8,7 @@ from pathlib import Path
 from filmcheck import report
 
 TIERS = ("voice", "plan", "shots", "render", "final")
-EXCEPTABLE = ("flat", "dark", "blown", "still", "shot_long", "text_over_subtitle")
+EXCEPTABLE = ("flat", "dark", "blown", "still", "shot_long", "text_over_subtitle", "blurred")   # blurred: specs/021
 SKIP_DIRS = {"out", "stills", "publish", ".check", "node_modules"}          # same as tools/render/lib.mjs
 SKIP_SUFFIX = (".mp4", ".log")
 SKIP_NAMES = {"checks.json", "CHECKS.md", "qc-exceptions.json"}

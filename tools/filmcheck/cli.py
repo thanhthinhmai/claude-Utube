@@ -710,6 +710,11 @@ def cmd_qc_shots(a) -> int:
     lines = tier_lines(r, d.name)
     lines.append(f"  luma {m['luma_p50']:.2f} · saturation {m['saturation_p50']:.2f} · {m['cuts_per_min']} cuts/min"
                  + (f" · style from {m['style_source']}" if m.get("style_source") else ""))
+    g = m.get("shot_grammar")                                  # specs/021
+    if g:
+        pct = lambda d: " ".join(f"{k} {v:.0%}" for k, v in d.items() if v)  # noqa: E731
+        lines.append(f"  scale: {pct(g['scale_share'])} · angle: {pct(g['angle_share'])} · longest same-scale run "
+                     f"{g['longest_same_scale']} · focus p50 {g['focused_share_p50']}")
     acc = (r.get("style_accept") or {}).get("reason")
     lines.append(f"{'✓' if r['pass'] else '✗'} shots: {len(blk)} frame problem(s) · {len(wrn)} style warning(s)"
                  + (f" (accepted: {acc})" if acc and wrn else "")

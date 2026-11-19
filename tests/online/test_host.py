@@ -236,6 +236,9 @@ class Host(_Base):
             self.assertIn(f"URL: http://127.0.0.1:{self.state()['web']}/#/jobs/{jid}", r.stdout)
             ids = [j["id"] for j in w.call("GET", "/api/v1/jobs")[1]["jobs"]]
             self.assertIn(jid, ids)
+            r = self.studio("job", "run", jid, "--step", "Render", "--", "sh", "-c", "echo mode=${STUDIO_MODE:-none}")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("mode=none", r.stdout)       # the wrapped command is not an online job (GPU probe, specs/019)
             summary = self.tmp / "q.md"
             summary.write_text("Orange or grey?")
             r = self.studio("review", "request", jid, "--kind", "question", "--summary", str(summary))

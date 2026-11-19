@@ -172,6 +172,13 @@ def tiers_markdown(tiers: dict) -> list:
         if sa and sa.get("reason") and wrn:
             accepted.append(f"- {label}: {len(wrn)} style warning(s) accepted — {sa['reason']}")
     out.append("")
+    g = ((tiers.get("shots") or {}).get("measures") or {}).get("shot_grammar")      # specs/021
+    if g:
+        out += ["Shot grammar (film):", "", "| Measure | Film |", "|---|---|"]
+        out += [f"| scale {k} | {v:.0%} |" for k, v in (g.get("scale_share") or {}).items() if v is not None]
+        out += [f"| angle {k} | {v:.0%} |" for k, v in (g.get("angle_share") or {}).items() if v is not None]
+        out += [f"| {k.replace('_', ' ')} | {g[k]} |" for k in ("scale_change_share", "longest_same_scale", "focused_share_p50",
+                                                                  "top_set_share") if g.get(k) is not None] + [""]
     if open_:
         out += ["Open:", ""] + [f"- {k}: {i.get('ref')} {i.get('rule')} {i.get('measure')} (limit {i.get('limit')})"
                                 + (f" → {i['fix']}" if i.get("fix") else "") for k, i in open_[:40]]

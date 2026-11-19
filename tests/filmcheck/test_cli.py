@@ -47,7 +47,7 @@ class Flow(unittest.TestCase):
         self.assertEqual(self.studio("script", "status", "baker")[0], 0)
         args = json.loads(self.log.read_text().splitlines()[-1])
         self.assertIn("Read,Grep,WebSearch,Bash", args)
-        self.assertNotIn("--model", args)                       # inherit and no STUDIO_MODEL: the session's model
+        self.assertEqual(args[args.index("--model") + 1], "claude-opus-5-5")   # inherit, no STUDIO_MODEL: Opus, never the CLI default
 
     def test_one_fix_round(self):
         self.tag("[editor-p1 P02]")

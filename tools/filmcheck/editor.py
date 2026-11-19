@@ -203,10 +203,13 @@ def run(film_dir: Path, paras: set, timeout: int = 900) -> dict:
     return {"bad": True, "model": model}
 
 
+DEFAULT_MODEL = "claude-opus-5-5"
+
+
 def model_args() -> list:
-    """`--model` for claude -p: nothing for inherit (Claude Code keeps the job's or the session's model), unless
-    STUDIO_MODEL names the job's model."""
+    """`--model` for claude -p: the setting, else the job's model (STUDIO_MODEL), else Opus. Never the CLI's own
+    default, which can be a smaller model on the user's machine."""
     m = editor_model()
     if m != "inherit":
         return ["--model", m]
-    return ["--model", os.environ["STUDIO_MODEL"]] if os.environ.get("STUDIO_MODEL") else []
+    return ["--model", os.environ.get("STUDIO_MODEL") or DEFAULT_MODEL]

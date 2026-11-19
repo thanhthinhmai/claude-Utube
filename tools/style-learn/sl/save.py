@@ -55,12 +55,57 @@ def _proof_sources(proof: Path) -> list:
     return files
 
 
-def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bool = False) -> int:
+CORR_HEAD = "## Corrections log"
+DEMO_FILES = ("DEMO.md", "demo", "test.jpg", "test.mp4", "demo-checks.json")
+
+
+def corrections(text: str) -> list:
+    """The table rows of the "Corrections log" section of an EVIDENCE.md (header and separator left out)."""
+    out, inside = [], False
+    for ln in text.splitlines():
+        if ln.startswith("## "):
+            inside = ln.strip().startswith(CORR_HEAD)
+            continue
+        if inside and ln.strip().startswith("|") and not set(ln.replace("|", "").strip()) <= set("-: "):
+            out.append(ln.strip())
+    return out[1:] if out else []                      # the first row is the header
+
+
+def shot_refs(summary: dict) -> dict:
+    """my-styles/<slug>/shots.json (specs/021 data-model ShotGrammarRefs) from the set summary, or {}."""
+    by = summary.get("by_orientation") or {}
+    g = (by.get(summary.get("majority_orientation")) or {}).get("shot_grammar")
+    if not g:
+        return {}
+    rng = lambda k: [g[k]["min"], g[k]["max"]] if g.get(k) and g[k].get("min") is not None else None  # noqa: E731
+    out = {"source": f"learned {datetime.date.today().isoformat()}, {summary.get('videos_measured')} videos",
+           "scale_share": {k[6:]: rng(k) for k in g if k.startswith("scale_") and k != "scale_change_share" and rng(k)},
+           "angle_share": {k[6:]: rng(k) for k in g if k.startswith("angle_") and rng(k)},
+           "scale_change_share": rng("scale_change_share"), "focused_share_p50": rng("focused_share_p50")}
+    if g.get("longest_same_scale", {}).get("max") is not None:
+        out["longest_same_scale_max"] = g["longest_same_scale"]["max"]
+    if g.get("top_set_share", {}).get("max") is not None:
+        out["top_set_share_max"] = g["top_set_share"]["max"]
+    try:
+        import sys as _s
+        _s.path.insert(0, str(Path(__file__).resolve().parents[2]))
+        from filmcheck import focus
+        out["focus_t"] = focus.FOCUS_T
+    except ImportError:
+        pass
+    return {k: v for k, v in out.items() if v not in (None, {}, [])}
+
+
+def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bool = False, update: bool = False) -> int:
     refset.check_slug(slug, "mã phong cách")
     mine = refset.root() / "my-styles"
     lib = library_styles()
-    if slug in lib or (mine / slug).exists():
-        raise StepError(f"mã \"{slug}\" đã có trong thư viện hoặc my-styles/: chọn mã khác")
+    old = mine / slug
+    if slug in lib or (old.exists() and not update):
+        raise StepError(f"mã \"{slug}\" đã có trong thư viện hoặc my-styles/: chọn mã khác"
+                        + ("" if slug in lib else " (học lại phong cách này: thêm --update)"))
+    if update and not old.exists():
+        raise StepError(f"--update: chưa có my-styles/{slug}/ để học lại")
     if based_on not in lib and not (mine / based_on).exists():
         raise UsageError(f"--based-on \"{based_on}\" không phải phong cách thư viện hay phong cách riêng")
     d = refset.set_dir(name)
@@ -93,6 +138,11 @@ def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bo
         names.report(viol)
         raise StepError(f"{len(viol)} vi phạm tên hoặc câu thoại: sửa rồi lưu lại")
 
+    if update and (old / "EVIDENCE.md").exists():          # specs/021 FR-008: the old corrections log is kept
+        new_rows = set(corrections((style / "EVIDENCE.md").read_text(encoding="utf-8")))
+        lost = [r for r in corrections((old / "EVIDENCE.md").read_text(encoding="utf-8")) if r not in new_rows]
+        if lost:
+            raise StepError("EVIDENCE.md mới làm mất dòng của nhật ký sửa cũ (phải giữ mọi dòng): " + lost[0][:120])
     tmp = mine / f".{slug}.tmp"
     shutil.rmtree(tmp, ignore_errors=True)
     (tmp / "measurements").mkdir(parents=True)
@@ -107,8 +157,15 @@ def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bo
     s = scrub(refset.read_json(summ)) if summ.exists() else {}
     refset.write_json(tmp / "measurements" / "summary.json", s)
     meta = scrub(refset.read_json(style / "style.json"))
+    created = datetime.date.today().isoformat()
+    if update:
+        try:
+            created = refset.read_json(old / "style.json").get("created") or created
+        except (OSError, ValueError):
+            pass
+        meta["updated"] = datetime.date.today().isoformat()
     meta.update({"slug": slug, "en": en, "cn": cn, "based_on": based_on, "borrows": meta.get("borrows", []),
-                 "library_version": library_version(), "created": datetime.date.today().isoformat(),
+                 "library_version": library_version(), "created": created,
                  "source": "learned",
                  "reference": {"videos": s.get("videos_measured"), "measured_seconds": s.get("measured_seconds"),
                                "formats": sorted((s.get("by_orientation") or {}).keys())}})
@@ -118,17 +175,33 @@ def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bo
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(p, dst)
     shutil.copy2(ours, tmp / "styleframe.jpg")
-    tmp.rename(mine / slug)
+    refs = shot_refs(s)                                      # specs/021: the shot grammar the checks compare with
+    if refs:
+        refset.write_json(tmp / "shots.json", refs)
+    if update:                                               # the demo film stays with the style (specs/021 FR-015)
+        for f in DEMO_FILES:
+            src = old / f
+            if src.is_dir():
+                shutil.copytree(src, tmp / f)
+            elif src.exists():
+                shutil.copy2(src, tmp / f)
+        gone = mine / f".{slug}.old"
+        shutil.rmtree(gone, ignore_errors=True)
+        old.rename(gone)
+        tmp.rename(old)
+        shutil.rmtree(gone, ignore_errors=True)
+    else:
+        tmp.rename(mine / slug)
 
     readme = mine / "README.md"
     title = en + (f" · {cn}" if cn else "")
     row = f"| {slug} | {title} | {based_on} | learned ({s.get('videos_measured', '?')} video) | {meta['created']} |\n"
     text = readme.read_text(encoding="utf-8") if readme.exists() else \
         "# Phong cách riêng\n\n| Slug | Tên | Dựa trên | Nguồn | Ngày lưu |\n|---|---|---|---|---|\n"
-    readme.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8")
-    with open(readme, "a", encoding="utf-8") as f:
-        f.write(row)
-    print(f"✓ đã lưu my-styles/{slug}/ và thêm vào danh mục my-styles/README.md")
+    text = text if text.endswith("\n") else text + "\n"
+    lines = [ln for ln in text.splitlines(True) if not ln.startswith(f"| {slug} |")]
+    readme.write_text("".join(lines) + row, encoding="utf-8")
+    print(f"✓ đã lưu my-styles/{slug}/" + (" (học lại)" if update else "") + " và cập nhật danh mục my-styles/README.md")
     return 0
 
 
@@ -143,6 +216,8 @@ def clean(name: str, keep: bool = False) -> int:
         return 0
     targets = [d / "videos", d / "proof" / "compare.jpg"]
     targets += list((d / "profile").glob("*/words.json")) + list((d / "profile").glob("*/sheets"))
+    # specs/021: full-size shot frames and the unlabelled sheets; the small labelled shot sheets and the labels stay
+    targets += list((d / "profile").glob("*/shot-frames")) + list((d / "profile").glob("*/label-sheets")) + [d / "profile" / "pass2"]
     # frames taken from the reference videos (anything in proof/out that we did not draw ourselves)
     targets += [f for f in (d / "proof" / "out").glob("*") if not f.name.startswith("ours_")]
     total = 0

@@ -1,0 +1,81 @@
+[
+ {
+  "id": "l01",
+  "para": "P01",
+  "text": "Your alarm rings at seven.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l02",
+  "para": "P01",
+  "text": "You hop out of bed.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l03",
+  "para": "P01",
+  "text": "Why do you land a beat late?",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l04",
+  "para": "P02",
+  "text": "Overnight, Earth's pull dropped by ten percent.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l05",
+  "para": "P03",
+  "text": "The Moon pulls one sixth as hard.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l06",
+  "para": "P03",
+  "text": "Today we lost just one tenth.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l07",
+  "para": "P04",
+  "text": "Your bathroom scale reads ten percent lighter.",
+  "voice": "am_michael",
+  "speed": 1.1,
+  "asr": "Your bathroom scale reads 10% lighter."
+ },
+ {
+  "id": "l08",
+  "para": "P04",
+  "text": "Your jumps go eleven percent higher.",
+  "voice": "am_michael",
+  "speed": 1.1,
+  "asr": "Your jumps go 11% higher."
+ },
+ {
+  "id": "l09",
+  "para": "P04",
+  "text": "Your coffee pours in a slow arc.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l10",
+  "para": "P05",
+  "text": "Same body. Same breakfast.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l11",
+  "para": "P05",
+  "text": "The planet just holds you a little looser.",
+  "voice": "am_michael",
+  "speed": 1.1
+ }
+]

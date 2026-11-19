@@ -29,6 +29,7 @@ NUM_WORDS = set("zero one two three four five six seven eight nine ten eleven tw
 def _tokens(text: str, digits_as_number: bool) -> list:
     """Normalised words; a run of number words, or a written number, becomes one "#" (twenty-three thousand ↔ 23,000)."""
     out = []
+    text = re.sub(r"(\d)\s*%", r"\1 percent", text)                 # the recogniser writes "eleven percent" as "11%"
     for raw in re.split(r"[\s\-–—]+", text.lower()):
         w = rhythm.norm(raw)
         if not w:

@@ -9,7 +9,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from filmcheck import plancheck, qc, rhythm, stylerefs, tiers
+from filmcheck import focus, labeler, plancheck, qc, rhythm, stylerefs, tiers
 
 HERE = Path(__file__).resolve().parent
 FLAT_SHARE, FLAT_SD, TEXT_AREA = 0.60, 0.04, 0.02
@@ -76,6 +76,10 @@ def score(frames: list, shots: list, cues, style: dict, dur: float, film_dir=Non
             issues.append(_issue("flat", ref, at, round(max(m["dominant_share"], 0), 2), flat,
                                  text=f"one colour covers {m['dominant_share']:.0%}, luma spread {m['luma_sd']:.3f}",
                                  fix="move the camera out of the object, or add the shot as an exception"))
+        elif f.get("focus") is not None and f["focus"]["focused_share"] == 0 and not has_text:   # specs/021 FR-011
+            issues.append(_issue("blurred", ref, at, f["focus"]["focused_share"], f"> 0 of 12 tiles sharp",
+                                 text=f"sharpest tile {f['focus']['sharpest']} (sharp from {focus.FOCUS_T:g})",
+                                 fix="put the subject in focus (focus distance, aperture), or add the shot as an exception"))
         cue_on = any(a <= at < b for a, b, _ in cues or [])
         if cue_on:
             H = 540
@@ -149,13 +153,27 @@ def run(film_dir: Path, lib, say=print) -> dict:
         job = fh.name
     try:
         got = _node([HERE / "shots.mjs", d, job], timeout=7200)
+        for f in got["frames"]:                          # specs/021: the shared focus measure
+            try:
+                f["focus"] = focus.measure(f["file"])
+            except focus.FocusError:
+                f["focus"] = None
         style = stylerefs.load(d)
         issues, meas, skipped = score(got["frames"], shots, inp.get("cues"), style, dur, film_dir=d)
         meas["render"] = {"mode": got.get("mode"), "renderer": got.get("renderer")}
+        mids = [f for f in got["frames"] if "~" not in f["key"]]
+        g_issues, g_meas, g_skipped, labels = shot_grammar(d, fp, job, out, mids, shots, style, say)
+        issues += g_issues
+        skipped += g_skipped
+        meas.update(g_meas)
         exc = tiers.load_exceptions(d)
         tiers.apply_exceptions(issues, exc)
         bad = {i["ref"] for i in issues if i["severity"] == "block" and not i.get("excepted")}
         marks = {f["key"]: True for f in frames if f["shot"] in bad}
+        for f in frames:                                 # FR-014: the sheet shows each shot's labels
+            lab = labels.get(f["shot"])
+            if lab and "~" not in f["key"]:
+                f["label"] = f"{f['shot']} · {lab['scale'].upper()} · {lab['angle']}"
         with open(job, "w") as fh:
             json.dump({"frames": frames, "out": str(out), "sheet": {"marks": marks, "cols": 6, "per": 48}}, fh)
         sheets = _node([HERE / "shots.mjs", d, job], timeout=1800).get("sheets", [])
@@ -167,6 +185,109 @@ def run(film_dir: Path, lib, say=print) -> dict:
     res = tiers.result("shots", issues, meas, skipped, time.time() - t0, fp, exceptions=exc)
     tiers.save_tier(d, "shots", res)
     return tiers.load_tier(d, "shots")
+
+
+def _gissue(rule, ref, measure, limit, ids=(), fix="", severity="warn"):
+    i = _issue(rule, ref, None, measure, limit, text=(" ".join(ids[:12]) + (" …" if len(ids) > 12 else "")) if ids else "",
+               fix=fix, severity=severity)
+    i["shots"] = list(ids)
+    return i
+
+
+def _rng(r) -> str:
+    return f"{r[0]:g}–{r[1]:g}"
+
+
+def shot_grammar(d: Path, fp: str, job: str, out: Path, mids: list, shots: list, style: dict, say) -> tuple:
+    """specs/021 FR-010, FR-012, FR-013: labels from the independent labeler (kept per source), the film's shot
+    grammar, and warnings against the style's ranges with the shots concerned. (issues, measures, skipped, labels)"""
+    issues, skipped, meas = [], [], {}
+    sg = style.get("shot_grammar") or {}
+    lf = d / ".check" / "labels.json"
+    labels, info = {}, {}
+    try:
+        old = json.loads(lf.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        old = {}
+    if old.get("fingerprint") == fp and old.get("labeler") == labeler.version() and old.get("labels"):
+        labels, info = old["labels"], {"reused": True, "model": old.get("model")}
+        say("  labels: reused")
+    else:
+        try:
+            with open(job, "w") as fh:
+                json.dump({"frames": [{**f, "label": f["shot"]} for f in mids], "out": str(out),
+                           "sheet": {"marks": {}, "cols": 6, "per": 48, "prefix": "label-sheet"}}, fh)
+            sheets = _node([HERE / "shots.mjs", d, job], timeout=1800).get("sheets", [])
+            ids = [f["shot"] for f in mids]
+            groups = [(sh, ids[k * 48:(k + 1) * 48]) for k, sh in enumerate(sheets)]
+            got = labeler.label(groups, {f["shot"]: f.get("focus") or {} for f in mids})
+            labels = got["labels"]
+            info = {"reused": False, "model": got["model"], "calls": got["calls"], "usage": got["usage"]}
+            lf.write_text(json.dumps({"fingerprint": fp, "labeler": labeler.version(), "model": got["model"], "at": tiers.now(),
+                                      "labels": labels},
+                                     ensure_ascii=False), encoding="utf-8")
+            say(f"  labels: {len(labels)} shots · {got['model']} · {len(sheets)} sheet(s)")
+        except (labeler.LabelError, ShotError) as e:
+            issues.append(_gissue("shot_grammar_unchecked", "film", "not labelled", "labels",
+                                  fix=f"the labeler could not run ({e}); run qc shots again, or accept with a reason"))
+            return issues, {"labels": {"error": str(e)}}, skipped, {}
+    focus_of = {f["shot"]: f.get("focus") for f in mids}
+    rows = [{"id": s["id"], "t0": s["t0"], "t1": s["t1"], "set": s.get("set") or None, "focus": focus_of.get(s["id"]),
+             **(labels.get(s["id"]) or {})} for s in shots]
+    g = labeler.grammar(rows)
+    meas["labels"] = info
+    meas["shot_grammar"] = g
+    if not stylerefs.has_shot_grammar(style):
+        skipped.append("shot grammar: the style has no measurements (shots.json), skipped")
+        return issues, meas, skipped, labels
+    length = {r["id"]: r["t1"] - r["t0"] for r in rows}
+    by_scale = {}
+    for r in rows:
+        if r.get("scale"):
+            by_scale.setdefault(r["scale"], []).append(r["id"])
+    over = max(((k, (g["scale_share"].get(k) or 0) - (sg["scale_share"].get(k) or [0, 1])[1]) for k in sg.get("scale_share", {})),
+               key=lambda kv: kv[1], default=(None, 0))[0]
+    for key, film, ref, rule in (("scale", g["scale_share"], sg.get("scale_share") or {}, "style_scale_"),
+                                 ("angle", g["angle_share"], sg.get("angle_share") or {}, "style_angle_")):
+        for k, r in ref.items():
+            v = film.get(k)
+            if v is None or r[0] <= v <= r[1]:
+                continue
+            if v < r[0]:
+                pool = sorted(by_scale.get(over, []) if key == "scale" else [x["id"] for x in rows if x.get("angle") == "eye"],
+                              key=lambda i: -length[i])[:5]
+                fix = f"too few {k}: change some of these shots to {k}"
+            else:
+                pool = [x["id"] for x in rows if x.get(key) == k]
+                fix = f"too many {k}: change some of these shots"
+            issues.append(_gissue(rule + k, "film", v, _rng(r), pool, fix))
+    if sg.get("scale_change_share") and g["scale_change_share"] is not None:
+        r = sg["scale_change_share"]
+        if g["scale_change_share"] < r[0]:
+            same = [b["id"] for a, b in zip(rows, rows[1:]) if a.get("scale") and a.get("scale") == b.get("scale")
+                    and a["scale"] not in ("insert", "unknown")]
+            issues.append(_gissue("style_scale_change", "film", g["scale_change_share"], _rng(r), same,
+                                  "cut between different scales more often (these shots repeat the scale before them)"))
+        elif g["scale_change_share"] > r[1]:
+            issues.append(_gissue("style_scale_change", "film", g["scale_change_share"], _rng(r), [],
+                                  "the style keeps the same scale across a cut more often: let some neighbouring shots share a scale"))
+    if sg.get("longest_same_scale_max"):
+        for run in labeler.runs(rows):
+            if len(run) > sg["longest_same_scale_max"]:
+                issues.append(_gissue("style_same_scale_run", run[0], len(run), f"≤ {sg['longest_same_scale_max']}", run,
+                                      "break the run with a shot of another scale"))
+    if sg.get("focused_share_p50") and g["focused_share_p50"] is not None:
+        r = sg["focused_share_p50"]
+        if not (r[0] <= g["focused_share_p50"] <= r[1]):
+            pool = sorted((x for x in rows if x.get("focus")), key=lambda x: x["focus"]["focused_share"])[:5]
+            issues.append(_gissue("style_focus", "film", g["focused_share_p50"], _rng(r), [x["id"] for x in pool],
+                                  "match the style's depth of field"))
+    if sg.get("top_set_share_max") and g["top_set_share"] is not None and g["top_set_share"] > sg["top_set_share_max"]:
+        sets = [x.get("set") for x in rows if x.get("set")]
+        top = max(set(sets), key=sets.count)
+        issues.append(_gissue("style_top_set", "film", g["top_set_share"], f"≤ {sg['top_set_share_max']:g}",
+                              [x["id"] for x in rows if x.get("set") == top], f"too many shots in one place ({top})"))
+    return issues, meas, skipped, labels
 
 
 def accept_style(film_dir: Path, reason: str) -> dict:

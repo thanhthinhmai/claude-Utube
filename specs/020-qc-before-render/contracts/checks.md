@@ -20,6 +20,7 @@
 | shots | `flat` | block | màu nhiều nhất > 60% hoặc độ lệch độ sáng < 0,04 (không tính chữ, letterbox) | có |
 | shots | `dark` | block | độ sáng p50 < 0,04 | có |
 | shots | `blown` | block | > 25% điểm có độ sáng > 0,98 | có |
+| shots | `blurred` | block | không ô nào trong 12 ô nét (specs/021 `focus.py`) | có |
 | shots | `missing_glyph` | block | ký tự không có phông | không |
 | shots | `text_over_subtitle` | block | chữ cắt vùng phụ đề lúc có phụ đề | có |
 | shots | `style_luma` | warn | độ sáng p50 của phim ngoài khoảng của phong cách | lý do chung (`accept-style`) |

@@ -32,8 +32,8 @@ class StyleRefs(unittest.TestCase):
     def test_dusk_hypothetical(self):
         ev = (REPO / "my-styles" / "dusk-hypothetical" / "EVIDENCE.md").read_text()
         got = stylerefs.from_evidence(ev)
-        self.assertEqual(got, {"luma_p50": [0.198, 0.299], "saturation_p50": [0.319, 0.504], "cuts_per_min": [16, 26],
-                               "loudness_range": [2.4, 3.3]})
+        self.assertEqual(got, {"luma_p50": [0.198, 0.299], "saturation_p50": [0.319, 0.504], "cuts_per_min": [21, 29],
+                               "loudness_range": [2.4, 3.3]})          # cuts/min re-measured by specs/021 (scene > 0.15)
 
     def test_qc_json_overrides(self):
         self.style("s", "| Metric | Median | Range |\n|---|---|---|\n| luma p50 | 0.2 | 0.1–0.3 |\n"
@@ -43,6 +43,14 @@ class StyleRefs(unittest.TestCase):
         self.assertEqual(got["shot_max"], 8)
         self.assertNotIn("loudness_range", got)
         self.assertTrue(stylerefs.has_ranges(got))
+
+    def test_shot_grammar(self):                                       # specs/021 T016
+        self.style("sg")
+        (self.root / "my-styles" / "sg" / "shots.json").write_text(json.dumps({"scale_share": {"huge": [0.1, 0.3]}}))
+        got = stylerefs.load(self.film)
+        self.assertEqual(got["shot_grammar"]["scale_share"]["huge"], [0.1, 0.3])
+        self.assertTrue(stylerefs.has_shot_grammar(got))
+        self.assertFalse(stylerefs.has_shot_grammar({}))
 
     def test_no_measurements(self):
         self.style("plain")

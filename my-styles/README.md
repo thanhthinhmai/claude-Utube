@@ -7,3 +7,4 @@ Phong cách ở đây được đưa vào git và đi cùng repo. Khi người d
 | Slug | Tên | Dựa trên | Nguồn | Ngày lưu |
 |---|---|---|---|---|
 | toi-tram | Quiet Night | scifi-toon | learned (5 video) | 2026-11-06 |
+| dusk-hypothetical | Dusk Hypothetical | brick-toy | learned (10 video), có phim mẫu (`demo/`, 23,6 s) | 2026-11-13 |
