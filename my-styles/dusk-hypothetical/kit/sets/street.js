@@ -1,6 +1,6 @@
 // Dusk street: a road receding to a skyline, sidewalks, buildings with lit window grids, street lamps, string lights.
 import * as THREE from 'three';
-import { box, canvasTex, car, duskSky, floor, foodCart, lamp, litBoard, mesh, mulberry, plant, stdMat, stringLights } from './parts.js';
+import { box, canvasTex, car, duskSky, floor, foodCart, lamp, litBoard, mesh, mulberry, plant, stdMat, stringLights, tree, cyl, prop } from './parts.js';
 
 export function build() {
   const g = new THREE.Group(), lights = [], spots = [];
@@ -34,6 +34,9 @@ export function build() {
   car(g, 3.2, -4.5, { color: '#3f6fc0', ry: 0 }); car(g, -3.6, -9.0, { color: '#c0423e', ry: Math.PI });
   foodCart(g, lights, -3.4, -2.2, { ry: 0.4 });
   litBoard(g, 5.5, 3.1, -7.2, { w: 1.8, h: 0.5, ry: -Math.PI / 2, glow: '#9ad0f0', rows: 1 });
+  // specs/027 (FR-008): dressing in all three layers of the default wide shot
+  tree(g, -5.4, 3.2, { h: 2.8, seed: 7 }); tree(g, 5.6, -2.5, { h: 3, seed: 8 }); tree(g, -5.6, -14, { h: 3, seed: 9 });
+  prop(cyl(g, 0.24, 0.8, '#3a5a4a', 4.4, 0.52, 2.6, 12), 'bin');
   return {
     group: g, lights, room: { x0: -6.2, x1: 6.2, z0: -60, z1: 14 }, fog: [14, 70], grade: { exposure: 0.7, saturation: 1.08 },
     anchors: { hero: { x: 0, y: 0, z: 0, ry: 0 }, heroSeat: { x: -4.5, z: -0.5, ry: 0.6, y: 0.12 }, extras: spots.slice(0, 8), crowd: { area: { x0: -6, x1: 6, z0: -40, z1: -4 } }, fg: [{ x: -3.9, y: 2, z: 2.5 }] },

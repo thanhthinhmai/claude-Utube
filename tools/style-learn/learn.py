@@ -97,6 +97,25 @@ def cmd_label(a):
     return 0
 
 
+def cmd_craft_label(a):
+    from sl import craftset
+    from filmcheck import craftlabel
+    skip = [x for x in (a.skip or "").split(",") if x]
+    try:
+        tot = craftset.label_set(a.set, a.force)
+    except craftlabel.CraftLabelError as e:
+        raise StepError(str(e)) from None
+    print(f"Craft labels: {tot['shots']} shot(s) labelled now in {tot['videos']} video(s), {tot['calls']} call(s).")
+    sm = craftset.summary(a.set, skip)
+    if not sm["per_video"]:
+        raise StepError("chưa có nhãn nào: bộ chưa có shots.json (chạy learn shots và learn label trước)")
+    print("\n".join(craftset.table(sm)))
+    if a.write:
+        c = craftset.write_style(a.set, a.write, sm, skip)
+        print(f"✓ my-styles/{a.write}/template.json → craft (action min {c['action']['min']}), EVIDENCE.md")
+    return 0
+
+
 def cmd_summary(a):
     from sl import summary
     s = summary.build(a.set)
@@ -209,6 +228,12 @@ def main(argv=None) -> int:
     lb.add_argument("--set", dest="set_label", action="append", metavar="'vNN:Sxxx key=value …'",
                     help="sửa tay một nhãn, ví dụ --set 'v03:S014 scale=huge angle=top'")
     lb.set_defaults(fn=cmd_label)
+
+    cl = sub.add_parser("craft-label", help="gán nhãn hành động, ngoài trời, đồ trong tay cho mọi cảnh (specs/027)")
+    cl.add_argument("set"); cl.add_argument("--force", action="store_true", help="gán lại tất cả")
+    cl.add_argument("--skip", help="video không tính vào tỉ lệ, ví dụ v03,v08 (video 2D phẳng)")
+    cl.add_argument("--write", metavar="STYLE", help="ghi craft vào my-styles/STYLE/template.json và EVIDENCE.md")
+    cl.set_defaults(fn=cmd_craft_label)
 
     s = sub.add_parser("summary", help="tổng hợp cả bộ")
     s.add_argument("set"); s.set_defaults(fn=cmd_summary)

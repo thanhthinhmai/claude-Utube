@@ -1,6 +1,6 @@
 // Stadium at dusk: a green pitch, tiered stands with thousands of seats, floodlight towers, a jumbotron.
 import * as THREE from 'three';
-import { floor, box, lamp, duskSky, mesh, mat, canvasTex, stdMat } from './parts.js';
+import { floor, box, lamp, duskSky, mesh, mat, canvasTex, stdMat, bench, ball, cyl, prop } from './parts.js';
 
 export function build() {
   const g = new THREE.Group(), lights = [], seats = [];
@@ -36,6 +36,13 @@ export function build() {
   box(g, 16, 7, 0.6, '#1c1626', 0, 20, -58);
   mesh(g, new THREE.PlaneGeometry(15, 6.2), mat('#2a2040', 0.5, '#7a5cc0', 0.55), [0, 20, -57.68], false);
   duskSky(g, { x: 0, y: 18, z: -75, w: 200, h: 50, blocks: 60, skylineY: 6 });
+  // specs/027 (FR-008): dressing in all three layers of the default wide shot
+  bench(g, -6, -31, { len: 3, ry: Math.PI / 2 }); ball(g, 1.4, 0.12, -30.4, { color: '#f4efe4' }); ball(g, -2.4, 0.12, -33.6, { color: '#f4efe4' });
+  for (const [x, z] of [[-1.8, -29.6], [-2.4, -30.1], [2.6, -30.0], [3.1, -29.4]]) prop(cyl(g, 0.12, 0.42, '#e07a3a', x, 0.21, z, 10), 'cone');
+  const goal = new THREE.Group(); goal.position.set(0, 0, -41.5); g.add(goal); prop(goal, 'goal');
+  for (const sx of [-1, 1]) cyl(goal, 0.06, 2.4, '#f4efe4', sx * 3.6, 1.2, 0, 8);
+  box(goal, 7.3, 0.1, 0.1, '#f4efe4', 0, 2.4, 0);
+  for (const sx of [-1, 1]) prop(cyl(g, 0.03, 1.5, '#f4efe4', sx * 40, 0.75, -40, 6), 'flag');
   return {
     group: g, lights, room: { x0: -44, x1: 44, z0: -42, z1: 30 }, fog: [40, 160], grade: { exposure: 0.64, saturation: 1.15 },
     anchors: { hero: { x: 0, y: 0, z: -32, ry: 0 }, heroSeat: { x: 0, z: -44, ry: 0, y: 0.4 }, extras: [{ x: -1.5, y: 0, z: -33.2, ry: 0.4 }, { x: 1.6, y: 0, z: -33.4, ry: -0.4 }, { x: -3, y: 0, z: -35, ry: 0.3 }], crowd: { slots: seats }, fg: [] },

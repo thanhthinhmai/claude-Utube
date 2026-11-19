@@ -97,6 +97,7 @@ Bằng chứng: v04_shots_3.jpg#7, v05_shots_2.jpg#15, v10_shots_5.jpg#3, v07_sh
 Nên làm: dựng mỗi nơi bằng lưới đồ vật lặp lại cộng một đạo cụ kể chuyện; đặt đạo cụ trên tay nhân vật ở cận; mở nơi mới bằng cảnh rộng; có ít nhất một đèn trong cảnh.
 Không nên làm: đồ vật lặp đều mà không có đạo cụ nào kể chuyện; nền trống; một nơi kéo dài nhiều phút không cắt sang nơi khác.
 Trong bộ dựng: `sets/*.js`, `sets/parts.js`, `catalog.sets`, `set: 'custom:<tên>'`
+Thêm (specs/027): đo trên 1.650 cảnh 3D, 29–76% cảnh ở ngoài trời (trung vị 39%). Bối cảnh ngoài trời lúc hoàng hôn: `court`, `rooftop`, `parking`, `street-dusk` (vòm trời, nhà sáng đèn, cây, cột đèn, hàng rào). Mỗi bối cảnh có đồ ở cả ba lớp tiền, trung, hậu cảnh (`set_info.props_min`); bối cảnh `custom:` ghi `fn.outdoor = true|false`. `qc plan` cảnh báo `craft_outdoor` khi ra ngoài khoảng.
 
 ## 7. Đám đông
 
@@ -174,6 +175,7 @@ Bằng chứng: v09/strips/S082.jpg#0, v06/strips/S192.jpg#5, v05/strips/S062.jp
 Nên làm: mỗi cảnh một việc: đổi nét mặt, một động tác tay, một cái nghiêng đầu hay một đạo cụ tự diễn; động tác lên trong 0,25–0,8 s rồi giữ; miệng mấp máy khi có bong bóng; chớp mắt cho cảnh dài.
 Không nên làm: cảnh có người mà máy đứng và không có gì động; cả đám đông cùng diễn; động tác lặp vòng như máy.
 Trong bộ dựng: `cast[].act`, `cast[].talk`, `cast[].blink`, `cast[].path`, `catalog.acts`
+Thêm (specs/027): đo trên 1.650 cảnh 3D, trong các cảnh có người, 7–35% có hành động thật (trung vị 14%), 8–25% có người cầm đồ (trung vị 12%). Hành động thật là act loại `body` (`run`, `jump`, `throw`, `carry`, `fall`, `push`, `type`) hoặc `pair` (`give:<đồ>@<người>`, `high-five@<người>`); cử chỉ (`nod`, `look:`, `lean-in`, `point`, `wave`…) không tính. Đồ cầm tay: `cast[].item` (`ball`, `cards`, `cash`, `box`, `keys`, cùng các đồ cũ), `hand: left|right`. `qc plan` chặn `craft_action` dưới p25 (10%), cảnh báo `craft_prop` ngoài khoảng. Dùng hành động cho nhịp có việc xảy ra, không rải đều mọi cảnh.
 
 ## 12. Chuyển động máy
 
@@ -192,6 +194,7 @@ Bằng chứng: v01/strips/S010.jpg#7, v10/strips/S073.jpg#0, v02/strips/S160.jp
 Nên làm: đẩy chậm vào ở khoảng một nửa số cận và trung cảnh, có lúc bắt đầu và dừng mềm; bám theo khi nhân vật chạy; giữ cú máy lớn cho cảnh đinh; đồ hoạ trọn khung để đứng.
 Không nên làm: máy đứng chết ở mọi cảnh; lia nhanh, rung tay; trôi ngang liên tục.
 Trong bộ dựng: `move: 'auto' | {type, speed}`, `catalog.moves`, `camera.js → place`
+Thêm (specs/027): 4–24% cảnh qua vai (trung vị 10%). Cảnh hai người có `talk` hoặc bong bóng mà không ghi `cam` thì kit tự quay qua vai người thật (vai mờ, mặt người nói rõ), đổi người và giữ phía đường 180° ở cảnh kế; hai người phải quay vào nhau (`ry`). Máy mới: `hands` (cận tay và đồ), `hero-low` (góc thấp cho khoảnh khắc thắng).
 
 ## 13. Chuyển cảnh
 
