@@ -9,6 +9,11 @@
   "author": "The White House"
  },
  "figure_hash": "496a36ede5222ea9",
- "approved": null,
+ "approved": {
+  "hash": "496a36ede5222ea9",
+  "at": "2026-11-19T12:28:06+00:00",
+  "by": "chat",
+  "note": "approved by the user in chat on 2026-11-19 (shared sheet of the new kit)"
+ },
  "history": []
 }

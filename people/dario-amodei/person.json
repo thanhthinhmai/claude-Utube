@@ -9,6 +9,11 @@
   "author": "TechCrunch"
  },
  "figure_hash": "b4561f2c3b5c2019",
- "approved": null,
+ "approved": {
+  "hash": "b4561f2c3b5c2019",
+  "at": "2026-11-19T12:28:06+00:00",
+  "by": "chat",
+  "note": "approved by the user in chat on 2026-11-19 (shared sheet of the new kit)"
+ },
  "history": []
 }
