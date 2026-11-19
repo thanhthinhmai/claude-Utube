@@ -30,7 +30,7 @@ Dạng và luật xem [data-model.md](../data-model.md#film-reviews-trong-checks
 ## `mix.json`
 
 ```json
-{"music": "seed:1", "music_under_voice_db": -6.0, "music_between_db": -12.0, "sfx_db": -18.0}
+{"music": "seed:7", "music_under_voice_db": -6.0, "duck_db": -6, "sfx_db": 0}
 ```
 
 - Dải hợp lệ theo research R11. `kit/sound/mix.py` đọc tệp này khi có.

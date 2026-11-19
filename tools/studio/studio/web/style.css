@@ -523,3 +523,9 @@ table.lessons tr.l-draft td:nth-child(2) { color: var(--warn, #b26b00); font-wei
 .vline .vact { display: flex; gap: 4px; flex-wrap: wrap; }
 .vline .tag.warn { background: var(--warn-soft); color: var(--warn); border-radius: 4px; padding: 1px 6px; justify-self: start; }
 @media (max-width: 560px) { .vline { grid-template-columns: 30px minmax(0, 1fr); } .vline .vact { grid-column: 2; } }
+.edit-mix .choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; margin: 8px 0 10px; }
+.edit-mix .choice { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; text-align: left; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; }
+.edit-mix .choice.on { border-color: var(--accent); background: var(--accent-soft); }
+.edit-mix .mixrow { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr) 70px; gap: 10px; align-items: center; padding: 6px 0; font-size: 13px; }
+.edit-mix input[type=range] { width: 100%; accent-color: var(--accent); }
+@media (max-width: 560px) { .edit-mix .mixrow { grid-template-columns: 1fr; } }

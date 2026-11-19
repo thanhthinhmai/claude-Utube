@@ -90,6 +90,26 @@ class ScoreAndMix(unittest.TestCase):
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
+    def test_mix_settings(self):                                     # specs/026 T046: mix.json from the job page
+        import mix
+        d = Path(tempfile.mkdtemp(prefix="mix."))
+        try:
+            (d / "voices").mkdir(); (d / "kit").mkdir()
+            shutil.copy(REPO / "my-styles" / "dusk-hypothetical" / "template.json", d / "kit" / "template.json")
+            sr = 24000
+            v = (0.3 * np.sin(2 * np.pi * 180 * np.arange(sr) / sr)).astype(np.float32)
+            with wave.open(str(d / "voices" / "l1.wav"), "wb") as w:
+                w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr); w.writeframes((v * 32767).astype(np.int16).tobytes())
+            (d / "events.json").write_text(json.dumps({"dur": 6.0, "ev": [{"type": "voice", "id": "l1", "t": 0.5}]}))
+            import soundfile as sf
+            gap = lambda y, s: float(np.sqrt(np.mean(y[int(3 * s):int(5 * s)] ** 2)))     # noqa: E731  no voice here
+            y1, s1 = sf.read(mix.mix(str(d)))
+            (d / "mix.json").write_text(json.dumps({"music": "none"}))
+            y2, s2 = sf.read(mix.mix(str(d)))
+            self.assertLess(gap(y2, s2), gap(y1, s1) / 10)               # no music: the pause is near silent
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

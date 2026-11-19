@@ -41,8 +41,10 @@ def mix_ranges(d: Path) -> dict:
     """research R11: music under the voice within the style's measured range ± 3 dB; the rest fixed."""
     t = store.read_json(d / "kit" / "template.json") or {}
     lo, hi = ((t.get("sound") or {}).get("music_under_voice_db")) or [-8.5, -3.3]
-    return {"under": [round(lo - 3, 1), round(hi + 3, 1)], "between": [-20, -6], "sfx": [-30, -6],
-            "music": ["seed:1", "seed:2", "seed:3", "none"]}
+    cur = store.read_json(d / "mix.json") or {}
+    return {"under": [round(lo - 3, 1), round(hi + 3, 1)], "duck": [-20, 0], "sfx": [-24, 6],
+            "music": ["seed:7", "seed:3", "seed:11", "none"], "current": cur,
+            "defaults": {"music": "seed:7", "music_under_voice_db": round((lo + hi) / 2, 1), "duck_db": -6, "sfx_db": 0}}
 
 
 def pending_review(j: dict):

@@ -109,11 +109,11 @@ description: "Tasks for 026 — review points and edits on the film job page"
 
 **Independent Test**: quickstart mục 5 (phần trộn).
 
-- [ ] T045 [P] [US4] Test trong `tests/filmcheck/test_edit.py`: `mix under=-40` → mã 2 (ngoài dải của `template.json` ± 3 dB); `music=seed:2` ghi `mix.json`; dấu `all` không đổi sau khi đổi `mix.json`
-- [ ] T046 [US4] `my-styles/dusk-hypothetical/kit/sound/mix.py` đọc `mix.json` (`music` seed hoặc `none`, `music_under_voice_db`, `music_between_db`, `sfx_db`); không có tệp thì như cũ; test nhỏ trong `my-styles/dusk-hypothetical/kit/test/` hoặc `tests/filmcheck/test_kit.py`
-- [ ] T047 [US4] Thao tác `mix` trong `tools/filmcheck/edit.py`: kiểm dải (research R11), ghi `mix.json`, chạy `mix.py` bằng Python của thư viện (`cd $LIB && .venv/bin/python <phim>/kit/sound/mix.py <phim>`), nếu có `out/video.mp4` thì ghép lại bằng `$LIB/core/render/mux.sh`
-- [ ] T048 [US4] Khung Mix trên trang (`web/app.js`): các lựa chọn nhạc từ `mix_ranges.music`, bốn thanh trượt trong dải, máy nghe bản trộn, ghi "does not redraw the picture"
-- [ ] T049 [US4] Điểm mix trong `CLAUDE.md` và `tools/runner/agent.py`
+- [X] T045 [P] [US4] Test trong `tests/filmcheck/test_edit.py`: `mix under=-40` → mã 2 (ngoài dải của `template.json` ± 3 dB); `music=seed:2` ghi `mix.json`; dấu `all` không đổi sau khi đổi `mix.json`
+- [X] T046 [US4] `my-styles/dusk-hypothetical/kit/sound/mix.py` đọc `mix.json` (`music` seed hoặc `none`, `music_under_voice_db`, `music_between_db`, `sfx_db`); không có tệp thì như cũ; test nhỏ trong `my-styles/dusk-hypothetical/kit/test/` hoặc `tests/filmcheck/test_kit.py`
+- [X] T047 [US4] Thao tác `mix` trong `tools/filmcheck/edit.py`: kiểm dải (research R11), ghi `mix.json`, chạy `mix.py` bằng Python của thư viện (`cd $LIB && .venv/bin/python <phim>/kit/sound/mix.py <phim>`), nếu có `out/video.mp4` thì ghép lại bằng `$LIB/core/render/mux.sh`
+- [X] T048 [US4] Khung Mix trên trang (`web/app.js`): các lựa chọn nhạc từ `mix_ranges.music`, bốn thanh trượt trong dải, máy nghe bản trộn, ghi "does not redraw the picture"
+- [X] T049 [US4] Điểm mix trong `CLAUDE.md` và `tools/runner/agent.py`
 
 ---
 

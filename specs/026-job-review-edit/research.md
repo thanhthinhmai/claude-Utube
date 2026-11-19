@@ -95,8 +95,8 @@
 ## R11. Nhạc và mức tiếng
 
 - **Decision**:
-  - `mix.json` có dạng `{"music": "seed:1"|"seed:2"|"seed:3"|"none", "music_under_voice_db": x, "music_between_db": y, "sfx_db": z}`.
-  - Dải cho phép lấy từ `template.json` → `sound`: `music_under_voice_db` trong dải đo của phong cách, nới ±3 dB; `music_between_db` trong [−20, −6]; `sfx_db` trong [−30, −6]. Lời luôn chuẩn hoá về `lufs` của phong cách.
+  - `mix.json` có dạng `{"music": "seed:7"|"seed:3"|"seed:11"|"none", "music_under_voice_db": x, "duck_db": y, "sfx_db": z}` (seed 7 là nhạc mặc định của bộ dựng).
+  - Dải cho phép lấy từ `template.json` → `sound`: `music_under_voice_db` trong dải đo của phong cách, nới ±3 dB; `duck_db` (nhạc giảm bao nhiêu khi có lời, mặc định −6) trong [−20, 0]; `sfx_db` (tăng giảm hiệu ứng so với mặc định) trong [−24, +6]. Khi làm, "nhạc giữa các nhịp" của spec được hiểu là mức giảm nhạc khi có lời (`duck_db`). Lời luôn chuẩn hoá về `lufs` của phong cách.
   - `mix.py` đọc `mix.json` khi có; không có thì giữ cách cũ. Các lựa chọn nhạc là các `seed` của `score.compose`, và mỗi kiểu chỉ soạn khi được chọn.
   - `edit mix …` ghi `mix.json` rồi chạy `mix.py`. Nếu đã có `out/video.mp4` thì ghép tiếng lại bằng `core/render/mux.sh` của thư viện (gọi, không sửa).
 - **Rationale**: bộ âm thanh hiện có một kiểu nhạc với `seed`. Đổi `seed` cho ra bài khác mà không phải viết thêm kiểu nhạc (spec Assumptions).

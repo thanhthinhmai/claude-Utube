@@ -438,3 +438,65 @@ def voice_known(v: str) -> bool:
             return f"{v}.npy" in z.namelist()
     except (OSError, zipfile.BadZipFile):
         return True                                  # no model here: the name's form was checked
+
+
+# ---------- mix (US4) ----------
+def mix_ranges(d: Path) -> dict:
+    """research R11: music under the voice within the style's measured range ± 3 dB, duck and sfx fixed."""
+    try:
+        t = json.loads((d / "kit" / "template.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        t = {}
+    lo, hi = ((t.get("sound") or {}).get("music_under_voice_db")) or [-8.5, -3.3]
+    return {"music_under_voice_db": (round(lo - 3, 1), round(hi + 3, 1)), "duck_db": (-20.0, 0.0), "sfx_db": (-24.0, 6.0)}
+
+
+@op("mix", "mix")
+def mix_edit(d: Path, a: dict) -> dict:
+    import re
+    import subprocess
+    if not (d / "kit" / "sound" / "mix.py").is_file():
+        raise EditError("this film has no kit mix (kit/sound/mix.py): the mix cannot be changed here")
+    try:
+        cur = json.loads((d / "mix.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        cur = {}
+    new = dict(cur)
+    if a.get("music"):
+        if not re.fullmatch(r"seed:\d{1,4}|none", str(a["music"])):
+            raise EditError("music: seed:N or none")
+        new["music"] = str(a["music"])
+    rng = mix_ranges(d)
+    for key, field in (("under", "music_under_voice_db"), ("duck", "duck_db"), ("sfx", "sfx_db")):
+        val = a.get(key, a.get(field))
+        if val is None or val == "":
+            continue
+        try:
+            x = float(val)
+        except ValueError:
+            raise EditError(f"{key}: a number of dB") from None
+        lo, hi = rng[field]
+        if not lo <= x <= hi:
+            raise EditError(f"{key}: {x:g} dB is outside {lo:g} … {hi:g} dB")
+        new[field] = round(x, 1)
+    if new == cur:
+        raise EditError("nothing to change: music=…, under=…, duck=… or sfx=…")
+    write_atomic(d / "mix.json", json.dumps(new, indent=1) + "\n")
+    out = {"ref": "mix", "old": cur, "new": new, "ok": True}
+    if no_run():
+        return out
+    lib = lib_path()
+    py = lib / ".venv" / "bin" / "python"
+    p = subprocess.run([str(py if py.is_file() else "python3"), str(d / "kit" / "sound" / "mix.py"), str(d)], cwd=str(lib),
+                       capture_output=True, text=True, timeout=3600)
+    if p.returncode:
+        return {**out, "ok": False, "error": (p.stderr or p.stdout).strip()[-300:]}
+    video = d / "out" / "video.mp4"
+    if video.is_file():                                # the picture is kept: only the sound goes back on
+        final = d / f"{d.name}.mp4"
+        m = subprocess.run(["sh", str(lib / "core" / "render" / "mux.sh"), str(video), str(d / "out" / "mix.wav"), str(final)],
+                           cwd=str(lib), capture_output=True, text=True, timeout=3600)
+        out["check"] = {"muxed": m.returncode == 0}
+        if m.returncode:
+            return {**out, "ok": False, "error": (m.stderr or m.stdout).strip()[-300:]}
+    return out

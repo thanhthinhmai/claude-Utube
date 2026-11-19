@@ -31,7 +31,7 @@ Cổng nằm trong các lệnh có sẵn:
 | `shots-check` | — | — | `qc shots` đầy đủ |
 | `except` | `<S#> <luật> --reason "…"` | lý do không rỗng; cảnh và luật có trong kết quả tầng | `qc except` |
 | `accept-style` | `--reason "…"` | lý do không rỗng | `qc accept-style` |
-| `mix` | `[music=seed:N\|none] [under=dB] [between=dB] [sfx=dB]` | trong dải của R11 | `mix.py`; ghép tiếng lại nếu đã có video |
+| `mix` | `[music=seed:N\|none] [under=dB] [duck=dB] [sfx=dB]` | trong dải của R11 | `mix.py`; ghép tiếng lại nếu đã có video |
 | `publish` | `[chosen=1..3] [description-file=…] [hashtags=a,b,c]` | chọn trong 1..3; 3–5 hashtag | `publish --check-only` |
 
 Mã thoát: 0 lưu và kiểm đạt · 1 lưu được, kiểm chưa đạt · 2 không hợp lệ, không ghi gì · 4 `base` khác dấu hiện tại · 5 bận (`busy.json` còn sống, chặn bước này).

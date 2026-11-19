@@ -18,7 +18,7 @@ Trả trạng thái để vẽ thanh tiến trình và các khung sửa.
   "editable": {"shots": true, "reason": null},
   "catalog": {"sets": ["bedroom", "…", "custom:platform"], "cams": ["wide", "…"], "acts": ["yawn", "…"], "act_prefixes": {"face": ["…"]}},
   "voices": ["am_michael", "…"],
-  "mix_ranges": {"under": [-11.5, -0.3], "between": [-20, -6], "sfx": [-30, -6], "music": ["seed:1", "seed:2", "seed:3", "none"]},
+  "mix_ranges": {"under": [-11.5, -0.3], "duck": [-20, 0], "sfx": [-24, 6], "music": ["seed:7", "seed:3", "seed:11", "none"], "current": {…}, "defaults": {…}},
   "review": {"id": "r-…", "kind": "shots", "decision": null}
 }
 ```

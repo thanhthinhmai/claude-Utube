@@ -202,3 +202,26 @@ class Voice(unittest.TestCase):                                    # specs/026 T
         r = self.run_op("voice-set", speed="0.95", confirm="all")
         self.assertEqual(r["code"], 0, r)
         self.assertTrue(all(x["speed"] == 0.95 for x in self.rows()))
+
+
+class Mix(unittest.TestCase):                                      # specs/026 T045
+    def setUp(self):
+        TMP.mkdir(exist_ok=True)
+        os.environ["STUDIO_EDIT_NO_RUN"] = "1"
+        self.d = samples.review_film(Path(tempfile.mkdtemp(dir=TMP)))
+
+    def tearDown(self):
+        os.environ.pop("STUDIO_EDIT_NO_RUN", None)
+
+    def test_ranges_and_picture_kept(self):
+        from filmcheck import tiers
+        pic = tiers.fingerprint(self.d)
+        base = points.fingerprint(self.d, "mix")
+        for a in ({"under": "-40"}, {"duck": "3"}, {"sfx": "-30"}, {"music": "loud"}, {}):
+            self.assertEqual(edit.run(self.d, "mix", a, base=base)["code"], 2, a)
+        self.assertFalse((self.d / "mix.json").exists())
+        r = edit.run(self.d, "mix", {"music": "seed:3", "under": "-6"}, base=base)
+        self.assertEqual(r["code"], 0, r)
+        self.assertEqual(json.loads((self.d / "mix.json").read_text()), {"music": "seed:3", "music_under_voice_db": -6.0})
+        self.assertEqual(r["stale"], ["Self-check", "Publish"])
+        self.assertEqual(tiers.fingerprint(self.d), pic)                 # the picture is not touched

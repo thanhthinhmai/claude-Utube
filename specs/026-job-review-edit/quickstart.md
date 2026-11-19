@@ -96,3 +96,9 @@ Thử thật (SC-006): làm một phim 5 phút bằng chat, có ít nhất một
 - Khung Voice mở thẳng khi đang chờ duyệt: chọn giọng, tốc độ, nghe từng dòng, ô `say`, "Save say", "Remake line".
 - Sửa `say` của l001 rồi "Remake line": chỉ `voices/l001.wav` đổi (l002 giữ giờ cũ), chữ của kịch bản giữ nguyên, mất **7,3 s**.
 - `voice make --changed`: đổi chữ 2 dòng thì đúng 2 tệp được làm lại (test, SC-004). `qc voice` báo `script_mismatch` khi lời đọc lệch kịch bản (FR-007).
+
+### US4, 2026-11-19 (cùng phim): **đạt**
+
+- `edit review-trial mix music=none sfx=-6`: trộn lại bằng tiếng thật trong **14 s**; chỉ Self-check và Publish phải làm lại; dấu hình không đổi (test).
+- Test âm thanh: chọn `music: none` thì đoạn lặng giữa các câu nhỏ hơn 10 lần so với có nhạc.
+- Khi làm, "nhạc giữa các nhịp" được hiểu là mức giảm nhạc khi có lời (`duck_db`, research R11).

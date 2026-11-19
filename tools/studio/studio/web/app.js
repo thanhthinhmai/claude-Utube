@@ -504,6 +504,7 @@ async function editPanel(body) {
   if (!pt) return;
   const edit = { script: async () => { const sc = body.querySelector(".script"); if (sc) sc.remove(); await editScript(body); },
     voice: async () => { body.querySelectorAll(".tbl, .done-actions").forEach((x) => x.remove()); await editVoice(body); },
+    mix: async () => editMix(body),
     shots: async () => {
       body.querySelectorAll(".thumbs, .sheet-img, .done-actions.spread, .sheet-img + p, #done-more-shots").forEach((x) => x.remove());
       await editShots(body);
@@ -512,7 +513,7 @@ async function editPanel(body) {
   if (edit && canEdit(pt)) {                          // not waiting: the read-only view stays, with a way in
     const btn = document.createElement("button");
     btn.className = "btn"; btn.id = "open-edit";
-    btn.textContent = { script: "Edit paragraphs", shots: "Change shots", voice: "Change the voice" }[pt];
+    btn.textContent = { script: "Edit paragraphs", shots: "Change shots", voice: "Change the voice", mix: "Change the mix" }[pt];
     btn.onclick = () => { RAIL.open = pt; DONE.drawn = {}; doneRefresh(true); };
     body.prepend(btn);
   }
@@ -969,6 +970,42 @@ async function editVoice(body) {
   body.append(box);
   draw();
   approveBar(body, "voice", issues.some((/** @type {any} */ i) => i.severity === "block") ? "The voice check has problems: make those lines again." : "");
+}
+
+/** Mix panel: pick the music, set the levels inside the allowed ranges, mix again; the picture is not drawn again (US4).
+ * @param {HTMLElement} body */
+function editMix(body) {
+  const r = RAIL.data.mix_ranges, cur = { ...r.defaults, ...(r.current || {}) };
+  const ed = canEdit("mix");
+  const names = { "seed:7": "Score A (the style's own)", "seed:3": "Score B", "seed:11": "Score C", none: "No music" };
+  const box = document.createElement("div");
+  box.className = "edit-mix";
+  const slider = (/** @type {string} */ k, /** @type {string} */ label, /** @type {number[]} */ rg, /** @type {number} */ val) =>
+    `<div class="mixrow"><label for="mx-${k}">${label}</label><input type="range" id="mx-${k}" data-k="${k}" min="${rg[0]}" max="${rg[1]}" step="0.5" value="${val}" ${ed ? "" : "disabled"}>
+      <span class="num small" id="mx-${k}-v">${Number(val).toFixed(1)} dB</span></div>`;
+  box.innerHTML = `<p class="muted small">A new mix does not draw the picture again: only the sound goes back on the video.</p>
+    <div class="choices">${r.music.map((/** @type {string} */ m) => `<button class="choice${m === cur.music ? " on" : ""}" data-m="${m}" ${ed ? "" : "disabled"}>${esc(names[m] || m)}</button>`).join("")}</div>
+    ${slider("under", "Music in the pauses (below the voice)", r.under, cur.music_under_voice_db)}
+    ${slider("duck", "Music while the voice speaks", r.duck, cur.duck_db)}
+    ${slider("sfx", "Sound effects", r.sfx, cur.sfx_db)}
+    <div class="row done-actions"><button class="primary" id="mix-go" ${ed ? "" : "disabled"}>Mix again</button><span class="msg small">${esc(RAIL.msg.mix || "")}</span></div>`;
+  let music = cur.music;
+  box.querySelectorAll(".choice").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+    music = /** @type {HTMLElement} */ (el).dataset.m;
+    box.querySelectorAll(".choice").forEach((x) => x.classList.toggle("on", x === el));
+  }; });
+  box.querySelectorAll("input[type=range]").forEach((el) => { /** @type {HTMLInputElement} */ (el).oninput = () => {
+    /** @type {HTMLElement} */ (box.querySelector(`#mx-${/** @type {HTMLElement} */ (el).dataset.k}-v`)).textContent = `${Number(/** @type {HTMLInputElement} */ (el).value).toFixed(1)} dB`;
+  }; });
+  /** @type {HTMLElement} */ (box.querySelector("#mix-go")).onclick = async (e) => {
+    const btn = /** @type {HTMLButtonElement} */ (e.currentTarget); btn.disabled = true; btn.textContent = "Mixing…";
+    const val = (/** @type {string} */ k) => /** @type {HTMLInputElement} */ (box.querySelector(`#mx-${k}`)).value;
+    try { const x = await sendEdit("mix", "mix", { music, under: val("under"), duck: val("duck"), sfx: val("sfx") }); RAIL.msg.mix = editMsg(x); }
+    catch (err) { RAIL.msg.mix = /** @type {Error} */ (err).message; }
+    DONE.drawn = {}; doneRefresh(true);
+  };
+  body.append(box);
+  approveBar(body, "mix");
 }
 
 /** Live updates on a job page: only what changed, so a playing line or the open section stays (specs/025 R5).
