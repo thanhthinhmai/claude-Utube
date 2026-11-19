@@ -74,7 +74,7 @@ Mỗi yêu cầu đi đúng **một** luồng:
    - Kênh mẫu: `topics refs <kênh> --add UC…`. Kết quả, kênh mẫu và bằng chứng nằm trong `channels/<kênh>/topics.json`, `TOPICS.md`, `references.json` (không vào git; không nêu tên kênh nào trong phim).
 3. **Kịch bản được chấm** (specs/010, phim có lời đọc), xen vào quy trình của thư viện:
    - Sau bước Brief: ghi `films/<tên>/BRIEF.md` (tóm tắt yêu cầu, tối đa 2000 ký tự).
-   - Sau `TREATMENT.md`, trước giọng đọc: viết `SCRIPT.md` và `SOURCES.md` theo `specs/010-script-review-qc/contracts/files.md`. Tìm số liệu bằng WebSearch (tối đa 5 lượt); mở mọi đường dẫn được dẫn bằng `sh bin/studio web fetch <url> --film <tên>`.
+   - Sau `TREATMENT.md`, trước giọng đọc: viết `SCRIPT.md` và `SOURCES.md` theo `specs/010-script-review-qc/contracts/files.md`. Tìm số liệu bằng WebSearch (tối đa 10 lượt, ưu tiên nguồn gốc: báo cáo, bài nghiên cứu, trang chính thức); mở mọi đường dẫn được dẫn bằng `sh bin/studio web fetch <url> --film <tên>`.
    - `sh bin/studio script check <tên>` tới khi đạt, rồi `sh bin/studio script review <tên>`. Mã 1: chỉ sửa các đoạn bị ghi P1 hoặc P2, rồi chạy lại. Mã 3 (hết 2 vòng sửa): dừng, báo người dùng điểm cuối và các lỗi còn lại.
    - **Điểm duyệt** (specs/026): mỗi phim có điểm duyệt bật theo kênh (mặc định Script và Shots; xem `sh bin/studio point status <tên>`). Ở mỗi điểm đang bật:
      - Có giao diện: `sh bin/studio review request <mã> --kind <script|voice|shots|mix|publish> --film <tên> --summary <tệp>`, báo người dùng đường dẫn, rồi `review wait`. Người dùng sửa và duyệt trên trang việc; trang chỉ chạy `sh bin/studio edit …`, không ghi tệp.

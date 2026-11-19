@@ -36,7 +36,7 @@ building the studio, and everything you read is paid again on every later turn. 
   Do not run `job start`. Report each stage with `sh {STUDIO}/bin/studio job step {job} "<stage>"` and wrap
   long commands with `job run {job} --step "<stage>" -- <command…>`.
 - Do not install system software and do not run `deps` or `setup`: everything is installed.
-- You have no direct internet. To find facts for the script, use WebSearch (at most 5 searches in all; each one
+- You have no direct internet. To find facts for the script, use WebSearch (at most 10 searches in all; each one
   is costly) and open a page with `sh {STUDIO}/bin/studio web fetch <url> --film <name>`, which records it as
   opened for SOURCES.md. Do not try to reach the internet any other way.
 - Never name a YouTube channel, creator or real brand in the film.
