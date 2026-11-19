@@ -408,3 +408,57 @@ def make_tier_film(root: Path, name: str, *, shots, lines=(), cues=None, cards=N
     (d / "index.html").write_text(page, encoding="utf-8")
     (d / "TREATMENT.md").write_text(f"Style: {style or 'test-style'}\n", encoding="utf-8")
     return d
+
+
+# ---------- review points and edits (specs/026) ----------
+REVIEW_SCRIPT = """Title: A Night Without Sleep
+Target: 20s
+Language: en
+
+[P01] Tonight you go to bed like always. You close your eyes, and nothing happens.
+[P02] The first day feels almost fine. You are tired and a little slow.
+[P03] By day three you start seeing things that are not there.
+[P04] The longest anyone has stayed awake on record is eleven days.
+"""
+REVIEW_SOURCES = ('- [P04] "eleven days": Guinness World Records, 1964, https://example.org/longest-awake\n')
+REVIEW_OPENED = [{"url": "https://example.org/longest-awake", "final_url": "https://example.org/longest-awake",
+                  "status": 200, "at": "2026-11-19T00:00:00Z"}]
+REVIEW_SCENES = {"custom": [], "scenes": [
+    {"id": "S01", "dur": 3.0, "set": "bedroom", "cam": "wide-eye", "cast": [{"who": "hero", "pose": "sit", "face": "dot", "act": [[0.5, "look:up"]]}]},
+    {"id": "S02", "dur": 3.0, "set": "bedroom", "cam": "close", "cast": [{"who": "hero", "pose": "sit", "face": "half", "act": [[0.4, "nod"]]}]},
+    {"id": "S03", "dur": 3.0, "set": "classroom", "cam": "mid-eye", "cast": [{"who": "hero", "pose": "sit", "face": "sweat", "act": [[0.3, "hands-face"]]}]},
+    {"id": "S04", "dur": 3.0, "set": "void", "cam": "close", "cast": [{"who": "hero", "pose": "stand", "face": "wow", "act": [[0.2, "raise-hand"]]}]},
+]}
+
+
+def _silent_wav(path: Path, seconds=1.0, sr=24000) -> None:
+    import wave
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr)
+        w.writeframes(b"\0\0" * int(sr * seconds))
+
+
+def review_film(root: Path, name: str = "night", *, kit=True) -> Path:
+    """A film folder for the review points (specs/026 T001): script, sources, 8 voice lines taken from the script,
+    silent voice files, an empty checks.json and, with kit=True, the dusk-hypothetical kit and a valid scenes.json."""
+    import re
+    import shutil
+    d = Path(root) / "films" / name
+    write_script(d, REVIEW_SCRIPT, REVIEW_SOURCES, opened=REVIEW_OPENED)
+    rows, n = [], 0
+    for m in re.finditer(r"^\[(P\d+)\]\s*(.*)$", REVIEW_SCRIPT, re.M):
+        for s in re.split(r"(?<=[.?!])\s+", m.group(2).strip()):
+            n += 1
+            rows.append({"id": f"L{n:02d}", "para": m.group(1), "text": s, "voice": "am_michael", "speed": 1.0})
+    (d / "voices").mkdir(exist_ok=True)
+    for r in rows:
+        _silent_wav(d / "voices" / f"{r['id']}.wav")
+    (d / "voices" / "dur.json").write_text(json.dumps({r["id"]: 1.0 for r in rows}), encoding="utf-8")
+    (d / "lines.json").write_text(json.dumps(rows, indent=1), encoding="utf-8")
+    (d / "index.html").write_text("<!doctype html><script type=module>import { film } from './kit/film.js'; "
+                                  "await film({ cues: './cues.json' });</script>", encoding="utf-8")
+    if kit:
+        src = Path(__file__).resolve().parents[2] / "my-styles" / "dusk-hypothetical" / "kit"
+        shutil.copytree(src, d / "kit", ignore=shutil.ignore_patterns("test", "__pycache__"))
+        (d / "scenes.json").write_text(json.dumps(REVIEW_SCENES, indent=1), encoding="utf-8")
+    return d

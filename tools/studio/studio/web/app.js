@@ -9,13 +9,14 @@ const STATUS = {
 };
 const KIND = { learn: "Learn a style", film: "Make a film", topics: "Score topics" };
 const REVIEW = { "style-1": "Review 1: style draft", "style-2": "Review 2: proof frame", question: "Question from the studio",
-  treatment: "Treatment review" };
+  treatment: "Treatment review", script: "Script review", voice: "Voice review", shots: "Shots review", mix: "Mix review",
+  publish: "Publish review" };
 // Online mode (specs/007): the same page serves many customers; MODE comes from GET /health
 let MODE = "local";
 /** @type {any} */
 let ME = null;
 const DECISION = { approve: "Approve", revise: "Request changes", accept_anyway: "Accept anyway", stop: "Stop" };
-const SOURCE = { ui: "the studio", chat: "the chat" };
+const SOURCE = { ui: "the studio", chat: "the chat", api: "the API" };
 
 // ---------- helpers ----------
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -456,6 +457,8 @@ async function doneOpen(j) {
     shotCount: 24, lines: null, dur: null, labels: null, drawn: {} });
   DONE.job = j;
   DONE.drawn = {};
+  RAIL.editing = {}; RAIL.last = {};
+  await railRefresh();
   await doneRefresh();
 }
 /** @param {boolean} [clicked] a click on a step: always draw it (live updates leave a playing section alone) */
@@ -490,6 +493,19 @@ async function doneRefresh(clicked = false) {
   DONE.drawn.key = key;
   stopAudio();
   await ({ script: doneScript, voice: doneVoice, shots: doneShots, mix: doneMix, render: doneRender }[DONE.tab] || (() => {}))(body, sec);
+  await editPanel(body);
+}
+/** specs/026: the edit part of the open section. @param {HTMLElement} body */
+async function editPanel(body) {
+  if (!RAIL.data) return;
+  const pt = TAB_POINT[DONE.tab];
+  if (!pt) return;
+  if (pt === "script" && (canEdit("script") || pendingFor("script"))) {
+    const sc = body.querySelector(".script"); if (sc) sc.remove();
+    await editScript(body);
+    return;
+  }
+  approveBar(body, pt);
 }
 function stopAudio() {
   if (DONE.audio) { DONE.audio.pause(); DONE.audio = null; }
@@ -622,6 +638,150 @@ function doneRender(body, s) {
       `<i class="${i < done ? "d" : i < done + w && done < total ? "r" : ""}"></i>`).join("")}</div>`;
 }
 
+// ---------- review points and edits (specs/026) ----------
+/** @type {any} */
+const RAIL = { data: null, editing: {}, last: {}, msg: {} };
+const STATE_LABEL = { done: "Done", running: "Running", waiting: "Waiting for you", todo: "Not yet", stale: "Must run again", skipped: "Skipped" };
+const STEP_TAB = { Script: "script", Voice: "voice", Shots: "shots", Mix: "mix", Render: "render", "Self-check": "selfcheck", Publish: "publish" };
+const TAB_POINT = { script: "script", voice: "voice", shots: "shots", mix: "mix", publish: "publish" };
+const POINT_STEP = { script: "Script", voice: "Voice", shots: "Shots", mix: "Mix", publish: "Publish" };
+
+async function railRefresh() {
+  const slot = document.getElementById("rail-slot");
+  if (!slot || !DONE.job) return;
+  let v;
+  try { v = await get(`/jobs/${encodeURIComponent(DONE.job.id)}/steps`); } catch { slot.hidden = true; return; }
+  RAIL.data = v;
+  slot.hidden = false;
+  const wait = v.review && !v.review.decision ? POINT_STEP[v.review.kind] : null;
+  slot.innerHTML = `<div class="rail-head"><p class="section-title">Steps</p>
+      ${wait ? `<span class="badge s-waiting_review">Waiting for you: ${esc(wait)}</span>` : v.busy ? `<span class="badge">Busy: ${esc(v.busy.step)}</span>` : ""}</div>
+    <ol class="rail" role="tablist">${v.steps.map((/** @type {any} */ s, i) => `<li><button class="rs st-${s.state}" data-step="${esc(s.name)}"
+        ${STEP_TAB[s.name] ? "" : "disabled"} aria-selected="${STEP_TAB[s.name] === DONE.tab}">
+        <span class="n"><span>${i + 1}</span>${s.review_on ? `<span class="gate">REVIEW</span>` : ""}</span>
+        <span class="t">${esc(s.name)}</span><span class="s">${esc(s.state === "stale" ? STATE_LABEL.stale : s.note || STATE_LABEL[s.state] || s.state)}</span></button></li>`).join("")}</ol>
+    <div id="impact"></div>`;
+  slot.querySelectorAll("button[data-step]:not([disabled])").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+    const tab = STEP_TAB[/** @type {HTMLElement} */ (el).dataset.step];
+    if (DONE.data && DONE.data.sections[tab]) { DONE.tab = tab; DONE.drawn = {}; doneRefresh(true); railMarks(); }
+  }; });
+  railMarks();
+}
+function railMarks() {
+  const v = RAIL.data, box = document.getElementById("impact");
+  if (!v || !box) return;
+  document.querySelectorAll("#rail-slot button[data-step]").forEach((el) =>
+    el.setAttribute("aria-selected", String(STEP_TAB[/** @type {HTMLElement} */ (el).dataset.step] === DONE.tab)));
+  const pt = TAB_POINT[DONE.tab];
+  const hit = pt ? v.impact[pt] : null;
+  box.innerHTML = pt ? `<p class="impact"><b>If you change ${esc(POINT_STEP[pt])}:</b> ${hit.length
+    ? hit.map((/** @type {string} */ x) => `<span class="chip">↻ ${esc(x)}</span>`).join(" ") + ` <span class="muted">run again, and their approvals stop counting.</span>`
+    : `<span class="muted">nothing else runs again.</span>`}</p>` : "";
+}
+/** The point is waiting for this person's review. @param {string} pt */
+const pendingFor = (pt) => RAIL.data && RAIL.data.review && !RAIL.data.review.decision && RAIL.data.review.kind === pt ? RAIL.data.review : null;
+/** Edits are open while the job is not finished and the step is not busy. @param {string} pt */
+function canEdit(pt) {
+  const v = RAIL.data;
+  if (!v || !DONE.job || ["done", "failed", "stopped"].includes(DONE.job.status)) return false;
+  if (v.busy && (v.busy.step === POINT_STEP[pt] || (v.impact[pt] || []).includes(v.busy.step))) return false;
+  return v.points[pt] && v.points[pt].state !== "skipped";
+}
+/** Send one edit and wait for its result (the page never writes a file itself). @param {string} point @param {string} op @param {any} args */
+async function sendEdit(point, op, args) {
+  const base = RAIL.data.points[point].fingerprint;
+  const a = await post(`/jobs/${encodeURIComponent(DONE.job.id)}/actions`, { point, op, args, base });
+  for (let i = 0; i < 1200; i++) {
+    await new Promise((r) => setTimeout(r, i < 20 ? 300 : 1000));
+    const x = await get(`/jobs/${encodeURIComponent(DONE.job.id)}/actions/${a.id}`);
+    if (!["queued", "running"].includes(x.status)) { await railRefresh(); return x; }
+  }
+  throw new Error("The edit is taking long; its result will show in the log.");
+}
+const editMsg = (/** @type {any} */ x) => x.status === "conflict" ? "Changed since you opened it: reload the page."
+  : x.status === "busy" ? (x.result && x.result.error) || "Busy: try again when the running step ends."
+  : x.status === "invalid" || x.status === "failed" ? (x.result && x.result.error) || "The edit was not saved."
+  : x.result && x.result.code === 1 ? "Saved, but the check does not pass yet." : "Saved.";
+/** Approve / request changes for the point shown. @param {HTMLElement} body @param {string} pt @param {string} [blocked] why approve is off */
+function approveBar(body, pt, blocked) {
+  const r = pendingFor(pt);
+  const old = body.querySelector(".approve-bar"); if (old) old.remove();
+  if (!r) return;
+  const bar = document.createElement("div");
+  bar.className = "approve-bar";
+  bar.innerHTML = `<div class="row spread"><span class="muted" id="approve-why">${esc(blocked || `Approving lets the film go on after ${POINT_STEP[pt]}.`)}</span>
+      <span class="row"><button class="btn" id="ask-changes">Request changes…</button>
+      <button class="primary" id="approve" ${blocked ? "disabled" : ""}>Approve ${esc(POINT_STEP[pt].toLowerCase())}</button></span></div>
+    <div id="changes-box" hidden><textarea id="changes-note" maxlength="4000" placeholder="What should change?"></textarea>
+      <div class="row"><button class="btn" id="send-note">Send back with this note</button></div></div>
+    <p class="muted small" id="approve-msg" role="status"></p>`;
+  body.prepend(bar);
+  const msg = /** @type {HTMLElement} */ (bar.querySelector("#approve-msg"));
+  /** @type {HTMLElement} */ (bar.querySelector("#ask-changes")).onclick = () => { /** @type {HTMLElement} */ (bar.querySelector("#changes-box")).hidden = false; };
+  /** @type {HTMLElement} */ (bar.querySelector("#approve")).onclick = async (e) => {
+    const btn = /** @type {HTMLButtonElement} */ (e.currentTarget); btn.disabled = true;
+    try { await post(`/reviews/${encodeURIComponent(r.id)}/decision`, { value: "approve", base: RAIL.data.points[pt].fingerprint }); route(); }
+    catch (err) { msg.className = "fail small"; msg.textContent = err.message; btn.disabled = false; }
+  };
+  /** @type {HTMLElement} */ (bar.querySelector("#send-note")).onclick = async () => {
+    const note = /** @type {HTMLTextAreaElement} */ (bar.querySelector("#changes-note")).value.trim();
+    if (note.length < 3) { msg.className = "fail small"; msg.textContent = "Say what should change (at least 3 characters)."; return; }
+    try { await post(`/reviews/${encodeURIComponent(r.id)}/decision`, { value: "revise", note }); route(); }
+    catch (err) { msg.className = "fail small"; msg.textContent = err.message; }
+  };
+}
+
+/** Script panel: every paragraph, edit one, run the check, approve (US1). @param {HTMLElement} body */
+async function editScript(body) {
+  let text = "";
+  try { text = await (await fetch(fileUrl("SCRIPT.md"), { credentials: "same-origin", cache: "no-store" })).text(); } catch { return; }
+  const paras = [];
+  for (const ln of text.split("\n")) {
+    const m = ln.match(/^\s*\[(P\d+)\]\s*(.*)$/);
+    if (m) paras.push({ id: m[1], text: m[2] });
+    else if (paras.length && ln.trim() && !ln.trim().startsWith(">")) paras[paras.length - 1].text += " " + ln.trim();
+  }
+  const box = document.createElement("div");
+  box.className = "edit-script";
+  const open = () => Object.keys(RAIL.editing).some((k) => k.startsWith("script:"));
+  const draw = () => {
+    box.innerHTML = paras.map((p) => {
+      const ed = RAIL.editing[`script:${p.id}`] !== undefined, last = RAIL.last[`script:${p.id}`];
+      return `<div class="para" data-p="${esc(p.id)}"><div class="row spread"><span class="pid">${esc(p.id)}</span>
+          ${last ? `<span class="${last.ok ? "pass" : "fail"} small">${esc(last.text)}</span>` : ""}</div>
+        ${ed ? `<textarea maxlength="4000" aria-label="Paragraph ${esc(p.id)}">${esc(RAIL.editing[`script:${p.id}`])}</textarea>
+          <div class="row"><button class="primary" data-check>Run script check</button><button class="btn" data-cancel>Cancel</button></div>`
+        : `<p>${esc(p.text)}</p>${canEdit("script") ? `<button class="btn small" data-edit>Edit</button>` : ""}`}</div>`;
+    }).join("");
+    box.querySelectorAll("[data-edit]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+      const id = /** @type {HTMLElement} */ (el.closest(".para")).dataset.p;
+      RAIL.editing[`script:${id}`] = paras.find((p) => p.id === id).text; draw(); bar();
+    }; });
+    box.querySelectorAll("[data-cancel]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+      delete RAIL.editing[`script:${/** @type {HTMLElement} */ (el.closest(".para")).dataset.p}`]; draw(); bar();
+    }; });
+    box.querySelectorAll("[data-check]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = async () => {
+      const div = /** @type {HTMLElement} */ (el.closest(".para")), id = div.dataset.p;
+      const val = /** @type {HTMLTextAreaElement} */ (div.querySelector("textarea")).value;
+      /** @type {HTMLButtonElement} */ (el).disabled = true; /** @type {HTMLElement} */ (el).textContent = "Checking…";
+      try {
+        const x = await sendEdit("script", "script-para", { para: id, text: val });
+        const c = (x.result && x.result.check) || {};
+        RAIL.last[`script:${id}`] = { ok: x.status === "done" && x.result.code === 0,
+          text: editMsg(x) + (c.score != null ? ` Score ${c.score}/10${c.failed && c.failed.length ? ` · failed: ${c.failed.join(", ")}` : ""}` : "") };
+        if (x.status === "done") { delete RAIL.editing[`script:${id}`]; paras.find((p) => p.id === id).text = val.replace(/\s+/g, " ").trim(); }
+      } catch (err) { RAIL.last[`script:${id}`] = { ok: false, text: /** @type {Error} */ (err).message }; }
+      draw(); bar();
+    }; });
+  };
+  const bar = () => {
+    const failed = Object.entries(RAIL.last).some(([k, v]) => k.startsWith("script:") && !(/** @type {any} */ (v)).ok);
+    approveBar(body, "script", open() ? "Run the script check on your edits before you approve." : failed ? "The script check does not pass yet." : "");
+  };
+  body.append(box);
+  draw(); bar();
+}
+
 /** Live updates on a job page: only what changed, so a playing line or the open section stays (specs/025 R5).
  * @param {string} id */
 async function refreshJob(id) {
@@ -634,6 +794,8 @@ async function refreshJob(id) {
   const pr = document.getElementById("job-progress"); if (pr) pr.textContent = j.progress ? `${j.progress.done}/${j.progress.total}` : "—";
   const lg = document.getElementById("job-log");
   if (lg) lg.textContent = j.log.map((/** @type {any} */ l) => `${new Date(l.t).toLocaleTimeString("en-GB")}  ${l.line}`).join("\n") || "No lines yet.";
+  await railRefresh();
+  if (Object.keys(RAIL.editing).length) return;          // an open edit box stays as it is
   await doneRefresh();
 }
 
@@ -668,6 +830,7 @@ async function pageJob(id) {
     ${j.status === "waiting_resume" ? `<p class="notice">You decided, but the Claude session is no longer waiting. Open Claude Code again and say “continue job ${esc(j.name)}”.</p>` : ""}
     ${j.status === "inactive" ? `<p class="notice">No updates for over 10 minutes: the Claude session may have closed or stopped.</p>` : ""}
     ${j.error ? `<p class="error">${esc(j.error)}</p>` : ""}
+    ${j.kind === "film" ? `<div class="panel rail-panel" id="rail-slot" hidden></div>` : ""}
     <div class="panel" id="step-panel">${stepHtml(j)}</div>
     ${j.kind === "film" ? `<div class="panel done" id="done-slot" hidden></div>` : ""}
     ${qualityHtml(j.qa)}

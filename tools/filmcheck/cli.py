@@ -414,6 +414,12 @@ def cmd_channel_set(a, channels):
         ch[f] = float(vals[0])
     elif f in ("name", "niche", "audience", "language", "style", "voice", "title_rules", "thumbnail_rules"):
         ch[f] = " ".join(vals)
+    elif f == "reviews":                                         # specs/026: reviews script,shots | none
+        from filmcheck import points
+        try:
+            ch[f] = points.parse_list(",".join(vals))
+        except points.PointError as e:
+            raise channels.ChannelError(str(e)) from None
     elif f == "hero":                                            # specs/022: hero hoodie=#d9b23a hair=bald …
         hero = dict(ch.get("hero") or {})
         for v in vals:
@@ -948,6 +954,89 @@ def cmd_render_gate(a) -> int:
     return 1 if why else 0
 
 
+# ---------- review points and edits (specs/026) ----------
+def cmd_point_status(a) -> int:
+    from filmcheck import points, steps
+    d = film_dir(a.film)
+    st, rail = points.status(d), steps.status(d)
+    data = {"film": d.name, "points": st, "steps": rail, "impact": {p: steps.impact(p) for p in points.POINTS}}
+    lines = [f"{p:8} {'on ' if v['on'] else 'off'} {v['state']}" + (f" · approved {v['approved_at']} ({v['source']})"
+                                                                    if v["approved_at"] else "") for p, v in st.items()]
+    lines += ["", "  ".join(f"{s['name']}: {s['state']}" for s in rail)]
+    out(a, data, lines)
+    return 0
+
+
+def cmd_point_set(a) -> int:
+    from filmcheck import points
+    try:
+        on = points.set_on(film_dir(a.film), a.points)
+    except points.PointError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    print(f"✓ review points: {', '.join(on) or 'none'}")
+    return 0
+
+
+def cmd_point_approve(a) -> int:
+    from filmcheck import points
+    d = film_dir(a.film)
+    try:
+        code, why = points.approve(d, a.point, a.base, a.source, a.by, a.review)
+    except points.PointError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    if a.json:
+        print(json.dumps({"code": code, "reasons": why, "fingerprint": points.fingerprint(d, a.point)}))
+    elif code:
+        for w in why:
+            print(f"✗ {a.point}: {w}", file=sys.stderr)
+    else:
+        print(f"✓ {a.point} approved ({a.source})")
+    return code
+
+
+def cmd_point_gate(a) -> int:
+    from filmcheck import points
+    try:
+        why = points.gate(film_dir(a.film), a.point)
+    except points.PointError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    for w in why:
+        print(w)
+    return 1 if why else 0
+
+
+def edit_args(a) -> dict:
+    args = {"ref": []}
+    for t in a.args:
+        k, eq, v = t.partition("=")
+        if eq and k:
+            args[k.replace("-", "_")] = v
+        else:
+            args["ref"].append(t)
+    for k in ("text_file", "say", "reason", "confirm"):
+        if getattr(a, k) is not None:
+            args[k] = getattr(a, k)
+    return args
+
+
+def cmd_edit(a) -> int:
+    from filmcheck import edit
+    d = film_dir(a.film)
+    r = edit.run(d, a.op, edit_args(a), a.base, a.by, a.source)
+    if a.json:
+        print(json.dumps(r, ensure_ascii=False))
+    else:
+        mark = {0: "✓", 1: "!"}.get(r["code"], "✗")
+        print(f"{mark} edit {a.op} {r.get('ref') or ''}".rstrip() + (f": {r['error']}" if r.get("error") else "")
+              + (f" · check {json.dumps(r['check'], ensure_ascii=False)[:300]}" if r.get("check") else ""))
+        if r["code"] in (0, 1) and r["stale"]:
+            print(f"  run again: {', '.join(r['stale'])}")
+    return r["code"]
+
+
 def not_yet(a) -> int:
     print(f"✗ not built yet: {a.cmd}", file=sys.stderr)
     return 2
@@ -1009,6 +1098,38 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("render-gate", help="may this film be rendered? (specs/020)")
     s.add_argument("film")
     s.add_argument("--skip-checks", default=None)
+
+    pt = sub.add_parser("point", help="review points of a film (specs/026)").add_subparsers(dest="cmd", required=True)
+    s = pt.add_parser("status")
+    s.add_argument("film")
+    s.add_argument("--json", action="store_true")
+    s = pt.add_parser("set")
+    s.add_argument("film")
+    s.add_argument("points", help="script,shots,… or none")
+    s = pt.add_parser("approve")
+    s.add_argument("film")
+    s.add_argument("point")
+    s.add_argument("--base")
+    s.add_argument("--source", default="chat", choices=["ui", "chat", "api"])
+    s.add_argument("--by", default="local")
+    s.add_argument("--review", default=None)
+    s.add_argument("--json", action="store_true")
+    s = pt.add_parser("gate")
+    s.add_argument("film")
+    s.add_argument("point")
+
+    s = sub.add_parser("edit", help="change one part of a film from the job page, the chat or the API (specs/026)")
+    s.add_argument("film")
+    s.add_argument("op")
+    s.add_argument("args", nargs="*", help="a reference (P03, L17, S012, a rule) and key=value pairs")
+    s.add_argument("--base")
+    s.add_argument("--by", default="local")
+    s.add_argument("--source", default="chat", choices=["ui", "chat", "api"])
+    s.add_argument("--text-file")
+    s.add_argument("--say")
+    s.add_argument("--reason")
+    s.add_argument("--confirm")
+    s.add_argument("--json", action="store_true")
 
     pb = sub.add_parser("publish", help="make and check a film's publish pack (specs/011)")
     pb.add_argument("film")
@@ -1130,6 +1251,8 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("qc-except", "qc-except"): cmd_qc_except, ("qc-voice", "qc-voice"): cmd_qc_voice,
             ("voice-asr", "voice-asr"): cmd_voice_asr, ("voice-make", "voice-make"): cmd_voice_make, ("qc-limits", "qc-limits"): cmd_qc_limits,
             ("render-done", "render-done"): cmd_render_done,
+            ("point", "status"): cmd_point_status, ("point", "set"): cmd_point_set, ("point", "approve"): cmd_point_approve,
+            ("point", "gate"): cmd_point_gate, ("edit", "edit"): cmd_edit,
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach, ("kit", "use"): cmd_kit_use,

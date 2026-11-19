@@ -29,8 +29,8 @@ Năm giá trị cố định: `script`, `voice`, `shots`, `mix`, `publish`.
 
 - `on`: đặt khi `channel attach` (theo `channel.reviews`, mặc định `["script","shots"]`) hoặc bằng `point set`. Phim không có kênh thì lấy mặc định.
 - Một lần duyệt **còn hiệu lực** khi `approved[p].fingerprint` bằng dấu hiện tại của điểm `p`.
-- Trạng thái của một điểm: `off`, `not_reached`, `waiting` (có yêu cầu duyệt chưa có quyết định), `approved` (còn hiệu lực), `stale` (đã duyệt nhưng dấu đổi), `rejected` (quyết định cuối là `revise`), `skipped` (phim không có lời đọc, áp cho script và voice).
-- Chỉ bật hay tắt được điểm ở trạng thái `off`, `not_reached`, `stale` hoặc `rejected`. Điểm `approved` hay `waiting` thì không.
+- Trạng thái của một điểm: `off`, `not_reached`, `ready` (đã có phần việc, chưa duyệt), `waiting` (có yêu cầu duyệt chưa có quyết định), `approved` (còn hiệu lực), `stale` (đã duyệt nhưng dấu đổi), `rejected` (quyết định cuối là `revise`), `skipped` (phim không có lời đọc, áp cho script và voice).
+- Chỉ bật hay tắt được điểm ở trạng thái `off`, `not_reached`, `ready`, `stale` hoặc `rejected`. Điểm `approved` hay `waiting` thì không.
 
 ## Channel (bổ sung)
 

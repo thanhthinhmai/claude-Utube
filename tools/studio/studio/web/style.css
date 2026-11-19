@@ -474,3 +474,28 @@ table.lessons tr.l-draft td:nth-child(2) { color: var(--warn, #b26b00); font-wei
 .done-zoom { position: fixed; inset: 0; background: rgba(0, 0, 0, .82); display: grid; place-items: center; padding: 20px; z-index: 50; cursor: zoom-out; }
 .done-zoom img { max-width: 100%; max-height: 100%; border-radius: 8px; }
 @media (prefers-reduced-motion: reduce) { .done .stages .st-running .dot, .done .chunks i.r { animation: none; } }
+
+/* specs/026: step rail, review gates, edits */
+.rail-panel .rail-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rail { list-style: none; display: flex; gap: 6px; overflow-x: auto; margin: 8px 0 0; padding: 0 0 4px; }
+.rail li { flex: 0 0 auto; }
+.rail .rs { min-width: 100px; text-align: left; display: grid; gap: 1px; padding: 7px 10px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: inherit; cursor: pointer; }
+.rail .rs:hover:not([disabled]) { background: var(--hover); }
+.rail .rs[disabled] { cursor: default; }
+.rail .rs[aria-selected="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.rail .n { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; color: var(--muted); }
+.rail .t { font-weight: 600; font-size: 13.5px; }
+.rail .s { font-size: 12px; color: var(--muted); }
+.rail .st-done .s { color: var(--ok); } .rail .st-waiting .s { color: var(--warn); } .rail .st-running .s { color: var(--info); }
+.rail .st-stale .s { color: var(--bad); }
+.rail .gate { font-size: 10px; font-weight: 700; color: var(--accent-ink); background: var(--accent-soft); border-radius: 4px; padding: 0 5px; }
+.impact { margin: 10px 0 0; font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.impact .chip { background: var(--bad-soft); color: var(--bad); border-radius: 6px; padding: 1px 7px; font-size: 12px; font-weight: 600; }
+.approve-bar { border: 1px solid var(--accent-line); background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; }
+.approve-bar .spread { justify-content: space-between; }
+.approve-bar textarea, .edit-script textarea { width: 100%; min-height: 80px; margin: 8px 0; }
+.edit-script { display: grid; gap: 8px; }
+.edit-script .para { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; display: grid; gap: 4px; }
+.edit-script .para p { margin: 0; max-width: 70ch; font-size: 13.5px; }
+.done .btn.small { font-size: 12px; padding: 3px 9px; justify-self: start; }

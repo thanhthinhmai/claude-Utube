@@ -165,6 +165,20 @@ class Snapshot(unittest.TestCase):
         self.assertIn("#200", text)                     # the lesson with a rule comes first
         self.assertTrue(r["warning"])
 
+    def test_review_points_go_to_the_film(self):   # specs/026 T010
+        from filmcheck import report
+        channels.attach(self.root, self.film, "honey-facts")
+        rv = report.load(self.film)["reviews"]
+        self.assertEqual((rv["on"], rv["from"]), (["script", "shots"], "channel honey-facts"))
+        ch = channels.load(self.root, "honey-facts")
+        ch["reviews"] = ["script", "voice", "publish"]
+        channels.save(self.root, ch)
+        channels.attach(self.root, self.film, "honey-facts")
+        self.assertEqual(report.load(self.film)["reviews"]["on"], ["script", "voice", "publish"])
+        self.assertIn("Điểm duyệt: script, voice, publish", (self.root / "channels" / "honey-facts" / "CHANNEL.md").read_text())
+        ch["reviews"] = ["script", "bogus"]
+        self.assertTrue(any(e.startswith("reviews:") for e in channels.validate(ch, self.root)))
+
     def test_missing_style_is_refused(self):
         with self.assertRaises(channels.ChannelError):
             channels.attach(self.root, self.film, "honey-facts", style="gone")

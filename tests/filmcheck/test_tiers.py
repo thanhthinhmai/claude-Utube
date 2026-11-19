@@ -31,7 +31,7 @@ class Tiers(unittest.TestCase):
     def test_fingerprint(self):
         a = tiers.fingerprint(self.d)
         v = tiers.fingerprint(self.d, "voice")
-        for f in ("qc-exceptions.json", "checks.json", "CHECKS.md", "render.log"):
+        for f in ("qc-exceptions.json", "checks.json", "CHECKS.md", "render.log", "mix.json"):   # 026: mix.json
             (self.d / f).write_text("x")
         (self.d / ".check" / "more.json").write_text("{}")
         (self.d / ".job").write_text("j-1\n")                                   # specs/023: job ids, pyc, compare sheets

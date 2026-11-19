@@ -118,6 +118,9 @@ def validate(ch: dict, root: Path, lib: Path = None) -> list:
             if isinstance(t, str) and find_banned(t.lstrip("#"), banned):
                 errs.append(f"hashtags: {t} is also a banned word")
     errs += hero_errors(ch.get("hero"), ch.get("style"), root)
+    rv = ch.get("reviews")
+    if rv is not None and (not isinstance(rv, list) or not all(x in REVIEW_POINTS for x in rv)):
+        errs.append(f"reviews: a list of {', '.join(REVIEW_POINTS)}")           # specs/026
     dec = ch.get("decisions") or []
     if not isinstance(dec, list) or len(dec) > 100 or not all(
             isinstance(d, dict) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(d.get("date"))) and 1 <= len(str(d.get("text", "")).strip()) <= 300
@@ -166,7 +169,19 @@ def normal(ch: dict) -> dict:
            "decisions": list(ch.get("decisions") or []), "updated": ch.get("updated")}
     if ch.get("hero") is not None:
         out["hero"] = ch["hero"]
+    if ch.get("reviews") is not None:
+        out["reviews"] = list(ch["reviews"])
     return out
+
+
+REVIEW_POINTS = ("script", "voice", "shots", "mix", "publish")       # specs/026; = filmcheck.points.POINTS
+DEFAULT_REVIEWS = ["script", "shots"]
+
+
+def reviews_of(ch: dict) -> list:
+    """The review points a new film of this channel starts with (data-model "Channel")."""
+    rv = ch.get("reviews")
+    return list(DEFAULT_REVIEWS) if rv is None else [p for p in REVIEW_POINTS if p in rv]
 
 
 # ---------- reading and writing ----------
@@ -230,6 +245,7 @@ def channel_md(ch: dict) -> str:
         rows.append(f"- Tiêu đề{most}: {ch.get('title_rules') or '–'}")
     if ch.get("thumbnail_rules"):
         rows.append(f"- Thumbnail: {ch['thumbnail_rules']}")
+    rows.append(f"- Điểm duyệt: {', '.join(reviews_of(ch)) or 'không'}")
     h = ch.get("hero")
     if isinstance(h, dict):
         extra = [x for x in (f"hat {h['hat']}" if h.get("hat") else "", "glasses" if h.get("glasses") else "") if x]
@@ -451,6 +467,11 @@ def attach(root: Path, film_dir: Path, slug: str, shared_path: Path = None, lib:
     film_dir.mkdir(parents=True, exist_ok=True)
     _write(film_dir / "channel.json", json.dumps(snap, ensure_ascii=False, indent=1) + "\n")
     _write(film_dir / "CHANNEL_BRIEF.md", text)
+    from filmcheck import points                                    # specs/026: the film's review points (checks.json)
+    try:
+        points.set_on(film_dir, reviews_of(ch), origin=f"channel {slug}")
+    except points.PointError:
+        pass                                                        # a point already approved or waiting keeps its state
     warn = f"{left} lessons did not fit in CHANNEL_BRIEF.md ({BRIEF_MAX} characters): merge or retire some" if left else None
     return {"snapshot": snap, "warning": warn}
 
