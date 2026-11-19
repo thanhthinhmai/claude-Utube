@@ -3,13 +3,14 @@
 // DUR, SHOTS, CARDS, CUES, TEXTS(t), render(t), READY, and reads CLEAN and SUBJECT on every frame.
 import * as THREE from 'three';
 import { makeStage } from './stage.js';
-import { plan, sceneAt, camName, CATALOG, mulberry } from './plan.js';
+import { plan, sceneAt, camName, CATALOG, mulberry, parseAct } from './plan.js';
 import { SETS } from './sets/index.js';
 import * as parts from './sets/parts.js';
-import { makeFigure } from './figure.js';
-import { actState, blinkOn, talkOn, breath, riseOf, blackAt, streakAt } from './acting.js';
+import { makeFigure, makeItem, joints, itemAt } from './figure.js';
+import { actState, blinkOn, talkOn, breath, riseOf, blackAt, streakAt, throwPath, RELEASE } from './acting.js';
 import { makeCrowd, lookOf } from './crowd.js';
-import { place, frameX } from './camera.js';
+import { place, frameX, CAMS, otsPair } from './camera.js';
+const CAMS_TARGET = Object.fromEntries(Object.entries(CAMS).map(([k, v]) => [k, v.target]));
 import { drawGfx, drawCue, area, SERIF, SANS } from './graphics.js';
 
 export { plan, CATALOG };
@@ -31,9 +32,18 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
   const cueRows = typeof cues === 'string' ? (await readJSON(cues)) || [] : cues || [];
   // the style's measures (specs/023): copied into the film's kit by "kit use"; beside the kit in my-styles
   const template = (await readJSON(new URL('./template.json', import.meta.url))) || (await readJSON(new URL('../template.json', import.meta.url)));
-  const P = plan(scenes, cueRows, CATALOG, template);
+  // specs/027: what the plan needs to know of each set (outdoors, room): the kit's sets export `info`; a film's custom
+  // set says it on its builder function (custom.busstop.outdoor = true), else it counts as indoors, with a warning
+  const info = {};
+  for (const [n, m] of Object.entries(SETS)) if (m.info) info[n] = m.info;
+  for (const [n, fn] of Object.entries(custom)) {
+    if (fn.outdoor === undefined) console.warn(`[kit] custom set "${n}" does not say outdoor: true/false; counted as indoors`);
+    info[`custom:${n}`] = { outdoor: !!fn.outdoor, room: fn.room };
+  }
+  const P = plan(scenes, cueRows, CATALOG, template, info);
+  for (const n of P.NOTES) console.warn('[kit]', n);
   const RISE = riseOf(template);
-  Object.assign(window, { DUR: P.DUR, SHOTS: P.SHOTS, CARDS: P.CARDS, CUES: P.CUES, CAST: P.CAST, MOVES: P.MOVES });
+  Object.assign(window, { DUR: P.DUR, SHOTS: P.SHOTS, CARDS: P.CARDS, CUES: P.CUES, CAST: P.CAST, MOVES: P.MOVES, CRAFT: P.CRAFT });
 
   const stage = makeStage(size || [innerWidth, innerHeight]);
   const A = { ...area(stage.W, stage.H), under: stage.ctx };
@@ -93,6 +103,37 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
     return slot;
   }
 
+  // ---------- specs/027: who holds what, and thrown items ----------
+  const KINDS = CATALOG.act_kinds || {};
+  const pa = (a) => { const p = parseAct(a[1]); return p && !p.prefix ? { t: a[0], ...p, spec: KINDS[p.base] || {} } : null; };
+  const actsOf = (c) => (c.act || []).map(pa).filter(Boolean);
+  // the item cast[i] holds at lt: undefined keeps the pose's own item; null is empty hands
+  function heldAt(cast, i, lt) {
+    const ev = [];
+    for (const a of actsOf(cast[i])) {
+      const item = a.item ?? a.spec.item;
+      if (a.base === 'give') ev.push([a.t, item], [a.t + a.spec.dur / 2, null]);
+      else if (a.base === 'throw') ev.push([a.t, item], [a.t + RELEASE, null]);
+      else if (a.base === 'carry') ev.push([a.t, item]);
+    }
+    cast.forEach((o, k) => { if (k !== i) for (const a of actsOf(o)) if (a.who === i) {
+      if (a.base === 'give') ev.push([a.t + a.spec.dur / 2, a.item ?? a.spec.item]);
+      if (a.base === 'throw') ev.push([a.t + RELEASE + 0.7, a.item ?? a.spec.item]);   // caught at the end of the flight
+    } });
+    let item = cast[i].item;
+    for (const [t, it] of ev.sort((x, y) => x[0] - y[0])) if (t <= lt) item = it;
+    return item;
+  }
+  // a pair act aimed at cast[i] makes it answer: take for give, the same high five
+  function incoming(cast, i, lt) {
+    let best = null;
+    cast.forEach((o, k) => { if (k !== i) for (const a of actsOf(o)) if (a.who === i && (a.base === 'give' || a.base === 'high-five') && a.t <= lt && lt - a.t <= a.spec.dur + 0.35)
+      if (!best || a.t > best.t) best = { name: a.base === 'give' ? 'take' : 'high-five', local: lt - a.t, t: a.t }; });
+    return best;
+  }
+  const flying = new Map();                  // thrown items, one per throw
+  const worldOf = (f, j, item, hand) => { f.group.updateMatrixWorld(true); return f.group.localToWorld(itemAt(j, item, hand)); };
+
   let boxes = [];
   function render(t) {
     const s = sceneAt(P.scenes, Math.max(0, Math.min(t, P.DUR)));
@@ -107,6 +148,7 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
     }
 
     // cast
+    for (const fl of flying.values()) fl.g.visible = false;
     const used = [], shown = new Set(), heads = [], streaks = [];
     (s.cast || []).forEach((c, i) => {
       // a state swap (act 'swap', specs/023): from its time on the person wears cast[].swap; a light streak covers the change
@@ -133,12 +175,36 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
       const st = actState(c.act || [], lt, RISE, { face: c.face });
       const talk = c.talk || (s.gfx || []).filter((g) => g.type === 'bubble' && g.who === i)
         .map((g) => [g.at ?? 0, Math.min((g.at ?? 0) + 1.2, g.until ?? s.dur)]);
-      const j = f.pose(pose, lt, { sit: slot.sit, seat: slot.seat, turn: (c.turn || 0) * D2R + st.turn, tilt: (c.tilt || 0) * D2R + st.tilt,
-        nod: (c.nod || 0) * D2R + st.pitch, hold: c.hold, breath: breath(seed, t),
-        mix: st.arms ? { from: st.from, to: st.arms, w: st.w, wave: st.wave } : null });
+      // specs/027: a body or pair act (own, or answering a partner's) replaces the pose while it plays
+      const body = st.body || incoming(s.cast, i, lt);
+      const held = heldAt(s.cast, i, lt);
+      const j = f.pose(body ? body.name : pose, body ? body.local : lt, { sit: slot.sit && !(body && ['run', 'jump', 'fall', 'push', 'carry'].includes(body.name)), seat: slot.seat, turn: (c.turn || 0) * D2R + st.turn, tilt: (c.tilt || 0) * D2R + st.tilt,
+        nod: (c.nod || 0) * D2R + st.pitch, hold: held !== undefined ? held : c.hold, hand: c.hand, breath: breath(seed, t),
+        mix: st.arms && !body ? { from: st.from, to: st.arms, w: st.w, wave: st.wave }
+          : (!body && held && (pose === 'stand' || pose === 'sit') ? { to: 'hold', w: 1 } : null) });
+      if (j.hop) f.group.position.y += j.hop * (c.scale || 1);
+      // thrown items fly on their own from the hand at the release to the partner's hands or 4 m ahead on the ground
+      for (const a of actsOf(c)) {
+        if (a.base !== 'throw') continue;
+        const key = `${s.id}|${i}|${a.t}`, item = a.item ?? a.spec.item;
+        if (!flying.has(key)) { const g = makeItem(item); scene.add(g); flying.set(key, { g }); }
+        const fl = flying.get(key);
+        const from = worldOf(f, joints('throw', RELEASE), item, 'right');
+        let to;
+        if (a.who != null && s.cast[a.who]) {
+          const ps = castPlace(s, set, s.cast[a.who], a.who, []);
+          to = new THREE.Vector3(ps.x, (ps.y || 0) + 0.95, ps.z);
+        } else {
+          const fy = f.group.rotation.y; to = new THREE.Vector3(f.group.position.x + Math.sin(fy) * 4, 0.12, f.group.position.z + Math.cos(fy) * 4);
+        }
+        const fp = throwPath(lt, a.t, from.toArray(), to.toArray());
+        fl.g.visible = fp.state === 'air' || (fp.state === 'ground' && a.who == null);
+        fl.g.position.fromArray(fp.p); fl.g.rotation.set(lt * 6, lt * 4, 0);
+      }
+      const hand = worldOf(f, j, held || c.hold || j.item || 'ball', c.hand);
       f.face(st.face || c.face || 'dot', { blink: c.blink !== false && blinkOn(seed, t, (c.blink && c.blink.every) || [2, 5]), talk: talkOn(talk, lt) });
       const head = new THREE.Vector3(0, (j.lift + 1.02) * (c.scale || 1), 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), slot.ry || 0).add(f.group.position);
-      heads.push({ head, facing: slot.ry || 0, who: c.who });
+      heads.push({ head, facing: slot.ry || 0, who: c.who, hand });
     });
     heroFig.group.visible = shown.has(heroFig);
     for (const f of extras.values()) f.group.visible = shown.has(f);
@@ -154,7 +220,16 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
     const fx = frameX(s.frame, scale, template, rand);
     const raking = (template && template.light && template.light.raking) ?? 0.55;
     const lightSide = s.light ?? (rand() < raking ? (rand() < 0.5 ? -1 : 1) : 0);
-    const cp = place(cam, camName(s.cam), subj.head, subj.facing, { ...camOpts, move: s._move, lt, dur: s.dur, fx }, k, set.room);
+    // specs/027: the hands camera frames the subject's hands and item instead of the head
+    const target = (CAMS_TARGET[camName(s.cam)] === 'hands' && subj.hand) ? subj.hand : subj.head;
+    // specs/027: over the shoulder of a real partner when the shot has two or more people
+    // only when the subject faces the partner (within 70°): side by side, a real shoulder would show the back of a head
+    const near = camName(s.cam) === 'ots' && heads.length >= 2
+      ? heads.filter((h) => h !== subj).sort((a, b) => a.head.distanceTo(subj.head) - b.head.distanceTo(subj.head))[0] : null;
+    const faces = (h, o) => { const d = o.head.clone().sub(h.head); d.y = 0; return d.lengthSq() > 1e-6 && (Math.sin(h.facing) * d.x + Math.cos(h.facing) * d.z) / d.length() > Math.cos(70 * D2R); };
+    const partner = near && faces(subj, near) ? near : null;
+    const cp = partner ? otsPair(cam, subj.head, partner.head, camOpts.side ?? 1, set.room, { facing: subj.facing })
+      : place(cam, camName(s.cam), target, subj.facing, { ...camOpts, move: s._move, lt, dur: s.dur, fx }, k, set.room);
     stage.focus(cp.focus, cp.aper); stage.aim(new THREE.Vector3(subj.head.x, 0, subj.head.z), lightSide);
     // closing card (TEMPLATE.md §9): the episode's cast as real figures in a row along the bottom of the picture,
     // facing the camera, popping in one by one, each with a small act; the card's 2D parts draw over them

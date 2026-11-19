@@ -92,3 +92,24 @@ Re-learned on 2026-11-13 from the ten most-viewed films, full length: 2192 shots
 ## Why `based_on: brick-toy`
 
 Candidates read: `brick-toy`, `lowpoly-island`, `tilt-shift`. The measured look needs a **perspective** three.js camera, a **character rig** and **physical DOF** with foreground blur. `lowpoly-island` is orthographic isometric (wrong lens); `tilt-shift` has no character rig. `brick-toy` has the perspective camera, the rig with pose objects and the DOF set-up; only its engine is taken, not its rules (no bricks, no stop-motion stepping, no macro-desk world).
+
+## Craft shares (specs/027)
+
+learn craft-label dusk-hypothetical-3, 2026-11-19, 1650 shots of 8 videos (skipped v03, v08), craftlabel 56331af26eb1.
+Action and prop: share of shots with people; outdoor and ots: share of shots that are not cards. Action min = p25 of the videos (error in qc plan); others warn outside min–max.
+
+| video | shots | action | prop | outdoor | ots |
+|---|---|---|---|---|---|
+| v01 | 199 | 0.11 | 0.141 | 0.397 | 0.241 |
+| v02 | 210 | 0.134 | 0.113 | 0.286 | 0.105 |
+| v04 | 158 | 0.144 | 0.075 | 0.399 | 0.044 |
+| v05 | 201 | 0.152 | 0.152 | 0.756 | 0.08 |
+| v06 | 203 | 0.068 | 0.13 | 0.3 | 0.133 |
+| v07 | 247 | 0.352 | 0.247 | 0.498 | 0.093 |
+| v09 | 190 | 0.148 | 0.109 | 0.295 | 0.195 |
+| v10 | 242 | 0.07 | 0.09 | 0.376 | 0.058 |
+| min | | 0.068 | 0.075 | 0.286 | 0.044 |
+| p25 | | 0.1 | 0.104 | 0.299 | 0.075 |
+| p50 | | 0.139 | 0.121 | 0.387 | 0.099 |
+| p75 | | 0.149 | 0.144 | 0.424 | 0.149 |
+| max | | 0.352 | 0.247 | 0.756 | 0.241 |

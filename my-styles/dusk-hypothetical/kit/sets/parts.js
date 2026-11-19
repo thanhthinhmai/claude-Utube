@@ -114,15 +114,15 @@ export function chair(g, x, z, { color = '#a8745e', back = '#82588a', ry = 0, se
   box(c, 0.5, 0.08, 0.5, color, 0, seat - 0.04, 0);
   box(c, 0.5, 0.5, 0.07, back, 0, seat + 0.25, -0.24);
   for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) cyl(c, 0.025, seat - 0.08, '#3a2e48', a * 0.21, (seat - 0.08) / 2, b * 0.21, 6);
-  return c;
+  return prop(c, 'chair');
 }
 export function desk(g, x, z, { color = '#c89a6e', h = 0.86, w = 1.0, d = 0.6 } = {}) {
-  box(g, w, 0.06, d, color, x, h, z);
+  prop(box(g, w, 0.06, d, color, x, h, z), 'desk');
   box(g, w - 0.1, 0.35, 0.04, '#7a5a7a', x, h - 0.2, z - d / 2 + 0.05);
   for (const sx of [-1, 1]) box(g, 0.05, h, d - 0.06, '#5a4874', x + sx * (w / 2 - 0.04), h / 2, z);
 }
 export function locker(g, x, z, { color = '#3f6f8f', h = 2.0, w = 0.45, face = 1 } = {}) {
-  box(g, w - 0.02, h, 0.45, color, x, h / 2, z);
+  prop(box(g, w - 0.02, h, 0.45, color, x, h / 2, z), 'locker');
   box(g, 0.03, 0.18, 0.02, '#e0d6c8', x + w * 0.3, h * 0.55, z + face * 0.235);
   for (let i = 0; i < 3; i++) box(g, w * 0.6, 0.015, 0.02, '#2a3a52', x, h * 0.82 + i * 0.05, z + face * 0.235);
 }
@@ -130,14 +130,14 @@ export function bench(g, x, z, { len = 2, color = '#b07a5e', seat = 0.6, ry = 0 
   const b = new THREE.Group(); b.position.set(x, 0, z); b.rotation.y = ry; g.add(b);
   box(b, len, 0.08, 0.45, color, 0, seat - 0.04, 0);
   for (const sx of [-1, 1]) box(b, 0.06, seat - 0.08, 0.4, '#5a4874', sx * (len / 2 - 0.15), (seat - 0.08) / 2, 0);
-  return b;
+  return prop(b, 'bench');
 }
 export function table(g, x, z, { w = 1.8, d = 0.8, h = 0.86, color = '#d0a070' } = {}) {
-  box(g, w, 0.06, d, color, x, h, z);
+  prop(box(g, w, 0.06, d, color, x, h, z), 'table');
   for (const [a, b] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) cyl(g, 0.035, h, '#5a4874', x + a * (w / 2 - 0.1), h / 2, z + b * (d / 2 - 0.08), 8);
 }
 export function plant(g, x, z, { h = 1.0 } = {}) {
-  cyl(g, 0.16, 0.3, '#b0603e', x, 0.15, z);
+  prop(cyl(g, 0.16, 0.3, '#b0603e', x, 0.15, z), 'plant');
   mesh(g, new THREE.SphereGeometry(0.3 * h, 12, 10), '#4f8f4a', [x, 0.3 + 0.3 * h, z]);
 }
 
@@ -154,22 +154,22 @@ export function poster(g, x, y, z, { w = 0.6, h = 0.85, seed = 1, ry = 0 } = {})
     else c.fillRect(W * 0.2, H * 0.2, W * 0.6, H * 0.45);
     c.fillRect(W * 0.2, H * 0.8, W * 0.6, H * 0.06);
   });
-  const o = mesh(g, new THREE.PlaneGeometry(w, h), stdMat(col, { map, rough: 0.9 }), [x, y, z], false); o.rotation.y = ry; return o;
+  const o = mesh(g, new THREE.PlaneGeometry(w, h), stdMat(col, { map, rough: 0.9 }), [x, y, z], false); o.rotation.y = ry; return prop(o, 'poster');
 }
 export function backpack(g, x, z, { color = '#3f6fc0', y = 0, ry = 0 } = {}) {
   const b = new THREE.Group(); b.position.set(x, y, z); b.rotation.y = ry; g.add(b);
   mesh(b, new THREE.BoxGeometry(0.34, 0.42, 0.18), stdMat(color), [0, 0.21, 0]);
   mesh(b, new THREE.BoxGeometry(0.26, 0.16, 0.06), stdMat(new THREE.Color(color).multiplyScalar(0.8).getStyle()), [0, 0.14, 0.11]);
-  return b;
+  return prop(b, 'backpack');
 }
-export function ball(g, x, y, z, { color = '#e07a3a', r = 0.12 } = {}) { return mesh(g, new THREE.SphereGeometry(r, 16, 12), stdMat(color, { rough: 0.7 }), [x, y, z]); }
+export function ball(g, x, y, z, { color = '#e07a3a', r = 0.12 } = {}) { return prop(mesh(g, new THREE.SphereGeometry(r, 16, 12), stdMat(color, { rough: 0.7 }), [x, y, z]), 'ball'); }
 export function tray(g, x, y, z, { seed = 1 } = {}) {
   const r = mulberry(seed * 13 + 3), t = new THREE.Group(); t.position.set(x, y, z); g.add(t);
   mesh(t, new THREE.BoxGeometry(0.42, 0.025, 0.3), stdMat('#c8b8d8', { rough: 0.6 }), [0, 0.012, 0]);
   mesh(t, new THREE.CylinderGeometry(0.08, 0.07, 0.04, 14), stdMat(['#e0b040', '#c0423e', '#4f8f4a'][Math.floor(r() * 3)]), [-0.09, 0.045, 0]);
   mesh(t, new THREE.BoxGeometry(0.09, 0.05, 0.12), stdMat('#f0e0c0'), [0.1, 0.05, 0.02]);
   mesh(t, new THREE.CylinderGeometry(0.03, 0.03, 0.11, 10), stdMat(PROP_COLS[Math.floor(r() * PROP_COLS.length)]), [0.12, 0.08, -0.09]);
-  return t;
+  return prop(t, 'tray');
 }
 // a self-lit sign or board with a few bars of text-like marks (no words)
 export function litBoard(g, x, y, z, { w = 2, h = 0.7, color = '#2a2040', glow = '#ffd8a8', ry = 0, rows = 3 } = {}) {
@@ -178,10 +178,10 @@ export function litBoard(g, x, y, z, { w = 2, h = 0.7, color = '#2a2040', glow =
     for (let i = 0; i < rows; i++) c.fillRect(W * 0.1, H * (0.2 + i * 0.25), W * (0.5 + 0.3 * ((i * 37) % 3) / 2), H * 0.1);
   });
   const o = mesh(g, new THREE.PlaneGeometry(w, h), stdMat('#ffffff', { map, emissive: '#ffffff', ei: 0.5, rough: 0.6 }), [x, y, z], false);
-  o.material.emissiveMap = map; o.rotation.y = ry; return o;
+  o.material.emissiveMap = map; o.rotation.y = ry; return prop(o, 'board');
 }
 export function globe(g, x, y, z) {
-  mesh(g, new THREE.CylinderGeometry(0.08, 0.1, 0.05, 12), stdMat('#5a4874'), [x, y + 0.025, z]);
+  prop(mesh(g, new THREE.CylinderGeometry(0.08, 0.1, 0.05, 12), stdMat('#5a4874'), [x, y + 0.025, z]), 'globe');
   mesh(g, new THREE.SphereGeometry(0.17, 20, 14), stdMat('#3f8fb0', { rough: 0.6 }), [x, y + 0.24, z]);
   mesh(g, new THREE.TorusGeometry(0.19, 0.008, 6, 24, Math.PI), stdMat('#c99a2e'), [x, y + 0.24, z]).rotation.y = Math.PI / 2;
 }
@@ -189,10 +189,10 @@ export function laptop(g, x, y, z, { ry = 0 } = {}) {
   const l = new THREE.Group(); l.position.set(x, y, z); l.rotation.y = ry; g.add(l);
   mesh(l, new THREE.BoxGeometry(0.34, 0.015, 0.24), stdMat('#2a2438'), [0, 0.008, 0]);
   const s = mesh(l, new THREE.BoxGeometry(0.34, 0.22, 0.012), stdMat('#7d9cc0', { emissive: '#7d9cc0', ei: 0.9 }), [0, 0.12, -0.12]); s.rotation.x = -0.25;
-  return l;
+  return prop(l, 'laptop');
 }
 export function trophy(g, x, y, z) {
-  mesh(g, new THREE.BoxGeometry(0.14, 0.06, 0.14), stdMat('#3a2e50'), [x, y + 0.03, z]);
+  prop(mesh(g, new THREE.BoxGeometry(0.14, 0.06, 0.14), stdMat('#3a2e50'), [x, y + 0.03, z]), 'trophy');
   mesh(g, new THREE.CylinderGeometry(0.02, 0.02, 0.1, 8), stdMat('#d9b23a', { rough: 0.3, emissive: '#5a4010', ei: 0.4 }), [x, y + 0.11, z]);
   mesh(g, new THREE.CylinderGeometry(0.09, 0.04, 0.12, 14), stdMat('#d9b23a', { rough: 0.3, emissive: '#5a4010', ei: 0.4 }), [x, y + 0.22, z]);
 }
@@ -211,7 +211,7 @@ export function car(g, x, z, { color = '#c0423e', ry = 0 } = {}) {
   for (const [wx, wz] of [[-0.6, 0.45], [0.6, 0.45], [-0.6, -0.45], [0.6, -0.45]]) mesh(c, new THREE.CylinderGeometry(0.2, 0.2, 0.14, 14), stdMat('#1c1626'), [wx, 0.2, wz]).rotation.x = Math.PI / 2;
   mesh(c, new THREE.SphereGeometry(0.06, 8, 6), stdMat('#ffe0b8', { emissive: '#ffe0b8', ei: 1.5 }), [0.92, 0.5, 0.3]);
   mesh(c, new THREE.SphereGeometry(0.06, 8, 6), stdMat('#ffe0b8', { emissive: '#ffe0b8', ei: 1.5 }), [0.92, 0.5, -0.3]);
-  return c;
+  return prop(c, 'car');
 }
 export function foodCart(g, lights, x, z, { color = '#e07a3a', ry = 0 } = {}) {
   const c = new THREE.Group(); c.position.set(x, 0, z); c.rotation.y = ry; g.add(c);
@@ -220,5 +220,106 @@ export function foodCart(g, lights, x, z, { color = '#e07a3a', ry = 0 } = {}) {
   for (const sx of [-0.7, 0.7]) mesh(c, new THREE.CylinderGeometry(0.025, 0.025, 0.55, 8), stdMat('#5a4874'), [sx, 1.38, 0.3]);
   for (const sx of [-0.45, 0.45]) mesh(c, new THREE.CylinderGeometry(0.16, 0.16, 0.06, 14), stdMat('#1c1626'), [sx, 0.16, 0.37]).rotation.x = Math.PI / 2;
   lamp(c, lights, { x: 0, y: 1.55, z: 0.25, r: 0.07, power: 1.4, range: 4 });
-  return c;
+  return prop(c, 'cart');
+}
+
+// ---------- specs/027: props are counted by layer (catalog.json → set_info.props_min) ----------
+// prop(obj, kind): marks an object as one story or dressing prop; countProps(group, hero) sorts them into the layers
+// of the default wide shot looking toward -z at the hero: fore (between the camera and the hero), mid (around the
+// hero, up to 3 m behind) and back (further behind)
+export function prop(obj, kind) { obj.userData.prop = kind; return obj; }
+export function countProps(group, hero = { z: 0 }) {
+  const out = { total: 0, fore: 0, mid: 0, back: 0, kinds: {} };
+  group.updateMatrixWorld(true);
+  const p = new THREE.Vector3();
+  group.traverse((o) => {
+    if (!o.userData.prop) return;
+    o.getWorldPosition(p);
+    const layer = p.z > hero.z + 0.8 ? 'fore' : p.z >= hero.z - 3 ? 'mid' : 'back';
+    out.total++; out[layer]++; out.kinds[o.userData.prop] = (out.kinds[o.userData.prop] || 0) + 1;
+  });
+  return out;
+}
+const tagGroup = (g, x, y, z, kind, ry = 0) => { const o = new THREE.Group(); o.position.set(x, y, z); o.rotation.y = ry; g.add(o); return prop(o, kind); };
+
+// a round-topped tree: trunk and three leaf balls in dusk greens
+export function tree(g, x, z, { h = 2.6, seed = 1 } = {}) {
+  const t = tagGroup(g, x, 0, z, 'tree'), r = mulberry(seed * 19 + 5);
+  cyl(t, 0.09, h * 0.55, '#5a3e3a', 0, h * 0.275, 0, 8);
+  const greens = ['#3f6e4a', '#4a7a52', '#365e46'];
+  for (let i = 0; i < 3; i++) mesh(t, new THREE.SphereGeometry(h * (0.24 + 0.06 * r()), 12, 10), greens[i], [(r() - 0.5) * h * 0.25, h * (0.62 + 0.12 * i), (r() - 0.5) * h * 0.2]);
+  return t;
+}
+// a street lamp: a pole, an arm and a glowing head with its light (bloom point)
+export function streetLamp(g, lights, x, z, { h = 3.4, ry = 0, power = 1.6 } = {}) {
+  const s = tagGroup(g, x, 0, z, 'lamp', ry);
+  cyl(s, 0.05, h, '#2a2238', 0, h / 2, 0, 8);
+  box(s, 0.6, 0.05, 0.05, '#2a2238', 0.3, h, 0);
+  lamp(s, lights, { x: 0.6, y: h - 0.08, z: 0, r: 0.13, color: '#ffd29a', power, range: 7 });
+  return s;
+}
+// a chain-link fence along x from x0 to x1 at z: posts, a top rail and a see-through mesh
+export function fence(g, x0, x1, z, { h = 2.2, along = 'x' } = {}) {
+  const len = Math.abs(x1 - x0), mid = (x0 + x1) / 2, f = tagGroup(g, along === 'x' ? mid : z, 0, along === 'x' ? z : mid, 'fence', along === 'x' ? 0 : Math.PI / 2);
+  for (let i = 0; i <= Math.ceil(len / 2.5); i++) cyl(f, 0.03, h, '#4a4058', -len / 2 + Math.min(len, i * 2.5), h / 2, 0, 6);
+  box(f, len, 0.04, 0.04, '#4a4058', 0, h, 0);
+  mesh(f, new THREE.PlaneGeometry(len, h), new THREE.MeshStandardMaterial({ color: '#8a7a9a', transparent: true, opacity: 0.22, side: THREE.DoubleSide, roughness: 0.9 }), [0, h / 2, 0], false);
+  return f;
+}
+// a house or shop block with a grid of lit windows (self-lit, so they glow at dusk) and a flat roof edge
+export function house(g, x, z, { w = 4, h = 5, d = 4, color = '#6e4e80', seed = 1, lit = 0.35, ry = 0 } = {}) {
+  const o = tagGroup(g, x, 0, z, 'house', ry), r = mulberry(seed * 23 + 11);
+  const map = canvasTex(`house-${seed}-${lit}`, 64, 96, (c, W, H) => {
+    c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
+    for (let yy = 8; yy < H - 10; yy += 18) for (let xx = 6; xx < W - 8; xx += 16) { c.fillStyle = r() < lit ? '#ffd29a' : '#2a2040'; c.fillRect(xx, yy, 9, 11); }
+  });
+  const m = stdMat(color, { rough: 0.9, emissive: '#ffffff', ei: map ? 0.9 : 0 });
+  if (map) { m.emissiveMap = map; map.repeat.set(Math.max(1, Math.round(w / 2)), Math.max(1, Math.round(h / 3))); }
+  mesh(o, new THREE.BoxGeometry(w, h, d), m, [0, h / 2, 0]);
+  box(o, w + 0.2, 0.2, d + 0.2, new THREE.Color(color).multiplyScalar(0.7).getStyle(), 0, h + 0.1, 0);
+  return o;
+}
+// a basketball hoop on a pole facing +z (ry turns it)
+export function hoop(g, x, z, { ry = 0 } = {}) {
+  const o = tagGroup(g, x, 0, z, 'hoop', ry);
+  cyl(o, 0.07, 3.0, '#3a3050', 0, 1.5, 0, 8);
+  box(o, 0.05, 0.05, 0.6, '#3a3050', 0, 3.0, 0.3);
+  box(o, 1.6, 1.0, 0.05, '#f0e6d8', 0, 3.3, 0.6);
+  mesh(o, new THREE.TorusGeometry(0.23, 0.02, 6, 20), '#e07a3a', [0, 3.0, 0.85]).rotation.x = Math.PI / 2;
+  return o;
+}
+// a railing along x at z (rooftop edge, balcony)
+export function railing(g, x0, x1, z, { h = 1.05, along = 'x' } = {}) {
+  const len = Math.abs(x1 - x0), mid = (x0 + x1) / 2, o = tagGroup(g, along === 'x' ? mid : z, 0, along === 'x' ? z : mid, 'railing', along === 'x' ? 0 : Math.PI / 2);
+  for (let i = 0; i <= Math.ceil(len / 1.2); i++) cyl(o, 0.025, h, '#5a5068', -len / 2 + Math.min(len, i * 1.2), h / 2, 0, 6);
+  box(o, len, 0.05, 0.06, '#6a6078', 0, h, 0);
+  box(o, len, 0.03, 0.03, '#5a5068', 0, h * 0.5, 0);
+  return o;
+}
+// parking bay lines: n white stripes across z from x0, every `gap` m
+export function parkLines(g, { x0 = -8, z = -4, n = 8, gap = 2.6, len = 4.5 } = {}) {
+  for (let i = 0; i <= n; i++) box(g, 0.1, 0.012, len, '#e8e0f0', x0 + i * gap, 0.006, z);
+}
+// a sky dome: a gradient from lilac overhead to a warm glow at the horizon, with a soft sun disc (fog-free)
+export function skyDome(g, { r = 100, sun = [-0.5, 0.06, -1], top = '#7a6ac0', mid = '#d49ac0', low = '#ffc49a' } = {}) {
+  const map = canvasTex(`sky-dome-${top}-${low}`, 4, 256, (c) => {
+    const gr = c.createLinearGradient(0, 0, 0, 256);
+    gr.addColorStop(0, top); gr.addColorStop(0.42, mid); gr.addColorStop(0.5, low); gr.addColorStop(1, low);
+    c.fillStyle = gr; c.fillRect(0, 0, 4, 256);
+  });
+  const d = mesh(g, new THREE.SphereGeometry(r, 32, 16), new THREE.MeshBasicMaterial({ color: map ? '#ffffff' : mid, map, side: THREE.BackSide, fog: false, depthWrite: false }), [0, 0, 0], false);
+  d.renderOrder = -1; d.name = 'sky';
+  const s = new THREE.Vector3(...sun).normalize().multiplyScalar(r * 0.9);
+  mesh(g, new THREE.SphereGeometry(r * 0.06, 16, 12), new THREE.MeshBasicMaterial({ color: '#fff0d0', fog: false }), [s.x, s.y, s.z], false);
+  return d;
+}
+// a window lit from outside: a glowing pane (blooms) that reads as dusk light coming in
+export function windowGlow(g, x, y, z, { w = 1.6, h = 1.3, ry = 0, color = '#ffc89a', ei = 1.1 } = {}) {
+  const o = mesh(g, new THREE.PlaneGeometry(w, h), mat('#fff0e0', 0.6, color, ei), [x, y, z], false);
+  o.rotation.y = ry; return prop(o, 'window');
+}
+// a shaft of low sun through a window: a slanted, faint warm plane drawn over the scene (no light of its own)
+export function sunBeam(g, x, y, z, { w = 1.4, h = 4, ry = 0, tilt = 0.75, color = '#ffc89a', opacity = 0.12 } = {}) {
+  const o = mesh(g, new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }), [x, y, z], false);
+  o.rotation.set(-tilt, ry, 0); o.renderOrder = 2; return o;
 }

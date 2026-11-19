@@ -1,6 +1,6 @@
 // Classroom at dusk: a grid of desks and chairs, window band on the back wall, light strips, a board on the side.
 import * as THREE from 'three';
-import { backpack, box, ceiling, chair, desk, floor, globe, grid, lamp, lightStrip, litBoard, plant, poster, wall, windows } from './parts.js';
+import { backpack, box, ceiling, chair, desk, floor, globe, grid, lamp, lightStrip, litBoard, plant, poster, wall, windows, sunBeam } from './parts.js';
 
 export function build() {
   const g = new THREE.Group(), lights = [], seats = [];
@@ -9,6 +9,7 @@ export function build() {
   wall(g, { len: 16, along: 'z', at: -7, from: -3 }); wall(g, { len: 16, along: 'z', at: 7, from: -3 });
   ceiling(g, { w: 14, d: 16, z: -3 });
   windows(g, { z: -9.88, n: 5, gap: 2.5, y: 2.0, h: 1.6 });
+  for (const x of [-2.5, 2.5]) sunBeam(g, x, 1.0, -8.5, { w: 1.6, h: 3.2 });          // specs/027 FR-011: low sun through the windows
   for (const x of [-3, 0, 3]) lightStrip(g, lights, { x, z: -4, len: 11, along: 'z', every: 5.5 });
   box(g, 3.6, 1.3, 0.06, '#2f4a3e', 6.88, 1.8, -3).rotation.y = -Math.PI / 2;   // board on the side wall
   // desks: 5 across, 5 deep; the hero's desk is front centre

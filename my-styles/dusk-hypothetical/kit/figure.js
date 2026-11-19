@@ -64,6 +64,58 @@ const ARMS = {
   'hands-face': (sx, L) => ({ elbow: V(sx * 0.25, L + 0.42, 0.24), hand: V(sx * 0.12, L + 0.8, 0.3) }),
 };
 ARMS.wave = ARMS['raise-hand'];
+
+// ---------- specs/027 acts (research R3): legs and arms as pure functions of the act's own time t ----------
+// One-shot acts start from the standing pose and end back in it ACT_BACK s after their length (fall stays down), so a
+// page can switch from 'stand' to an act pose and back without a jump. Lengths equal catalog.json → act_kinds.
+export const ACT_LEN = { run: 0.62, jump: 0.9, throw: 0.8, carry: 0.62, fall: 0.7, push: 0.6, type: 0.3, give: 1.0, 'high-five': 0.8, take: 1.0 };
+export const ACT_BACK = 0.35;
+const UPPER = 0.27, FORE = 0.26;          // upper arm and forearm of the standing pose (rest: 0.267, 0.243–0.27)
+const sm = (u) => { u = Math.min(1, Math.max(0, u)); return u * u * (3 - 2 * u); };
+const mixJ = (a, b, w) => { const o = {}; for (const k of Object.keys(a)) o[k] = a[k] instanceof THREE.Vector3 ? a[k].clone().lerp(b[k], w) : a[k] + (b[k] - a[k]) * w; return o; };
+// weight of an act's pose: 0 → 1 over the way in, held, 1 → 0 over ACT_BACK after `len` (a hold act never goes back)
+const inOut = (t, len, rise, hold = false) => sm(t / rise) * (hold ? 1 : 1 - sm((t - len) / ACT_BACK));
+const REST_LEGS = (sx) => LEGS.stand(sx);
+LEGS.run = (sx, t) => {
+  const ph = t * Math.PI * 2 / ACT_LEN.run + (sx > 0 ? Math.PI : 0), s = Math.sin(ph), lift = 0.53 + 0.03 * Math.abs(Math.cos(ph));
+  return { lift, hip: V(sx * 0.08, lift, 0), knee: V(sx * 0.08, 0.33 + 0.1 * Math.max(0, s), 0.06 + 0.2 * s), ankle: V(sx * 0.08, 0.07 + 0.16 * Math.max(0, -s), -0.04 + 0.26 * s) };
+};
+LEGS.carry = (sx, t) => LEGS.walk(sx, t * 1.6 / (1 / ACT_LEN.carry) / 1.6);
+LEGS.jump = (sx, t) => {
+  const crouch = sm(t / 0.22) * (1 - sm((t - 0.22) / 0.08)) + sm((t - 0.68) / 0.1) * (1 - sm((t - 0.82) / 0.12));
+  const lift = 0.55 - 0.12 * crouch;
+  return { lift, hip: V(sx * 0.08, lift, 0), knee: V(sx * 0.09, 0.3 - 0.04 * crouch, 0.03 + 0.14 * crouch), ankle: V(sx * 0.08, 0.06, 0) };
+};
+LEGS.fall = (sx, t) => {
+  const w = sm(t / ACT_LEN.fall), seat = 0.14;
+  const down = { lift: seat, hip: V(sx * 0.1, seat + 0.02, 0), knee: V(sx * 0.13, seat + 0.16, 0.3), ankle: V(sx * 0.15, 0.06, 0.48) };
+  return mixJ(REST_LEGS(sx), down, w);
+};
+LEGS.push = (sx, t) => {
+  const w = inOut(t, ACT_LEN.push, 0.25, true), lean = { lift: 0.52, hip: V(sx * 0.08, 0.52, 0), knee: V(sx * 0.08, 0.29, sx < 0 ? 0.14 : -0.04), ankle: V(sx * 0.08, 0.06, sx < 0 ? 0.16 : -0.2) };
+  return mixJ(REST_LEGS(sx), lean, w);
+};
+for (const n of ['throw', 'type', 'give', 'high-five', 'take']) LEGS[n] = (sx) => LEGS.stand(sx);
+const restArm = (sx, L, t, sit) => ARMS.rest(sx, L, t, sit);
+const toward = (sx, L, t, sit, target, w) => { const r = restArm(sx, L, t, sit); return { elbow: r.elbow.clone().lerp(target.elbow, w), hand: r.hand.clone().lerp(target.hand, w) }; };
+ARMS.run = (sx, L, t) => { const s = Math.sin(t * Math.PI * 2 / ACT_LEN.run + (sx > 0 ? 0 : Math.PI)); return { elbow: V(sx * 0.28, L + 0.24, 0.04 + 0.1 * s), hand: V(sx * 0.24, L + 0.16 + 0.06 * s, 0.12 + 0.18 * s) }; };
+ARMS.carry = (sx, L) => ({ elbow: V(sx * 0.27, L + 0.22, 0.16), hand: V(sx * 0.19, L + 0.26, 0.34) });
+ARMS.type = (sx, L, t, sit) => ({ elbow: V(sx * 0.27, L + 0.2, 0.14), hand: V(sx * 0.12, L + 0.14 + 0.035 * Math.max(0, Math.sin(t * Math.PI * 2 / ACT_LEN.type + (sx > 0 ? 0 : 2))), 0.36) });
+ARMS.jump = (sx, L, t, sit) => toward(sx, L, t, sit, { elbow: V(sx * 0.34, L + 0.62, 0.04), hand: V(sx * 0.3, L + 0.9, 0.08) }, sm((t - 0.2) / 0.15) * (1 - sm((t - 0.66) / 0.2)));
+ARMS.fall = (sx, L, t, sit) => toward(sx, L, t, sit, { elbow: V(sx * 0.33, L + 0.18, -0.1), hand: V(sx * 0.42, L + 0.02, -0.22) }, sm(t / 0.4));
+ARMS.push = (sx, L, t, sit) => toward(sx, L, t, sit, { elbow: V(sx * 0.24, L + 0.32, 0.26), hand: V(sx * 0.16, L + 0.36, 0.52) }, inOut(t, ACT_LEN.push, 0.25, true));
+ARMS.throw = (sx, L, t, sit) => {
+  if (sx < 0) return toward(sx, L, t, sit, { elbow: V(-0.28, L + 0.3, 0.16), hand: V(-0.2, L + 0.36, 0.34) }, inOut(t, ACT_LEN.throw, 0.25));
+  const back = { elbow: V(0.32, L + 0.5, -0.12), hand: V(0.3, L + 0.66, -0.26) }, fwd = { elbow: V(0.28, L + 0.5, 0.24), hand: V(0.26, L + 0.6, 0.46) }, end = { elbow: V(0.24, L + 0.28, 0.24), hand: V(0.16, L + 0.24, 0.42) };
+  const a = mixJ(back, fwd, sm((t - 0.36) / 0.16)), b = mixJ(a, end, sm((t - 0.55) / 0.25));
+  return toward(sx, L, t, sit, b, inOut(t, ACT_LEN.throw, 0.3));
+};
+// the arm reaches forward to hand an item over (give) or to take it (take); hands meet at half the length
+ARMS.give = (sx, L, t, sit) => sx > 0 ? toward(sx, L, t, sit, { elbow: V(0.24, L + 0.3, 0.24), hand: V(0.12, L + 0.34, 0.5) }, sm(t / (ACT_LEN.give / 2)) * (1 - sm((t - ACT_LEN.give) / ACT_BACK))) : restArm(sx, L, t, sit);
+ARMS.take = ARMS.give;
+ARMS['high-five'] = (sx, L, t, sit) => sx > 0 ? toward(sx, L, t, sit, { elbow: V(0.3, L + 0.56, 0.2), hand: V(0.22, L + 0.86, 0.34) }, sm(t / (ACT_LEN['high-five'] / 2)) * (1 - sm((t - ACT_LEN['high-five']) / ACT_BACK))) : restArm(sx, L, t, sit);
+// the whole figure's lift off the ground during a jump (metres, figure frame)
+export function hopOf(name, t) { return name === 'jump' ? 0.32 * Math.max(0, Math.sin(Math.PI * Math.min(1, Math.max(0, (t - 0.28) / 0.42)))) : 0; }
 ARMS['shrug-up'] = ARMS.shrug;
 // pose name → legs, arms, held item, head pitch
 export const POSES = {
@@ -79,11 +131,24 @@ export const POSES = {
   cheer: { legs: 'stand', arms: 'cheer', pitch: -0.15 },
   shrug: { legs: 'stand', arms: 'shrug', tilt: 0.12 },
   hug: { legs: 'stand', arms: 'hug', pitch: 0.1 },
+  // specs/027: act poses; t is the act's own time (run, carry, type loop)
+  run: { legs: 'run', arms: 'run', pitch: 0.12 },
+  carry: { legs: 'carry', arms: 'carry', item: 'box' },
+  type: { legs: 'stand', arms: 'type', pitch: 0.28 },
+  jump: { legs: 'jump', arms: 'jump', pitch: -0.1 },
+  fall: { legs: 'fall', arms: 'fall', pitch: -0.2 },
+  push: { legs: 'push', arms: 'push', pitch: 0.1 },
+  throw: { legs: 'throw', arms: 'throw' },
+  give: { legs: 'give', arms: 'give', pitch: 0.12 },
+  take: { legs: 'take', arms: 'take', pitch: 0.12 },
+  'high-five': { legs: 'high-five', arms: 'high-five', pitch: -0.1 },
 };
 export const FACES = ['dot', 'half', 'wow', 'happy', 'blank', 'angry', 'sad', 'sweat'];
 export const HAIR = ['bald', 'short', 'bun', 'curly'];
 export const HATS = ['cap', 'beanie'];
-export const ITEMS = ['phone', 'book', 'bag', 'cup', 'paper'];
+export const ITEMS = ['phone', 'book', 'bag', 'cup', 'paper', 'ball', 'cards', 'cash', 'box', 'keys'];
+// grip: 'one' sits in one hand, 'both' between the hands (catalog.json → items)
+export const GRIP = { ball: 'one', cards: 'one', cash: 'one', keys: 'one' };
 
 // joint points of a pose at time t; sit: true seats any pose (legs from 'sit')
 export function joints(name, t = 0, opts = {}) {
@@ -106,7 +171,42 @@ export function joints(name, t = 0, opts = {}) {
     }
   }
   out.shoulder = { [-1]: V(-0.22, out.lift + 0.48, 0), 1: V(0.22, out.lift + 0.48, 0) };
+  out.hop = hopOf(name, t);
+  // act poses blend between targets: keep the arm's two segments their standing length so no blend shortens a limb
+  if (ACT_LEN[name] !== undefined) for (const sx of [-1, 1]) {
+    const a = out.arms[sx], sh = out.shoulder[sx];
+    a.elbow = sh.clone().add(a.elbow.clone().sub(sh).setLength(UPPER));
+    a.hand = a.elbow.clone().add(a.hand.clone().sub(a.elbow).setLength(FORE));
+  }
   return out;
+}
+
+// ---------- items (specs/027) ----------
+// one item as its own group, centred on its grip point; a figure shows one of its own, a thrown item flies on its own
+export function makeItem(name) {
+  const g = new THREE.Group(); g.name = `item:${name}`;
+  const add = (geo, m) => { const o = new THREE.Mesh(geo, m); o.castShadow = o.receiveShadow = true; g.add(o); return o; };
+  if (name === 'phone') { add(new THREE.BoxGeometry(0.13, 0.22, 0.02), mat('#1c1626', 0.4)); const s = add(new THREE.PlaneGeometry(0.11, 0.19), new THREE.MeshBasicMaterial({ color: '#7d9cc0' })); s.position.z = -0.011; s.rotation.y = Math.PI; g.rotation.x = -0.6; }
+  else if (name === 'book') { add(new THREE.BoxGeometry(0.3, 0.03, 0.22), mat('#c8563e')); g.rotation.x = 0.9; }
+  else if (name === 'bag') add(new THREE.BoxGeometry(0.34, 0.26, 0.16), mat('#5a6a3a')).position.y = -0.1;
+  else if (name === 'cup') add(new THREE.CylinderGeometry(0.06, 0.05, 0.13, 14), mat('#f0e6d8', 0.6));
+  else if (name === 'paper') { add(new THREE.BoxGeometry(0.22, 0.3, 0.005), mat('#f4efe4', 0.8)); g.rotation.x = -0.5; }
+  else if (name === 'ball') add(new THREE.SphereGeometry(0.12, 18, 12), mat('#e07a3a', 0.7));
+  else if (name === 'cards') for (let i = 0; i < 4; i++) { const c = add(new THREE.BoxGeometry(0.09, 0.13, 0.004), mat(i % 2 ? '#f4efe4' : '#fff8f0', 0.7)); c.position.set((i - 1.5) * 0.025, 0.05, i * 0.003); c.rotation.z = (i - 1.5) * 0.28; }
+  else if (name === 'cash') { add(new THREE.BoxGeometry(0.17, 0.035, 0.08), mat('#6aa86a', 0.8)); add(new THREE.BoxGeometry(0.06, 0.04, 0.085), mat('#e8e0c8', 0.8)); }
+  else if (name === 'box') { add(new THREE.BoxGeometry(0.42, 0.3, 0.3), mat('#c8935a', 0.95)); add(new THREE.BoxGeometry(0.43, 0.04, 0.08), mat('#e0c070', 0.8)).position.y = 0.13; }
+  else if (name === 'keys') { add(new THREE.TorusGeometry(0.03, 0.006, 6, 16), mat('#d8d0c0', 0.3)); for (const a of [-0.4, 0.3]) { const k = add(new THREE.BoxGeometry(0.014, 0.07, 0.004), mat('#e0c070', 0.3)); k.position.set(Math.sin(a) * 0.04, -0.05, 0); k.rotation.z = a; } }
+  else throw new Error(`unknown item "${name}"`);
+  return g;
+}
+
+// the item's grip point in the figure's frame: one hand for a one-hand item, else between the hands
+export function itemAt(j, item, hand = 'right') {
+  if (GRIP[item] === 'one') { const h = j.arms[hand === 'left' ? -1 : 1].hand; return h.clone().add(V(0, 0.02, 0.05)); }
+  const m = j.arms[-1].hand.clone().add(j.arms[1].hand).multiplyScalar(0.5);
+  if (item === 'bag') m.y -= 0.04;
+  if (item === 'box') m.add(V(0, 0, 0.08));
+  return m.add(V(0, 0.03, 0.03));
 }
 
 // ---------- figure ----------
@@ -175,14 +275,9 @@ export function makeFigure({ hoodie = '#c0423e', strings = '#f4eef8', hair = 'ba
     for (const sx of [-1, 1]) { const g = fm(new THREE.TorusGeometry(0.07, 0.01, 6, 20)); g.position.set(sx * 0.12, 0.35, 0.335); }
     const br = fm(new THREE.BoxGeometry(0.1, 0.01, 0.01)); br.position.set(0, 0.36, 0.34);
   }
-  // held items, built once and shown on demand; placed at the hands' midpoint
+  // held items, built once and shown on demand; placed at the hands' midpoint, or in one hand (specs/027)
   const items = {};
-  const ig = (name, build) => { const g = new THREE.Group(); build(g); g.visible = false; group.add(g); items[name] = g; };
-  ig('phone', (g) => { add(new THREE.BoxGeometry(0.13, 0.22, 0.02), mat('#1c1626', 0.4), g); const s = add(new THREE.PlaneGeometry(0.11, 0.19), new THREE.MeshBasicMaterial({ color: '#7d9cc0' }), g); s.position.z = -0.011; s.rotation.y = Math.PI; g.rotation.x = -0.6; });
-  ig('book', (g) => { add(new THREE.BoxGeometry(0.3, 0.03, 0.22), mat('#c8563e'), g); g.rotation.x = 0.9; });
-  ig('bag', (g) => { add(new THREE.BoxGeometry(0.34, 0.26, 0.16), mat('#5a6a3a'), g).position.y = -0.1; });
-  ig('cup', (g) => { add(new THREE.CylinderGeometry(0.06, 0.05, 0.13, 14), mat('#f0e6d8', 0.6), g); });
-  ig('paper', (g) => { add(new THREE.BoxGeometry(0.22, 0.3, 0.005), mat('#f4efe4', 0.8), g); g.rotation.x = -0.5; });
+  for (const name of ITEMS) { const g = makeItem(name); g.visible = false; group.add(g); items[name] = g; }
 
   const limb = (o, p, q, r) => { o.position.copy(p).add(q).multiplyScalar(0.5); o.scale.set(r, p.distanceTo(q), r); o.quaternion.setFromUnitVectors(UP, q.clone().sub(p).normalize()); };
   const place = (o, p, r, sy = 1, sz = 1) => { o.position.copy(p); o.scale.set(r, r * sy, r * sz); };
@@ -206,19 +301,19 @@ export function makeFigure({ hoodie = '#c0423e', strings = '#f4eef8', hair = 'ba
       }
       head.position.set(0, lift + 0.72, 0);
       head.rotation.set(j.pitch + (opts.nod || 0), opts.turn || 0, j.tilt + (opts.tilt || 0), 'YXZ');
-      fig.hold(opts.hold === undefined ? j.item : opts.hold);
+      fig.hold(opts.hold === undefined ? j.item : opts.hold, { hand: opts.hand });
       return j;
     },
-    // show one held item (or none) between the hands
-    hold(item) {
+    // show one held item (or none): between the hands, or in one hand for a one-hand item (hand 'right' = +x side)
+    hold(item, { hand = 'right' } = {}) {
       if (held) items[held].visible = false; held = item && items[item] ? item : null;
       if (held && last) {
-        const m = last.arms[-1].hand.clone().add(last.arms[1].hand).multiplyScalar(0.5);
-        if (held === 'bag') m.y -= 0.04;
-        items[held].position.copy(m).add(V(0, 0.03, 0.03)); items[held].visible = true;
+        items[held].position.copy(itemAt(last, held, hand)); items[held].visible = true;
       }
       return fig;
     },
+    // where the held item sits in the figure's frame (tests and hand-overs read it)
+    itemPoint(item, hand = 'right') { return last ? itemAt(last, item, hand) : null; },
     // face(name, {blink, talk}): blink closes the eyes to lines; talk opens the mouth (acting.js)
     face(name = 'dot', { blink = false, talk = false } = {}) {
       if (!FACES.includes(name)) throw new Error(`unknown face "${name}"`);

@@ -11,6 +11,10 @@ export const CAMS = {
   'mid-eye':   { d: 2.8, h: -0.15, yaw: 24, aim: 0.32, fov: 45, aper: 4.5 },
   'mid-low':   { d: 2.4, abs: 0.55, yaw: 20, aim: 0.3, fov: 48, aper: 5.5 },
   ots:         { d: 2.5, h: 0.05, yaw: 12, aim: 0.35, fov: 44, shoulder: true, aper: 4.5 },
+  // specs/027: hands and the held item close and shallow (film.js puts the item's point in place of the head);
+  // a low hero angle for the winning moment, closer and lower than mid-low, looking up
+  hands:       { d: 0.85, h: 0.22, yaw: 34, aim: 0.0, fov: 28, aper: 1.6, target: 'hands' },
+  'hero-low':  { d: 2.2, abs: 0.32, yaw: 16, aim: 0.12, fov: 50, aper: 5 },
   'wide-eye':  { d: 6.2, h: -0.25, yaw: 22, aim: 0.75, fov: 50 },
   'wide-high': { d: 6.0, abs: 4.2, yaw: 24, aim: 0.8, fov: 50 },
   'very-wide': { d: 15, h: 0.15, yaw: 14, aim: 0.6, fov: 55 },
@@ -95,7 +99,7 @@ export function place(cam, name, head, facing = 0, opts = {}, k = 0, room = null
   cam.position.copy(pos); cam.lookAt(look);
   // focus on the face (0.3 m in front of the head's centre), and a smaller aperture up close, so close-ups stay sharp
   const dh = pos.distanceTo(head);
-  const focus = c.soft ? 0.45 : Math.max(0.3, dh - 0.3);
+  const focus = c.soft ? 0.45 : c.target === 'hands' ? dh : Math.max(0.3, dh - 0.3);   // hands: the item itself
   // specs/023: the aperture by shot scale, so the sharp share of the frame lands in the reference's range
   // (template.json → framing.by_scale.<scale>.focused_share); 022 closed it near the camera, which left crowds sharp
   const out = { focus, aper: c.soft ? undefined : (c.aper ?? 4.5) };
@@ -108,6 +112,30 @@ export function place(cam, name, head, facing = 0, opts = {}, k = 0, room = null
     out.shoulderFacing = Math.atan2(-toCam.x, -toCam.z);
   }
   return out;
+}
+
+// specs/027 R6: a real over-the-shoulder shot between two people: the camera stands behind the partner's head and
+// to one side (side ±1 keeps the 180° line), looking at the subject's face; the partner's head and shoulder fill a
+// soft third of the frame. No stand-in figure is needed. → {focus, aper}
+export function otsPair(cam, subject, partner, side = 1, room = null, { back = 0.75, across = 1.05, up = 0.18, fov = 40, aim = 0.2, shift = 0.25, aper = 4.5, facing = null } = {}) {
+  const dir = subject.clone().sub(partner); dir.y = 0;
+  if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
+  dir.normalize();
+  const right = new THREE.Vector3(dir.z, 0, -dir.x);
+  // when the subject is turned clearly to one side of the line, stand on that side so the face is seen
+  if (facing != null) { const lat = Math.sin(facing) * right.x + Math.cos(facing) * right.z; if (Math.abs(lat) > 0.15) side = Math.sign(lat); }
+  const pos = partner.clone().addScaledVector(dir, -back).addScaledVector(right, across * side);
+  pos.y = partner.y + up;
+  // aim a little past the subject, away from the partner: the subject sits about two thirds across the frame
+  const look = new THREE.Vector3(subject.x, subject.y - aim, subject.z).addScaledVector(right, -shift * side);
+  let f = fov;
+  if (room) {
+    const d0 = pos.distanceTo(look), k = inside(room, look, pos);
+    if (k < 1) { pos.lerpVectors(look, pos, k); f = Math.min(80, 2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(f) / 2) * d0 / Math.max(pos.distanceTo(look), 0.3)))); }
+  }
+  cam.fov = f; cam.updateProjectionMatrix(); cam.position.copy(pos); cam.lookAt(look);
+  // a wide aperture: the partner's head close to the lens goes soft, as the reference's shoulder does
+  return { focus: Math.max(0.3, pos.distanceTo(subject) - 0.3), aper };
 }
 
 // largest s in [0, 1] so that look + s·(pos − look) stays inside the room (with a margin)

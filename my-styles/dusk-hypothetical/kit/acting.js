@@ -4,7 +4,7 @@
 //   blinkOn(seed, t, every): is the figure blinking at film time t
 //   talkOn(talk, lt): is the mouth open (talk spans in scene time)
 //   breath(seed, t): chest scale
-import { mulberry } from './plan.js';
+import { mulberry, parseAct, CATALOG } from './plan.js';
 
 export const RISE = [0.25, 0.83];          // template.json → motion.rise_s (p25–p75); median 0.417
 export const BLINK_S = 0.12;
@@ -46,7 +46,41 @@ export function actState(acts = [], lt = 0, rise = 0.417, base = {}) {
     st.turn = prevLook[0] + (to[0] - prevLook[0]) * w;
     st.pitch += prevLook[1] + (to[1] - prevLook[1]) * w;
   }
+  st.body = bodyAct(acts, lt);
   return st;
+}
+
+// specs/027 (research R3): the body or pair act playing at scene time lt, or null.
+// {name, local (s since it started), item, who}. A one-shot act plays its length plus BACK s (the way back to
+// standing); a looping act (run, carry, type) and a held one (fall, push) play until the next body act.
+export const BACK = 0.35;
+const HOLD = new Set(['fall', 'push']);
+export function bodyAct(acts = [], lt = 0, catalog = CATALOG) {
+  const kinds = catalog.act_kinds || {};
+  const list = [...acts].map((a) => ({ t: a[0], p: parseAct(a[1], catalog) }))
+    .filter((a) => a.p && !a.p.prefix && ['body', 'pair'].includes((kinds[a.p.base] || {}).kind)).sort((a, b) => a.t - b.t);
+  let cur = null;
+  for (const a of list) if (a.t <= lt) cur = a;
+  if (!cur) return null;
+  const spec = kinds[cur.p.base], local = lt - cur.t;
+  if (!spec.loop && !HOLD.has(cur.p.base) && local > spec.dur + BACK) return null;
+  return { name: cur.p.base, local, t: cur.t, item: cur.p.item ?? spec.item ?? null, who: cur.p.who, dur: spec.dur };
+}
+
+// who holds a handed-over item at scene time lt: the giver until half the act's length, then the taker
+export const handoff = (lt, t, dur) => (lt < t + dur / 2 ? 'giver' : 'taker');
+
+// a thrown item (research R3): in the hand until the release, then a parabola from `from` to `to` (world [x, y, z])
+// over `flight` s with its top `peak` m above the higher end, then at rest on the ground at `to`
+export const RELEASE = 0.5;
+export function throwPath(lt, t, from, to, { flight = 0.7, peak = 0.5 } = {}) {
+  const u = (lt - t - RELEASE) / flight;
+  if (u < 0) return { state: 'hand', p: from };
+  if (u >= 1) return { state: 'ground', p: to };
+  const top = Math.max(from[1], to[1]) + peak;
+  // y follows a quadratic through from (u=0), top (u=0.5·), to (u=1)
+  const y = (1 - u) * (1 - u) * from[1] + 2 * u * (1 - u) * (2 * top - (from[1] + to[1]) / 2) + u * u * to[1];
+  return { state: 'air', p: [from[0] + (to[0] - from[0]) * u, y, from[2] + (to[2] - from[2]) * u] };
 }
 
 // blink times: intervals drawn in [every[0], every[1]] seconds from the figure's seed, over film time

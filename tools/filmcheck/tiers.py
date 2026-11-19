@@ -8,7 +8,8 @@ from pathlib import Path
 from filmcheck import report
 
 TIERS = ("voice", "plan", "shots", "render", "final")
-EXCEPTABLE = ("flat", "dark", "blown", "still", "shot_long", "text_over_subtitle", "blurred")   # blurred: specs/021
+EXCEPTABLE = ("flat", "dark", "blown", "still", "shot_long", "text_over_subtitle", "blurred",   # blurred: specs/021
+              "craft_action")   # specs/027: the shot leaves the action share at the next qc plan
 SKIP_DIRS = {"out", "stills", "publish", ".check", "node_modules", "compare"}   # as tools/render/lib.mjs; compare/: specs/023 sheets
 SKIP_SUFFIX = (".mp4", ".log", ".pyc")
 SKIP_NAMES = {"checks.json", "CHECKS.md", "qc-exceptions.json", ".job", ".job.out"}   # .job: the job id is not the film (specs/023)
