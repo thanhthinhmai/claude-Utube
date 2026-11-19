@@ -90,4 +90,4 @@ Mỗi dòng: `{"at", "by", "source": "ui|chat|api", "op", "point", "ref": "P3|L1
 
 ## Busy lock (`.check/busy.json`)
 
-`{"step": "Voice", "pid": 1234, "since": "…", "by": "edit|job run"}`. Coi là còn sống khi tiến trình `pid` còn chạy trên cùng máy, và khoá được ghi chưa quá 6 giờ.
+`{"step": "Voice", "pid": 1234, "host": "…", "since": "…", "by": "edit|job run"}`. Cùng `host`: còn sống khi `pid` còn chạy và chưa quá 6 giờ. Khác `host` (online): còn sống khi chưa quá 6 giờ và việc đang `running` với bước trùng.

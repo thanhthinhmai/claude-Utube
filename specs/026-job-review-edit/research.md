@@ -61,7 +61,7 @@
 
 - **Decision**:
   - `edit script-para <P#> --text-file f` thay nội dung đoạn `[P#]` trong `SCRIPT.md` rồi chạy `script check` (theo luật, không gọi Claude). Lượt biên tập không chạy lại (Clarifications).
-  - Sau khi duyệt Script, agent dựng lại `lines.json` từ kịch bản như hiện nay. Những dòng có chữ đổi thì `voice make --only <id,…>`. Dòng còn trùng chữ thì giữ `wav` cũ (so chữ, `say`, giọng, tốc độ).
+  - Sau khi duyệt Script, agent dựng lại `lines.json` từ kịch bản như hiện nay. Rồi `voice make --changed`: `voices/.made.json` ghi chữ (hoặc `say`), giọng và tốc độ của mỗi dòng lúc tạo; chỉ dòng khác hoặc thiếu `wav` được tạo lại.
   - Thêm kiểm "lời khớp kịch bản" vào `qc voice` (tầng 0), dùng lại phép so của `qc.py` (FR-007).
 - **Rationale**: lời đọc chỉ đi một chiều, từ kịch bản sang `lines.json`. Tạo lại giọng chỉ cho dòng đổi (FR-017, SC-004).
 
@@ -115,9 +115,9 @@
 
 ## R13. Khoá bận và hai người cùng sửa
 
-- **Decision**: `.check/busy.json` có dạng `{"step": "Voice", "pid": …, "since": …}`.
+- **Decision**: `.check/busy.json` có dạng `{"step": "Voice", "pid": …, "host": …, "since": …}`. Online, `job run` chạy trong container khác với web và worker, nên khoá khác `host` được coi là còn sống khi chưa quá 6 giờ và việc đang `running` với bước trùng.
   - `edit` tạo khoá trong lúc chạy.
   - `job run` tạo khoá khi việc có `film_dir`, với `step` là tên bước của nó.
-  - `edit` từ chối (mã 5) khi khoá còn sống (pid còn chạy) và bước của khoá nằm trong tập bước mà thao tác đọc hoặc ghi theo `steps.py`.
+  - `edit` từ chối (mã 5) khi khoá còn sống (cùng `host`: pid còn chạy) và bước của khoá nằm trong tập bước mà thao tác đọc hoặc ghi theo `steps.py`.
   - Hai người cùng sửa thì xử lý bằng `base` (mã 4). Trang hiện "Changed since you opened it: reload".
 - **Rationale**: FR-024 và FR-025 không cần khoá phân tán. Thư mục phim là một chỗ duy nhất.

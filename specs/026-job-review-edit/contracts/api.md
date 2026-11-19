@@ -1,6 +1,6 @@
 # Contract: API v1 (bổ sung)
 
-Quyền giống `GET /jobs/{id}` (specs/025): local thì mọi người dùng của máy; online và app thì chủ việc hoặc chủ xưởng, người khác nhận `404 not_found`. Mã API (specs/009) được dùng, tên quyền là `jobs:write`. Mọi lỗi theo dạng hiện có `{"error": {"code", "message"}}`.
+Quyền giống `GET /jobs/{id}` (specs/025): local thì mọi người dùng của máy; online và app thì chủ việc hoặc chủ xưởng, người khác nhận `404 not_found`. Mã API (specs/009) gọi được các đường này qua cơ chế hiện có (`tokens.is_forbidden`), không thêm phạm vi quyền. Mọi lỗi theo dạng hiện có `{"error": {"code", "message"}}`.
 
 ## `GET /api/v1/jobs/{id}/steps`
 
@@ -40,7 +40,7 @@ Trả tài liệu `action` (data-model), có `status` và `result`. Trang theo d
 
 ## `PUT /api/v1/jobs/{id}/points`
 
-Body: `{"on": ["script", "shots", "voice"]}`. Chạy `point set` (local) hoặc một thao tác `point-set` (online). Đổi một điểm đang `approved` hay `waiting` thì nhận `409 point_locked`.
+Body: `{"on": ["script", "shots", "voice"]}`. Gọi thẳng `points.set_on` (local và online: chỉ ghi `checks.json`, không cần container). Đổi một điểm đang `approved` hay `waiting` thì nhận `409 point_locked`.
 
 ## `POST /api/v1/reviews/{rid}/decision` (đổi)
 

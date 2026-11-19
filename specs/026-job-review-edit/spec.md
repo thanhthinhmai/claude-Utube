@@ -201,8 +201,8 @@ Sau Self-check, chủ phim xem ba tiêu đề và thumbnail của gói đăng, c
 ### Session 2026-11-19
 
 - Q: Điểm duyệt nào được bật cho một phim? → A: Mặc định theo kênh (Script và Shots bật), đặt bằng 5 ô đánh dấu trên trang kênh hoặc `channel set … reviews`; đổi được cho từng phim khi bắt đầu và trong lúc làm (điểm chưa tới). Không dùng file Excel cho cấu hình này.
-- Q: Ai chạy lại các bước phụ thuộc sau khi sửa trên trang? → A: Trang chỉ chạy lệnh của bước đang sửa (không gọi Claude); agent làm lại các bước "Must run again" sau khi duyệt (FR-016a). Mặc định do Claude chốt, theo hiến pháp V (đơn giản).
-- Q: Sửa kịch bản trên trang có chạy lại lượt biên tập Claude không? → A: Không; chỉ máy chấm theo luật (FR-006).
+- Q: Ai chạy lại các bước phụ thuộc sau khi sửa trên trang? → A: Trang chỉ chạy lệnh của bước đang sửa (không gọi Claude); agent làm lại các bước "Must run again" sau khi duyệt (FR-016a). Mặc định do Claude đề xuất, người dùng xác nhận 2026-11-19.
+- Q: Sửa kịch bản trên trang có chạy lại lượt biên tập Claude không? → A: Không; chỉ máy chấm theo luật (FR-006). Người dùng xác nhận 2026-11-19.
 - Ngoài phạm vi 026: nhập danh sách nhiều phim từ một bảng tính (CSV/Excel) để làm số lượng lớn; làm thành spec riêng sau khi 026 xong.
 
 ## Assumptions

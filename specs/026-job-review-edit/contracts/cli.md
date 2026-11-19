@@ -15,6 +15,7 @@ Cổng nằm trong các lệnh có sẵn:
 
 - `voice make <phim>`: chặn khi cổng `script` có lý do. Bỏ qua bằng `--skip-review "<lý do>"` (ghi vào `reviews.skipped`).
 - `voice make <phim> --only L09,L10`: chỉ tạo lại các dòng đó (R8).
+- `voice make <phim> --changed`: chỉ tạo lại các dòng có chữ, `say`, giọng hoặc tốc độ khác lần tạo trước (theo `voices/.made.json`) hoặc thiếu `wav` (R7).
 - `render <phim>`: `render-gate` chặn thêm theo cổng `shots`. `--skip-checks "<lý do>"` bỏ qua cả cổng này và được ghi lại.
 - `qc shots <phim> --only S012[,S013]`: chỉ vẽ ảnh xem trước, không ghi kết quả tầng (R10).
 
