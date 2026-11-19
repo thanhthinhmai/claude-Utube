@@ -390,5 +390,36 @@
     "huge → insert → insert"
    ]
   }
+ },
+ "craft": {
+  "source": "learn craft-label dusk-hypothetical-3, 2026-11-19, 1650 shots of 8 videos (skipped v03, v08), craftlabel 56331af26eb1",
+  "action": {
+   "share_p25": 0.1,
+   "share_p50": 0.139,
+   "share_p75": 0.149,
+   "min": 0.1,
+   "rule": "error"
+  },
+  "outdoor": {
+   "range": [
+    0.286,
+    0.756
+   ],
+   "rule": "warn"
+  },
+  "prop": {
+   "range": [
+    0.075,
+    0.247
+   ],
+   "rule": "warn"
+  },
+  "ots": {
+   "range": [
+    0.044,
+    0.241
+   ],
+   "rule": "warn"
+  }
  }
 }

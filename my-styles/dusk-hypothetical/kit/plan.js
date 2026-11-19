@@ -13,14 +13,39 @@ export const camName = (cam) => (typeof cam === 'string' ? cam : cam && cam.name
 const castOf = (s) => s.cast || [];
 
 // specs/023: an act is a catalogue act, or face:<face>, pose:<pose>, look:<direction>
-export function actOk(name, catalog = CATALOG) {
-  if (typeof name !== 'string') return false;
-  if ((catalog.acts || []).includes(name)) return true;
-  const m = /^([a-z]+):(.+)$/.exec(name); if (!m) return false;
-  const allowed = (catalog.act_prefixes || {})[m[1]];
-  const list = typeof allowed === 'string' ? catalog[allowed] : allowed;
-  return Array.isArray(list) && list.includes(m[2]);
+// specs/027: a catalogue act may name an item and a partner: throw:ball, give:cash@1, high-five@1 (partner = cast index)
+export function parseAct(name, catalog = CATALOG) {
+  if (typeof name !== 'string') return null;
+  const [head, at] = name.split('@');
+  const who = at === undefined ? null : (/^\d+$/.test(at) ? Number(at) : NaN);
+  const [base, item] = head.split(':');
+  if ((catalog.acts || []).includes(base)) return { base, item: item ?? null, who, prefix: null };
+  if (at !== undefined) return null;
+  return { base: head, item: null, who: null, prefix: item === undefined ? null : base, value: item ?? null };
 }
+
+export function actOk(name, catalog = CATALOG) {
+  const a = parseAct(name, catalog); if (!a) return false;
+  if (!a.prefix) {
+    if (!(catalog.acts || []).includes(a.base)) return false;
+    if (a.item && !Object.hasOwn(catalog.items || {}, a.item)) return false;
+    if (Number.isNaN(a.who)) return false;
+    return true;
+  }
+  const allowed = (catalog.act_prefixes || {})[a.prefix];
+  const list = typeof allowed === 'string' ? catalog[allowed] : allowed;
+  return Array.isArray(list) && list.includes(a.value);
+}
+
+// gesture, body or pair (research R5): only body and pair acts count as real action; pose:<p> takes the kind of p
+export function kindOf(name, catalog = CATALOG) {
+  const a = parseAct(name, catalog); if (!a) return null;
+  const kinds = catalog.act_kinds || {};
+  if (!a.prefix) return (kinds[a.base] || {}).kind || 'gesture';
+  if (a.prefix === 'pose') return (kinds[a.value] || {}).kind || 'gesture';
+  return 'gesture';
+}
+
 const spans = (x) => Array.isArray(x) && x.every((r) => Array.isArray(r) && r.length === 2 && r[0] < r[1]);
 
 // Throws Error("<scene id>: <reason>") on the first problem.
@@ -48,16 +73,23 @@ export function check(scenes, catalog = CATALOG) {
       if (c.face && !has(catalog.faces, c.face)) bad(`unknown face "${c.face}"`);
       if (c.hair && !has(catalog.hair, c.hair)) bad(`unknown hair "${c.hair}"`);
       if (c.hat && !has(catalog.hats, c.hat)) bad(`unknown hat "${c.hat}"`);
+      if (c.item != null && !Object.hasOwn(catalog.items || {}, c.item)) bad(`unknown item "${c.item}"`);
+      if (c.hand != null && !['left', 'right'].includes(c.hand)) bad('hand is "left" or "right"');
       if (c.act !== undefined) {
         if (!Array.isArray(c.act)) bad('act is a list of [seconds, act]');
         for (const a of c.act) {
           if (!Array.isArray(a) || typeof a[0] !== 'number' || a[0] < 0 || a[0] >= s.dur) bad(`act time ${a && a[0]} outside the scene (0–${s.dur} s)`);
           if (!actOk(a[1], catalog)) bad(`unknown act "${a[1]}"`);
+          const pa = parseAct(a[1], catalog), spec = pa && !pa.prefix ? (catalog.act_kinds || {})[pa.base] || {} : {};
+          if (spec.needs === 'partner') {
+            const k = castOf(s).indexOf(c);
+            if (pa.who == null || pa.who === k || !castOf(s)[pa.who]) bad(`act "${a[1]}" needs a partner: ${pa.base}@<cast index of another person>`);
+          }
         }
       }
       if (c.talk !== undefined && !(spans(c.talk) && c.talk.every(([a, b]) => a >= 0 && b <= s.dur + 1e-9))) bad('talk is [[t0, t1], …] inside the scene');
       if (c.path !== undefined) {
-        if (c.pose !== 'walk') bad('path needs pose "walk"');
+        if (!['walk', 'run', 'carry'].includes(c.pose)) bad('path needs pose "walk", "run" or "carry"');
         if (!(Array.isArray(c.path) && c.path.length >= 2 && c.path.every((p, k) => Array.isArray(p) && p.length === 3 && (k === 0 || p[0] > c.path[k - 1][0])))) bad('path is [[seconds, x, z], …] in time order');
       }
       if (c.swap !== undefined && !(c.swap && typeof c.swap === 'object' && (c.act || []).some((a) => a[1] === 'swap'))) bad('swap is a look {hoodie, hair, hat, glasses} with an act "swap"');
@@ -130,21 +162,80 @@ export function moveOf(scene, template = null, catalog = CATALOG) {
   return { type: 'drift-h', speed: b.drift_px_s ? between(r(), ...b.drift_px_s) : 16 };
 }
 
-export function plan(scenes, cues = [], catalog = CATALOG, template = null) {
+// the person who talks in a scene: cast[].talk first, else the first speech bubble's person; null when nobody talks
+export function speakerOf(s) {
+  const cast = castOf(s);
+  const k = cast.findIndex((c) => Array.isArray(c.talk) && c.talk.length);
+  if (k >= 0) return k;
+  const b = (s.gfx || []).find((g) => g.type === 'bubble' && Number.isInteger(g.who) && cast[g.who]);
+  return b ? b.who : null;
+}
+
+const inRoom = (room, at) => at[0] >= room.x0 && at[0] <= room.x1 && at[1] >= room.z0 && at[1] <= room.z1;
+
+// specs/027 R6: a scene with two or more people and someone talking, with no camera written, is shot over the shoulder
+// at the speaker; the next such scene of the same pair turns round (shows the other one when the same person talks
+// on) and keeps the camera on the same side of the line between them (side flips with the subject). A person placed
+// outside the set's room cannot carry the shoulder: then a medium shot of the speaker, with a note.
+// info: {set name: {room, outdoor}} from the page's sets. Returns {scenes, notes}.
+export function withDefaults(scenes, info = {}) {
+  let prev = null; const notes = [];
+  const out = (scenes || []).map((s) => {
+    const cast = castOf(s);
+    if (!s || s.cam !== undefined || cast.length < 2) { prev = null; return s; }
+    const sp = speakerOf(s);
+    if (sp == null) { prev = null; return s; }
+    const room = (info[s.set] || {}).room;
+    if (room && cast.some((c) => Array.isArray(c.at) && !inRoom(room, c.at))) {
+      notes.push(`${s.id}: someone stands outside the set's room, so no over-the-shoulder shot: mid-eye on cast ${sp}`);
+      prev = null;
+      return { ...s, cam: { name: 'mid-eye', subject: sp }, _autoCam: 'mid-eye' };
+    }
+    const other = sp === 0 ? 1 : 0;
+    const pair = [cast[sp].who, cast[other].who].sort();
+    let subject = sp;
+    if (prev && prev.pair === pair.join('|') && prev.who === cast[sp].who) subject = other;
+    prev = { pair: pair.join('|'), who: cast[subject].who };
+    return { ...s, cam: { name: 'ots', subject, side: cast[subject].who === pair[0] ? 1 : -1 }, _autoCam: 'ots' };
+  });
+  return { scenes: out, notes };
+}
+
+// one row of window.CRAFT (data-model.md): people, real action, outdoors, someone holding an item, the camera, card
+export function craftOf(s, info = {}, catalog = CATALOG) {
+  const cast = castOf(s), kinds = catalog.act_kinds || {};
+  const card = s.set === 'void' || (s.gfx || []).some((g) => ['title', 'chapter', 'end-choice'].includes(g.type));
+  const acts = (c) => (c.act || []).map((a) => parseAct(a[1], catalog)).filter((a) => a && !a.prefix);
+  const action = cast.some((c) => (kinds[c.pose] || {}).kind === 'body'
+    || (c.act || []).some((a) => ['body', 'pair'].includes(kindOf(a[1], catalog))));
+  const holds = (c, i) => !!c.item || /^hold-/.test(c.pose || '') || (kinds[c.pose] || {}).item
+    || acts(c).some((a) => a.item || (kinds[a.base] || {}).item)
+    || cast.some((o) => acts(o).some((a) => a.base === 'give' && a.who === i));
+  const outdoor = !!((info[s.set] || {}).outdoor ?? ((catalog.set_info || {})[s.set] || {}).outdoor);
+  // acts that need an item and name none (they use the act's own item: qc plan warns craft_item_default)
+  const itemDefault = cast.flatMap((c) => acts(c).filter((a) => (kinds[a.base] || {}).item && !a.item).map((a) => a.base));
+  return { people: cast.length, action: !card && action, outdoor: !card && outdoor, prop: !card && cast.some(holds),
+    cam: camName(s.cam), card, ...(itemDefault.length ? { item_default: itemDefault } : {}) };
+}
+
+export function plan(scenes, cues = [], catalog = CATALOG, template = null, info = {}) {
+  const auto = withDefaults(scenes, info);
+  scenes = auto.scenes;
   check(scenes, catalog);
-  let t = 0; const timed = [], SHOTS = [], CARDS = [], CAST = [], MOVES = [];
+  let t = 0; const timed = [], SHOTS = [], CARDS = [], CAST = [], MOVES = [], CRAFT = [];
   for (const s of scenes) {
     const t0 = R(t), t1 = R(t + s.dur), move = moveOf(s, template, catalog);
     const acts = castOf(s).reduce((n, c) => n + (c.act || []).length, 0);
     timed.push({ ...s, t0, t1, _move: move }); SHOTS.push([t0, t1, s.set, s.id]); CARDS.push(...cardsOf(s, t0));
     CAST.push([t0, t1, s.id, castOf(s).length]); MOVES.push([t0, t1, s.id, move.type, acts]);
+    CRAFT.push([t0, t1, s.id, craftOf(s, info, catalog)]);
     t += s.dur;
   }
   const DUR = R(t);
   // cues as rows [t0, t1, text] or as the studio's cues.json objects {t0, t1, text}
   const CUES = (cues || []).map((c) => (Array.isArray(c) ? c : [c.t0, c.t1, c.text]))
     .map(([a, b, x]) => [R(a), R(b), String(x)]).filter(([a, b]) => b > a && a < DUR);
-  return { DUR, SHOTS, CARDS, CUES, CAST, MOVES, scenes: timed };
+  return { DUR, SHOTS, CARDS, CUES, CAST, MOVES, CRAFT, NOTES: auto.notes, scenes: timed };
 }
 
 // the scene on screen at time t (binary search; the last scene owns t = DUR)
