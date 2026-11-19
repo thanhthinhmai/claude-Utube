@@ -175,6 +175,39 @@ class Pack(Base):
         self.assertLess(time.time() - t0, 10)            # SC-003
 
 
+class Chosen(Base):                                                # specs/026 T050
+    def test_chosen_title_first(self):
+        d = self.copy("chosen")
+        pk = json.loads((d / "publish" / "pack.json").read_text())
+        pk["chosen"] = 2
+        (d / "publish" / "pack.json").write_text(json.dumps(pk))
+        p = publish.read_pack(d)
+        publish.write_publish_md(d, p, [], [])
+        rows = [l for l in (d / "publish" / "PUBLISH.md").read_text().splitlines() if l.startswith("| ")]
+        self.assertTrue(rows[1].startswith("| 2 (chosen) |"), rows)   # rows[0] is the header
+        pk["chosen"] = 4
+        (d / "publish" / "pack.json").write_text(json.dumps(pk))
+        with self.assertRaises(publish.PublishError):
+            publish.read_pack(d)
+
+    def test_publish_edit(self):
+        import os
+        from filmcheck import edit, points
+        d = self.copy("pub-edit")
+        os.environ["STUDIO_EDIT_NO_RUN"] = "1"
+        try:
+            base = points.fingerprint(d, "publish")
+            self.assertEqual(edit.run(d, "publish", {"hashtags": "#a,#b"}, base=base)["code"], 2)
+            self.assertEqual(edit.run(d, "publish", {"chosen": "4"}, base=base)["code"], 2)
+            r = edit.run(d, "publish", {"chosen": "3", "hashtags": "egypt,history,tombs"}, base=base)
+            self.assertEqual(r["code"], 0, r)
+            pk = json.loads((d / "publish" / "pack.json").read_text())
+            self.assertEqual((pk["chosen"], pk["hashtags"]), (3, ["#egypt", "#history", "#tombs"]))
+            self.assertEqual(r["stale"], [])
+        finally:
+            os.environ.pop("STUDIO_EDIT_NO_RUN", None)
+
+
 class Report(Base):
     def test_publish_and_script_results_live_together(self):
         d = self.copy("report")

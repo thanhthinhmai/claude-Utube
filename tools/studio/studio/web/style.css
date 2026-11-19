@@ -529,3 +529,11 @@ table.lessons tr.l-draft td:nth-child(2) { color: var(--warn, #b26b00); font-wei
 .edit-mix .mixrow { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr) 70px; gap: 10px; align-items: center; padding: 6px 0; font-size: 13px; }
 .edit-mix input[type=range] { width: 100%; accent-color: var(--accent); }
 @media (max-width: 560px) { .edit-mix .mixrow { grid-template-columns: 1fr; } }
+.edit-publish { display: grid; gap: 8px; }
+.edit-publish .titles { display: grid; gap: 8px; }
+.edit-publish .title-pick { display: grid; grid-template-columns: auto 160px minmax(0, 1fr); gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 8px; cursor: pointer; }
+.edit-publish .title-pick.on { border-color: var(--accent); background: var(--accent-soft); }
+.edit-publish .title-pick img { width: 160px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: var(--hover); max-width: 100%; }
+.edit-publish .title-pick span { display: grid; gap: 2px; }
+.edit-publish textarea { min-height: 90px; } .edit-publish input#pub-tags { width: 100%; }
+@media (max-width: 560px) { .edit-publish .title-pick { grid-template-columns: auto minmax(0, 1fr); } .edit-publish .title-pick img { grid-column: 2; width: 100%; } }

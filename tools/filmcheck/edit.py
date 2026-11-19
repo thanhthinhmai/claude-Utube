@@ -500,3 +500,48 @@ def mix_edit(d: Path, a: dict) -> dict:
         if m.returncode:
             return {**out, "ok": False, "error": (m.stderr or m.stdout).strip()[-300:]}
     return out
+
+
+# ---------- publish (US5) ----------
+@op("publish", "publish")
+def publish_edit(d: Path, a: dict) -> dict:
+    import re
+    f = d / "publish" / "pack.json"
+    try:
+        pk = json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        raise EditError(f"publish/pack.json cannot be read: {e}") from None
+    old = {k: pk.get(k) for k in ("chosen", "summary", "hashtags")}
+    if a.get("chosen"):
+        if str(a["chosen"]) not in ("1", "2", "3"):
+            raise EditError("chosen: 1, 2 or 3")
+        pk["chosen"] = int(a["chosen"])
+    desc = a.get("description")
+    if desc is None and a.get("description_file"):
+        try:
+            desc = Path(a["description_file"]).read_text(encoding="utf-8")
+        except OSError as e:
+            raise EditError(f"the description file cannot be read: {e}") from None
+    if desc is not None:
+        desc = desc.strip()
+        if not desc or len(desc) > 4000:
+            raise EditError("the description: 1–4000 characters")
+        pk["summary"] = desc
+    if a.get("hashtags"):
+        tags = [("#" + t.strip().lstrip("#")) for t in str(a["hashtags"]).split(",") if t.strip()]
+        if not 3 <= len(tags) <= 5 or not all(re.fullmatch(r"#\w{1,29}", t) for t in tags):
+            raise EditError("hashtags: 3–5 tags such as #science (letters and digits, at most 30 characters)")
+        pk["hashtags"] = tags
+    new = {k: pk.get(k) for k in ("chosen", "summary", "hashtags")}
+    if new == old:
+        raise EditError("nothing to change: chosen=…, a description or hashtags=…")
+    write_atomic(f, json.dumps(pk, ensure_ascii=False, indent=1) + "\n")
+    if no_run():
+        return {"ref": "pack", "old": old, "new": new, "ok": True}
+    code, txt = studio_cli("publish", str(d), "--no-draw", "--json")
+    try:
+        r = json.loads(txt.splitlines()[-1])
+    except (ValueError, IndexError):
+        return {"ref": "pack", "old": old, "new": new, "ok": False, "error": txt[-300:]}
+    return {"ref": "pack", "old": old, "new": new, "ok": bool(r.get("pass")), "check": {"pass": r.get("pass"),
+            "problems": (r.get("problems") or [])[:10]}}

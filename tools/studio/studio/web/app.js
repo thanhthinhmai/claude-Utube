@@ -505,6 +505,7 @@ async function editPanel(body) {
   const edit = { script: async () => { const sc = body.querySelector(".script"); if (sc) sc.remove(); await editScript(body); },
     voice: async () => { body.querySelectorAll(".tbl, .done-actions").forEach((x) => x.remove()); await editVoice(body); },
     mix: async () => editMix(body),
+    publish: async () => editPublish(body),
     shots: async () => {
       body.querySelectorAll(".thumbs, .sheet-img, .done-actions.spread, .sheet-img + p, #done-more-shots").forEach((x) => x.remove());
       await editShots(body);
@@ -513,7 +514,8 @@ async function editPanel(body) {
   if (edit && canEdit(pt)) {                          // not waiting: the read-only view stays, with a way in
     const btn = document.createElement("button");
     btn.className = "btn"; btn.id = "open-edit";
-    btn.textContent = { script: "Edit paragraphs", shots: "Change shots", voice: "Change the voice", mix: "Change the mix" }[pt];
+    btn.textContent = { script: "Edit paragraphs", shots: "Change shots", voice: "Change the voice", mix: "Change the mix",
+      publish: "Change the publish pack" }[pt];
     btn.onclick = () => { RAIL.open = pt; DONE.drawn = {}; doneRefresh(true); };
     body.prepend(btn);
   }
@@ -1006,6 +1008,39 @@ function editMix(body) {
   };
   body.append(box);
   approveBar(body, "mix");
+}
+
+/** Publish panel: pick one of the three titles (with its thumbnail), change the description and hashtags (US5).
+ * @param {HTMLElement} body */
+async function editPublish(body) {
+  /** @type {any} */ let pk = null;
+  try { pk = await (await fetch(fileUrl("publish/pack.json"), { cache: "no-store" })).json(); } catch { pk = null; }
+  if (!pk || !Array.isArray(pk.titles)) { approveBar(body, "publish"); return; }
+  const ed = canEdit("publish");
+  let chosen = pk.chosen || 1;
+  const box = document.createElement("div");
+  box.className = "edit-publish";
+  box.innerHTML = `<div class="titles">${pk.titles.map((/** @type {any} */ t, /** @type {number} */ i) => `<label class="title-pick${i + 1 === chosen ? " on" : ""}">
+      <input type="radio" name="pub-title" value="${i + 1}" ${i + 1 === chosen ? "checked" : ""} ${ed ? "" : "disabled"}>
+      <img src="${fileUrl(`publish/thumbnail-${i + 1}.png`)}" alt="Thumbnail ${i + 1}" onerror="this.onerror=null;this.src=this.src.replace('.png','.jpg')">
+      <span><b>${esc(t.text)}</b><span class="muted small">${esc(t.angle)} · on the picture: “${esc((t.thumb || {}).text || "")}”</span></span></label>`).join("")}</div>
+    <label class="small muted" for="pub-desc">Description</label><textarea id="pub-desc" maxlength="4000" ${ed ? "" : "disabled"}>${esc(pk.summary || "")}</textarea>
+    <label class="small muted" for="pub-tags">Hashtags (3–5, comma between)</label><input id="pub-tags" value="${esc((pk.hashtags || []).join(", "))}" ${ed ? "" : "disabled"}>
+    <div class="row done-actions"><button class="primary" id="pub-save" ${ed ? "" : "disabled"}>Save and check</button><span class="msg small">${esc(RAIL.msg.publish || "")}</span></div>`;
+  box.querySelectorAll("input[name=pub-title]").forEach((el) => { /** @type {HTMLInputElement} */ (el).onchange = () => {
+    chosen = Number(/** @type {HTMLInputElement} */ (el).value);
+    box.querySelectorAll(".title-pick").forEach((x) => x.classList.toggle("on", x.contains(el)));
+  }; });
+  /** @type {HTMLElement} */ (box.querySelector("#pub-save")).onclick = async (e) => {
+    const btn = /** @type {HTMLButtonElement} */ (e.currentTarget); btn.disabled = true;
+    const args = { chosen: String(chosen), description: /** @type {HTMLTextAreaElement} */ (box.querySelector("#pub-desc")).value,
+      hashtags: /** @type {HTMLInputElement} */ (box.querySelector("#pub-tags")).value };
+    try { const x = await sendEdit("publish", "publish", args); RAIL.msg.publish = editMsg(x) + ((x.result && x.result.check && x.result.check.problems || []).length ? ` ${x.result.check.problems[0]}` : ""); }
+    catch (err) { RAIL.msg.publish = /** @type {Error} */ (err).message; }
+    DONE.drawn = {}; doneRefresh(true);
+  };
+  body.append(box);
+  approveBar(body, "publish");
 }
 
 /** Live updates on a job page: only what changed, so a playing line or the open section stays (specs/025 R5).

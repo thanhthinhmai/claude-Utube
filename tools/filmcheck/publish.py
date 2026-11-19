@@ -124,6 +124,9 @@ def read_pack(d: Path) -> dict:
     if not isinstance(pk.get("hashtags"), list) or not all(isinstance(x, str) for x in pk["hashtags"]):
         raise PublishError("pack.json: 'hashtags' must be a list of strings")
     pk.setdefault("language", "")
+    ch_ = pk.setdefault("chosen", 1)                     # specs/026: the title the owner picked on the job page
+    if ch_ not in (1, 2, 3):
+        raise PublishError("pack.json: 'chosen' must be 1, 2 or 3")
     return pk
 
 
@@ -502,9 +505,11 @@ def write_publish_md(d: Path, pack: dict, notes: list, problems: list) -> None:
     rows = [f"# Publish: {title}", "",
             f"Video: ../{d.name}.mp4" + (f" · Subtitles: subtitles.srt ({lang})" if has_srt else ""), "",
             "## Pick one pair", "", "| # | Angle | Title | Thumbnail | Text on it |", "|---|---|---|---|---|"]
-    for i, t in enumerate(pack["titles"]):
+    chosen = pack.get("chosen", 1) - 1
+    for i in [chosen] + [k for k in range(len(pack["titles"])) if k != chosen]:     # the picked title first (026)
+        t = pack["titles"][i]
         cell = lambda s: str(s).replace("|", "\\|")        # noqa: E731
-        rows.append(f"| {i + 1} | {ANGLE_LABEL.get(t['angle'], t['angle'])} | {cell(t['text'])} | {files[i]} | "
+        rows.append(f"| {i + 1}{' (chosen)' if i == chosen else ''} | {ANGLE_LABEL.get(t['angle'], t['angle'])} | {cell(t['text'])} | {files[i]} | "
                     f"{cell(t['thumb']['text'])} |")
     desc = (d / "publish" / "description.md")
     rows += ["", "## Description (copy all)", "", "```text", desc.read_text(encoding="utf-8").rstrip() if desc.is_file() else "",

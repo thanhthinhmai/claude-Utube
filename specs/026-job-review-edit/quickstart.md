@@ -102,3 +102,8 @@ Thử thật (SC-006): làm một phim 5 phút bằng chat, có ít nhất một
 - `edit review-trial mix music=none sfx=-6`: trộn lại bằng tiếng thật trong **14 s**; chỉ Self-check và Publish phải làm lại; dấu hình không đổi (test).
 - Test âm thanh: chọn `music: none` thì đoạn lặng giữa các câu nhỏ hơn 10 lần so với có nhạc.
 - Khi làm, "nhạc giữa các nhịp" được hiểu là mức giảm nhạc khi có lời (`duck_db`, research R11).
+
+### US5, 2026-11-19 (bản chép của `aged-backward`): **đạt**
+
+- `edit … publish chosen=2`: lưu trong 0,3 s; `PUBLISH.md` xếp tiêu đề 2 lên đầu, ghi "(chosen)"; kiểm gói đăng chạy lại (ở bản chép báo phụ đề cũ, đúng là "lưu được, kiểm chưa đạt", mã 1).
+- Test: `chosen` ngoài 1–3 bị từ chối; hashtag phải có 3–5 cái; đổi gói đăng không làm bước nào phải làm lại.

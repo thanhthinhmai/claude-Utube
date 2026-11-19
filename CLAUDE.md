@@ -97,6 +97,7 @@ Mỗi yêu cầu đi đúng **một** luồng:
 3a. **Gói đăng** (specs/011, mọi phim), sau Self-check:
    - Gói đăng dùng phụ đề đã đạt tầng 1 của phim; thumbnail được chụp không có phụ đề và thẻ chữ của phim.
    - Viết `films/<tên>/publish/pack.json` theo `specs/011-publish-pack/contracts/files.md`: 3 tiêu đề (tò mò, con số hoặc lợi ích, câu hỏi), mỗi tiêu đề có một thumbnail (thời điểm lấy từ bảng ảnh Self-check, chữ trên ảnh bổ sung chứ không lặp tiêu đề), 2 dòng mở đầu, tóm tắt, chương, 3–5 hashtag. Viết bằng ngôn ngữ của phim; số chỉ lấy từ `SCRIPT.md` hoặc `SOURCES.md`; không nêu tên kênh nào.
+   - **Điểm Publish** (specs/026, bật theo kênh): sau `publish` lần đầu, gửi `review request … --kind publish --film <tên>`; người dùng chọn tiêu đề (`chosen` trong `pack.json`), sửa mô tả và hashtag trên trang.
    - `sh bin/studio publish <tên>`. Mã 1: sửa `pack.json` một lần rồi chạy lại; còn lỗi thì báo người dùng một dòng khi giao. Gói đăng không chặn việc giao phim.
    - Phim cũ đã xong (kể cả trước 010): người dùng nhờ "làm gói đăng cho <tên>" thì làm đúng hai bước trên, không dựng lại phim.
 4. Không sửa file nào trong `lib/` (hiến pháp VI). Muốn dùng phiên bản thư viện mới thì đổi `library.lock` theo quy trình spec-kit.

@@ -123,10 +123,10 @@ description: "Tasks for 026 — review points and edits on the film job page"
 
 **Independent Test**: với phim đã có gói đăng, chọn tiêu đề 2, sửa hashtag, `publish --check-only` đạt.
 
-- [ ] T050 [P] [US5] Test trong `tests/filmcheck/test_publish.py`: `pack.json` có `chosen: 2` → `PUBLISH.md` xếp tiêu đề 2 lên đầu; `chosen: 4` → lỗi; thao tác `publish hashtags=a,b` (2 hashtag) → mã 2
-- [ ] T051 [US5] `chosen` trong `tools/filmcheck/publish.py` và `specs/011-publish-pack/contracts/files.md`; thao tác `publish` trong `tools/filmcheck/edit.py`
-- [ ] T052 [US5] Khung Publish trên trang (`web/app.js`): ba tiêu đề kèm thumbnail (đường `/films/<tên>/publish/<tệp>` hiện có), chọn một, ô mô tả, ô hashtag, kết quả kiểm
-- [ ] T053 [US5] Điểm publish trong `CLAUDE.md` và `tools/runner/agent.py`
+- [X] T050 [P] [US5] Test trong `tests/filmcheck/test_publish.py`: `pack.json` có `chosen: 2` → `PUBLISH.md` xếp tiêu đề 2 lên đầu; `chosen: 4` → lỗi; thao tác `publish hashtags=a,b` (2 hashtag) → mã 2
+- [X] T051 [US5] `chosen` trong `tools/filmcheck/publish.py` và `specs/011-publish-pack/contracts/files.md`; thao tác `publish` trong `tools/filmcheck/edit.py`
+- [X] T052 [US5] Khung Publish trên trang (`web/app.js`): ba tiêu đề kèm thumbnail (đường `/films/<tên>/publish/<tệp>` hiện có), chọn một, ô mô tả, ô hashtag, kết quả kiểm
+- [X] T053 [US5] Điểm publish trong `CLAUDE.md` và `tools/runner/agent.py`
 
 ---
 
