@@ -1,0 +1,28 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Sketch Explainer kit catalogue</title></head>
+<body>
+<script type="module">
+// The kit's catalogue as a film page (specs/028 T013, FR-002): one shot per set, then the roles, poses, expressions,
+// props and board kinds. `qc shots` can check it and the GPU test compares it with a software render (T031).
+import { film, CATALOG } from './film.js';
+const D = 1.5, scenes = [];
+CATALOG.sets.forEach((s, i) => scenes.push({ id: 'set-' + s, dur: D, set: s, cam: { size: 'huge', move: 'still' }, vig: 0,
+  cast: s === 'office' ? [{ who: 'narrator', x: 960, seat: true, s: 0.8, still: true }] : [{ who: 'narrator', x: 1500, s: 0.5, still: true }], cap: [s, '', 400, 120, 0] }));
+const roles = [...CATALOG.roles, 'extra:1', 'extra:2', 'extra:3'];
+for (let k = 0; k < roles.length; k += 5) scenes.push({ id: 'roles-' + k, dur: D, set: 'dark', cam: { size: 'huge', move: 'still' }, vig: 0,
+  cast: roles.slice(k, k + 5).map((w, i) => ({ who: w, x: 260 + i * 350, s: 0.5, still: true })), lab: roles.slice(k, k + 5).map((w, i) => [w, '', 260 + i * 350, 1040, 260 + i * 350, 1000, 0, 0]) });
+for (let k = 0; k < CATALOG.poses.length; k += 5) scenes.push({ id: 'poses-' + k, dur: D, set: 'dark', cam: { size: 'huge', move: 'still' }, vig: 0,
+  cast: CATALOG.poses.slice(k, k + 5).map((p, i) => ({ who: 'narrator', x: 260 + i * 350, s: 0.5, pose: p, still: true })), lab: CATALOG.poses.slice(k, k + 5).map((p, i) => [p, '', 260 + i * 350, 1040, 260 + i * 350, 1000, 0, 0]) });
+for (let k = 0; k < CATALOG.exprs.length; k += 6) scenes.push({ id: 'exprs-' + k, dur: D, set: 'dark', cam: { size: 'huge', move: 'still' }, vig: 0,
+  cast: CATALOG.exprs.slice(k, k + 6).map((e, i) => ({ who: 'narrator', x: 220 + i * 300, s: 0.45, expr: e, still: true })), lab: CATALOG.exprs.slice(k, k + 6).map((e, i) => [e, '', 220 + i * 300, 1040, 220 + i * 300, 1000, 0, 0]) });
+for (let k = 0; k < CATALOG.props.length; k += 6) scenes.push({ id: 'props-' + k, dur: D, set: 'dark', cam: { size: 'huge', move: 'still' }, vig: 0,
+  props: CATALOG.props.slice(k, k + 6).map((p, i) => [p, 220 + i * 300, 520, 0.6, p === 'tag' ? 'tag' : p === 'paperstack' || p === 'coinstack' ? 8 : p === 'robot' ? 1 : 0]),
+  lab: CATALOG.props.slice(k, k + 6).map((p, i) => [p, '', 220 + i * 300, 900, 220 + i * 300, 860, 0, 0]) });
+const B = { num: { k: 'num', text: '$12B', sub: 'sub', at: 0 }, bars: { k: 'bars', title: 'bars', items: [['a', 3, 'blue'], ['b', 7, 'growth']], at: 0 },
+  list: { k: 'list', title: 'list', rows: ['one', 'two', 'three'], hi: 1, at: 0, step: 0 }, vs: { k: 'vs', l: ['A', 'left', 'blue'], r: ['B', 'right', 'loss'], at: 0 },
+  pie: { k: 'pie', sl: [['slice a', 30, 'gold'], ['slice b', 20, 'blue']], at: -2 }, line: { k: 'line', points: [1, 2, 1.5, 3, 4, 3.6, 5], at: -2 } };
+for (const look of CATALOG.looks) for (const k of CATALOG.boards) scenes.push({ id: `board-${look}-${k}`, dur: D, set: look === 'chalk' ? 'whiteboard-room' : look === 'screen' ? 'newsroom' : 'whiteboard-room', cam: { size: 'insert', move: 'still' }, vig: 0,
+  board: Object.assign({}, B[k], { look: look === 'screen' ? undefined : look }) });
+await film({ scenes });
+</script>
+</body></html>

@@ -109,3 +109,26 @@ class SoundCraft(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Segments(unittest.TestCase):
+    """specs/028 T036: effects and music windows only inside the measured segments."""
+
+    def test_only_inside_segments(self):
+        audio, words, plan, sfx_t = synth(seconds=40.0)
+        segs = [[0.0, 20.0]]
+        words_in = [w for w in words if w["end"] <= 20.0]          # the transcript covers only the segment
+        res = sc.analyze(audio, words_in, segs)
+        self.assertTrue(all(t < 20.0 for t in res["sfx"]["onsets"]))
+        self.assertTrue(all(w[1] <= 20.0 for w in res["music"]["windows"]))
+        full = sc.analyze(audio, words_in)                           # old way: speech after 20 s counts as effects
+        self.assertGreater(full["sfx"]["per_min"], res["sfx"]["per_min"])
+        self.assertAlmostEqual(res["sfx"]["per_min"], len(res["sfx"]["onsets"]) / (20.0 / 60), places=1)
+
+    def test_restrict_stored_result(self):
+        res = {"speech": {}, "music": {"windows": [[0.0, 5.0, True, -10.0], [60.0, 65.0, True, -9.0]], "tempo": None, "tempo_conf": "low"},
+               "sfx": {"onsets": [1.0, 2.0, 61.0, 62.0, 63.0], "per_min": 99}}
+        out = sc.restrict(res, [[0.0, 30.0]])
+        self.assertEqual(out["sfx"]["onsets"], [1.0, 2.0])
+        self.assertEqual(out["sfx"]["per_min"], 4.0)
+        self.assertEqual(len(out["music"]["windows"]), 1)

@@ -1,0 +1,37 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>kit try</title></head>
+<body>
+<script type="module">
+// A 60-second scene table that uses only names from kit/catalog.json (specs/028 T014, quickstart §2).
+// No story: a tour of sets, people, boards, signs and bubbles. Numbers here are placeholders for a kit check only.
+import { film } from './kit/film.js';
+const SCENES = [
+  { id: 'S001', dur: 2.8, card: { big: 'The kit', small: 'a test reel' } },
+  { id: 'S002', dur: 4.2, set: 'street-day', cam: { size: 'wide' }, cast: [{ who: 'narrator', x: 760, pose: 'palm', expr: 'happy' }, { who: 'extra:1', x: 1100 }, { who: 'extra:4', x: 1300, view: 'back' }],
+    cap: ['Monday', 'a test', 1500, 160] },
+  { id: 'S003', dur: 4.6, set: 'whiteboard-room', cam: { size: 'med' }, cast: [{ who: 'banker', x: 1500, pose: 'pointL', expr: 'excited' }],
+    board: { k: 'bars', title: 'sales (placeholder)', items: [['last year', 4, 'blue'], ['this year', 9, 'growth', 1.4]] } },
+  { id: 'S004', dur: 3.4, set: 'office', cam: { size: 'med' }, cast: [{ who: 'auditor', x: 960, seat: true, s: 0.8, expr: 'deadpan' }],
+    lab: [['the auditor', '', 1500, 200, 1100, 330, 0.5]] },
+  { id: 'S005', dur: 3.6, set: 'living-room', cam: { size: 'cu' }, cast: [{ who: 'narrator', x: 900, pose: 'hold', expr: 'worried' }],
+    sign: { who: 0, text: 'NOT AUDITED', sub: 'placeholder', col: 'loss', w: 420 } },
+  { id: 'S006', dur: 4.0, set: 'trading-floor', cam: { size: 'wide' }, cast: [{ who: 'trader', x: 600, pose: 'up', expr: 'excited', hop: 0.4 }, { who: 'banker', x: 1000, pose: 'raise', expr: 'excited' }, { who: 'extra:2', x: 1400, pose: 'up' }],
+    bub: [[0, '!', 0.6]] },
+  { id: 'S007', dur: 4.4, set: 'chalk-room', cam: { size: 'med' }, cast: [{ who: 'critic', x: 1500, pose: 'pointL', expr: 'neutral' }],
+    board: { k: 'list', title: 'risks', rows: ['one', 'two', 'three'], hi: 1 } },
+  { id: 'S008', dur: 3.2, set: 'spotlight', cam: { size: 'med' }, cast: [{ who: 'official', x: 960, pose: 'rest', expr: 'sad' }], trans: 'dissolve' },
+  { id: 'S009', dur: 4.0, set: 'tv-room', cam: { size: 'med' }, cast: [{ who: 'narrator', x: 1500, pose: 'pointL', expr: 'happy' }],
+    board: { k: 'num', count: [0, 12.5, 1], pre: '$', post: 'B', sub: 'placeholder' } },
+  { id: 'S010', dur: 3.8, set: 'meeting', cam: { size: 'wide' }, cast: [{ who: 'extra:5', x: 420 }, { who: 'banker', x: 760 }, { who: 'extra:6', x: 1100 }, { who: 'narrator', x: 1460, pose: 'palm', talk: [0.4, 3] }],
+    bub: [[3, 'It works!', 0.5]] },
+  { id: 'S011', dur: 3.0, set: 'vault-room', cam: { size: 'wide' }, cast: [{ who: 'auditor', x: 1500, pose: 'palm' }], cap: ['no cash leaves', '', 760, 160] },
+  { id: 'S012', dur: 4.2, set: 'custom:rooftop', custom: [['sky', { kind: 'sunset' }], ['skyline', { y: 820, col: '#6a5f7a', seed: 9 }], ['floor', { y: 900, col: '#5e5a62', planks: false }]],
+    cam: { size: 'med' }, cast: [{ who: 'narrator', x: 860, pose: 'think', expr: 'calm' }], think: { who: 0, picture: '' } },
+  { id: 'S013', dur: 3.6, set: 'newsroom', cam: { size: 'med' }, cast: [{ who: 'critic', x: 560, s: 0.7, pose: 'palm', talk: [0.3, 3.2] }],
+    board: { k: 'num', text: 'BREAKING', size: 80, sub: 'placeholder' } },
+  { id: 'S014', dur: 3.6, set: 'data-center', cam: { size: 'huge' }, cast: [{ who: 'worker', x: 960, walk: [600, 1300, 0, 3.4] }] },
+  { id: 'S015', dur: 4.4, set: 'park', cam: { size: 'wide' }, cast: [{ who: 'narrator', x: 800, pose: 'wide', expr: 'beam' }, { who: 'extra:7', x: 1150, pose: 'up' }] },
+];
+await film({ scenes: SCENES });
+</script>
+</body></html>

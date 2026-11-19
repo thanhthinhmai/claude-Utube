@@ -12,16 +12,16 @@ Nguồn mã khởi đầu (đọc, không sửa): `films/anthropic-ipo-15/{kit.j
 
 ## Phase 1: Setup
 
-- [ ] T001 Tạo khung thư mục `my-styles/sketch-explainer/kit/` (`sets/`, `examples/`, `tools/`), `people/`, `tests/sketchkit/`; thêm `people/*/.sheet/` vào `.gitignore`
-- [ ] T002 [P] Chép phông `Kalam-Bold.ttf` vào `my-styles/sketch-explainer/kit/` và ghi dòng Kalam (OFL) vào `CREDITS`
-- [ ] T003 [P] Gọi `node --test tests/sketchkit/` từ `tests/filmcheck/run.sh` (bỏ qua khi không có `node`)
+- [X] T001 Tạo khung thư mục `my-styles/sketch-explainer/kit/` (`sets/`, `examples/`, `tools/`), `people/`, `tests/sketchkit/`; thêm `people/*/.sheet/` vào `.gitignore`
+- [X] T002 [P] Chép phông `Kalam-Bold.ttf` vào `my-styles/sketch-explainer/kit/` và ghi dòng Kalam (OFL) vào `CREDITS`
+- [X] T003 [P] Gọi `node --test tests/sketchkit/` từ `tests/filmcheck/run.sh` (bỏ qua khi không có `node`)
 
 ## Phase 2: Foundational (chặn mọi user story)
 
-- [ ] T004 Viết `my-styles/sketch-explainer/kit/core.js` (ES module, `// @ts-check`): `el`, `lerp`, `clamp01`, `ease`, `circ` (chỉ Bézier), `rrect` (góc Bézier, không `rx`), `bumpy`, `arcPts`, `ovalHead`, `segOutline(points, w)` vẽ viền dày thành đoạn rời; tách từ `kit.js`, `cast.js`, `scenes3.js` của phim Anthropic
-- [ ] T005 Viết `my-styles/sketch-explainer/kit/rig.js`: `makeChar`, `setChar`, `POSES`, `EXPRS` từ `kit.js`; nét `strokeFor(scale) = 0.0052 × 1920 × scale/0.6` (R5); **bỏ giày**: chân kết thúc bằng nét nhọn; bóng elip mờ dưới chân; bóng lưỡi liềm một bên đầu
-- [ ] T006 Viết `my-styles/sketch-explainer/kit/catalog.json` theo data-model.md "Danh mục": `version`, `sets`, `parts`, `roles`, `poses`, `exprs`, `props`, `boards`, `cams`, `trans`, `defaults` (mỗi số kèm `evidence` trỏ tới `EVIDENCE.md`), `hero_default` (Max: hoodie `#e8833a`, tóc nâu sẫm), `avoid_hero: {}`
-- [ ] T007 Viết `my-styles/sketch-explainer/kit/film.js`: `film({scenes, cues, hero, custom})` dựng hợp đồng trang (`DUR`, `SHOTS`, `CARDS`, `TEXTS`, `CUES`, `render`, `READY`, `CLEAN`); kiểm mọi tên theo `catalog.json`, gom lỗi vào `window.KIT_ERRORS` `[{shot, kind: unknown_set|unknown_pose|unknown_role|unknown_prop|unknown_person|bad_value, name, hint}]` (hint = tên gần nhất), vẽ ô đỏ cho cảnh lỗi và vẫn đặt `READY` (R3)
+- [X] T004 Viết `my-styles/sketch-explainer/kit/core.js` (ES module, `// @ts-check`): `el`, `lerp`, `clamp01`, `ease`, `circ` (chỉ Bézier), `rrect` (góc Bézier, không `rx`), `bumpy`, `arcPts`, `ovalHead`, `segOutline(points, w)` vẽ viền dày thành đoạn rời; tách từ `kit.js`, `cast.js`, `scenes3.js` của phim Anthropic
+- [X] T005 Viết `my-styles/sketch-explainer/kit/rig.js`: `makeChar`, `setChar`, `POSES`, `EXPRS` từ `kit.js`; nét `strokeFor(scale) = 0.0052 × 1920 × scale/0.6` (R5); **bỏ giày**: chân kết thúc bằng nét nhọn; bóng elip mờ dưới chân; bóng lưỡi liềm một bên đầu
+- [X] T006 Viết `my-styles/sketch-explainer/kit/catalog.json` theo data-model.md "Danh mục": `version`, `sets`, `parts`, `roles`, `poses`, `exprs`, `props`, `boards`, `cams`, `trans`, `defaults` (mỗi số kèm `evidence` trỏ tới `EVIDENCE.md`), `hero_default` (Max: hoodie `#e8833a`, tóc nâu sẫm), `avoid_hero: {}`
+- [X] T007 Viết `my-styles/sketch-explainer/kit/film.js`: `film({scenes, cues, hero, custom})` dựng hợp đồng trang (`DUR`, `SHOTS`, `CARDS`, `TEXTS`, `CUES`, `render`, `READY`, `CLEAN`); kiểm mọi tên theo `catalog.json`, gom lỗi vào `window.KIT_ERRORS` `[{shot, kind: unknown_set|unknown_pose|unknown_role|unknown_prop|unknown_person|bad_value, name, hint}]` (hint = tên gần nhất), vẽ ô đỏ cho cảnh lỗi và vẫn đặt `READY` (R3)
 
 **Checkpoint**: trang trống với 1 cảnh dựng được, `READY` bật.
 
@@ -30,13 +30,13 @@ Nguồn mã khởi đầu (đọc, không sửa): `films/anthropic-ipo-15/{kit.j
 **Goal**: phim mới chỉ viết bảng cảnh.
 **Independent Test**: `kit use` một phim thử, bảng cảnh 6 cảnh chỉ dùng tên trong danh mục, trang dựng mọi cảnh, xuất đủ biến trang.
 
-- [ ] T008 [P] [US1] Test `tests/sketchkit/names.test.mjs`: tên sai trong bảng cảnh sinh `KIT_ERRORS` đúng `kind`, đúng mã cảnh và `hint` là tên gần nhất (phần kiểm tên tách thành hàm thuần `checkScene(scene, catalog)` trong `film.js`)
-- [ ] T009 [US1] Viết `my-styles/sketch-explainer/kit/sets/index.js`: `PARTS` (tường, sàn, cửa sổ có phố, giá sách, đèn bàn, bảng trắng, bảng đen, TV, bàn họp, bục, cột nhà chính phủ, dãy nhà, két, tủ máy chủ, quầy hàng, bản đồ, đèn rọi, ống khói, trời ngày/đêm/hoàng hôn, cỏ, đường, vỉa hè…) và `SETS` gồm ít nhất 24 bối cảnh của FR-006, mỗi bối cảnh là danh sách phần có `floor`, `fg`; `buildSet(name|parts, ctx)`; chuyển `room`, `wb`, `chalk`, `tv`, `stage`, `meet`, `floor`, `street`, `gov`, `studio`, `night`, `curb` từ `scenes3.js`/`proof.js`
-- [ ] T010 [P] [US1] Viết `my-styles/sketch-explainer/kit/boards.js`: `boardShape` (wb, chalk, tv, paper), `boardText` (num có đếm lên, bars bằng nét dày + viền đoạn rời, list, vs, pie, line), `signUI` (chữ tự thu nhỏ vừa biển), `bubbleUI`, `thinkUI`, `cardUI` (nền gần đen dạng radial, chữ trắng viết tay), số lớn xanh lá; tách từ `scenes3.js`
-- [ ] T011 [P] [US1] Viết `my-styles/sketch-explainer/kit/roles.js`: vai chung `narrator`, `banker`, `auditor`, `trader`, `critic`, `official`, `worker`, `extra:<n>` (mặt trắng `#f7f7f5`), `variant(base, {hair, glasses, hat, suit})`, `narrator(hero)` đọc `channel.json` (R10); tách từ `cast.js` (không người thật)
-- [ ] T012 [US1] Nối `film.js` với `sets`, `boards`, `roles`, `rig`: dựng từng cảnh theo data-model.md "Cảnh" và "Người trong cảnh" (`walk`, `still`, `seat`, `view: back`, `custom:<tên>`, `card`, `trans: dissolve` 0,4–0,6 s)
-- [ ] T013 [US1] Viết `my-styles/sketch-explainer/kit/catalog.html`: mỗi bối cảnh, vai, tư thế, biểu cảm, bảng, đạo cụ một ô, theo hợp đồng trang để `qc shots` chụp được
-- [ ] T014 [US1] Viết bảng cảnh mẫu `my-styles/sketch-explainer/kit/examples/try.html` (≈ 60 s, chỉ tên trong danh mục, có `custom:` một lần) và kiểm bằng `sh bin/studio kit use kit-try --style sketch-explainer` + `sh bin/studio qc plan kit-try` (quickstart §2)
+- [X] T008 [P] [US1] Test `tests/sketchkit/names.test.mjs`: tên sai trong bảng cảnh sinh `KIT_ERRORS` đúng `kind`, đúng mã cảnh và `hint` là tên gần nhất (phần kiểm tên tách thành hàm thuần `checkScene(scene, catalog)` trong `film.js`)
+- [X] T009 [US1] Viết `my-styles/sketch-explainer/kit/sets/index.js`: `PARTS` (tường, sàn, cửa sổ có phố, giá sách, đèn bàn, bảng trắng, bảng đen, TV, bàn họp, bục, cột nhà chính phủ, dãy nhà, két, tủ máy chủ, quầy hàng, bản đồ, đèn rọi, ống khói, trời ngày/đêm/hoàng hôn, cỏ, đường, vỉa hè…) và `SETS` gồm ít nhất 24 bối cảnh của FR-006, mỗi bối cảnh là danh sách phần có `floor`, `fg`; `buildSet(name|parts, ctx)`; chuyển `room`, `wb`, `chalk`, `tv`, `stage`, `meet`, `floor`, `street`, `gov`, `studio`, `night`, `curb` từ `scenes3.js`/`proof.js`
+- [X] T010 [P] [US1] Viết `my-styles/sketch-explainer/kit/boards.js`: `boardShape` (wb, chalk, tv, paper), `boardText` (num có đếm lên, bars bằng nét dày + viền đoạn rời, list, vs, pie, line), `signUI` (chữ tự thu nhỏ vừa biển), `bubbleUI`, `thinkUI`, `cardUI` (nền gần đen dạng radial, chữ trắng viết tay), số lớn xanh lá; tách từ `scenes3.js`
+- [X] T011 [P] [US1] Viết `my-styles/sketch-explainer/kit/roles.js`: vai chung `narrator`, `banker`, `auditor`, `trader`, `critic`, `official`, `worker`, `extra:<n>` (mặt trắng `#f7f7f5`), `variant(base, {hair, glasses, hat, suit})`, `narrator(hero)` đọc `channel.json` (R10); tách từ `cast.js` (không người thật)
+- [X] T012 [US1] Nối `film.js` với `sets`, `boards`, `roles`, `rig`: dựng từng cảnh theo data-model.md "Cảnh" và "Người trong cảnh" (`walk`, `still`, `seat`, `view: back`, `custom:<tên>`, `card`, `trans: dissolve` 0,4–0,6 s)
+- [X] T013 [US1] Viết `my-styles/sketch-explainer/kit/catalog.html`: mỗi bối cảnh, vai, tư thế, biểu cảm, bảng, đạo cụ một ô, theo hợp đồng trang để `qc shots` chụp được
+- [X] T014 [US1] Viết bảng cảnh mẫu `my-styles/sketch-explainer/kit/examples/try.html` (≈ 60 s, chỉ tên trong danh mục, có `custom:` một lần) và kiểm bằng `sh bin/studio kit use kit-try --style sketch-explainer` + `sh bin/studio qc plan kit-try` (quickstart §2)
 
 **Checkpoint**: US1 chạy được độc lập.
 
@@ -45,13 +45,13 @@ Nguồn mã khởi đầu (đọc, không sửa): `films/anthropic-ipo-15/{kit.j
 **Goal**: phim dựng từ bộ dựng nằm trong khoảng số đo của kênh mẫu.
 **Independent Test**: phim thử 60 s qua `qc shots` và `learn compare --clip` trong khoảng (SC-002); bảng cảnh mẫu 3 phút đạt SC-003.
 
-- [ ] T015 [P] [US2] Test `tests/sketchkit/camera.test.mjs`: `camAt` đi thẳng (tốc độ không đổi trong phần chạy), giữ yên `hold` cuối cảnh, có dịch `cx1/cy1`; `camFor` xen kẽ đẩy/kéo giữa hai cảnh liền nhau; tỉ lệ mặc định trên 100 cảnh giả: đẩy 28–38%, kéo 18–28%, đứng 17–27%
-- [ ] T016 [P] [US2] Test `tests/sketchkit/acting.test.mjs`: `schedule` tất định theo `id`; hành động đầu ở 0,15 s; khoảng cách 2–3 s; cảnh ≥ 4 s có ≥ 1 hành động sau giây đầu, cảnh ≥ 6 s có ≥ 2; người `still` chỉ nhận `expr`/`blink`
-- [ ] T017 [US2] Viết `my-styles/sketch-explainer/kit/camera.js`: `camFor(scene, prev)` và `camAt(cam, lt, d)` theo R5 (đẩy 3,3 %/s, kéo 8,6 %/s, dịch, `hold` 0,3, không tăng tốc, tuỳ chọn ease-out ≤ 0,25 s); `size` → khung (ecu, cu, med, wide, huge, insert, ots có bóng tối tiền cảnh)
-- [ ] T018 [US2] Viết `my-styles/sketch-explainer/kit/acting.js`: `schedule(scene)` theo R6; `film.js` áp hành động (cử chỉ, biểu cảm, chớp mắt, dựng đồ hoạ, ký hiệu bật, bước vào, chữ hiện dần) và giữ tư thế giữa hai hành động
-- [ ] T019 [US2] Đổi màu `sets/index.js` và `roles.js` về luật mục 3 của `STYLE.md`: bối cảnh bão hoà ≤ 0,15 và ít tương phản hơn người; đỏ và xanh lá chỉ trong `boards.js` theo nghĩa (`loss`, `danger` → đỏ; `money`, `growth` → xanh lá)
-- [ ] T020 [P] [US2] Viết `my-styles/sketch-explainer/kit/tools/count.mjs`: đọc bảng cảnh của một phim, in tỉ lệ cỡ cảnh, chuỗi cùng cỡ dài nhất, số bối cảnh khác nhau; và `suggestSizes(n, seed)` gợi ý chuỗi cỡ cảnh (~47% trung, đổi cỡ ~2/3, ≤ 4 liền) trong `camera.js`
-- [ ] T021 [US2] Mở rộng `examples/try.html` thành bảng cảnh mẫu 3 phút (dùng `suggestSizes`), chạy `count.mjs` (SC-003), dựng bản 60 s, chạy `qc shots` và `learn compare sketch-ref --clip` (SC-002); đo nét viền trên khung của phim thử (độ dài đoạn điểm tối ở 1920 px, người ở trung cảnh: 0,45–0,6% bề ngang) và thời gian dựng 100 khung (mục tiêu < 40 ms/khung phần mềm); chỉnh số mặc định trong `catalog.json → defaults` tới khi đạt; ghi mọi kết quả vào `my-styles/sketch-explainer/kit/MEASURE.md`
+- [X] T015 [P] [US2] Test `tests/sketchkit/camera.test.mjs`: `camAt` đi thẳng (tốc độ không đổi trong phần chạy), giữ yên `hold` cuối cảnh, có dịch `cx1/cy1`; `camFor` xen kẽ đẩy/kéo giữa hai cảnh liền nhau; tỉ lệ mặc định trên 100 cảnh giả: đẩy 28–38%, kéo 18–28%, đứng 17–27%
+- [X] T016 [P] [US2] Test `tests/sketchkit/acting.test.mjs`: `schedule` tất định theo `id`; hành động đầu ở 0,15 s; khoảng cách 2–3 s; cảnh ≥ 4 s có ≥ 1 hành động sau giây đầu, cảnh ≥ 6 s có ≥ 2; người `still` chỉ nhận `expr`/`blink`
+- [X] T017 [US2] Viết `my-styles/sketch-explainer/kit/camera.js`: `camFor(scene, prev)` và `camAt(cam, lt, d)` theo R5 (đẩy 3,3 %/s, kéo 8,6 %/s, dịch, `hold` 0,3, không tăng tốc, tuỳ chọn ease-out ≤ 0,25 s); `size` → khung (ecu, cu, med, wide, huge, insert, ots có bóng tối tiền cảnh)
+- [X] T018 [US2] Viết `my-styles/sketch-explainer/kit/acting.js`: `schedule(scene)` theo R6; `film.js` áp hành động (cử chỉ, biểu cảm, chớp mắt, dựng đồ hoạ, ký hiệu bật, bước vào, chữ hiện dần) và giữ tư thế giữa hai hành động
+- [X] T019 [US2] Đổi màu `sets/index.js` và `roles.js` về luật mục 3 của `STYLE.md`: bối cảnh bão hoà ≤ 0,15 và ít tương phản hơn người; đỏ và xanh lá chỉ trong `boards.js` theo nghĩa (`loss`, `danger` → đỏ; `money`, `growth` → xanh lá)
+- [X] T020 [P] [US2] Viết `my-styles/sketch-explainer/kit/tools/count.mjs`: đọc bảng cảnh của một phim, in tỉ lệ cỡ cảnh, chuỗi cùng cỡ dài nhất, số bối cảnh khác nhau; và `suggestSizes(n, seed)` gợi ý chuỗi cỡ cảnh (~47% trung, đổi cỡ ~2/3, ≤ 4 liền) trong `camera.js`
+- [X] T021 [US2] Mở rộng `examples/try.html` thành bảng cảnh mẫu 3 phút (dùng `suggestSizes`), chạy `count.mjs` (SC-003), dựng bản 60 s, chạy `qc shots` và `learn compare sketch-ref --clip` (SC-002); đo nét viền trên khung của phim thử (độ dài đoạn điểm tối ở 1920 px, người ở trung cảnh: 0,45–0,6% bề ngang) và thời gian dựng 100 khung (mục tiêu < 40 ms/khung phần mềm); chỉnh số mặc định trong `catalog.json → defaults` tới khi đạt; ghi mọi kết quả vào `my-styles/sketch-explainer/kit/MEASURE.md`
 
 **Checkpoint**: MVP (US1 + US2) đủ để làm phim mới.
 
@@ -92,9 +92,9 @@ Nguồn mã khởi đầu (đọc, không sửa): `films/anthropic-ipo-15/{kit.j
 **Goal**: tiếng động chỉ đếm trong các đoạn đã đo.
 **Independent Test**: video thử có lời ngoài đoạn không làm tăng số tiếng động; đo lại `sketch-ref` cho trung vị 12–20/phút (SC-008).
 
-- [ ] T036 [P] [US6] Thêm ca vào `tests/learn/test_soundcraft.py`: âm thanh tổng hợp có tiếng gõ trong và ngoài `segments`, `analyze(..., segments)` chỉ đếm tiếng trong đoạn và chia cho tổng thời lượng đoạn; `music.windows` ngoài đoạn bị bỏ
-- [ ] T037 [US6] Sửa `tools/style-learn/sl/soundcraft.py`: `analyze(audio, words, segments=None)` theo R9; `sound_set` truyền `segments` từ `video.json`; thêm `--recompute` lọc lại từ `sound.json` đã lưu (không cần video) và nối vào `tools/style-learn/learn.py`
-- [ ] T038 [US6] Chạy `sh bin/studio learn sound sketch-ref --recompute` ở thư mục chính, ghi trung vị mới vào `my-styles/sketch-explainer/EVIDENCE.md` (thay dòng sửa tay #3 bằng số đo của công cụ)
+- [X] T036 [P] [US6] Thêm ca vào `tests/learn/test_soundcraft.py`: âm thanh tổng hợp có tiếng gõ trong và ngoài `segments`, `analyze(..., segments)` chỉ đếm tiếng trong đoạn và chia cho tổng thời lượng đoạn; `music.windows` ngoài đoạn bị bỏ
+- [X] T037 [US6] Sửa `tools/style-learn/sl/soundcraft.py`: `analyze(audio, words, segments=None)` theo R9; `sound_set` truyền `segments` từ `video.json`; thêm `--recompute` lọc lại từ `sound.json` đã lưu (không cần video) và nối vào `tools/style-learn/learn.py`
+- [X] T038 [US6] Chạy `sh bin/studio learn sound sketch-ref --recompute` ở thư mục chính, ghi trung vị mới vào `my-styles/sketch-explainer/EVIDENCE.md` (thay dòng sửa tay #3 bằng số đo của công cụ)
 
 ## Phase 9: Polish
 
