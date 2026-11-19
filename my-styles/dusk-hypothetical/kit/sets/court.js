@@ -26,7 +26,7 @@ export function build() {
   ball(g, 1.6, 0.12, 2.6); ball(g, -7.5, 0.12, -9.6, { color: '#d9b23a' });                       // one in front, one by the fence
   prop(cyl(g, 0.25, 0.8, '#3a5a4a', -4.2, 0.4, 3.6, 12), 'bin');                                // a bin in the foreground
   return {
-    group: g, lights, room: info.room, fog: [18, 90], grade: { exposure: 0.66, saturation: 1.05 },
+    group: g, lights, room: info.room, fog: [18, 90], grade: { exposure: 0.6, saturation: 1.05 },
     anchors: { hero: { x: 0, y: 0, z: 0, ry: 0 }, heroSeat: { x: -6.5, z: -1.5, ry: Math.PI / 2, seat: 0.6 },
       extras: [{ x: -1.4, y: 0, z: -1.2, ry: 0.4 }, { x: 1.5, y: 0, z: -1.4, ry: -0.4 }, { x: -2.8, y: 0, z: -3.2, ry: 0.3 }, { x: 3, y: 0, z: -3.5, ry: -0.3 }],
       crowd: { area: { x0: -8, x1: 8, z0: -9, z1: -4 } }, fg: [{ x: -4.2, y: 0.8, z: 3.6 }] },

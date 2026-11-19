@@ -5,12 +5,15 @@ import * as THREE from 'three';
 import { makePost } from '/core/three/post.js';
 
 export const GRADE = {
-  exposure: 0.8,              // ACES tone mapping exposure (round 3)
-  background: '#241a36', fog: '#2a1e40', fogNear: 8, fogFar: 24,
-  vignette: 0.26, saturation: 0.62, contrast: 0.22,   // post.vig uniforms (rounds 3–4)
-  bloom: 0.3,                                        // practical strips glow, no blowout (round 4)
+  exposure: 0.8,              // ACES tone mapping exposure before EXP_MUL (round 3; scenes and sets nudge it, 0.6–1.0)
+  background: '#d9a6c8', fog: '#c9a0c4', fogNear: 6, fogFar: 34,   // specs/027 v3: light warm haze, not dark violet
+  vignette: 0.2, saturation: 0.62 * 1.22, contrast: 0.12,          // post.vig uniforms (v3, films/kit-post trial)
+  bloom: 0.38, bloomThreshold: 0.85, bloomRadius: 0.7, warm: 0.35,  // lamps and lit windows glow; a warm cast
   dof: { focus: 2.4, aper: 4.5, maxCoc: 14 },        // subject sharp, layers behind soft (round 9)
   shadow: 0.25,                                      // key light shadow intensity (round 4)
+  ao: { amount: 0.6, radius: 0.35, scale: 2, samples: 8 },       // ambient occlusion: soft shadow where things meet (specs/027 R4)
+  expMul: 0.8,                                      // v3: every exposure × this (reference shots: luma p50 0.327)
+  fillWhite: 0.45, frontWhite: 0.6,                  // v3: fill and front light toward white, so faces are not lilac
 };
 // mood floods for one shot (STYLE.md lighting #5); each stays inside the style's luma and saturation range
 export const MOODS = {
@@ -20,6 +23,7 @@ export const MOODS = {
   lilac: { hemi: ['#c8b0f0', '#9a80b0', 2.2], key: ['#ffd0c0', 1.8], rim: ['#ffc0a0', 4.0], front: ['#d8c0f0', 4.4], exp: 1.05, sat: 0.96 },
 };
 export const GRADE_LIMITS = { exposure: [0.6, 1.0], saturation: [0.85, 1.15] };
+const WHITE = new THREE.Color('#ffffff'), GROUND = new THREE.Color('#d8b8a8'), FRONT = new THREE.Color('#fff4ee');
 
 export function makeStage(size = [innerWidth, innerHeight]) {
   const [W, H] = size;
@@ -44,7 +48,7 @@ export function makeStage(size = [innerWidth, innerHeight]) {
     b.style.cssText = `position:fixed;left:0;right:0;height:6.4vh;background:#000;z-index:3;${pos}`; document.body.appendChild(b);
   }
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(GRADE.background);
+  scene.background = new THREE.Color(GRADE.background);        // seen only where a set has no walls and no sky dome
   scene.fog = new THREE.Fog(GRADE.fog, GRADE.fogNear, GRADE.fogFar);
   const cam = new THREE.PerspectiveCamera(50, W / H, 0.05, 120);
 
@@ -59,10 +63,15 @@ export function makeStage(size = [innerWidth, innerHeight]) {
   const front = new THREE.PointLight('#b896e0', 4, 14); front.position.set(0, 1.6, 4);
   scene.add(hemi, key, key.target, sun, sun.target, rim, rim.target, front);
 
-  const post = makePost(renderer, scene, cam, W, H, { ssaa: 1, ao: false });
+  const aoOff = typeof location !== 'undefined' && new URLSearchParams(location.search).get('ao') === '0';   // timing runs (R4)
+  const post = makePost(renderer, scene, cam, W, H, aoOff ? { ssaa: 1, ao: false }
+    : { ssaa: 1, ao: true, aoAmt: GRADE.ao.amount, aoRadius: GRADE.ao.radius, aoScale: GRADE.ao.scale });
+  // fewer AO samples than the library's 16 (R4: 16 samples cost 63 ms a frame at 1080p, over the +50 % budget)
+  if (post.dof.ao) { post.dof.ao.updateGtaoMaterial({ samples: GRADE.ao.samples }); post.dof.ao.updatePdMaterial({ samples: GRADE.ao.samples, rings: 2 }); }
   setDof(post, GRADE.dof);
   post.vig.uniforms.amt.value = GRADE.vignette; post.vig.uniforms.contrast.value = GRADE.contrast;
-  post.bloom.strength = GRADE.bloom;
+  post.vig.uniforms.warm.value = GRADE.warm;
+  post.bloom.strength = GRADE.bloom; post.bloom.threshold = GRADE.bloomThreshold; post.bloom.radius = GRADE.bloomRadius;
 
   let mood = 'dusk';
   const stage = {
@@ -75,8 +84,9 @@ export function makeStage(size = [innerWidth, innerHeight]) {
       sun.color.set(m.key[0]); sun.intensity = 7 * m.key[1] / 1.8;
       rim.color.set(m.rim[0]); rim.intensity = m.rim[1];
       front.color.set(m.front[0]); front.intensity = m.front[1];
-      renderer.toneMappingExposure = clampTo(nudge.exposure ?? GRADE.exposure * m.exp, ...GRADE_LIMITS.exposure);
+      renderer.toneMappingExposure = clampTo(nudge.exposure ?? GRADE.exposure * m.exp, ...GRADE_LIMITS.exposure) * GRADE.expMul;
       post.vig.uniforms.sat.value = GRADE.saturation * m.sat * (nudge.saturation ?? 1);
+      hemi.color.lerp(WHITE, GRADE.fillWhite); hemi.groundColor.lerp(GROUND, 0.4); front.color.lerp(FRONT, GRADE.frontWhite);
     },
     // aim the key, rim and front lights at a point (the subject), keeping their directions
     // side: -1 key from the left (the 022 default), +1 from the right, 0 soft from behind (specs/023, TEMPLATE.md §5)

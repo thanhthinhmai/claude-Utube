@@ -113,3 +113,7 @@ Action and prop: share of shots with people; outdoor and ots: share of shots tha
 | p50 | | 0.139 | 0.121 | 0.387 | 0.099 |
 | p75 | | 0.149 | 0.144 | 0.424 | 0.149 |
 | max | | 0.352 | 0.247 | 0.756 | 0.241 |
+
+## Brightness inside the picture (specs/027 R8, 2026-11-19)
+
+The frame-level numbers above include the reference's letterbox bars (≈ 13 % of the frame, black), so they read darker than what is inside the picture. Measured again with the same tool (`sl.color.frame_stats`) on the picture area only (bars cut), one mid-shot frame per shot, 1668 non-card shots of the eight 3D films: **luma p25/p50/p75 0.253 / 0.327 / 0.403, saturation 0.293 / 0.360 / 0.458**. On the same picture-only measure the kit 023 grade gave luma p50 0.242 (six shots of films/pause-ten-seconds): darker than the reference although its frames had passed the frame-level comparison. The kit v3 grade (`kit/GRADE.md`) gives luma p50 0.354, saturation 0.387 on 22 shots of the eleven sets (films/kit-sets), inside the reference's middle range. The frame-level table stays as it is: films are measured with their bars too, so tier 4 compares like with like.

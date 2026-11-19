@@ -1,6 +1,6 @@
 // Bedroom at dusk: bed, desk with a lamp, a window with the skyline, a shelf grid of books, posters, fairy lights.
 import * as THREE from 'three';
-import { backpack, box, ceiling, chair, desk, floor, lamp, laptop, mesh, mulberry, plant, poster, stringLights, wall, windows, prop } from './parts.js';
+import { backpack, box, ceiling, chair, desk, floor, lamp, laptop, mesh, mulberry, plant, poster, stringLights, wall, windows, prop, sunBeam } from './parts.js';
 
 export function build() {
   const g = new THREE.Group(), lights = [];
@@ -10,6 +10,7 @@ export function build() {
   wall(g, { len: 7, along: 'z', at: 3.5, from: -1.5, color: '#53406e', band: null });
   ceiling(g, { w: 7, d: 7, y: 3.0, z: -1.5 });
   windows(g, { z: -4.88, n: 1, w: 1.8, h: 1.4, y: 1.8, x0: 0.6 });
+  sunBeam(g, 0.6, 0.9, -3.6, { w: 1.6, h: 2.8, opacity: 0.14 });                       // specs/027 FR-011
   // bed on the left, along z
   box(g, 1.3, 0.45, 2.2, '#6e4e80', -2.6, 0.23, -3.2);
   box(g, 1.25, 0.18, 2.1, '#e0d0e8', -2.6, 0.52, -3.2);

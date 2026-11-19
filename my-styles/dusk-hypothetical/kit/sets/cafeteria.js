@@ -1,6 +1,6 @@
 // School cafeteria: rows of long tables with benches, a lit serving counter, windows at the back, hanging lamps.
 import * as THREE from 'three';
-import { bench, box, ceiling, floor, grid, lamp, litBoard, mat, mesh, pennants, table, tray, wall, windows, plant, cyl, prop } from './parts.js';
+import { bench, box, ceiling, floor, grid, lamp, litBoard, mat, mesh, pennants, table, tray, wall, windows, plant, cyl, prop, sunBeam } from './parts.js';
 
 export function build() {
   const g = new THREE.Group(), lights = [], seats = [];
@@ -8,6 +8,7 @@ export function build() {
   wall(g, { len: 18, at: -15 }); wall(g, { len: 20, along: 'z', at: -9, from: -6 }); wall(g, { len: 20, along: 'z', at: 9, from: -6 });
   ceiling(g, { w: 18, d: 20, y: 3.6, z: -6 });
   windows(g, { z: -14.88, n: 6, gap: 2.6, y: 2.2, h: 1.6 });
+  for (const x of [-3.9, 1.3, 6.5]) sunBeam(g, x, 1.1, -13.4, { w: 1.7, h: 3.4 });      // specs/027 FR-011
   grid(g, { nx: 3, nz: 4, dx: 5, dz: 2.8, z0: -1, make: (gg, x, z, i, j) => {
     table(gg, x, z, { w: 3.6, d: 0.85 });
     for (const sz of [-1, 1]) {

@@ -71,12 +71,12 @@ description: "Task list for 027 — nâng tay nghề bộ dựng 3D"
 
 **Independent Test**: `learn compare` đạt; 6 cảnh cũ/mới cạnh ô kênh mẫu; thời gian dựng ≤ +50%; khung phim cũ giống hệt.
 
-- [ ] T031 [US3] Đo thời gian mỗi khung trên GPU, có và không AO, ở 1920×1080 trên 3 bối cảnh (R4), ghi vào `specs/027-kit-craft-upgrade/baseline.md`; chọn AO cho mọi cảnh hay chỉ cảnh trung và gần
-- [ ] T032 [US3] `my-styles/dusk-hypothetical/kit/stage.js`: grade v3 từ `films/kit-post/kit/stage.js` (vòm trời, sương sáng, AO, phơi sáng, bão hoà, ánh mặt, bloom) thành mặc định, bỏ cờ `?post=v2`; `sunBeam` và `windowGlow` dùng được từ bối cảnh
-- [ ] T033 [US3] Chạy `learn compare` trên khung chứng minh dựng lại bằng v3. Nếu độ sáng trung vị vượt khoảng thì đo lại khoảng trên ô bảng ảnh 10 video (R8), sửa `my-styles/dusk-hypothetical/style.json` và `EVIDENCE.md` kèm bằng chứng; chỉnh số tới khi đạt
-- [ ] T034 [US3] Viết lại `my-styles/dusk-hypothetical/kit/GRADE.md` (mỗi số mới kèm số đo và vòng chỉnh)
-- [ ] T035 [US3] Kiểm FR-013: dựng 5 khung của `films/pause-ten-seconds` và `films/hundred-words` bằng kit đã chép của chúng, so với T003 (khác biệt = 0)
-- [ ] T036 [US3] Bảng so `films/kit-acting/compare-us3.jpg` (ô kênh mẫu, v2 cũ, v3) cho 6 cảnh của bản thử và 2 bối cảnh ngoài trời mới. ⏸ Duyệt
+- [X] T031 [US3] Đo thời gian mỗi khung trên GPU, có và không AO, ở 1920×1080 trên 3 bối cảnh (R4), ghi vào `specs/027-kit-craft-upgrade/baseline.md`; chọn AO cho mọi cảnh hay chỉ cảnh trung và gần
+- [X] T032 [US3] `my-styles/dusk-hypothetical/kit/stage.js`: grade v3 từ `films/kit-post/kit/stage.js` (vòm trời, sương sáng, AO, phơi sáng, bão hoà, ánh mặt, bloom) thành mặc định, bỏ cờ `?post=v2`; `sunBeam` và `windowGlow` dùng được từ bối cảnh
+- [X] T033 [US3] Chạy `learn compare` trên khung chứng minh dựng lại bằng v3. Nếu độ sáng trung vị vượt khoảng thì đo lại khoảng trên ô bảng ảnh 10 video (R8), sửa `my-styles/dusk-hypothetical/style.json` và `EVIDENCE.md` kèm bằng chứng; chỉnh số tới khi đạt
+- [X] T034 [US3] Viết lại `my-styles/dusk-hypothetical/kit/GRADE.md` (mỗi số mới kèm số đo và vòng chỉnh)
+- [X] T035 [US3] Kiểm FR-013: dựng 5 khung của `films/pause-ten-seconds` và `films/hundred-words` bằng kit đã chép của chúng, so với T003 (khác biệt = 0)
+- [X] T036 [US3] Bảng so `films/kit-acting/compare-us3.jpg` (ô kênh mẫu, v2 cũ, v3) cho 6 cảnh của bản thử và 2 bối cảnh ngoài trời mới. ⏸ Duyệt
 
 ## Phase 6: User Story 4 — Làm lại phút đầu của pause-ten-seconds (P4)
 

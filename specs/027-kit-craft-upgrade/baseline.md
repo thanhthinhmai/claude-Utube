@@ -34,3 +34,8 @@ Ghi chú: `node --test my-styles/*/kit/test/*.test.mjs` chạy thẳng sẽ lỗ
 | ots | 0 (0/22) | máy `ots` |
 
 Bối cảnh: `custom:cafe` 12, `custom:watch` 6, còn lại mỗi bối cảnh 1.
+
+## US3 (T031, T035), 2026-11-19
+
+- AO cost, 100 frames of films/kit-acting at 1920×1080 on the GPU (page still, includes the browser start): no AO 16.3 s, AO 16 samples 22.6 s (+63 ms a frame), AO 8 samples 17.7 s (+14 ms a frame). Kept 8 samples.
+- FR-013 / SC-008: the 5 reference frames of films/pause-ten-seconds and films/hundred-words drawn again with their own copied kits are byte-identical to T003 (10/10).
