@@ -63,7 +63,7 @@ class LabelSet(unittest.TestCase):
             refset.write_json(prof / "shots.json", {"video": vid, "shots": rows})
         tf = self.p.dir / "my-styles" / "sty" / "template.json"
         tf.parent.mkdir(parents=True)
-        tf.write_text(json.dumps({"version": 1}), encoding="utf-8")
+        tf.write_text(json.dumps({"version": 1, "source": {}}), encoding="utf-8")
         self.calls = []
 
     def tearDown(self):
@@ -91,6 +91,7 @@ class LabelSet(unittest.TestCase):
         c = craftset.write_style("ref-set", "sty", sm)
         tpl = json.loads((self.p.dir / "my-styles" / "sty" / "template.json").read_text())
         self.assertEqual(tpl["craft"]["action"]["rule"], "error")
+        self.assertIn("craft-labels.json", tpl["source"]["craft"])
         self.assertEqual(tpl["craft"]["action"]["min"], c["action"]["share_p25"])
         self.assertEqual(tpl["craft"]["ots"]["range"], [0.25, round(1 / 3, 3)])
         ev = (self.p.dir / "my-styles" / "sty" / "EVIDENCE.md").read_text()

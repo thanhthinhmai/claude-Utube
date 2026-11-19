@@ -1,5 +1,5 @@
 {
- "version": 1,
+ "version": 3,
  "sets": ["classroom", "lockers", "gym", "street", "bedroom", "cafeteria", "stadium", "void", "court", "rooftop", "parking", "street-dusk"],
  "poses": ["stand", "sit", "walk", "hold-phone", "hold-book", "hold-bag", "hold-cup", "hold-paper", "point", "cheer", "shrug", "hug", "run", "carry", "type"],
  "faces": ["dot", "half", "wow", "happy", "blank", "angry", "sad", "sweat"],

@@ -84,17 +84,17 @@ description: "Task list for 027 — nâng tay nghề bộ dựng 3D"
 
 **Independent Test**: tầng 0–4 đạt, bảng so ba hàng, hai clip 60 s.
 
-- [ ] T037 [US4] Tạo `films/pause-ten-redo/` bằng `channel attach` và `kit use`, chép `lines.json`, `voices/`, `cues.json`, `narration.json` của 0:00–1:00 từ `films/pause-ten-seconds` (phim gốc giữ nguyên); `job start`
-- [ ] T038 [US4] Viết bảng cảnh mới cho 0:00–1:00 trong `films/pause-ten-redo/index.html`, giữ mốc cắt, dùng act, đồ, máy và bối cảnh mới theo `TEMPLATE.md`
-- [ ] T039 [US4] Chạy `qc voice`, `qc plan`, `qc shots` tới khi đạt (`craft_action` đạt; nhãn tầng 2 khớp ≥ 80%)
-- [ ] T040 [US4] `sh bin/studio render pause-ten-redo --fps 60` (GPU, bọc `job run`), rồi `sh bin/studio qc pause-ten-redo`; ghi thời gian dựng so với T003 (SC-006) và chuyển động trong cảnh so với bản gốc (SC-003)
-- [ ] T041 [US4] Bảng so ba hàng `films/pause-ten-redo/compare.jpg` và hai clip 60 s trước và sau; ghi SC-001…SC-008 vào `specs/027-kit-craft-upgrade/quickstart.md` (đạt, đạt một phần, thất bại). ⏸ Duyệt: người dùng chọn có dùng kit v3 cho phim dài không
+- [X] T037 [US4] Tạo `films/pause-ten-redo/` bằng `channel attach` và `kit use`, chép `lines.json`, `voices/`, `cues.json`, `narration.json` của 0:00–1:00 từ `films/pause-ten-seconds` (phim gốc giữ nguyên); `job start`
+- [X] T038 [US4] Viết bảng cảnh mới cho 0:00–1:00 trong `films/pause-ten-redo/index.html`, giữ mốc cắt, dùng act, đồ, máy và bối cảnh mới theo `TEMPLATE.md`
+- [X] T039 [US4] Chạy `qc voice`, `qc plan`, `qc shots` tới khi đạt (`craft_action` đạt; nhãn tầng 2 khớp ≥ 80%)
+- [X] T040 [US4] `sh bin/studio render pause-ten-redo --fps 60` (GPU, bọc `job run`), rồi `sh bin/studio qc pause-ten-redo`; ghi thời gian dựng so với T003 (SC-006) và chuyển động trong cảnh so với bản gốc (SC-003)
+- [X] T041 [US4] Bảng so ba hàng `films/pause-ten-redo/compare.jpg` và hai clip 60 s trước và sau; ghi SC-001…SC-008 vào `specs/027-kit-craft-upgrade/quickstart.md` (đạt, đạt một phần, thất bại). ⏸ Duyệt: người dùng chọn có dùng kit v3 cho phim dài không
 
 ## Phase 7: Polish
 
-- [ ] T042 [P] Cập nhật `my-styles/dusk-hypothetical/TEMPLATE.md` (cách dùng act, đồ, máy, bối cảnh mới và luật craft) và `specs/023-style-craft-template/contracts/kit-api-v2.md` (dẫn sang `kit-api-v3.md`)
-- [ ] T043 [P] Cập nhật `CLAUDE.md` (luồng làm phim: CRAFT, `learn craft-label`, luật `craft_*`) và `my-styles/dusk-hypothetical/kit/catalog.json → version` = 3
-- [ ] T044 Chạy lại 5 bộ test của T002 (tất cả xanh), rồi commit đúng các tệp đã đổi (không `git add` thư mục, không commit symlink)
+- [X] T042 [P] Cập nhật `my-styles/dusk-hypothetical/TEMPLATE.md` (cách dùng act, đồ, máy, bối cảnh mới và luật craft) và `specs/023-style-craft-template/contracts/kit-api-v2.md` (dẫn sang `kit-api-v3.md`)
+- [X] T043 [P] Cập nhật `CLAUDE.md` (luồng làm phim: CRAFT, `learn craft-label`, luật `craft_*`) và `my-styles/dusk-hypothetical/kit/catalog.json → version` = 3
+- [X] T044 Chạy lại 5 bộ test của T002 (tất cả xanh), rồi commit đúng các tệp đã đổi (không `git add` thư mục, không commit symlink)
 
 ## Dependencies & Execution Order
 

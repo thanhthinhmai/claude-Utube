@@ -117,11 +117,13 @@ export function place(cam, name, head, facing = 0, opts = {}, k = 0, room = null
 // specs/027 R6: a real over-the-shoulder shot between two people: the camera stands behind the partner's head and
 // to one side (side ±1 keeps the 180° line), looking at the subject's face; the partner's head and shoulder fill a
 // soft third of the frame. No stand-in figure is needed. → {focus, aper}
-export function otsPair(cam, subject, partner, side = 1, room = null, { back = 0.75, across = 1.05, up = 0.18, fov = 40, aim = 0.2, shift = 0.25, aper = 10 } = {}) {
+export function otsPair(cam, subject, partner, side = 1, room = null, { back = 0.75, across = 1.05, up = 0.18, fov = 40, aim = 0.2, shift = 0.25, aper = 4.5, facing = null } = {}) {
   const dir = subject.clone().sub(partner); dir.y = 0;
   if (dir.lengthSq() < 1e-6) dir.set(0, 0, 1);
   dir.normalize();
   const right = new THREE.Vector3(dir.z, 0, -dir.x);
+  // when the subject is turned clearly to one side of the line, stand on that side so the face is seen
+  if (facing != null) { const lat = Math.sin(facing) * right.x + Math.cos(facing) * right.z; if (Math.abs(lat) > 0.15) side = Math.sign(lat); }
   const pos = partner.clone().addScaledVector(dir, -back).addScaledVector(right, across * side);
   pos.y = partner.y + up;
   // aim a little past the subject, away from the partner: the subject sits about two thirds across the frame

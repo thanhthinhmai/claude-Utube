@@ -118,6 +118,8 @@ def write_style(name: str, slug: str, sm: dict, skip=()) -> dict:
         raise refset.StepError(f"{tf} không có: phong cách chưa có template.json")
     tpl = json.loads(tf.read_text(encoding="utf-8"))
     tpl["craft"] = craft_block(name, sm, skip)
+    if isinstance(tpl.get("source"), dict):             # learn template-check: every number names its source
+        tpl["source"]["craft"] = tpl["craft"]["source"] + " (references/" + name + "/profile/craft-labels.json)"
     refset.write_json(tf, tpl)                     # indent 1, like every learned file
     ev = d / "EVIDENCE.md"
     text = ev.read_text(encoding="utf-8") if ev.is_file() else "# Evidence\n"

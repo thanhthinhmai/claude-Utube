@@ -41,3 +41,18 @@ sh bin/studio render pause-ten-redo --fps 60
 sh bin/studio qc pause-ten-redo
 ```
 Mong đợi: tầng 0–4 không có lỗi nặng; `craft_action` đạt; chuyển động trong cảnh cao hơn bản gốc; nhãn tầng 2 khớp ≥ 80%. Bảng so ba hàng và hai clip 60 s (trước, sau) để người dùng chọn.
+
+## Kết quả (2026-11-19)
+
+| Tiêu chí | Kết quả | Số đo |
+|---|---|---|
+| SC-001 cảnh có người có hành động ≥ mức tối thiểu | **Đạt** | phút làm lại 31% (5/16) so với mức 10% (p25 kênh mẫu, trung vị 14%); bản gốc 0% |
+| SC-002 đồ trong tay, qua vai, ngoài trời trong khoảng kênh mẫu | **Đạt một phần** | đồ 19% (khoảng 8–25%) ✓, qua vai 14% (4–24%) ✓, ngoài trời 18% (29–76%) ✗: kịch bản đặt phút đầu trong quán, đã chấp nhận có lý do |
+| SC-003 chuyển động trong cảnh cao hơn, không `still_person` | **Đạt một phần** | độ khác trung bình giữa hai khung (bỏ chỗ cắt) 0,625 → 0,680 (+9%), trung vị 0,412 → 0,338 (−18%); không cảnh nào `still_person` |
+| SC-004 độ sáng, bão hoà trong khoảng; `learn compare` | **Đạt** (theo cách đo trong khung hình, R8) | bối cảnh v3: sáng 0,354, bão hoà 0,387 so với kênh mẫu 0,327 / 0,360; theo cách đo cả khung (có dải đen) phim vẫn cảnh báo `style_luma`, đã ghi lý do |
+| SC-005 nhãn tầng 2 khớp ≥ 80% | **Đạt** | 19/23 (83%; cỡ cảnh lệch ≤ 1 bậc, góc đúng). Lệch: S001 máy `hands` đọc thành med·high; S006, S017, S021 cảnh đồ vật hoặc thẻ |
+| SC-006 thời gian dựng tăng ≤ 50% | **Đạt** | 450–466 s/phút phim (hai lượt dựng 469 s và 486 s cho 62,6 s) so với 416 s/phút của bản gốc (+12%); AO 8 mẫu +14 ms/khung |
+| SC-007 bảng so được duyệt | **Bỏ qua theo người dùng** (giai đoạn thử: không dừng chờ duyệt) | bảng so: `films/kit-acting/compare-acts.jpg`, `compare-cams.jpg`, `films/kit-sets/compare-us2.jpg`, `compare-us3.jpg`, `films/pause-ten-redo/compare/compare.jpg` và hai clip `before-0-62.mp4`, `after-0-62.mp4` |
+| SC-008 phim cũ không đổi | **Đạt** | 10/10 khung giống hệt từng byte |
+
+Tầng 4 của phút làm lại còn 1 lỗi do cách cắt: phút đầu dừng giữa đoạn P10 nên giọng thiếu phần còn lại của kịch bản (`qc` so cả kịch bản). Phim đầy đủ không gặp lỗi này.

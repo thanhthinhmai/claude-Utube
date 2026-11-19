@@ -7,7 +7,7 @@ import { makePost } from '/core/three/post.js';
 export const GRADE = {
   exposure: 0.8,              // ACES tone mapping exposure before EXP_MUL (round 3; scenes and sets nudge it, 0.6–1.0)
   background: '#d9a6c8', fog: '#c9a0c4', fogNear: 6, fogFar: 34,   // specs/027 v3: light warm haze, not dark violet
-  vignette: 0.2, saturation: 0.62 * 1.22, contrast: 0.12,          // post.vig uniforms (v3, films/kit-post trial)
+  vignette: 0.2, saturation: 0.62 * 1.22, contrast: 0.18,          // post.vig uniforms (v3, films/kit-post trial)
   bloom: 0.38, bloomThreshold: 0.85, bloomRadius: 0.7, warm: 0.35,  // lamps and lit windows glow; a warm cast
   dof: { focus: 2.4, aper: 4.5, maxCoc: 14 },        // subject sharp, layers behind soft (round 9)
   shadow: 0.25,                                      // key light shadow intensity (round 4)

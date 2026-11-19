@@ -223,9 +223,12 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
     // specs/027: the hands camera frames the subject's hands and item instead of the head
     const target = (CAMS_TARGET[camName(s.cam)] === 'hands' && subj.hand) ? subj.hand : subj.head;
     // specs/027: over the shoulder of a real partner when the shot has two or more people
-    const partner = camName(s.cam) === 'ots' && heads.length >= 2
+    // only when the subject faces the partner (within 70°): side by side, a real shoulder would show the back of a head
+    const near = camName(s.cam) === 'ots' && heads.length >= 2
       ? heads.filter((h) => h !== subj).sort((a, b) => a.head.distanceTo(subj.head) - b.head.distanceTo(subj.head))[0] : null;
-    const cp = partner ? otsPair(cam, subj.head, partner.head, camOpts.side ?? 1, set.room)
+    const faces = (h, o) => { const d = o.head.clone().sub(h.head); d.y = 0; return d.lengthSq() > 1e-6 && (Math.sin(h.facing) * d.x + Math.cos(h.facing) * d.z) / d.length() > Math.cos(70 * D2R); };
+    const partner = near && faces(subj, near) ? near : null;
+    const cp = partner ? otsPair(cam, subj.head, partner.head, camOpts.side ?? 1, set.room, { facing: subj.facing })
       : place(cam, camName(s.cam), target, subj.facing, { ...camOpts, move: s._move, lt, dur: s.dur, fx }, k, set.room);
     stage.focus(cp.focus, cp.aper); stage.aim(new THREE.Vector3(subj.head.x, 0, subj.head.z), lightSide);
     // closing card (TEMPLATE.md §9): the episode's cast as real figures in a row along the bottom of the picture,
