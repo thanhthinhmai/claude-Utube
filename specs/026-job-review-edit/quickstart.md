@@ -62,3 +62,14 @@ sh tests/run.sh && sh tests/render/run.sh && sh tests/ui/run.sh && sh tests/film
 ```
 
 Thử thật (SC-006): làm một phim 5 phút bằng chat, có ít nhất một lần sửa ở Script và một lần ở Shots trên trang, và không phải dựng hình lại.
+
+## Kết quả kiểm chứng
+
+### US1, 2026-11-19 (máy local, WSL2; phim `films/review-trial` chép từ `hundred-words`): **đạt**
+
+- Mục 1: `voice make` bị chặn (mã 1, in lệnh `point approve …`). Sau khi duyệt thì chạy (`STUDIO_TTS_DRY`, mã 0).
+- Mục 2, trên trình duyệt thật (Playwright, cổng 8787):
+  - thanh tiến trình có 10 bước, nhãn REVIEW ở Script và Shots, dòng "Waiting for you: Script";
+  - sửa P03 rồi "Run script check": lưu và chấm 10/10 trong **0,84 s** (SC-001: < 30 s); Voice chuyển "Must run again"; cột "If you change Script" có đủ 7 bước;
+  - nút Approve khoá khi còn ô sửa chưa kiểm; bấm Approve thì bước Script hiện "Approved", `review wait` trả mã 0, `voice make` chạy được.
+- Online (`tests/online/test_review_points_online.py`, `RUNNER=local`): việc chờ duyệt không giữ container; người khác nhận 404; sau khi duyệt, việc chạy lại trong < 60 s (SC-005) và đi tới xong.

@@ -859,6 +859,19 @@ def say_file(d: Path) -> Path:
 
 def cmd_voice_make(a) -> int:
     d = film_dir(a.film)
+    from filmcheck import points                   # specs/026: the voice is made from an approved script
+    if a.skip_review is not None:
+        try:
+            points.skip(d, "script", a.skip_review)
+        except points.PointError as e:
+            print(f"✗ voice make: --skip-review {e}", file=sys.stderr)
+            return 2
+        print(f"! voice make: script review skipped — {a.skip_review.strip()}")
+    why = points.gate(d, "script")
+    for w in why:
+        print(f"✗ voice make: {w}", file=sys.stderr)
+    if why:
+        return 1
     try:
         f = say_file(d)
     except (OSError, ValueError) as e:
@@ -1089,6 +1102,7 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--json", action="store_true")
     s = sub.add_parser("voice-make", help="make the voice files, with each line's \"say\" spelling (specs/023)")
     s.add_argument("film")
+    s.add_argument("--skip-review", default=None, help="make the voice without an approved script review (recorded)")
     s = sub.add_parser("voice-asr", help="word stamps with the studio's recogniser model (specs/020)")
     s.add_argument("film")
     s.add_argument("--lang", default=None)

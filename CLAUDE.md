@@ -76,6 +76,11 @@ Mỗi yêu cầu đi đúng **một** luồng:
    - Sau bước Brief: ghi `films/<tên>/BRIEF.md` (tóm tắt yêu cầu, tối đa 2000 ký tự).
    - Sau `TREATMENT.md`, trước giọng đọc: viết `SCRIPT.md` và `SOURCES.md` theo `specs/010-script-review-qc/contracts/files.md`. Tìm số liệu bằng WebSearch (tối đa 5 lượt); mở mọi đường dẫn được dẫn bằng `sh bin/studio web fetch <url> --film <tên>`.
    - `sh bin/studio script check <tên>` tới khi đạt, rồi `sh bin/studio script review <tên>`. Mã 1: chỉ sửa các đoạn bị ghi P1 hoặc P2, rồi chạy lại. Mã 3 (hết 2 vòng sửa): dừng, báo người dùng điểm cuối và các lỗi còn lại.
+   - **Điểm duyệt** (specs/026): mỗi phim có điểm duyệt bật theo kênh (mặc định Script và Shots; xem `sh bin/studio point status <tên>`). Ở mỗi điểm đang bật:
+     - Có giao diện: `sh bin/studio review request <mã> --kind <script|voice|shots|mix|publish> --film <tên> --summary <tệp>`, báo người dùng đường dẫn, rồi `review wait`. Người dùng sửa và duyệt trên trang việc; trang chỉ chạy `sh bin/studio edit …`, không ghi tệp.
+     - Không có giao diện: hỏi người dùng trong chat; đồng ý thì `sh bin/studio point approve <tên> <điểm> --source chat`.
+     - Bị gửi lại (`revise`): sửa theo ghi chú rồi gửi lại yêu cầu của cùng điểm. Sau khi duyệt: `point status <tên>`, làm lại các bước "stale" theo thứ tự (kịch bản đổi thì dựng lại `lines.json` từ kịch bản rồi `voice make --changed`); điểm đang bật mà "stale" thì gửi lại yêu cầu duyệt khi tới nó.
+     - Điểm Script: sau `script review` đạt, trước giọng. `voice make` từ chối khi kịch bản chưa được duyệt (`--skip-review "<lý do>"` chỉ cho bản thử, được ghi lại).
    - Phim không có lời đọc: `sh bin/studio script skip <tên> --reason "no narration"`.
    - Lời của `lines.json` lấy đúng từ kịch bản đã đạt (`qc` kiểm); xong giọng thì ghi `narration.json` có `lines_file`.
 3b. **Kiểm theo tầng** (specs/020, mọi phim; lỗi nào cũng kèm mã cảnh hoặc mã dòng, thời điểm và cách sửa):

@@ -223,7 +223,7 @@ def gate(film_dir: Path, point: str) -> list:
     """[] when the step after this point may run; else the reasons, each with the command to run."""
     d = Path(film_dir)
     st = state(d, point)
-    if st in ("off", "skipped", "approved"):
+    if st in ("off", "skipped", "approved", "not_reached"):      # not_reached: nothing to review (no SCRIPT.md, …)
         return []
     sk = load(d)["skipped"].get(point)
     if sk and sk.get("fingerprint") == fingerprint(d, point):

@@ -659,7 +659,9 @@ async function railRefresh() {
     <ol class="rail" role="tablist">${v.steps.map((/** @type {any} */ s, i) => `<li><button class="rs st-${s.state}" data-step="${esc(s.name)}"
         ${STEP_TAB[s.name] ? "" : "disabled"} aria-selected="${STEP_TAB[s.name] === DONE.tab}">
         <span class="n"><span>${i + 1}</span>${s.review_on ? `<span class="gate">REVIEW</span>` : ""}</span>
-        <span class="t">${esc(s.name)}</span><span class="s">${esc(s.state === "stale" ? STATE_LABEL.stale : s.note || STATE_LABEL[s.state] || s.state)}</span></button></li>`).join("")}</ol>
+        <span class="t">${esc(s.name)}</span><span class="s">${esc(s.state === "stale" ? STATE_LABEL.stale : s.approved_at
+          ? `Approved ${new Date(s.approved_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
+          : s.note || STATE_LABEL[s.state] || s.state)}</span></button></li>`).join("")}</ol>
     <div id="impact"></div>`;
   slot.querySelectorAll("button[data-step]:not([disabled])").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
     const tab = STEP_TAB[/** @type {HTMLElement} */ (el).dataset.step];
@@ -818,6 +820,7 @@ async function pageJob(id) {
       <div class="md">${open.summary_html}</div>
       <textarea id="answer" maxlength="4000" placeholder="Your answer"></textarea>
       <div class="row" style="margin-top:8px"><button class="primary" id="send-answer">Send</button></div><p id="answer-msg" class="muted" role="status"></p></div>`
+    : open && TAB_POINT[open.kind] ? `<p class="notice">This film is waiting for your ${esc(REVIEW[open.kind].toLowerCase())}: change what you want below, then approve.</p>`
     : open ? `<p class="notice">This job is waiting for your review: <a href="#/reviews/${esc(open.id)}">${open.kind === "treatment" ? "review the treatment" : "open the review"}</a>.</p>` : ""}
     ${j.status === "queued" ? `<p class="notice">${j.step === "Waiting for a Claude account" ? "Waiting for a Claude account: the studio owner needs to sign one in on AI accounts." : `In the queue${j.queue_position ? `: number ${j.queue_position}` : ""}. It starts by itself when the studio is free.`}</p>` : ""}
     ${MODE === "online" && j.status === "done" && j.links.film ? `<p><a class="button primary" href="${API}/films/${encodeURIComponent(j.links.film)}/download">Download the film</a>
@@ -895,6 +898,10 @@ function metricRows(c) {
 
 async function pageReview(id) {
   const r = await get(`/reviews/${encodeURIComponent(id)}`);
+  if (TAB_POINT[r.kind]) {                          // specs/026: a review point is edited and approved on the job page
+    location.replace(`#/jobs/${encodeURIComponent(r.job_id)}`);
+    return;
+  }
   const c = r.compare;
   const file = (p) => (p || "").split("/").pop();
   const proof = c ? `<div class="pair">
