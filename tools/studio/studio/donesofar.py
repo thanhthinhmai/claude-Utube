@@ -11,12 +11,13 @@ from .store import StudioError
 
 STEPS = [("script", "Script"), ("voice", "Voice"), ("shots", "Shots"), ("mix", "Mix"), ("render", "Render"),
          ("selfcheck", "Self-check"), ("publish", "Publish")]
-ALLOWED = re.compile(r"^(SCRIPT\.md|SOURCES\.md|lines\.json|checks\.json|CHECKS\.md|voices/l\d{3,4}\.wav|voices/dur\.json"
+ALLOWED = re.compile(r"^(SCRIPT\.md|SOURCES\.md|lines\.json|checks\.json|CHECKS\.md|voices/[lL]\d{2,4}\.wav|voices/dur\.json"
                      r"|out/mix\.wav|\.check/review-r\d+\.json|\.check/labels\.json"
-                     r"|\.check/shots/(sheet|label-sheet)-\d+\.jpg|\.check/shots/S\d{3,4}(~[A-Za-z0-9._~-]+)?\.jpg)$")
+                     r"|\.check/shots/(sheet|label-sheet)-\d+\.jpg|\.check/shots/S\d{2,4}(~[A-Za-z0-9._~-]+)?\.jpg"
+                     r"|scenes\.json|mix\.json|publish/pack\.json)$")       # 026: scene table, mix settings, publish pack
 TYPES = {".md": "text/markdown; charset=utf-8", ".json": "application/json", ".wav": "audio/wav", ".jpg": "image/jpeg"}
-SHOT = re.compile(r"^S\d{3,4}\.jpg$")
-EXTRA = re.compile(r"^S\d{3,4}~.+\.jpg$")
+SHOT = re.compile(r"^S\d{2,4}\.jpg$")
+EXTRA = re.compile(r"^S\d{2,4}~.+\.jpg$")
 SHEET = re.compile(r"^sheet-(\d+)\.jpg$")
 PARA = re.compile(r"^\[(P\d+)\]\s*(.*)$")
 RENDER_HEAD = re.compile(r"^render: (\w+) · .*?(\d+) chunks .*?(\d+) workers")

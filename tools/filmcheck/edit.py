@@ -204,3 +204,122 @@ def script_para(d: Path, a: dict) -> dict:
     return {"ref": para, "old": old, "new": text, "ok": r["pass"],
             "check": {"score": r["score"], "pass": r["pass"], "failed": failed, "issues": r["issues"][:20],
                       "est_seconds": r["est_seconds"]}}
+
+
+# ---------- shots (US2) ----------
+def lib_path() -> Path:
+    return Path(os.environ.get("STUDIO_LIB") or Path(__file__).resolve().parents[2] / "lib" / "lemo-opuscar")
+
+
+def no_run() -> bool:
+    """Tests: save and validate only; the step command (browser, TTS, mix) is not run."""
+    return bool(os.environ.get("STUDIO_EDIT_NO_RUN"))
+
+
+def scenecheck(d: Path, file: Path) -> dict:
+    import subprocess
+    p = subprocess.run(["node", str(Path(__file__).resolve().parent / "scenecheck.mjs"), str(d), str(file)],
+                       capture_output=True, text=True, timeout=120)
+    try:
+        return json.loads(p.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return {"ok": False, "error": (p.stderr or p.stdout).strip()[-300:] or "scenecheck gave no answer"}
+
+
+def ref_of(a: dict, key: str) -> str:
+    return str(a.get(key) or (a.get("ref") or [""])[0])
+
+
+@op("shot", "shots")
+def shot(d: Path, a: dict) -> dict:
+    import copy
+    sid = ref_of(a, "shot")
+    f = d / "scenes.json"
+    if not f.is_file():
+        raise EditError("no scene table: this film keeps its scenes in its page (only films with scenes.json can change a shot here)")
+    try:
+        doc = json.loads(f.read_text(encoding="utf-8"))
+    except ValueError as e:
+        raise EditError(f"scenes.json cannot be read: {e}") from None
+    scenes = doc.get("scenes") if isinstance(doc, dict) else None
+    s = next((x for x in scenes or [] if isinstance(x, dict) and x.get("id") == sid), None)
+    if s is None:
+        raise EditError(f"scenes.json has no shot \"{sid}\"")
+    old = copy.deepcopy(s)
+    changes = {k: str(a[k]) for k in ("set", "cam", "act") if a.get(k)}
+    if not changes:
+        raise EditError("say what to change: set=…, cam=… or act=…")
+    if "set" in changes:
+        s["set"] = changes["set"]
+    if "cam" in changes:
+        s["cam"] = changes["cam"]                    # a camera object (dist, yaw…) becomes the plain named camera
+    if "act" in changes:
+        cast = s.get("cast") or []
+        if not cast:
+            raise EditError(f"{sid} has nobody in it to act")
+        acts = cast[0].get("act") or []
+        t = acts[0][0] if acts and isinstance(acts[0], list) else 0.3
+        cast[0]["act"] = [[t, changes["act"]]]
+    tmp = d / ".check" / "scenes.edit.json"
+    write_atomic(tmp, json.dumps(doc, ensure_ascii=False, indent=1))
+    r = scenecheck(d, tmp)
+    if not r.get("ok"):
+        tmp.unlink(missing_ok=True)
+        raise EditError(r.get("error") or "the scene table does not pass the kit's check")
+    os.replace(tmp, f)
+    out = {"ref": sid, "old": {k: old.get(k) if k != "act" else (old.get("cast") or [{}])[0].get("act") for k in changes},
+           "new": changes, "ok": True, "check": {"scenes": "pass"}, "files": []}
+    if no_run():
+        return out
+    from filmcheck import plancheck, shotcheck
+    try:
+        pr = plancheck.run(d, lib_path())
+        out["check"]["plan"] = "pass" if pr["pass"] else f"{sum(1 for i in pr['issues'] if i['severity'] == 'block' and not i.get('excepted'))} problem(s)"
+        out["ok"] = pr["pass"]
+        out["files"] = shotcheck.preview(d, lib_path(), [sid])
+    except (plancheck.PlanError, shotcheck.ShotError) as e:
+        out.update(ok=False, error=str(e))
+    return out
+
+
+@op("shots-check", "shots")
+def shots_check(d: Path, a: dict) -> dict:
+    if no_run():
+        return {"ref": "film", "ok": True, "check": {"skipped": True}}
+    from filmcheck import plancheck, shotcheck
+    try:
+        pr = plancheck.run(d, lib_path())
+        r = shotcheck.run(d, lib_path(), say=lambda x: None)
+    except (plancheck.PlanError, shotcheck.ShotError) as e:
+        return {"ref": "film", "ok": False, "error": str(e)}
+    blk = sum(1 for i in r["issues"] if i["severity"] == "block" and not i.get("excepted"))
+    wrn = sum(1 for i in r["issues"] if i["severity"] == "warn")
+    return {"ref": "film", "ok": pr["pass"] and r["pass"],
+            "check": {"plan": pr["pass"], "shots": r["pass"], "problems": blk, "warnings": wrn,
+                      "accepted": bool((r.get("style_accept") or {}).get("reason"))}}
+
+
+@op("except", "shots")
+def except_shot(d: Path, a: dict) -> dict:
+    from filmcheck import tiers
+    refs = list(a.get("ref") or [])
+    sid, rule = str(a.get("shot") or (refs[0] if refs else "")), str(a.get("rule") or (refs[1] if len(refs) > 1 else ""))
+    if not sid or not rule:
+        raise EditError("say which shot and which rule: except S012 dark --reason \"…\"")
+    try:
+        tiers.add_exception(d, sid, rule, a.get("reason") or "")
+    except tiers.TierError as e:
+        raise EditError(str(e)) from None
+    t = tiers.recompute(d).get("tiers") or {}
+    return {"ref": f"{sid} {rule}", "new": (a.get("reason") or "").strip(), "ok": bool((t.get("shots") or {}).get("pass")),
+            "check": {k: t[k]["pass"] for k in ("plan", "shots") if t.get(k)}}
+
+
+@op("accept-style", "shots")
+def accept_style(d: Path, a: dict) -> dict:
+    from filmcheck import shotcheck, tiers
+    try:
+        shotcheck.accept_style(d, a.get("reason") or "")
+    except tiers.TierError as e:
+        raise EditError(str(e)) from None
+    return {"ref": "style", "new": (a.get("reason") or "").strip(), "ok": True}

@@ -73,3 +73,20 @@ Thử thật (SC-006): làm một phim 5 phút bằng chat, có ít nhất một
   - sửa P03 rồi "Run script check": lưu và chấm 10/10 trong **0,84 s** (SC-001: < 30 s); Voice chuyển "Must run again"; cột "If you change Script" có đủ 7 bước;
   - nút Approve khoá khi còn ô sửa chưa kiểm; bấm Approve thì bước Script hiện "Approved", `review wait` trả mã 0, `voice make` chạy được.
 - Online (`tests/online/test_review_points_online.py`, `RUNNER=local`): việc chờ duyệt không giữ container; người khác nhận 404; sau khi duyệt, việc chạy lại trong < 60 s (SC-005) và đi tới xong.
+
+### US2, 2026-11-19 (cùng phim, đã đổi sang `scenes.json`, 21 cảnh, GPU Intel UHD 730): **đạt**
+
+- `qc plan` 4 s; `qc shots` 53 s (0 lỗi khung, 7 cảnh báo phong cách).
+- Trên trình duyệt thật:
+  - khung Shots mở thẳng khi đang chờ duyệt;
+  - ô chọn máy chỉ có tên trong `catalog.json`;
+  - đổi máy của S02: lưu, kiểm kế hoạch và vẽ lại ảnh trong **5,6 s** (lần đầu 19 s; SC-001: < 2 phút); S02 có nhãn "changed" và nút duyệt khoá với lý do "Run the shot check…";
+  - "Run shot check" xong trong 74 s (đạt, còn 2 cảnh báo cho cả phim);
+  - giữ phong cách kèm lý do thì nút duyệt mở; bấm "Approve and render" thì bước Shots hiện "Approved".
+- `render-gate`: trước khi duyệt báo "style warning(s) are open"; sau khi duyệt trả mã 0.
+- Lỗi tìm thấy khi thử thật và đã sửa:
+  - bản xem trước vẽ cả thẻ chữ của cảnh khác;
+  - trang tự vẽ lại làm mất nhãn "changed";
+  - trạng thái "waiting" che trạng thái thật của bước;
+  - cảnh báo cho cả phim không có nút giữ;
+  - mẫu tên ảnh của 025 không nhận mã cảnh 2 chữ số.

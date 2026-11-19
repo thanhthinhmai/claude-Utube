@@ -23,6 +23,19 @@ export function actOk(name, catalog = CATALOG) {
 }
 const spans = (x) => Array.isArray(x) && x.every((r) => Array.isArray(r) && r.length === 2 && r[0] < r[1]);
 
+// specs/026: a scene table kept as data (scenes.json = {custom: [names], scenes: [...]}), so the job page can change a
+// shot without touching code. Every custom set the table names must be declared and have a builder on the page.
+export function sceneFile(doc, builders = null) {
+  if (!doc || typeof doc !== 'object' || !Array.isArray(doc.scenes)) throw new Error('scenes.json: {custom: [...], scenes: [...]}');
+  const custom = Array.isArray(doc.custom) ? doc.custom : [];
+  for (const s of doc.scenes) {
+    const m = typeof (s && s.set) === 'string' && /^custom:(.+)$/.exec(s.set);
+    if (m && !custom.includes(m[1])) throw new Error(`${s.id}: custom set "${m[1]}" is not declared in scenes.json custom`);
+  }
+  if (builders) for (const c of custom) if (typeof builders[c] !== 'function') throw new Error(`custom set "${c}" in scenes.json has no builder`);
+  return doc.scenes;
+}
+
 // Throws Error("<scene id>: <reason>") on the first problem.
 export function check(scenes, catalog = CATALOG) {
   if (!Array.isArray(scenes) || !scenes.length) throw new Error('scenes: at least one scene');

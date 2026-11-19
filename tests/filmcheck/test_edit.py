@@ -110,3 +110,59 @@ class ScriptPara(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Shots(unittest.TestCase):                                    # specs/026 T029
+    def setUp(self):
+        TMP.mkdir(exist_ok=True)
+        os.environ["STUDIO_EDIT_NO_RUN"] = "1"
+        self.d = samples.review_film(Path(tempfile.mkdtemp(dir=TMP)))
+
+    def tearDown(self):
+        os.environ.pop("STUDIO_EDIT_NO_RUN", None)
+
+    def shot(self, *ref, **kw):
+        return edit.run(self.d, "shot", {"ref": list(ref), **kw}, base=points.fingerprint(self.d, "shots"))
+
+    def scenes(self):
+        return json.loads((self.d / "scenes.json").read_text())["scenes"]
+
+    def test_changes_one_shot(self):
+        r = self.shot("S02", cam="mid-eye", act="wave")
+        self.assertEqual(r["code"], 0, r)
+        s = self.scenes()
+        self.assertEqual((s[1]["cam"], s[1]["cast"][0]["act"]), ("mid-eye", [[0.4, "wave"]]))
+        self.assertEqual(s[0], samples.REVIEW_SCENES["scenes"][0])
+        self.assertEqual(r["stale"], ["Render", "Self-check", "Publish"])
+
+    def test_outside_the_catalogue_writes_nothing(self):
+        before = (self.d / "scenes.json").read_bytes()
+        for kw in ({"cam": "fisheye"}, {"set": "moon"}, {"act": "backflip"}, {"set": "custom:platform"}, {}):
+            r = self.shot("S02", **kw)
+            self.assertEqual(r["code"], 2, (kw, r))
+        self.assertEqual(self.shot("S99", cam="close")["code"], 2)
+        self.assertEqual((self.d / "scenes.json").read_bytes(), before)
+        self.assertFalse((self.d / ".check" / "scenes.edit.json").exists())
+
+    def test_no_scene_table(self):
+        (self.d / "scenes.json").unlink()
+        r = self.shot("S02", cam="close")
+        self.assertEqual(r["code"], 2)
+        self.assertIn("no scene table", r["error"])
+
+    def test_exception_and_style_need_a_reason(self):
+        from filmcheck import tiers
+        (self.d / ".check").mkdir(exist_ok=True)
+        (self.d / ".check" / "plan-input.json").write_text(json.dumps({"fingerprint": tiers.fingerprint(self.d),
+                                                                        "shots": [{"id": "S02", "t0": 3, "t1": 6}]}))
+        base = points.fingerprint(self.d, "shots")
+        r = edit.run(self.d, "except", {"ref": ["S02", "dark"], "reason": ""}, base=base)
+        self.assertEqual(r["code"], 2)
+        r = edit.run(self.d, "except", {"ref": ["S02", "dark"], "reason": "a night beat on purpose"}, base=base)
+        self.assertIn(r["code"], (0, 1), r)
+        self.assertEqual(tiers.load_exceptions(self.d)[0]["reason"], "a night beat on purpose")
+        tiers.save_tier(self.d, "shots", tiers.result("shots", [{"ref": "S02", "at": 4, "rule": "style_depth", "severity": "warn",
+                        "measure": 1, "limit": 0, "text": "", "fix": "", "excepted": None}], {}, [], 0.0, tiers.fingerprint(self.d)))
+        self.assertEqual(edit.run(self.d, "accept-style", {"reason": " "}, base=base)["code"], 2)
+        self.assertEqual(edit.run(self.d, "accept-style", {"reason": "deliberate dark beat"}, base=base)["code"], 0)
+        self.assertEqual(tiers.load_tier(self.d, "shots")["style_accept"]["reason"], "deliberate dark beat")

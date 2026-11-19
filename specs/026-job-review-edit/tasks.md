@@ -71,17 +71,17 @@ description: "Tasks for 026 — review points and edits on the film job page"
 
 **Independent Test**: quickstart mục 3.
 
-- [ ] T026 [P] [US2] Test bộ dựng `my-styles/dusk-hypothetical/kit/test/film.test.mjs` (hoặc tệp mới `scenes-file.test.mjs`): `film()` không truyền `scenes` thì đọc `./scenes.json`; `custom` trong tệp không có hàm dựng → lỗi `custom set "x" in scenes.json has no builder`; truyền mảng như cũ vẫn chạy
-- [ ] T027 [US2] `my-styles/dusk-hypothetical/kit/film.js`: `scenes` mặc định `'./scenes.json'` (dạng `{custom, scenes}`), kiểm `custom` khớp; cập nhật `specs/022-style-film-kit/contracts/kit-api.md` một dòng về `scenes.json`
-- [ ] T028 [P] [US2] Viết `tools/filmcheck/scenecheck.mjs <thư mục phim> [tệp]`: import `kit/plan.js` của phim, `check(scenes, CATALOG)`, kiểm tên `custom:*` thuộc `custom`; in `{"ok":true}` hoặc `{"ok":false,"error":"s07: …"}`
-- [ ] T029 [P] [US2] Test trong `tests/filmcheck/test_edit.py`: `shot S02 cam=close` đổi đúng cảnh trong `scenes.json`; `cam=fisheye` (ngoài danh mục) → mã 2, `scenes.json` giữ nguyên SHA-256; phim không có `scenes.json` → mã 2 "no scene table"; `except S02 dark --reason ""` → mã 2; `accept-style --reason "deliberate dark beat"` → ghi như `qc accept-style`
-- [ ] T030 [US2] Thao tác `shot`, `shots-check`, `except`, `accept-style` trong `tools/filmcheck/edit.py` (bản tạm → `scenecheck.mjs` → `os.replace`; sau đó `qc plan` và `qc shots --only <S#>`; `shots-check` chạy `qc shots` đầy đủ; `except`/`accept-style` gọi `tiers.add_exception` / `cmd_qc_accept_style`)
-- [ ] T031 [US2] `qc shots --only S012[,S013]` trong `tools/filmcheck/shotcheck.py` và `cli.py`: chỉ vẽ ảnh các cảnh đó vào `.check/shots/`, không ghi `tiers.shots`; test trong `tests/filmcheck/test_shots.py` (Chrome giả hoặc bỏ qua khi thiếu Chromium, ghi rõ)
-- [ ] T032 [P] [US2] Test trong `tests/filmcheck/test_tiers.py`: `render-gate` có lý do "the shots review is not approved (run: …)" khi điểm shots bật và chưa duyệt; không còn khi đã duyệt; `--skip-checks` bỏ qua và ghi lại
-- [ ] T033 [US2] Cổng shots trong `cmd_render_gate` (`tools/filmcheck/cli.py`) gọi `points.gate(d, "shots")` sau `tiers.gate`
-- [ ] T034 [US2] Khung Shots trên trang (`web/app.js`): lưới ảnh 24 cảnh mỗi trang (mã, thời điểm, lời, nhãn lỗi/cảnh báo), ba ô chọn bối cảnh/máy/động tác chỉ từ `catalog` (không ô gõ tự do; khoá khi `editable.shots=false` và ghi lý do), nhãn "changed" tới khi `shots-check` xong, nút "Run shot check", "Keep it this way…" mở ô lý do bắt buộc (thao tác `except` hoặc `accept-style`), "Approve and render" khoá khi còn lỗi/cảnh báo/cảnh chưa kiểm (ghi lý do)
-- [ ] T035 [US2] Luồng chat `CLAUDE.md` (bước 3b, sau tầng 2): điểm duyệt shots như T022, trước `render`; agent online trong `tools/runner/agent.py` như T023
-- [ ] T036 [US2] Chuyển `films/review-trial` sang `scenes.json` và chạy quickstart mục 3; ghi kết quả vào `quickstart.md`
+- [X] T026 [P] [US2] Test bộ dựng `my-styles/dusk-hypothetical/kit/test/film.test.mjs` (hoặc tệp mới `scenes-file.test.mjs`): `film()` không truyền `scenes` thì đọc `./scenes.json`; `custom` trong tệp không có hàm dựng → lỗi `custom set "x" in scenes.json has no builder`; truyền mảng như cũ vẫn chạy
+- [X] T027 [US2] `my-styles/dusk-hypothetical/kit/film.js`: `scenes` mặc định `'./scenes.json'` (dạng `{custom, scenes}`), kiểm `custom` khớp; cập nhật `specs/022-style-film-kit/contracts/kit-api.md` một dòng về `scenes.json`
+- [X] T028 [P] [US2] Viết `tools/filmcheck/scenecheck.mjs <thư mục phim> [tệp]`: import `kit/plan.js` của phim, `check(scenes, CATALOG)`, kiểm tên `custom:*` thuộc `custom`; in `{"ok":true}` hoặc `{"ok":false,"error":"s07: …"}`
+- [X] T029 [P] [US2] Test trong `tests/filmcheck/test_edit.py`: `shot S02 cam=close` đổi đúng cảnh trong `scenes.json`; `cam=fisheye` (ngoài danh mục) → mã 2, `scenes.json` giữ nguyên SHA-256; phim không có `scenes.json` → mã 2 "no scene table"; `except S02 dark --reason ""` → mã 2; `accept-style --reason "deliberate dark beat"` → ghi như `qc accept-style`
+- [X] T030 [US2] Thao tác `shot`, `shots-check`, `except`, `accept-style` trong `tools/filmcheck/edit.py` (bản tạm → `scenecheck.mjs` → `os.replace`; sau đó `qc plan` và `qc shots --only <S#>`; `shots-check` chạy `qc shots` đầy đủ; `except`/`accept-style` gọi `tiers.add_exception` / `cmd_qc_accept_style`)
+- [X] T031 [US2] `qc shots --only S012[,S013]` trong `tools/filmcheck/shotcheck.py` và `cli.py`: chỉ vẽ ảnh các cảnh đó vào `.check/shots/`, không ghi `tiers.shots`; test trong `tests/filmcheck/test_shots.py` (Chrome giả hoặc bỏ qua khi thiếu Chromium, ghi rõ)
+- [X] T032 [P] [US2] Test trong `tests/filmcheck/test_tiers.py`: `render-gate` có lý do "the shots review is not approved (run: …)" khi điểm shots bật và chưa duyệt; không còn khi đã duyệt; `--skip-checks` bỏ qua và ghi lại
+- [X] T033 [US2] Cổng shots trong `cmd_render_gate` (`tools/filmcheck/cli.py`) gọi `points.gate(d, "shots")` sau `tiers.gate`
+- [X] T034 [US2] Khung Shots trên trang (`web/app.js`): lưới ảnh 24 cảnh mỗi trang (mã, thời điểm, lời, nhãn lỗi/cảnh báo), ba ô chọn bối cảnh/máy/động tác chỉ từ `catalog` (không ô gõ tự do; khoá khi `editable.shots=false` và ghi lý do), nhãn "changed" tới khi `shots-check` xong, nút "Run shot check", "Keep it this way…" mở ô lý do bắt buộc (thao tác `except` hoặc `accept-style`), "Approve and render" khoá khi còn lỗi/cảnh báo/cảnh chưa kiểm (ghi lý do)
+- [X] T035 [US2] Luồng chat `CLAUDE.md` (bước 3b, sau tầng 2): điểm duyệt shots như T022, trước `render`; agent online trong `tools/runner/agent.py` như T023
+- [X] T036 [US2] Chuyển `films/review-trial` sang `scenes.json` và chạy quickstart mục 3; ghi kết quả vào `quickstart.md`
 
 ---
 

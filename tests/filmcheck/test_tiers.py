@@ -89,6 +89,26 @@ class Tiers(unittest.TestCase):
         (self.d / "index.html").write_text("<p>changed</p>")               # US1 AC4: a changed film is not checked
         self.assertEqual(len(tiers.gate(self.d)), 2)
 
+    def test_render_gate_needs_the_shots_review(self):            # specs/026 T032
+        import os
+        import subprocess
+        fp = tiers.fingerprint(self.d)
+        for t in ("plan", "shots"):
+            tiers.save_tier(self.d, t, tiers.result(t, [], {}, [], 1.0, fp))
+        env = {**os.environ, "STUDIO_ROOT": str(self.d.parent.parent)}
+        gate = lambda *x: subprocess.run([sys.executable, str(REPO / "tools" / "filmcheck" / "cli.py"), "render-gate",   # noqa: E731
+                                          self.d.name, *x], capture_output=True, text=True, env=env)
+        r = gate()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("the shots review is not approved", r.stderr)
+        from filmcheck import points
+        self.assertEqual(points.approve(self.d, "shots")[0], 0)
+        self.assertEqual(gate().returncode, 0)
+        (self.d / "index.html").write_text("<p>changed again</p>")         # plan and shots stale first, then the review
+        self.assertIn("plan check", gate().stderr)
+        r = gate("--skip-checks", "a trial render")
+        self.assertEqual(r.returncode, 0)
+
     def test_skip_is_recorded(self):
         tiers.record_skip(self.d, "a test render")
         self.assertEqual(tiers.load_tier(self.d, "render")["skipped_checks"]["reason"], "a test render")

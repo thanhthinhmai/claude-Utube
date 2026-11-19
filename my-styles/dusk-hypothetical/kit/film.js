@@ -3,7 +3,7 @@
 // DUR, SHOTS, CARDS, CUES, TEXTS(t), render(t), READY, and reads CLEAN and SUBJECT on every frame.
 import * as THREE from 'three';
 import { makeStage } from './stage.js';
-import { plan, sceneAt, camName, CATALOG, mulberry } from './plan.js';
+import { plan, sceneAt, camName, CATALOG, mulberry, sceneFile } from './plan.js';
 import { SETS } from './sets/index.js';
 import * as parts from './sets/parts.js';
 import { makeFigure } from './figure.js';
@@ -20,7 +20,13 @@ async function readJSON(url) {
   try { const r = await fetch(url); return r.ok ? await r.json() : null; } catch { return null; }
 }
 
-export async function film({ scenes, cues = './cues.json', hero, custom = {}, size } = {}) {
+export async function film({ scenes = './scenes.json', cues = './cues.json', hero, custom = {}, size } = {}) {
+  // specs/026: the scene table may be a file of data (scenes.json), which the job page edits
+  if (typeof scenes === 'string') {
+    const doc = await readJSON(scenes);
+    if (!doc) throw new Error(`[kit] ${scenes} cannot be read`);
+    scenes = sceneFile(doc, custom);
+  }
   // hero costume: the film's channel snapshot (channel attach), else the kit default (FR-015)
   if (!hero) {
     const snap = await readJSON('./channel.json');

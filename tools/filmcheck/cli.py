@@ -753,6 +753,14 @@ def cmd_qc_plan(a) -> int:
 def cmd_qc_shots(a) -> int:
     from filmcheck import shotcheck
     d = film_dir(a.film)
+    if a.only:                                     # specs/026: frames of a few shots, no tier result
+        try:
+            files = shotcheck.preview(d, lib_dir(), [x for x in a.only.split(",") if x])
+        except shotcheck.ShotError as e:
+            print(f"✗ {e}", file=sys.stderr)
+            return 2
+        out(a, {"files": files}, [f"✓ {f}" for f in files] + ["  (no tier result: run qc shots on the whole film before the review)"])
+        return 0
     try:
         r = shotcheck.run(d, lib_dir(), say=(lambda x: None) if a.json else print)
     except shotcheck.ShotError as e:
@@ -962,6 +970,8 @@ def cmd_render_gate(a) -> int:
         print(f"! render: checks skipped — {a.skip_checks.strip()}")
         return 0
     why = tiers.gate(d)
+    from filmcheck import points                   # specs/026: the shots review point, after the tier checks
+    why += points.gate(d, "shots") if not why else []
     for w in why:
         print(f"✗ render: {w}", file=sys.stderr)
     return 1 if why else 0
@@ -1083,6 +1093,7 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("film")
     s.add_argument("--json", action="store_true")
     s = sub.add_parser("qc-shots", help="tier 2: one frame per shot, frame faults and the style (specs/020)")
+    s.add_argument("--only", default=None, help="S012,S013: draw these shots again, write no tier result (specs/026)")
     s.add_argument("film")
     s.add_argument("--json", action="store_true")
     s = sub.add_parser("qc-accept-style", help="accept the style warnings with a reason (specs/020)")

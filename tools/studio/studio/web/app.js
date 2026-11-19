@@ -459,6 +459,8 @@ async function doneOpen(j) {
   DONE.drawn = {};
   RAIL.editing = {}; RAIL.last = {};
   await railRefresh();
+  const rv = RAIL.data && RAIL.data.review;
+  if (rv && !rv.decision) DONE.tab = rv.kind;            // open on the step that waits for this person
   await doneRefresh();
 }
 /** @param {boolean} [clicked] a click on a step: always draw it (live updates leave a playing section alone) */
@@ -500,10 +502,18 @@ async function editPanel(body) {
   if (!RAIL.data) return;
   const pt = TAB_POINT[DONE.tab];
   if (!pt) return;
-  if (pt === "script" && (canEdit("script") || pendingFor("script"))) {
-    const sc = body.querySelector(".script"); if (sc) sc.remove();
-    await editScript(body);
-    return;
+  const edit = { script: async () => { const sc = body.querySelector(".script"); if (sc) sc.remove(); await editScript(body); },
+    shots: async () => {
+      body.querySelectorAll(".thumbs, .sheet-img, .done-actions.spread, .sheet-img + p, #done-more-shots").forEach((x) => x.remove());
+      await editShots(body);
+    } }[pt];
+  if (edit && (pendingFor(pt) || RAIL.open === pt)) { await edit(); return; }
+  if (edit && canEdit(pt)) {                          // not waiting: the read-only view stays, with a way in
+    const btn = document.createElement("button");
+    btn.className = "btn"; btn.id = "open-edit";
+    btn.textContent = pt === "script" ? "Edit paragraphs" : "Change shots";
+    btn.onclick = () => { RAIL.open = pt; DONE.drawn = {}; doneRefresh(true); };
+    body.prepend(btn);
   }
   approveBar(body, pt);
 }
@@ -779,6 +789,105 @@ async function editScript(body) {
   const bar = () => {
     const failed = Object.entries(RAIL.last).some(([k, v]) => k.startsWith("script:") && !(/** @type {any} */ (v)).ok);
     approveBar(body, "script", open() ? "Run the script check on your edits before you approve." : failed ? "The script check does not pass yet." : "");
+  };
+  body.append(box);
+  draw(); bar();
+}
+
+/** Shots panel: one frame per shot, change set / camera / acting from the kit's catalogue, keep a shot with a reason,
+ * run the shot check, approve and render (US2). @param {HTMLElement} body */
+async function editShots(body) {
+  const v = RAIL.data;
+  /** @type {any} */ let doc = null, checks = null;
+  try { checks = await (await fetch(fileUrl("checks.json"), { credentials: "same-origin", cache: "no-store" })).json(); } catch { checks = {}; }
+  if (v.editable.shots) {
+    try { doc = await (await fetch(fileUrl("scenes.json"), { credentials: "same-origin", cache: "no-store" })).json(); } catch { doc = null; }
+  }
+  const tier = ((checks || {}).tiers || {}).shots || { issues: [] };
+  const issues = tier.issues || [];
+  const accepted = (tier.style_accept || {}).reason;
+  const stale = (v.steps.find((/** @type {any} */ s) => s.name === "Shots") || {}).base !== "done";   // the files, not the review
+  RAIL.changed = RAIL.changed || new Set();
+  const box = document.createElement("div");
+  box.className = "edit-shots";
+  RAIL.shotPage = RAIL.shotPage || 24;
+  const draw = () => {
+    const scenes = doc ? doc.scenes : [];
+    const sel = (/** @type {string} */ id, /** @type {string} */ k, /** @type {string[]} */ list, /** @type {string} */ cur) =>
+      `<select data-k="${k}" aria-label="${k} of ${esc(id)}" ${canEdit("shots") ? "" : "disabled"}>${(list.includes(cur) ? list : [cur, ...list]).map((x) =>
+        `<option${x === cur ? " selected" : ""}>${esc(x)}</option>`).join("")}</select>`;
+    const acts = v.catalog ? [...v.catalog.acts, ...Object.entries(v.catalog.act_prefixes).flatMap(([p, xs]) => (/** @type {string[]} */ (xs)).map((x) => `${p}:${x}`))] : [];
+    box.innerHTML = (v.editable.shots ? "" : `<p class="muted small">Shots cannot be changed here: ${esc(v.editable.reason)}. You can still keep a shot with a reason and approve.</p>`)
+      + `<div class="row done-actions"><button class="btn" id="run-shots" ${canEdit("shots") ? "" : "disabled"}>Run shot check</button>
+        <span class="muted small">${stale ? "The shot check has not run on the current film." : `Shot check: ${tier.pass ? "pass" : "not yet"}`}${accepted ? ` · style accepted: ${esc(accepted)}` : ""}</span></div>
+      ${(() => {                                     // warnings about the whole film, not one shot
+        const ids = new Set(scenes.map((/** @type {any} */ x) => x.id));
+        const fw = issues.filter((/** @type {any} */ i) => !ids.has(i.ref) && (i.severity === "warn" || !i.excepted));
+        return fw.length ? `<div class="film-warn" data-id="film"><p class="small"><b>The whole film</b></p>
+          ${fw.map((/** @type {any} */ i) => `<p class="small"><span class="tag ${i.severity === "warn" ? "warn" : "bad"}">${esc(i.rule)}</span>
+            ${esc(String(i.measure ?? ""))}${i.limit ? ` outside ${esc(String(i.limit))}` : ""}</p>`).join("")}
+          ${!accepted && fw.some((/** @type {any} */ i) => i.severity === "warn") ? `<button class="btn small" data-style>Keep the style as it is…</button>` : accepted ? `<p class="small pass">Accepted: ${esc(accepted)}</p>` : ""}
+          <span class="msg small">${esc(RAIL.msg.film || "")}</span></div>` : "";
+      })()}
+      <div class="shot-grid">${scenes.slice(0, RAIL.shotPage).map((/** @type {any} */ s) => {
+        const mine = issues.filter((/** @type {any} */ i) => i.ref === s.id);
+        const blk = mine.filter((/** @type {any} */ i) => i.severity === "block" && !i.excepted), wrn = mine.filter((/** @type {any} */ i) => i.severity === "warn");
+        const cam = typeof s.cam === "string" ? s.cam : (s.cam || {}).name || "";
+        const act = ((((s.cast || [])[0] || {}).act || [])[0] || [])[1] || "";
+        const changed = RAIL.changed.has(s.id);
+        return `<figure class="shot ${changed ? "changed" : blk.length ? "issue" : wrn.length && !accepted ? "warn" : ""}" data-id="${esc(s.id)}">
+          <img src="${fileUrl(`.check/shots/${s.id}.jpg`)}?v=${Date.now()}" alt="Frame of ${esc(s.id)}" loading="lazy" onerror="this.style.visibility='hidden'">
+          <figcaption><span class="row spread"><code>${esc(s.id)}</code><span class="muted small">${Number(s.dur).toFixed(1)} s</span></span>
+          ${v.catalog ? `<span class="sel3">${sel(s.id, "set", v.catalog.sets, s.set)}${sel(s.id, "cam", v.catalog.cams, cam)}${act ? sel(s.id, "act", acts, act) : ""}</span>` : ""}
+          ${changed ? `<span class="tag acc">changed · run the shot check</span>` : ""}
+          ${blk.map((/** @type {any} */ i) => `<span class="tag bad">${esc(i.rule)}</span> <button class="btn small" data-keep="${esc(i.rule)}">Keep it this way…</button>`).join("")}
+          ${!accepted ? wrn.map((/** @type {any} */ i) => `<span class="tag warn">style: ${esc(i.rule)}</span> <button class="btn small" data-style>Keep the style as it is…</button>`).join("") : ""}
+          <span class="msg small">${esc(RAIL.msg[s.id] || "")}</span></figcaption></figure>`;
+      }).join("")}</div>
+      ${scenes.length > RAIL.shotPage ? `<p><button class="btn" id="more-shots">Show more (${scenes.length - RAIL.shotPage} left)</button></p>` : ""}`;
+    box.querySelectorAll("select[data-k]").forEach((el) => { /** @type {HTMLSelectElement} */ (el).onchange = async () => {
+      const fig = /** @type {HTMLElement} */ (el.closest(".shot")), id = fig.dataset.id, msg = /** @type {HTMLElement} */ (fig.querySelector(".msg"));
+      msg.textContent = RAIL.msg[id] = "Saving and drawing the shot again…";
+      try {
+        const x = await sendEdit("shots", "shot", { shot: id, [/** @type {HTMLElement} */ (el).dataset.k]: /** @type {HTMLSelectElement} */ (el).value });
+        if (x.status === "done") RAIL.changed.add(id);
+        RAIL.msg[id] = editMsg(x);
+      } catch (err) { RAIL.msg[id] = /** @type {Error} */ (err).message; }
+      DONE.drawn = {}; doneRefresh(true);                 // the page may have been drawn again meanwhile
+    }; });
+    box.querySelectorAll("[data-keep], [data-style]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+      const fig = /** @type {HTMLElement} */ (el.closest("[data-id]")), id = fig.dataset.id, rule = /** @type {HTMLElement} */ (el).dataset.keep;
+      const msg = /** @type {HTMLElement} */ (fig.querySelector(".msg"));
+      msg.innerHTML = `<input class="reason" maxlength="400" placeholder="Why keep it? (needed)"> <button class="btn small">Keep</button>`;
+      /** @type {HTMLElement} */ (msg.querySelector("button")).onclick = async () => {
+        const reason = /** @type {HTMLInputElement} */ (msg.querySelector("input")).value.trim();
+        if (!reason) { msg.append(" A reason is needed."); return; }
+        try {
+          const x = rule ? await sendEdit("shots", "except", { shot: id, rule, reason }) : await sendEdit("shots", "accept-style", { reason });
+          RAIL.msg[id] = x.status === "done" ? "Kept." : editMsg(x);
+        } catch (err) { RAIL.msg[id] = /** @type {Error} */ (err).message; }
+        DONE.drawn = {}; doneRefresh(true);
+      };
+    }; });
+    const more = /** @type {HTMLElement | null} */ (box.querySelector("#more-shots"));
+    if (more) more.onclick = () => { RAIL.shotPage += 24; draw(); };
+    const run = /** @type {HTMLButtonElement} */ (box.querySelector("#run-shots"));
+    run.onclick = async () => {
+      run.disabled = true; run.textContent = "Checking every shot…";
+      try {
+        const x = await sendEdit("shots", "shots-check", {});
+        if (x.status === "done") { RAIL.changed.clear(); RAIL.msg = {}; }
+      } catch (err) { RAIL.msg.film = /** @type {Error} */ (err).message; }
+      DONE.drawn = {}; await doneRefresh(true);
+    };
+  };
+  const bar = () => {
+    const open = issues.filter((/** @type {any} */ i) => i.severity === "block" && !i.excepted).length;
+    const warns = issues.filter((/** @type {any} */ i) => i.severity === "warn").length && !accepted;
+    approveBar(body, "shots", RAIL.changed.size || stale ? "Run the shot check on the current film before you approve."
+      : open ? `${open} frame problem(s) open: fix the shot or keep it with a reason.`
+      : warns ? "Style warnings are open: fix the shot or keep the style with a reason." : "");
+    const b = body.querySelector("#approve"); if (b) b.textContent = "Approve and render";
   };
   body.append(box);
   draw(); bar();

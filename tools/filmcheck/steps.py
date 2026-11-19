@@ -146,6 +146,7 @@ def status(film_dir: Path, job_step: str = None, pending: set = frozenset(), bus
             state, note = "running", "Busy"
         elif job_step and job_step == name and state != "waiting":
             state = "running"
-        out.append({"name": name, "state": state, "note": note, "point": pt, "review_on": bool(info and info["on"]),
+        out.append({"name": name, "state": state, "base": base[name][0], "note": note, "point": pt,
+                    "review_on": bool(info and info["on"]),
                     "approved_at": info["approved_at"] if info and info["state"] == "approved" else None})
     return out
