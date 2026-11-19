@@ -41,6 +41,20 @@ def attach(root, film="demo", **film_fields):
 
 
 class KitUse(unittest.TestCase):
+    def test_template_comes_with_the_kit(self):                            # specs/023 T036
+        root = make_root()
+        tpl = root / "my-styles" / "duskish" / "template.json"
+        tpl.write_text(json.dumps({"motion": {"rise_s": [0.25, 0.83]}}))
+        self.assertEqual(studio(root, "kit", "use", "demo", "--style", "duskish").returncode, 0)
+        got = json.loads((root / "films" / "demo" / "kit" / "template.json").read_text())
+        self.assertEqual(got["motion"]["rise_s"], [0.25, 0.83])
+        # a new template is a new kit: refused without --update, copied with it
+        tpl.write_text(json.dumps({"motion": {"rise_s": [0.3, 0.8]}}))
+        self.assertNotEqual(studio(root, "kit", "use", "demo", "--style", "duskish").returncode, 0)
+        self.assertEqual(studio(root, "kit", "use", "demo", "--style", "duskish", "--update").returncode, 0)
+        got = json.loads((root / "films" / "demo" / "kit" / "template.json").read_text())
+        self.assertEqual(got["motion"]["rise_s"], [0.3, 0.8])
+
     def test_first_copy_same_and_changed(self):
         root = make_root()
         r = studio(root, "kit", "use", "demo", "--style", "duskish")

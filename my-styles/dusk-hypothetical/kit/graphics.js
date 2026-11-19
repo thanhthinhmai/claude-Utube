@@ -27,10 +27,16 @@ function spaced(c, text, x, y, track, align = 'center') {   // wide tracking: dr
   chars.forEach((ch, i) => { c.fillText(ch, cx, y); cx += widths[i] + track; });
   c.textAlign = ta; return total;
 }
-function title(c, text, x, y, size, color, a, boxes, id, track = 0.18) {
+function title(c, text, x, y, size, color, a, boxes, id, track = 0.18, bold = false) {
   c.font = `${Math.round(size)}px ${SERIF}`; c.textBaseline = 'middle';
   c.shadowColor = 'rgba(255,220,160,0.55)'; c.shadowBlur = size * 0.35; c.fillStyle = color;
+  if (bold) {                // the kit's one serif is thin: a stroke of the same colour gives the reference's heavy caps
+    c.strokeStyle = color; c.lineWidth = size * 0.06; c.lineJoin = 'round';
+    const fill = c.fillText.bind(c); c.fillText = (t, xx, yy) => { c.strokeText(t, xx, yy); fill(t, xx, yy); };
+    var restore = () => { c.fillText = fill; };
+  }
   const w = spaced(c, text, x, y, size * track); c.shadowBlur = 0;
+  if (bold) restore();
   boxes.push({ id, text, x0: x - w / 2, y0: y - size * 0.6, x1: x + w / 2, y1: y + size * 0.6 });
   return w;
 }
@@ -113,18 +119,28 @@ export function drawGfx(c, g, lt, a, extra = {}) {
       boxes.push({ id, text, x0: bx, y0: by, x1: bx + w, y1: by + h });
       break;
     }
-    case 'stat': {                                          // number card on violet
-      c.fillStyle = '#3b2a62'; c.fillRect(0, a.y0, a.W, a.y1 - a.y0);
-      const g2 = c.createRadialGradient(a.W / 2, a.H / 2, 0, a.W / 2, a.H / 2, a.W * 0.6); g2.addColorStop(0, 'rgba(160,120,220,0.35)'); g2.addColorStop(1, 'rgba(0,0,0,0)');
-      c.fillStyle = g2; c.fillRect(0, a.y0, a.W, a.y1 - a.y0);
-      title(c, g.text || '', a.W / 2, a.H * 0.45, 120 * u, GOLD, a, boxes, id);
-      if (g.sub) title(c, g.sub, a.W / 2, a.H * 0.6, 46 * u, CREAM, a, boxes, id + '.sub', 0.14);
+    case 'stat': {                                          // a fact told by a picture (TEMPLATE.md §8)
+      if (g.over) dim(c, a, 0.5 * k, !extra.noBlur);       // over the defocused, darkened scene (corrections #23)
+      else {                                              // or on the violet void with faint grain
+        c.fillStyle = '#2e2050'; c.fillRect(0, a.y0, a.W, a.y1 - a.y0);
+        const g2 = c.createRadialGradient(a.W / 2, a.H / 2, 0, a.W / 2, a.H / 2, a.W * 0.6); g2.addColorStop(0, 'rgba(160,120,220,0.38)'); g2.addColorStop(1, 'rgba(0,0,0,0.45)');
+        c.fillStyle = g2; c.fillRect(0, a.y0, a.W, a.y1 - a.y0); grain(c, a);
+      }
+      if (g.icon && ICONS[g.icon]) {
+        c.save(); const sc = easeOut(lt / 0.25); c.translate(a.W / 2, a.H * 0.36); c.scale(0.7 + 0.3 * sc, 0.7 + 0.3 * sc);
+        ICONS[g.icon](c, 0, 0, 380 * u, Math.max(0, lt - 0.1)); c.restore();   // a third of the picture high (visual §11)
+        title(c, g.text || '', a.W / 2, a.H * 0.64, 72 * u, CREAM, a, boxes, id, 0.14, true);   // above the subtitle band (0.82)
+        if (g.sub) title(c, g.sub, a.W / 2, a.H * 0.72, 36 * u, CREAM, a, boxes, id + '.sub', 0.14);
+      } else {
+        title(c, g.text || '', a.W / 2, a.H * 0.45, 120 * u, GOLD, a, boxes, id, 0.18, true);
+        if (g.sub) title(c, g.sub, a.W / 2, a.H * 0.6, 46 * u, CREAM, a, boxes, id + '.sub', 0.14);
+      }
       break;
     }
     case 'title': {                                         // two lines, the second larger and gold
       const [x, y] = pos(g, a, 0.5, 0.2);
       if (g.text) title(c, g.text, x, y, 50 * u, CREAM, a, boxes, id);
-      if (g.sub) title(c, g.sub, x, y + 90 * u, 92 * u, GOLD, a, boxes, id + '.sub', 0.12);
+      if (g.sub) title(c, g.sub, x, y + 90 * u, 96 * u, GOLD, a, boxes, id + '.sub', 0.12, true);
       break;
     }
     case 'chapter': {
@@ -135,16 +151,26 @@ export function drawGfx(c, g, lt, a, extra = {}) {
       break;
     }
     case 'end-choice': {                                    // closing yes/no card with the episode's cast in a row
-      dim(c, a, 0.5 * k, !extra.noBlur);
-      if (g.text) title(c, g.text, a.W / 2, a.y0 + 150 * u, 62 * u, CREAM, a, boxes, id);
+      if (!extra.cast3d) dim(c, a, 0.5 * k, !extra.noBlur); // with real figures the card sits on the void, figures sharp
+      // bold question at the top, two icon tiles, the cast as 3D figures along the bottom (film.js draws them;
+      // extra.cast3d says so) — TEMPLATE.md §9, visual §9.12
+      if (g.text) title(c, g.text, a.W / 2, a.y0 + 120 * u, 64 * u, CREAM, a, boxes, id, 0.14, true);
       (g.options || ['YES', 'NO']).forEach((o, i) => {
-        const bw = 360 * u, bh = 150 * u, bx = a.W / 2 + (i ? 40 : -40 - 360) * u, by = a.H * 0.42;
+        const bw = 300 * u, bh = 250 * u, bx = a.W / 2 + (i ? 40 : -40 - 300) * u, by = a.H * 0.27;
+        const kk = easeOut((lt - 0.15 - i * 0.12) / 0.2); if (kk <= 0) return;
+        c.save(); c.globalAlpha = k * kk;
         rr(c, bx, by, bw, bh, 24 * u); c.fillStyle = PANEL; c.fill(); c.strokeStyle = i ? '#e85a6a' : '#7ad08a'; c.lineWidth = 4 * u; c.stroke();
-        c.font = `${Math.round(56 * u)}px ${SERIF}`; c.fillStyle = CREAM; c.textAlign = 'center'; c.textBaseline = 'middle'; spaced(c, o, bx + bw / 2, by + bh / 2, 8 * u);
+        const ic = (g.icons || [])[i] || (i ? 'cross' : 'check');
+        (ICONS[ic] || ICONS.check)(c, bx + bw / 2, by + bh * 0.4, 90 * u, 1);
+        c.font = `${Math.round(46 * u)}px ${SERIF}`; c.fillStyle = CREAM; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.strokeStyle = CREAM; c.lineWidth = 46 * u * 0.06; spaced(c, o, bx + bw / 2, by + bh * 0.82, 8 * u);
         boxes.push({ id: `${id}.o${i}`, text: o, x0: bx, y0: by, x1: bx + bw, y1: by + bh });
+        c.restore();
       });
-      const cast = g.cast || ['#d9b23a', '#c0423e', '#3f9a9a', '#7a5cc0', '#4f8f4a'];
-      cast.forEach((col, i) => flatPerson(c, a.W / 2 + (i - (cast.length - 1) / 2) * 120 * u, a.y1 - 150 * u, 70 * u, col));
+      if (!extra.cast3d) {
+        const cast = g.cast || ['#d9b23a', '#c0423e', '#3f9a9a', '#7a5cc0', '#4f8f4a'];
+        cast.forEach((col, i) => flatPerson(c, a.W / 2 + (i - (cast.length - 1) / 2) * 120 * u, a.y1 - 150 * u, 70 * u, col));
+      }
       break;
     }
     default: break;
@@ -183,3 +209,78 @@ function wrap(c, text, max) {
   for (const w of words) { const t = cur ? cur + ' ' + w : w; if (c.measureText(t).width > max && cur) { lines.push(cur); cur = w; } else cur = t; }
   if (cur) lines.push(cur); return lines.slice(0, 2);
 }
+
+// faint film grain on the violet void (visual §4.5); seeded, so a frame depends only on its time
+function grain(c, a) {
+  c.save(); c.globalAlpha = 0.05; c.fillStyle = '#ffffff';
+  let x = 1234567;
+  for (let i = 0; i < 900; i++) { x = (x * 1103515245 + 12345) & 0x7fffffff; const px = x % a.W; x = (x * 1103515245 + 12345) & 0x7fffffff; c.fillRect(px, a.y0 + (x % (a.y1 - a.y0)), 2, 2); }
+  c.restore();
+}
+
+// ---------- metaphor icons (TEMPLATE.md §8): flat drawings that build up; s = size, t = seconds since they started ----------
+const PINK = '#e85a6a', GREEN = '#7ad08a', LAV = '#b8a0e8';
+function stroke(c, col, w) { c.strokeStyle = col; c.lineWidth = w; c.lineCap = 'round'; c.lineJoin = 'round'; }
+export const ICONS = {
+  brain(c, x, y, s, t) {
+    c.fillStyle = '#f2a0b4'; for (const sx of [-1, 1]) { c.beginPath(); c.ellipse(x + sx * s * 0.24, y, s * 0.3, s * 0.38, 0, 0, 7); c.fill(); }
+    stroke(c, '#b85878', s * 0.035); const n = Math.min(6, Math.floor(t / 0.12) + 1);
+    for (let i = 0; i < n; i++) { const sx = i % 2 ? 1 : -1, yy = y - s * 0.22 + Math.floor(i / 2) * s * 0.2; c.beginPath(); c.arc(x + sx * s * 0.24, yy, s * 0.1, Math.PI * 0.1, Math.PI * 0.9); c.stroke(); }
+    stroke(c, '#b85878', s * 0.03); c.beginPath(); c.moveTo(x, y - s * 0.36); c.lineTo(x, y + s * 0.36); c.stroke();
+  },
+  'heart-pulse'(c, x, y, s, t) {
+    c.fillStyle = PINK; c.beginPath(); c.moveTo(x, y + s * 0.35);
+    c.bezierCurveTo(x - s * 0.6, y - s * 0.05, x - s * 0.3, y - s * 0.55, x, y - s * 0.2);
+    c.bezierCurveTo(x + s * 0.3, y - s * 0.55, x + s * 0.6, y - s * 0.05, x, y + s * 0.35); c.fill();
+    const pts = [[-0.9, 0.55], [-0.35, 0.55], [-0.22, 0.3], [-0.08, 0.8], [0.06, 0.45], [0.2, 0.55], [0.9, 0.55]];
+    const u = clamp(t / 1.0), last = Math.max(1, Math.floor(u * (pts.length - 1)) + 1);
+    stroke(c, GREEN, s * 0.045); c.beginPath();
+    pts.slice(0, last + 1).forEach(([px, py], i) => (i ? c.lineTo : c.moveTo).call(c, x + px * s, y + py * s)); c.stroke();
+  },
+  jar(c, x, y, s, t) {
+    const w = s * 0.5, h = s * 0.7, fill = clamp(t / 1.2) * 0.8;
+    c.fillStyle = 'rgba(184,160,232,0.18)'; rr(c, x - w / 2, y - h / 2, w, h, s * 0.08); c.fill();
+    c.fillStyle = LAV; rr(c, x - w / 2 + s * 0.03, y + h / 2 - h * fill - s * 0.02, w - s * 0.06, h * fill, s * 0.05); c.fill();
+    stroke(c, CREAM, s * 0.03); rr(c, x - w / 2, y - h / 2, w, h, s * 0.08); c.stroke();
+    c.fillStyle = GOLD; c.fillRect(x - w * 0.4, y - h / 2 - s * 0.1, w * 0.8, s * 0.09);
+  },
+  'map-path'(c, x, y, s, t) {
+    c.fillStyle = '#5a8a6a'; c.beginPath(); c.moveTo(x - s * 0.7, y - s * 0.1); c.quadraticCurveTo(x - s * 0.4, y - s * 0.55, x + s * 0.1, y - s * 0.35);
+    c.quadraticCurveTo(x + s * 0.7, y - s * 0.4, x + s * 0.65, y + s * 0.1); c.quadraticCurveTo(x + s * 0.3, y + s * 0.5, x - s * 0.2, y + s * 0.35);
+    c.quadraticCurveTo(x - s * 0.75, y + s * 0.3, x - s * 0.7, y - s * 0.1); c.fill();
+    const n = Math.floor(clamp(t / 1.2) * 12); c.fillStyle = CREAM;
+    for (let i = 0; i < n; i++) { const u = i / 11; c.beginPath(); c.arc(x - s * 0.45 + u * s * 0.9, y + s * 0.15 - Math.sin(u * Math.PI) * s * 0.35, s * 0.025, 0, 7); c.fill(); }
+    c.fillStyle = PINK; c.beginPath(); c.arc(x - s * 0.45, y + s * 0.15, s * 0.05, 0, 7); c.fill();
+    if (n >= 12) { c.fillStyle = GOLD; c.beginPath(); c.arc(x + s * 0.45, y + s * 0.15, s * 0.06, 0, 7); c.fill(); }
+  },
+  clipboard(c, x, y, s, t) {
+    c.fillStyle = '#c8a070'; rr(c, x - s * 0.32, y - s * 0.45, s * 0.64, s * 0.9, s * 0.05); c.fill();
+    c.fillStyle = '#f4efe4'; c.fillRect(x - s * 0.26, y - s * 0.36, s * 0.52, s * 0.76);
+    c.fillStyle = '#5a4874'; c.fillRect(x - s * 0.12, y - s * 0.5, s * 0.24, s * 0.1);
+    const n = Math.min(4, Math.floor(t / 0.25) + 1);
+    for (let i = 0; i < 4; i++) {
+      const yy = y - s * 0.22 + i * s * 0.17; c.fillStyle = 'rgba(90,72,116,0.5)'; c.fillRect(x - s * 0.08, yy - s * 0.015, s * 0.28, s * 0.03);
+      if (i < n) { stroke(c, GREEN, s * 0.035); c.beginPath(); c.moveTo(x - s * 0.2, yy); c.lineTo(x - s * 0.16, yy + s * 0.04); c.lineTo(x - s * 0.1, yy - s * 0.05); c.stroke(); }
+    }
+  },
+  coins(c, x, y, s, t) {
+    const n = Math.min(7, Math.floor(t / 0.12) + 1);
+    for (let i = 0; i < n; i++) { const yy = y + s * 0.35 - i * s * 0.1; c.fillStyle = '#b8902e'; c.beginPath(); c.ellipse(x, yy + s * 0.03, s * 0.3, s * 0.09, 0, 0, 7); c.fill(); c.fillStyle = GOLD; c.beginPath(); c.ellipse(x, yy, s * 0.3, s * 0.09, 0, 0, 7); c.fill(); }
+  },
+  clock(c, x, y, s, t) {
+    c.fillStyle = '#f4efe4'; c.beginPath(); c.arc(x, y, s * 0.42, 0, 7); c.fill(); stroke(c, '#5a4874', s * 0.05); c.beginPath(); c.arc(x, y, s * 0.42, 0, 7); c.stroke();
+    const a1 = -Math.PI / 2 + t * Math.PI * 1.5, a2 = -Math.PI / 2 + t * Math.PI * 0.12;
+    stroke(c, INKC, s * 0.04); c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a1) * s * 0.32, y + Math.sin(a1) * s * 0.32); c.stroke();
+    stroke(c, INKC, s * 0.06); c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a2) * s * 0.2, y + Math.sin(a2) * s * 0.2); c.stroke();
+  },
+  'speech-stack'(c, x, y, s, t) {
+    const n = Math.min(4, Math.floor(t / 0.18) + 1);
+    for (let i = 0; i < n; i++) {
+      const bx = x - s * 0.4 + (i % 2) * s * 0.2, by = y - s * 0.42 + i * s * 0.2;
+      c.fillStyle = i === n - 1 ? '#ffffff' : 'rgba(255,255,255,0.75)'; rr(c, bx, by, s * 0.6, s * 0.16, s * 0.07); c.fill();
+      c.fillStyle = 'rgba(26,18,38,0.5)'; c.fillRect(bx + s * 0.07, by + s * 0.065, s * (0.25 + 0.15 * (i % 2)), s * 0.03);
+    }
+  },
+  check(c, x, y, s) { stroke(c, GREEN, s * 0.14); c.beginPath(); c.moveTo(x - s * 0.35, y); c.lineTo(x - s * 0.08, y + s * 0.28); c.lineTo(x + s * 0.38, y - s * 0.3); c.stroke(); },
+  cross(c, x, y, s) { stroke(c, PINK, s * 0.14); c.beginPath(); c.moveTo(x - s * 0.3, y - s * 0.3); c.lineTo(x + s * 0.3, y + s * 0.3); c.moveTo(x + s * 0.3, y - s * 0.3); c.lineTo(x - s * 0.3, y + s * 0.3); c.stroke(); },
+};

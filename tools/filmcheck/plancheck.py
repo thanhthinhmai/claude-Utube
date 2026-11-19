@@ -137,7 +137,8 @@ def read_input(d: Path, lib, fp: str) -> dict:
     else:
         cards, cards_from = readcheck_cards(d, lib), "readcheck"
     c = {"fingerprint": fp, "dur": dur, "shots": shots, "cues": cues, "cues_from": cues_from, "cards": cards,
-         "cards_from": cards_from, "warnings": warns}
+         "cards_from": cards_from, "warnings": warns,
+         "cast": {str(c[2]): int(c[3]) for c in (page.get("cast") or []) if isinstance(c, list) and len(c) >= 4}}
     cache.parent.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps(c, ensure_ascii=False), encoding="utf-8")
     return c

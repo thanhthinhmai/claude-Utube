@@ -1,14 +1,15 @@
 // Film kit entry (specs/022, contracts/kit-api.md): a page writes a scene table and calls film({scenes}); this
 // builds the frame for any t and exports the library's page contract and specs/020's film-page contract:
-// DUR, SHOTS, CARDS, CUES, TEXTS(t), render(t), READY, and reads CLEAN on every frame.
+// DUR, SHOTS, CARDS, CUES, TEXTS(t), render(t), READY, and reads CLEAN and SUBJECT on every frame.
 import * as THREE from 'three';
 import { makeStage } from './stage.js';
-import { plan, sceneAt, camName, CATALOG } from './plan.js';
+import { plan, sceneAt, camName, CATALOG, mulberry } from './plan.js';
 import { SETS } from './sets/index.js';
 import * as parts from './sets/parts.js';
 import { makeFigure } from './figure.js';
+import { actState, blinkOn, talkOn, breath, riseOf, blackAt, streakAt } from './acting.js';
 import { makeCrowd, lookOf } from './crowd.js';
-import { place } from './camera.js';
+import { place, frameX } from './camera.js';
 import { drawGfx, drawCue, area, SERIF, SANS } from './graphics.js';
 
 export { plan, CATALOG };
@@ -28,8 +29,11 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
   }
   hero = { ...CATALOG.hero_default, ...(hero || {}) };
   const cueRows = typeof cues === 'string' ? (await readJSON(cues)) || [] : cues || [];
-  const P = plan(scenes, cueRows);
-  Object.assign(window, { DUR: P.DUR, SHOTS: P.SHOTS, CARDS: P.CARDS, CUES: P.CUES });
+  // the style's measures (specs/023): copied into the film's kit by "kit use"; beside the kit in my-styles
+  const template = (await readJSON(new URL('./template.json', import.meta.url))) || (await readJSON(new URL('../template.json', import.meta.url)));
+  const P = plan(scenes, cueRows, CATALOG, template);
+  const RISE = riseOf(template);
+  Object.assign(window, { DUR: P.DUR, SHOTS: P.SHOTS, CARDS: P.CARDS, CUES: P.CUES, CAST: P.CAST, MOVES: P.MOVES });
 
   const stage = makeStage(size || [innerWidth, innerHeight]);
   const A = { ...area(stage.W, stage.H), under: stage.ctx };
@@ -62,6 +66,15 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
   };
   const shoulder = makeFigure({ hoodie: '#5a4a9a', hair: 'short', hairColor: '#1c1420' }); scene.add(shoulder.group);
   const crowds = new Map();
+  const endFigs = new Map();                 // the closing card's cast (specs/023)
+  const swaps = new Map();                   // people after a state swap, by their new look
+  const swapFig = (c) => {
+    const base = c.who === 'hero' ? { hoodie: hero.hoodie, strings: hero.strings, hair: hero.hair, hat: hero.hat, glasses: hero.glasses }
+      : { ...lookOf(Number(c.who.slice(6)), 0), ...Object.fromEntries(['hoodie', 'hair', 'hat', 'glasses'].filter((k) => c[k] != null).map((k) => [k, c[k]])) };
+    const look = { ...base, ...c.swap }, key = `${c.who}|${JSON.stringify(look)}`;
+    if (!swaps.has(key)) { const f = makeFigure(look); scene.add(f.group); swaps.set(key, f); }
+    return swaps.get(key);
+  };
 
   function castPlace(s, set, c, i, used) {
     const a = set.anchors; let slot;
@@ -88,30 +101,93 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
     for (const [, o] of built) o.group.visible = o === set;
     const [fn, ff] = set.fog || [8, 24]; scene.fog.near = fn; scene.fog.far = ff;   // big places see further
     stage.grade(s.mood || 'dusk', { ...(set.grade || {}), ...(s.grade || {}) });   // set default, then the scene
+    if (s.mood === 'alarm') {                // the alarm light pulses red about once a second (v02 strip S097; TEMPLATE.md §10)
+      const pulse = 0.7 + 0.3 * Math.sin(t * Math.PI * 2 * 1.1);
+      stage.lights.front.intensity *= pulse; stage.lights.rim.intensity *= pulse; stage.lights.hemi.intensity *= 0.85 + 0.15 * pulse;
+    }
 
     // cast
-    const used = [], shown = new Set(), heads = [];
+    const used = [], shown = new Set(), heads = [], streaks = [];
     (s.cast || []).forEach((c, i) => {
-      const f = c.who === 'hero' ? heroFig : extra(Number(c.who.slice(6)), c);
+      // a state swap (act 'swap', specs/023): from its time on the person wears cast[].swap; a light streak covers the change
+      const swapAt = ((c.act || []).find((a) => a[1] === 'swap') || [])[0];
+      const swapped = swapAt != null && c.swap && lt >= swapAt;
+      const f = swapped ? swapFig(c) : c.who === 'hero' ? heroFig : extra(Number(c.who.slice(6)), c);
+      if (swapAt != null) streaks.push({ at: swapAt, fig: f });
       const slot = castPlace(s, set, c, i, used); used.push(slot);
       f.group.visible = true; shown.add(f);
       f.group.position.set(slot.x, slot.y || 0, slot.z); f.group.rotation.y = slot.ry || 0;
       f.group.scale.setScalar(c.scale || 1);
       const pose = c.pose === 'sit' ? 'sit' : c.pose || (slot.sit ? 'sit' : 'stand');
-      const j = f.pose(pose, lt, { sit: slot.sit, seat: slot.seat, turn: (c.turn || 0) * D2R, tilt: (c.tilt || 0) * D2R, nod: (c.nod || 0) * D2R, hold: c.hold });
-      f.face(c.face || 'dot');
+      // walking along a path (specs/023): position from the path at lt, facing the way it goes
+      if (c.path) {
+        const P0 = c.path, k2 = P0.findIndex((q) => q[0] > lt);
+        const [a, b] = k2 <= 0 ? (k2 === 0 ? [P0[0], P0[0]] : [P0.at(-2), P0.at(-1)]) : [P0[k2 - 1], P0[k2]];
+        const u = b[0] > a[0] ? Math.min(1, Math.max(0, (lt - a[0]) / (b[0] - a[0]))) : 1;
+        f.group.position.set(a[1] + (b[1] - a[1]) * u, slot.y || 0, a[2] + (b[2] - a[2]) * u);
+        if (b[1] !== a[1] || b[2] !== a[2]) f.group.rotation.y = Math.atan2(b[1] - a[1], b[2] - a[2]);
+        slot.x = f.group.position.x; slot.z = f.group.position.z; slot.ry = f.group.rotation.y;
+      }
+      // acting (specs/023, acting.js): act list, blinking, breathing, talking under the person's bubbles
+      const seed = c.who === 'hero' ? 1 : Number(c.who.slice(6)) + 2;
+      const st = actState(c.act || [], lt, RISE, { face: c.face });
+      const talk = c.talk || (s.gfx || []).filter((g) => g.type === 'bubble' && g.who === i)
+        .map((g) => [g.at ?? 0, Math.min((g.at ?? 0) + 1.2, g.until ?? s.dur)]);
+      const j = f.pose(pose, lt, { sit: slot.sit, seat: slot.seat, turn: (c.turn || 0) * D2R + st.turn, tilt: (c.tilt || 0) * D2R + st.tilt,
+        nod: (c.nod || 0) * D2R + st.pitch, hold: c.hold, breath: breath(seed, t),
+        mix: st.arms ? { from: st.from, to: st.arms, w: st.w, wave: st.wave } : null });
+      f.face(st.face || c.face || 'dot', { blink: c.blink !== false && blinkOn(seed, t, (c.blink && c.blink.every) || [2, 5]), talk: talkOn(talk, lt) });
       const head = new THREE.Vector3(0, (j.lift + 1.02) * (c.scale || 1), 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), slot.ry || 0).add(f.group.position);
       heads.push({ head, facing: slot.ry || 0, who: c.who });
     });
     heroFig.group.visible = shown.has(heroFig);
     for (const f of extras.values()) f.group.visible = shown.has(f);
+    for (const f of swaps.values()) f.group.visible = shown.has(f);
 
     // camera on the subject (cast[subject] or the hero or the first cast member); empty shots frame the hero anchor
     const camOpts = typeof s.cam === 'object' ? s.cam : {};
     const subj = heads[camOpts.subject ?? -1] || heads.find((h) => h.who === 'hero') || heads[0] ||
       { head: new THREE.Vector3(set.anchors.hero.x, (set.anchors.hero.y || 0) + 1.57, set.anchors.hero.z), facing: set.anchors.hero.ry || 0 };
-    const cp = place(cam, camName(s.cam), subj.head, subj.facing, camOpts, k, set.room);
-    stage.focus(cp.focus, cp.aper); stage.aim(new THREE.Vector3(subj.head.x, 0, subj.head.z));
+    // specs/023: the scene's camera move, where the subject sits, and the side the light comes from, all seeded by the scene
+    const rand = mulberry([...s.id].reduce((h, ch) => (h * 33 + ch.charCodeAt(0)) | 0, 7) >>> 0);
+    const scale = (CATALOG.cams[camName(s.cam)] || {}).scale;
+    const fx = frameX(s.frame, scale, template, rand);
+    const raking = (template && template.light && template.light.raking) ?? 0.55;
+    const lightSide = s.light ?? (rand() < raking ? (rand() < 0.5 ? -1 : 1) : 0);
+    const cp = place(cam, camName(s.cam), subj.head, subj.facing, { ...camOpts, move: s._move, lt, dur: s.dur, fx }, k, set.room);
+    stage.focus(cp.focus, cp.aper); stage.aim(new THREE.Vector3(subj.head.x, 0, subj.head.z), lightSide);
+    // closing card (TEMPLATE.md §9): the episode's cast as real figures in a row along the bottom of the picture,
+    // facing the camera, popping in one by one, each with a small act; the card's 2D parts draw over them
+    const end = (s.gfx || []).find((g) => g.type === 'end-choice' && lt >= (g.at ?? 0));
+    for (const f of endFigs.values()) f.group.visible = false;
+    let endFocus = 0;
+    const stool = set.group.getObjectByName('stool'); if (stool) stool.visible = !end;
+    if (end) {
+      const list = end.cast || ['#d9b23a', '#3f9a9a', '#c0423e', '#7a5cc0', '#4f8f4a', '#d9608c'];
+      // each figure stands on the floor where the view through the bottom of the picture meets it, a third of the picture high
+      const onFloor = (nx) => {
+        const p = new THREE.Vector3(nx, -0.46, 0.5).unproject(cam), dir = p.sub(cam.position).normalize();   // feet above the subtitle band
+        if (dir.y > -0.02) return null;
+        return cam.position.clone().addScaledVector(dir, -cam.position.y / dir.y);
+      };
+      list.forEach((look, i) => {
+        const key = typeof look === 'string' ? look : JSON.stringify(look);
+        if (!endFigs.has(key)) { const f = makeFigure(typeof look === 'string' ? { hoodie: look } : look); scene.add(f.group); endFigs.set(key, f); }
+        const f = endFigs.get(key), born = (end.at ?? 0) + 0.25 + i * 0.12, u = Math.min(1, Math.max(0, (lt - born) / 0.18));
+        if (u <= 0) return;
+        const nx = list.length > 1 ? -0.62 + (1.24 * i) / (list.length - 1) : 0;
+        const p0 = onFloor(nx); if (!p0) return;
+        const dist = p0.distanceTo(cam.position), vis = 2 * dist * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
+        f.group.visible = true; f.group.position.copy(p0); f.group.position.y += 0.15 * (1 - u) * (1 - u);
+        f.group.rotation.y = Math.atan2(cam.position.x - p0.x, cam.position.z - p0.z); f.group.scale.setScalar((0.24 * vis) / 1.95);
+        endFocus = dist;
+        const act = ['wave', 'cheer', 'raise-hand', 'shrug-up', 'point', 'hands-face'][i % 6];
+        const st = actState([[born + 0.2, act]], lt, RISE);
+        f.pose('stand', lt, { mix: st.arms ? { to: st.arms, w: st.w, wave: st.wave } : null, breath: breath(i + 40, t) });
+        f.face(['happy', 'dot', 'wow', 'half'][i % 4], { blink: blinkOn(i + 40, t) });
+      });
+    }
+    if (endFocus) stage.focus(endFocus, 2.5);           // the closing card's figures are sharp
     // over the shoulder: the hero is the soft shoulder in front when the hero is in the shot but not its subject
     const heroFront = cp.shoulder && subj.who !== 'hero' && heroFig.group.visible;
     shoulder.group.visible = !!cp.shoulder && !heroFront;
@@ -123,7 +199,8 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
 
     // crowd (slots already taken by the cast are left out)
     for (const [, cr] of crowds) cr.group.visible = false;
-    if (s.crowd && s.crowd.n > 0) {
+    // window.SUBJECT (specs/023): the motion check reads the cast only; crowds stay frozen in the style and are left out
+    if (s.crowd && s.crowd.n > 0 && !window.SUBJECT) {
       const key = `${s.id}|${s.set}|${s.crowd.n}|${s.crowd.seed ?? 1}`;
       let cr = crowds.get(key);
       if (!cr) {
@@ -142,6 +219,20 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
       const f = s.fade === 'out' ? Math.min(1, Math.max(0, (lt - (s.dur - 0.6)) / 0.6)) : Math.max(0, 1 - lt / 0.6);
       if (f > 0) { ctx.fillStyle = `rgba(0,0,0,${f})`; ctx.fillRect(0, 0, stage.W, stage.H); }
     }
+    // transitions into and out of this scene (specs/023, TEMPLATE.md §13): a dip is ≈ 0.12 s of black across the cut,
+    // a fade goes to black and back over ≈ 0.27 s; the lengths come from template.json → transitions
+    const TR = (template && template.transitions) || {};
+    const black = blackAt(s, P.scenes[P.scenes.indexOf(s) + 1], lt, TR);
+    if (black > 0) { stage.ctx.fillStyle = `rgba(0,0,0,${black})`; stage.ctx.fillRect(0, 0, stage.W, stage.H); }
+    // the light-streak swap: a bright horizontal smear over the person for ≈ 0.15 s around the change (motion-depth §2.3)
+    for (const st of streaks) {
+      const a = streakAt(lt, st.at, TR); if (a <= 0) continue;
+      const box = new THREE.Box3().setFromObject(st.fig.group), lo = box.min.clone().project(cam), hi = box.max.clone().project(cam);
+      const y0 = (1 - Math.max(lo.y, hi.y)) / 2 * stage.H, y1 = (1 - Math.min(lo.y, hi.y)) / 2 * stage.H;
+      const gr = stage.ctx.createLinearGradient(0, y0, 0, y1);
+      gr.addColorStop(0, 'rgba(255,240,230,0)'); gr.addColorStop(0.5, `rgba(255,245,235,${0.95 * a})`); gr.addColorStop(1, 'rgba(255,240,230,0)');
+      stage.ctx.fillStyle = gr; stage.ctx.fillRect(0, y0, stage.W, y1 - y0);
+    }
     // graphics and subtitles, unless the tools ask for a clean frame (thumbnails)
     boxes = [];
     if (!window.CLEAN) {
@@ -153,7 +244,7 @@ export async function film({ scenes, cues = './cues.json', hero, custom = {}, si
           const v = heads[g.who].head.clone().add(new THREE.Vector3(0, 0.45, 0)).project(cam);
           anchor = [(v.x + 1) / 2 * stage.W + 40 * A.u * (g.left ? -1 : 1), Math.max(A.y0 + 90 * A.u, (1 - v.y) / 2 * stage.H)];
         }
-        boxes.push(...drawGfx(ctx, g, lt - at, A, { anchor }));
+        boxes.push(...drawGfx(ctx, g, lt - at, A, { anchor, cast3d: true }));
       }
       const cue = P.CUES.find(([a, b]) => t >= a && t < b);
       if (cue) drawCue(ctx, cue[2], A);          // subtitles are declared in CUES, not in TEXTS (tier 2 checks other text against them)

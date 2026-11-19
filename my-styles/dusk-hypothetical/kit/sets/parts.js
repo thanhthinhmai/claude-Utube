@@ -140,3 +140,85 @@ export function plant(g, x, z, { h = 1.0 } = {}) {
   cyl(g, 0.16, 0.3, '#b0603e', x, 0.15, z);
   mesh(g, new THREE.SphereGeometry(0.3 * h, 12, 10), '#4f8f4a', [x, 0.3 + 0.3 * h, z]);
 }
+
+// ---------- story props (specs/023, TEMPLATE.md §6): one or two per set that tell what the place is for ----------
+const PROP_COLS = ['#d9608c', '#3f9a9a', '#e07a3a', '#7a5cc0', '#4f8f4a', '#c99a2e', '#3f6fc0'];
+// a poster on a wall: a coloured sheet with a simple drawn shape; face: +1 faces +z, or a ry in radians
+export function poster(g, x, y, z, { w = 0.6, h = 0.85, seed = 1, ry = 0 } = {}) {
+  const r = mulberry(seed * 31 + 7), col = PROP_COLS[Math.floor(r() * PROP_COLS.length)];
+  const map = canvasTex(`poster-${seed}`, 64, 90, (c, W, H) => {
+    c.fillStyle = col; c.fillRect(0, 0, W, H); c.fillStyle = 'rgba(255,240,220,.85)';
+    const k = Math.floor(r() * 3);
+    if (k === 0) { c.beginPath(); c.arc(W / 2, H * 0.42, W * 0.28, 0, Math.PI * 2); c.fill(); }
+    else if (k === 1) { c.beginPath(); c.moveTo(W / 2, H * 0.15); c.lineTo(W * 0.85, H * 0.7); c.lineTo(W * 0.15, H * 0.7); c.fill(); }
+    else c.fillRect(W * 0.2, H * 0.2, W * 0.6, H * 0.45);
+    c.fillRect(W * 0.2, H * 0.8, W * 0.6, H * 0.06);
+  });
+  const o = mesh(g, new THREE.PlaneGeometry(w, h), stdMat(col, { map, rough: 0.9 }), [x, y, z], false); o.rotation.y = ry; return o;
+}
+export function backpack(g, x, z, { color = '#3f6fc0', y = 0, ry = 0 } = {}) {
+  const b = new THREE.Group(); b.position.set(x, y, z); b.rotation.y = ry; g.add(b);
+  mesh(b, new THREE.BoxGeometry(0.34, 0.42, 0.18), stdMat(color), [0, 0.21, 0]);
+  mesh(b, new THREE.BoxGeometry(0.26, 0.16, 0.06), stdMat(new THREE.Color(color).multiplyScalar(0.8).getStyle()), [0, 0.14, 0.11]);
+  return b;
+}
+export function ball(g, x, y, z, { color = '#e07a3a', r = 0.12 } = {}) { return mesh(g, new THREE.SphereGeometry(r, 16, 12), stdMat(color, { rough: 0.7 }), [x, y, z]); }
+export function tray(g, x, y, z, { seed = 1 } = {}) {
+  const r = mulberry(seed * 13 + 3), t = new THREE.Group(); t.position.set(x, y, z); g.add(t);
+  mesh(t, new THREE.BoxGeometry(0.42, 0.025, 0.3), stdMat('#c8b8d8', { rough: 0.6 }), [0, 0.012, 0]);
+  mesh(t, new THREE.CylinderGeometry(0.08, 0.07, 0.04, 14), stdMat(['#e0b040', '#c0423e', '#4f8f4a'][Math.floor(r() * 3)]), [-0.09, 0.045, 0]);
+  mesh(t, new THREE.BoxGeometry(0.09, 0.05, 0.12), stdMat('#f0e0c0'), [0.1, 0.05, 0.02]);
+  mesh(t, new THREE.CylinderGeometry(0.03, 0.03, 0.11, 10), stdMat(PROP_COLS[Math.floor(r() * PROP_COLS.length)]), [0.12, 0.08, -0.09]);
+  return t;
+}
+// a self-lit sign or board with a few bars of text-like marks (no words)
+export function litBoard(g, x, y, z, { w = 2, h = 0.7, color = '#2a2040', glow = '#ffd8a8', ry = 0, rows = 3 } = {}) {
+  const map = canvasTex(`board-${rows}-${glow}`, 128, 48, (c, W, H) => {
+    c.fillStyle = color; c.fillRect(0, 0, W, H); c.fillStyle = glow;
+    for (let i = 0; i < rows; i++) c.fillRect(W * 0.1, H * (0.2 + i * 0.25), W * (0.5 + 0.3 * ((i * 37) % 3) / 2), H * 0.1);
+  });
+  const o = mesh(g, new THREE.PlaneGeometry(w, h), stdMat('#ffffff', { map, emissive: '#ffffff', ei: 0.5, rough: 0.6 }), [x, y, z], false);
+  o.material.emissiveMap = map; o.rotation.y = ry; return o;
+}
+export function globe(g, x, y, z) {
+  mesh(g, new THREE.CylinderGeometry(0.08, 0.1, 0.05, 12), stdMat('#5a4874'), [x, y + 0.025, z]);
+  mesh(g, new THREE.SphereGeometry(0.17, 20, 14), stdMat('#3f8fb0', { rough: 0.6 }), [x, y + 0.24, z]);
+  mesh(g, new THREE.TorusGeometry(0.19, 0.008, 6, 24, Math.PI), stdMat('#c99a2e'), [x, y + 0.24, z]).rotation.y = Math.PI / 2;
+}
+export function laptop(g, x, y, z, { ry = 0 } = {}) {
+  const l = new THREE.Group(); l.position.set(x, y, z); l.rotation.y = ry; g.add(l);
+  mesh(l, new THREE.BoxGeometry(0.34, 0.015, 0.24), stdMat('#2a2438'), [0, 0.008, 0]);
+  const s = mesh(l, new THREE.BoxGeometry(0.34, 0.22, 0.012), stdMat('#7d9cc0', { emissive: '#7d9cc0', ei: 0.9 }), [0, 0.12, -0.12]); s.rotation.x = -0.25;
+  return l;
+}
+export function trophy(g, x, y, z) {
+  mesh(g, new THREE.BoxGeometry(0.14, 0.06, 0.14), stdMat('#3a2e50'), [x, y + 0.03, z]);
+  mesh(g, new THREE.CylinderGeometry(0.02, 0.02, 0.1, 8), stdMat('#d9b23a', { rough: 0.3, emissive: '#5a4010', ei: 0.4 }), [x, y + 0.11, z]);
+  mesh(g, new THREE.CylinderGeometry(0.09, 0.04, 0.12, 14), stdMat('#d9b23a', { rough: 0.3, emissive: '#5a4010', ei: 0.4 }), [x, y + 0.22, z]);
+}
+export function pennants(g, { x0, x1, y, z, n = 14, seed = 2 } = {}) {
+  const r = mulberry(seed * 17 + 1);
+  for (let i = 0; i < n; i++) {
+    const u = i / (n - 1), x = x0 + (x1 - x0) * u, yy = y - 0.18 * Math.sin(Math.PI * u);
+    const tri = new THREE.Shape(); tri.moveTo(-0.12, 0); tri.lineTo(0.12, 0); tri.lineTo(0, -0.24);
+    mesh(g, new THREE.ShapeGeometry(tri), new THREE.MeshStandardMaterial({ color: PROP_COLS[Math.floor(r() * PROP_COLS.length)], side: THREE.DoubleSide, roughness: 0.9 }), [x, yy, z], false);
+  }
+}
+export function car(g, x, z, { color = '#c0423e', ry = 0 } = {}) {
+  const c = new THREE.Group(); c.position.set(x, 0, z); c.rotation.y = ry; g.add(c);
+  mesh(c, new THREE.BoxGeometry(1.8, 0.5, 0.9), stdMat(color, { rough: 0.5 }), [0, 0.45, 0]);
+  mesh(c, new THREE.BoxGeometry(1.0, 0.4, 0.82), stdMat('#3a3050', { rough: 0.3 }), [-0.1, 0.88, 0]);
+  for (const [wx, wz] of [[-0.6, 0.45], [0.6, 0.45], [-0.6, -0.45], [0.6, -0.45]]) mesh(c, new THREE.CylinderGeometry(0.2, 0.2, 0.14, 14), stdMat('#1c1626'), [wx, 0.2, wz]).rotation.x = Math.PI / 2;
+  mesh(c, new THREE.SphereGeometry(0.06, 8, 6), stdMat('#ffe0b8', { emissive: '#ffe0b8', ei: 1.5 }), [0.92, 0.5, 0.3]);
+  mesh(c, new THREE.SphereGeometry(0.06, 8, 6), stdMat('#ffe0b8', { emissive: '#ffe0b8', ei: 1.5 }), [0.92, 0.5, -0.3]);
+  return c;
+}
+export function foodCart(g, lights, x, z, { color = '#e07a3a', ry = 0 } = {}) {
+  const c = new THREE.Group(); c.position.set(x, 0, z); c.rotation.y = ry; g.add(c);
+  mesh(c, new THREE.BoxGeometry(1.4, 0.9, 0.7), stdMat(color), [0, 0.65, 0]);
+  mesh(c, new THREE.BoxGeometry(1.6, 0.06, 0.9), stdMat('#f0e6d8'), [0, 1.65, 0]);
+  for (const sx of [-0.7, 0.7]) mesh(c, new THREE.CylinderGeometry(0.025, 0.025, 0.55, 8), stdMat('#5a4874'), [sx, 1.38, 0.3]);
+  for (const sx of [-0.45, 0.45]) mesh(c, new THREE.CylinderGeometry(0.16, 0.16, 0.06, 14), stdMat('#1c1626'), [sx, 0.16, 0.37]).rotation.x = Math.PI / 2;
+  lamp(c, lights, { x: 0, y: 1.55, z: 0.25, r: 0.07, power: 1.4, range: 4 });
+  return c;
+}

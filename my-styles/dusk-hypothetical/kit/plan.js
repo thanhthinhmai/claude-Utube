@@ -12,6 +12,17 @@ const R = (x) => Math.round(x * 1000) / 1000;
 export const camName = (cam) => (typeof cam === 'string' ? cam : cam && cam.name);
 const castOf = (s) => s.cast || [];
 
+// specs/023: an act is a catalogue act, or face:<face>, pose:<pose>, look:<direction>
+export function actOk(name, catalog = CATALOG) {
+  if (typeof name !== 'string') return false;
+  if ((catalog.acts || []).includes(name)) return true;
+  const m = /^([a-z]+):(.+)$/.exec(name); if (!m) return false;
+  const allowed = (catalog.act_prefixes || {})[m[1]];
+  const list = typeof allowed === 'string' ? catalog[allowed] : allowed;
+  return Array.isArray(list) && list.includes(m[2]);
+}
+const spans = (x) => Array.isArray(x) && x.every((r) => Array.isArray(r) && r.length === 2 && r[0] < r[1]);
+
 // Throws Error("<scene id>: <reason>") on the first problem.
 export function check(scenes, catalog = CATALOG) {
   if (!Array.isArray(scenes) || !scenes.length) throw new Error('scenes: at least one scene');
@@ -37,10 +48,33 @@ export function check(scenes, catalog = CATALOG) {
       if (c.face && !has(catalog.faces, c.face)) bad(`unknown face "${c.face}"`);
       if (c.hair && !has(catalog.hair, c.hair)) bad(`unknown hair "${c.hair}"`);
       if (c.hat && !has(catalog.hats, c.hat)) bad(`unknown hat "${c.hat}"`);
+      if (c.act !== undefined) {
+        if (!Array.isArray(c.act)) bad('act is a list of [seconds, act]');
+        for (const a of c.act) {
+          if (!Array.isArray(a) || typeof a[0] !== 'number' || a[0] < 0 || a[0] >= s.dur) bad(`act time ${a && a[0]} outside the scene (0–${s.dur} s)`);
+          if (!actOk(a[1], catalog)) bad(`unknown act "${a[1]}"`);
+        }
+      }
+      if (c.talk !== undefined && !(spans(c.talk) && c.talk.every(([a, b]) => a >= 0 && b <= s.dur + 1e-9))) bad('talk is [[t0, t1], …] inside the scene');
+      if (c.path !== undefined) {
+        if (c.pose !== 'walk') bad('path needs pose "walk"');
+        if (!(Array.isArray(c.path) && c.path.length >= 2 && c.path.every((p, k) => Array.isArray(p) && p.length === 3 && (k === 0 || p[0] > c.path[k - 1][0])))) bad('path is [[seconds, x, z], …] in time order');
+      }
+      if (c.swap !== undefined && !(c.swap && typeof c.swap === 'object' && (c.act || []).some((a) => a[1] === 'swap'))) bad('swap is a look {hoodie, hair, hat, glasses} with an act "swap"');
+      if (c.blink !== undefined && c.blink !== false && !(c.blink && Array.isArray(c.blink.every) && c.blink.every.length === 2 && c.blink.every[0] > 0 && c.blink.every[0] <= c.blink.every[1])) bad('blink is false or {every: [a, b]} seconds');
     }
+    if (s.move !== undefined && s.move !== 'auto') {
+      const type = typeof s.move === 'string' ? s.move : s.move && s.move.type;
+      if (!has(catalog.moves || [], type)) bad(`unknown move "${type}"`);
+      if (typeof s.move === 'object' && s.move.speed !== undefined && !(s.move.speed > 0)) bad('move.speed must be > 0');
+    }
+    if (s.light !== undefined && ![-1, 0, 1].includes(s.light)) bad('light is -1 (key from the left), 0 (soft) or 1 (from the right)');
+    if (s.frame !== undefined && s.frame !== 'auto' && !(s.frame && s.frame.x >= 0 && s.frame.x <= 1 && s.frame.y >= 0 && s.frame.y <= 1)) bad('frame is "auto" or {x, y} in 0–1');
+    if (s.trans !== undefined) { if (!has(catalog.trans || [], s.trans)) bad(`unknown trans "${s.trans}"`); if (s.trans === 'fade' && ++fades > FADES_MAX) bad(`more than ${FADES_MAX} fades in the film`); }
     if (s.crowd && !(Number.isInteger(s.crowd.n) && s.crowd.n >= 0 && s.crowd.n <= CROWD_MAX)) bad(`crowd.n must be 0–${CROWD_MAX}`);
     for (const g of s.gfx || []) {
       if (!has(catalog.gfx, g.type)) bad(`unknown gfx "${g.type}"`);
+      if (g.icon !== undefined && !has(catalog.icons || [], g.icon)) bad(`unknown icon "${g.icon}"`);
       const at = g.at ?? 0, until = g.until ?? s.dur;
       if (!(at >= 0 && until <= s.dur + 1e-9 && at < until)) bad(`gfx "${g.type}" outside the scene (${at}–${until} s of ${s.dur} s)`);
       for (const t of textsOf(g)) if (t !== t.toUpperCase()) bad(`gfx "${g.type}" text must be caps: "${t}"`);
@@ -75,18 +109,42 @@ export function cardsOf(scene, t0) {
   return out;
 }
 
-export function plan(scenes, cues = [], catalog = CATALOG) {
+// specs/023: the camera move of a scene. 'auto' (the default) draws one from the style's measures for the scene's shot
+// scale (template.json → motion.cam_by_scale), seeded by the scene id, so the same table gives the same film.
+const seedOf = (id) => { let h = 5381; for (const ch of String(id)) h = (h * 33 + ch.charCodeAt(0)) | 0; return h >>> 0; };
+const between = (r, lo, hi) => lo + (hi - lo) * r;
+export function moveOf(scene, template = null, catalog = CATALOG) {
+  const m = scene.move;
+  if (m && typeof m === 'object') return { type: m.type, speed: m.speed ?? null, drift: m.drift ?? null };
+  if (typeof m === 'string' && m !== 'auto') return { type: m, speed: null };
+  const scale = (catalog.cams[camName(scene.cam)] || {}).scale;
+  const b = template && template.motion && template.motion.cam_by_scale && template.motion.cam_by_scale[scale];
+  if (!b) return { type: 'still', speed: null };
+  const r = mulberry(seedOf(scene.id));
+  if (r() >= b.moving) return { type: 'still', speed: null };
+  if (castOf(scene).some((c) => c.pose === 'walk') && r() < 0.6) return { type: 'follow', speed: b.drift_px_s ? between(r(), ...b.drift_px_s) : 20 };
+  // a push or pull also drifts a little, as the reference's dolly does (T065: motion720 counts shifts, not zoom)
+  const drift = () => (b.drift_px_s ? between(r(), b.drift_px_s[0] * 0.5, b.drift_px_s[0]) : 6) * (r() < 0.5 ? -1 : 1);
+  if (r() < (b.push || 0) / b.moving) return { type: 'push', speed: b.zoom_pct_s ? between(r(), ...b.zoom_pct_s) : 2, drift: drift() };
+  if (r() < 0.5) return { type: 'pull', speed: b.zoom_pct_s ? between(r(), ...b.zoom_pct_s) : 2, drift: drift() };
+  return { type: 'drift-h', speed: b.drift_px_s ? between(r(), ...b.drift_px_s) : 16 };
+}
+
+export function plan(scenes, cues = [], catalog = CATALOG, template = null) {
   check(scenes, catalog);
-  let t = 0; const timed = [], SHOTS = [], CARDS = [];
+  let t = 0; const timed = [], SHOTS = [], CARDS = [], CAST = [], MOVES = [];
   for (const s of scenes) {
-    const t0 = R(t), t1 = R(t + s.dur);
-    timed.push({ ...s, t0, t1 }); SHOTS.push([t0, t1, s.set, s.id]); CARDS.push(...cardsOf(s, t0)); t += s.dur;
+    const t0 = R(t), t1 = R(t + s.dur), move = moveOf(s, template, catalog);
+    const acts = castOf(s).reduce((n, c) => n + (c.act || []).length, 0);
+    timed.push({ ...s, t0, t1, _move: move }); SHOTS.push([t0, t1, s.set, s.id]); CARDS.push(...cardsOf(s, t0));
+    CAST.push([t0, t1, s.id, castOf(s).length]); MOVES.push([t0, t1, s.id, move.type, acts]);
+    t += s.dur;
   }
   const DUR = R(t);
   // cues as rows [t0, t1, text] or as the studio's cues.json objects {t0, t1, text}
   const CUES = (cues || []).map((c) => (Array.isArray(c) ? c : [c.t0, c.t1, c.text]))
     .map(([a, b, x]) => [R(a), R(b), String(x)]).filter(([a, b]) => b > a && a < DUR);
-  return { DUR, SHOTS, CARDS, CUES, scenes: timed };
+  return { DUR, SHOTS, CARDS, CUES, CAST, MOVES, scenes: timed };
 }
 
 // the scene on screen at time t (binary search; the last scene owns t = DUR)

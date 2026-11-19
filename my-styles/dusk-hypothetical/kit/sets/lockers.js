@@ -1,6 +1,6 @@
 // School corridor: rows of lockers on both sides receding to a dusk window, tiled floor, light strips overhead.
 import * as THREE from 'three';
-import { floor, ceiling, lightStrip, locker, duskSky, box, bench, mulberry } from './parts.js';
+import { backpack, bench, box, ceiling, duskSky, floor, lightStrip, locker, mulberry, poster, trophy } from './parts.js';
 
 const COLORS = ['#3f6f8f', '#3f6f8f', '#7a5cc0', '#3f6f8f', '#c0423e'];
 export function build() {
@@ -22,6 +22,10 @@ export function build() {
   box(g, 4.8, 2.4, 0.1, '#2a1e40', 0, 1.5, -28.5);
   duskSky(g, { x: 0, y: 1.6, z: -31, w: 8, h: 4, blocks: 8, skylineY: 0.5 });
   for (let i = 0; i < 18; i++) spots.push({ x: (i % 2 ? 1 : -1) * (0.9 + 0.3 * r()), y: 0, z: -1.5 - i * 1.1, ry: (i % 2 ? -1 : 1) * 1.2, sit: false });
+  // story props: posters on the lockers, bags on the floor, a lit trophy shelf (TEMPLATE.md §6)
+  [-6, -2, 3, 7].forEach((z, i) => poster(g, -1.86, 1.4, z, { seed: i + 7, w: 0.4, h: 0.55, ry: Math.PI / 2 }));
+  backpack(g, 1.2, -1.5, { color: '#c0423e', ry: -0.8 }); backpack(g, -1.1, -4.0, { color: '#7a5cc0', ry: 0.5 });
+  for (let i = 0; i < 3; i++) trophy(g, 1.75, 1.2, -9 + i * 0.4);
   return {
     group: g, lights, room: { x0: -2.3, x1: 2.3, z0: -28, z1: 6, y1: 2.85 }, fog: [8, 32],
     anchors: { hero: { x: 0, y: 0, z: 0, ry: 0 }, heroSeat: { x: -1.4, z: -6, ry: Math.PI / 2 }, extras: spots.slice(0, 8), crowd: { area: { x0: -1.6, x1: 1.6, z0: -24, z1: -2 } }, fg: [{ x: -1.9, y: 1.1, z: 1.8 }] },

@@ -1,6 +1,6 @@
 // Classroom at dusk: a grid of desks and chairs, window band on the back wall, light strips, a board on the side.
 import * as THREE from 'three';
-import { floor, wall, ceiling, lightStrip, windows, grid, desk, chair, box, plant, lamp } from './parts.js';
+import { backpack, box, ceiling, chair, desk, floor, globe, grid, lamp, lightStrip, litBoard, plant, poster, wall, windows } from './parts.js';
 
 export function build() {
   const g = new THREE.Group(), lights = [], seats = [];
@@ -20,6 +20,10 @@ export function build() {
   plant(g, -6.2, -9); plant(g, 6.2, -9);
   lamp(g, lights, { x: 5.6, y: 2.2, z: -9.6, r: 0.14, power: 1.2 });
   seats.sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
+  // story props: posters, a globe on the front desk, bags by the chairs, a lit board of notes (TEMPLATE.md §6)
+  [-7.5, -5.5, -3.5, -1.5].forEach((z, i) => poster(g, -6.95, 1.9, z, { seed: i + 1, ry: Math.PI / 2 }));   // the side wall
+  globe(g, -1.5, 0.86, 0.5);                                  // on a front-row desk
+  [[1.5, 0.2, '#d9608c'], [-1.5, 1.75, '#3f9a9a'], [3, 3.3, '#c99a2e']].forEach(([x, z, c]) => backpack(g, x + 0.45, z, { color: c, ry: 0.6 }));
   return {
     group: g, lights, room: { x0: -6.8, x1: 6.8, z0: -9.7, z1: 8, y1: 3.15 },
     anchors: { hero: { x: 0, y: 0, z: 0.9, ry: 0 }, heroSeat: { x: 0, z: 0.05, ry: 0 }, extras: seats.slice(0, 8), crowd: { slots: seats }, fg: [{ x: -0.9, y: 0.9, z: 1.6 }] },

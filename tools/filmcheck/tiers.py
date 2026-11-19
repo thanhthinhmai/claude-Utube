@@ -9,9 +9,9 @@ from filmcheck import report
 
 TIERS = ("voice", "plan", "shots", "render", "final")
 EXCEPTABLE = ("flat", "dark", "blown", "still", "shot_long", "text_over_subtitle", "blurred")   # blurred: specs/021
-SKIP_DIRS = {"out", "stills", "publish", ".check", "node_modules"}          # same as tools/render/lib.mjs
-SKIP_SUFFIX = (".mp4", ".log")
-SKIP_NAMES = {"checks.json", "CHECKS.md", "qc-exceptions.json"}
+SKIP_DIRS = {"out", "stills", "publish", ".check", "node_modules", "compare"}   # as tools/render/lib.mjs; compare/: specs/023 sheets
+SKIP_SUFFIX = (".mp4", ".log", ".pyc")
+SKIP_NAMES = {"checks.json", "CHECKS.md", "qc-exceptions.json", ".job", ".job.out"}   # .job: the job id is not the film (specs/023)
 EXC_FILE = "qc-exceptions.json"
 REASON_MAX = 200
 
@@ -32,7 +32,7 @@ def _files(d: Path, part: str) -> list:
     out = []
     for p in sorted(d.rglob("*")):
         rel = p.relative_to(d)
-        if rel.parts[0] in SKIP_DIRS or not p.is_file():
+        if rel.parts[0] in SKIP_DIRS or "__pycache__" in rel.parts or not p.is_file():
             continue
         if p.name.endswith(SKIP_SUFFIX) or p.name in SKIP_NAMES:
             continue

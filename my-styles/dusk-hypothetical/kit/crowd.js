@@ -50,17 +50,18 @@ export function makeCrowd({ n = 0, slots, area, seed = 1, bob = true, scale = 1 
   const N = people.length;
   // mid level: instanced parts (torso, head, legs, hair shell)
   const parts = {
-    torso: new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.23, 0.24, 4, 10), new THREE.MeshStandardMaterial({ roughness: 0.95 }), Math.max(1, N)),
+    // the same hoodie block as figure.js (specs/023, TEMPLATE.md §2): flat front, a touch narrower at the hem
+    torso: new THREE.InstancedMesh(new THREE.CylinderGeometry(0.205, 0.185, 0.46, 12, 1).scale(1, 1, 0.62), new THREE.MeshStandardMaterial({ roughness: 0.95 }), Math.max(1, N)),
     head: new THREE.InstancedMesh(new THREE.SphereGeometry(0.34, 18, 12), mat(SKIN, 0.6), Math.max(1, N)),
     legL: new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.045, 0.42, 3, 8), mat(SKIN, 0.6), Math.max(1, N)),
     legR: new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.045, 0.42, 3, 8), mat(SKIN, 0.6), Math.max(1, N)),
-    armL: new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.033, 0.42, 3, 8), mat(SKIN, 0.6), Math.max(1, N)),
-    armR: new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.033, 0.42, 3, 8), mat(SKIN, 0.6), Math.max(1, N)),
+    armL: new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.037, 0.42, 3, 8), new THREE.MeshStandardMaterial({ roughness: 0.95 }), Math.max(1, N)),
+    armR: new THREE.InstancedMesh(new THREE.CapsuleGeometry(0.037, 0.42, 3, 8), new THREE.MeshStandardMaterial({ roughness: 0.95 }), Math.max(1, N)),   // sleeves in the hoodie colour
     hair: new THREE.InstancedMesh(new THREE.SphereGeometry(0.355, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), new THREE.MeshStandardMaterial({ roughness: 0.8 }), Math.max(1, N)),
   };
   const c = new THREE.Color();
   people.forEach((p, i) => {
-    parts.torso.setColorAt(i, c.set(p.hoodie));
+    parts.torso.setColorAt(i, c.set(p.hoodie)); parts.armL.setColorAt(i, c); parts.armR.setColorAt(i, c);
     parts.hair.setColorAt(i, c.set(p.hat ? p.hatColor : p.hairColor));
   });
   for (const m of Object.values(parts)) { m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; group.add(m); if (m.instanceColor) m.instanceColor.needsUpdate = true; }
@@ -87,6 +88,12 @@ export function makeCrowd({ n = 0, slots, area, seed = 1, bob = true, scale = 1 
     for (const [d, i] of dist) {
       const p = people[i], y0 = p.y || 0, b = bob ? 0.012 * Math.sin(t * 2.4 + p.phase) : 0;
       let f = figures.get(i);
+      if (d < 1.1) {                                     // right at the lens: a black disc, not a soft head (specs/023)
+        if (f) f.group.visible = false;
+        for (const m of Object.values(parts)) m.setMatrixAt(i, hide);
+        pos.set([0, -999, 0], i * 3);
+        continue;
+      }
       if (near.has(i)) {
         if (!f) { f = makeFigure({ ...p, scale }); figures.set(i, f); group.add(f.group); f.face(p.face); }
         f.group.visible = true; f.group.position.set(p.x, y0 + b, p.z); f.group.rotation.y = p.ry || 0;
@@ -99,7 +106,7 @@ export function makeCrowd({ n = 0, slots, area, seed = 1, bob = true, scale = 1 
       if (d <= FAR_M) {
         const lift = (p.sit ? SEAT : 0.55) * scale, ry = p.ry || 0;
         Q.setFromEuler(E.set(0, ry, 0)); S.setScalar(scale);
-        M.compose(P.set(p.x, y0 + lift + 0.35 * scale + b, p.z), Q, S); parts.torso.setMatrixAt(i, M);
+        M.compose(P.set(p.x, y0 + lift + 0.3 * scale + b, p.z), Q, S); parts.torso.setMatrixAt(i, M);
         M.compose(P.set(p.x, y0 + lift + 1.02 * scale + b, p.z), Q, S); parts.head.setMatrixAt(i, M);
         if (p.hair !== 'bald' || p.hat) parts.hair.setMatrixAt(i, M.compose(P.set(p.x, y0 + lift + 1.04 * scale + b, p.z), Q, S)); else parts.hair.setMatrixAt(i, hide);
         const side = (sx) => new THREE.Vector3(sx, 0, 0).applyAxisAngle(UPV, ry);

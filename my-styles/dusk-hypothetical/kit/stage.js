@@ -79,10 +79,12 @@ export function makeStage(size = [innerWidth, innerHeight]) {
       post.vig.uniforms.sat.value = GRADE.saturation * m.sat * (nudge.saturation ?? 1);
     },
     // aim the key, rim and front lights at a point (the subject), keeping their directions
-    aim(target) {
-      key.position.set(target.x - 5, 6, target.z - 6); key.target.position.copy(target);
-      sun.position.set(target.x - 4, 5, target.z - 8); sun.target.position.set(target.x, 0, target.z + 1);
-      rim.position.set(target.x - 1, 2.6, target.z - 7); rim.target.position.set(target.x, 1, target.z);
+    // side: -1 key from the left (the 022 default), +1 from the right, 0 soft from behind (specs/023, TEMPLATE.md §5)
+    aim(target, side = -1) {
+      const sx = side === 0 ? -0.4 : side;
+      key.position.set(target.x + 5 * sx, 6, target.z - 6); key.target.position.copy(target);
+      sun.position.set(target.x + 4 * sx, 5, target.z - 8); sun.target.position.set(target.x, 0, target.z + 1);
+      rim.position.set(target.x + 1 * sx, 2.6, target.z - 7); rim.target.position.set(target.x, 1, target.z);
       front.position.set(target.x, 1.6, target.z + 4);
     },
     focus(dist, aper = GRADE.dof.aper) { setDof(post, { focus: dist, aper, maxCoc: GRADE.dof.maxCoc }); },

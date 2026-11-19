@@ -43,7 +43,8 @@ class Final(unittest.TestCase):
         r = qc.measure(d)
         self.assertIsNotNone(r["measures"]["loudness_range"])
         self.assertEqual(len(r["warnings"]), 1)
-        self.assertIn("loudness range", r["warnings"][0])
+        self.assertEqual(r["warnings"][0]["rule"], "loudness_range")
+        self.assertIn("loudness range", r["warnings"][0]["text"])
         self.assertTrue(r["pass"], r["problems"])                       # a warning does not fail the film
 
     def test_sound_longer_than_picture(self):
