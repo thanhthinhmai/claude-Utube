@@ -15,6 +15,24 @@ from pathlib import Path
 from filmcheck import rhythm, tiers
 
 PAUSE, TAIL_DIFF, SIMILAR = 0.8, 0.5, 0.92
+UNIT_SPOKEN = 0.9        # the recogniser folds a spoken "dollars" into "$104 billion": that word has no stamp of its own
+SCALE = re.compile(r"^(?:thousand|million|billion|trillion)\W*$|^\.\d", re.I)
+
+
+def currency_ends(ws: list, text: str) -> set:
+    """Indexes of the last stamped word of each "$N [scale]" group when the script says "dollars": the spoken
+    word "dollars" follows that word without a stamp, so the time after it is speech, not a pause or a tail."""
+    if not re.search(r"\bdollars?\b", text, re.I):
+        return set()
+    out = set()
+    for i, (w, _, _) in enumerate(ws):
+        if re.match(r"^\W*\$\d", w):
+            j = i
+            while j + 1 < len(ws) and SCALE.match(ws[j + 1][0]):
+                j += 1
+            out.add(j)
+    return out
+
 SIL_DB, SIL_MIN = -40, 0.3        # a real silence inside the recogniser's gap confirms the pause (pet-swap l38: 0.43 s audible in a 0.80 s gap)
 
 
@@ -112,12 +130,16 @@ def run(film_dir: Path, lib=None, lang="en") -> dict:
             issues.append(_issue("mispronounced", lid, 0.0, heard_w, want_w, text=f"\"{want_w}\" heard as \"{heard_w}\"",
                                  fix=f"add \"say\" to line {lid} with a spelling the voice reads right, then: sh bin/studio voice make <film>",
                                  severity="warn"))
+        cur = currency_ends(ws, text)                    # the script says "dollars"; the recogniser wrote "$"
         if length is not None:
             diff = abs(float(words[lid][-1][2]) - length)
+            if len(ws) - 1 in cur:                     # the line ends on "... billion dollars"
+                diff = max(0.0, diff - UNIT_SPOKEN)
             if diff > TAIL_DIFF:
                 issues.append(_issue("tail_mismatch", lid, length, round(diff, 2), TAIL_DIFF,
                                      fix=f"{redo} (the file and its last word disagree)"))
-        gaps = [(a[2], b[1]) for a, b in zip(ws, ws[1:]) if b[1] - a[2] >= PAUSE - 1e-9]
+        gaps = [(a[2] + (UNIT_SPOKEN if k in cur else 0.0), b[1]) for k, (a, b) in enumerate(zip(ws, ws[1:]))
+                if b[1] - a[2] - (UNIT_SPOKEN if k in cur else 0.0) >= PAUSE - 1e-9]
         if gaps:
             wav = d / "voices" / f"{lid}.wav"
             sil = silences(wav) if have_ffmpeg and wav.is_file() else None
