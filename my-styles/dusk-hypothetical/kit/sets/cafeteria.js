@@ -1,6 +1,6 @@
 // School cafeteria: rows of long tables with benches, a lit serving counter, windows at the back, hanging lamps.
 import * as THREE from 'three';
-import { bench, box, ceiling, floor, grid, lamp, litBoard, mat, mesh, pennants, table, tray, wall, windows } from './parts.js';
+import { bench, box, ceiling, floor, grid, lamp, litBoard, mat, mesh, pennants, table, tray, wall, windows, plant, cyl, prop } from './parts.js';
 
 export function build() {
   const g = new THREE.Group(), lights = [], seats = [];
@@ -26,6 +26,9 @@ export function build() {
   [[-2.2, -2.0], [0.4, -2.0], [2.6, -3.6], [-1.0, -5.2], [1.8, -5.2], [-3.0, -3.6]].forEach(([x, z], i) => tray(g, x, 0.86, z, { seed: i + 1 }));
   litBoard(g, 6.85, 2.5, -4, { w: 2.6, h: 0.8, ry: -Math.PI / 2, glow: '#ffd8a8' });
   pennants(g, { x0: -6, x1: 6, y: 3.0, z: -1.2, n: 16 });
+  // specs/027 (FR-008): dressing in all three layers of the default wide shot
+  plant(g, -2.6, 3.2, { h: 1.1 });
+  prop(cyl(g, 0.24, 0.85, '#5a6a8a', 2.7, 0.42, 3.1, 12), 'bin');
   return {
     group: g, lights, room: { x0: -8.7, x1: 8.7, z0: -14.7, z1: 5, y1: 3.4 }, fog: [10, 30],
     anchors: { hero: { x: 0, y: 0, z: 1.2, ry: 0 }, heroSeat: { x: hero.x, z: hero.z, ry: hero.ry }, extras: seats.slice(0, 8), crowd: { slots: seats }, fg: [{ x: 1.2, y: 0.9, z: 2.2 }] },

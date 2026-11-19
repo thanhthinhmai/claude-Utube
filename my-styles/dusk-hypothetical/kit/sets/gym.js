@@ -1,6 +1,6 @@
 // School gym: wooden court with lines, stepped bleachers full of seats at the back, hoops, high lamps.
 import * as THREE from 'three';
-import { ball, box, canvasTex, ceiling, floor, lamp, litBoard, mat, mesh, pennants, stdMat } from './parts.js';
+import { ball, box, canvasTex, ceiling, floor, lamp, litBoard, mat, mesh, pennants, stdMat, bench, backpack, cyl, prop } from './parts.js';
 
 export function build() {
   const g = new THREE.Group(), lights = [], seats = [];
@@ -35,6 +35,10 @@ export function build() {
   for (let i = 0; i < 6; i++) ball(g, -5.4 + (i % 3) * 0.26, 0.14 + Math.floor(i / 3) * 0.26, -1.5, { color: i % 2 ? '#e07a3a' : '#d9b23a' });
   litBoard(g, 0, 4.2, -11.9, { w: 2.4, h: 0.9, glow: '#ff9e70', rows: 2 });
   pennants(g, { x0: -8, x1: 8, y: 4.6, z: -11.6, n: 18 });
+  // specs/027 (FR-008): dressing in all three layers of the default wide shot
+  bench(g, -4.2, 2.6, { ry: 0.3 }); backpack(g, -3.7, 2.9, { color: '#c0423e', ry: 0.5 });
+  for (const [x, z] of [[2.6, 2.2], [3.3, 2.7]]) prop(cyl(g, 0.12, 0.42, '#e07a3a', x, 0.21, z, 10), 'cone');
+  prop(cyl(g, 0.18, 0.9, '#3f6fc0', 9.5, 0.45, -3, 14), 'cooler');
   return {
     group: g, lights, room: { x0: -11.7, x1: 11.7, z0: -20.7, z1: 10, y1: 8.7 }, fog: [12, 40], grade: { exposure: 0.62, saturation: 0.95 },
     anchors: { hero: { x: 0, y: 0, z: 0, ry: 0 }, heroSeat: { x: 0, z: -12.85, ry: 0, y: -0.6 + 0.53 }, extras: [{ x: -1.2, y: 0, z: -1, ry: 0.4 }, { x: 1.3, y: 0, z: -1.2, ry: -0.4 }, { x: -2.4, y: 0, z: -2.5, ry: 0.3 }, { x: 2.6, y: 0, z: -2.8, ry: -0.3 }], crowd: { slots: seats }, fg: [] },

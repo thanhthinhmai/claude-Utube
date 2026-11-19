@@ -55,15 +55,15 @@ description: "Task list for 027 — nâng tay nghề bộ dựng 3D"
 
 **Independent Test**: `catalog.html` có khung toàn và khung trung có người cho mỗi bối cảnh; `sets.test.mjs` đạt; bảng so với ô kênh mẫu có `place` cùng loại.
 
-- [ ] T022 [P] [US2] `my-styles/dusk-hypothetical/kit/test/sets.test.mjs`: dựng từng bối cảnh trong node, đếm `props` theo lớp, so `props_min` (tổng và mỗi lớp ≥ 1); bối cảnh ngoài trời có `sky` và nguồn sáng tự phát
-- [ ] T023 [US2] `my-styles/dusk-hypothetical/kit/sets/parts.js`: `tree`, `streetLamp`, `fence`, `house` (cửa sổ sáng tự phát), `hoop`, `railing`, `parkLines`, `skyDome`, `windowGlow`, `sunBeam`; mỗi hàm ghi `{kind}` vào danh sách `props` của bối cảnh
-- [ ] T024 [P] [US2] `my-styles/dusk-hypothetical/kit/sets/court.js` (sân bóng rổ: rổ, hàng rào, cột đèn, nhà sau, cây)
-- [ ] T025 [P] [US2] `my-styles/dusk-hypothetical/kit/sets/rooftop.js` (lan can, bồn nước, dây đèn, đường chân trời thành phố)
-- [ ] T026 [P] [US2] `my-styles/dusk-hypothetical/kit/sets/parking.js` (vạch, xe, cột đèn, hàng rào, cửa hàng sáng đèn)
-- [ ] T027 [P] [US2] `my-styles/dusk-hypothetical/kit/sets/street-dusk.js` (phố có nhà cửa sổ sáng, vỉa hè, cây, xe đỗ, cột đèn, ba lớp)
-- [ ] T028 [US2] Đăng ký 4 bối cảnh trong `my-styles/dusk-hypothetical/kit/sets/index.js` và `catalog.json` (`outdoor`, `sky`, `props_min`); thêm `outdoor`/`props_min` cho 7 bối cảnh cũ
-- [ ] T029 [US2] Thêm đồ cho 7 bối cảnh cũ (`classroom`, `lockers`, `gym`, `bedroom`, `cafeteria`, `street`, `stadium`) tới `props_min`, kèm cửa sổ sáng hoặc `windowGlow` ở bối cảnh trong nhà; `film.js` nhận `outdoor` của `custom:` (thiếu thì false và ghi cảnh báo)
-- [ ] T030 [US2] Cập nhật `my-styles/dusk-hypothetical/kit/catalog.html` (khung toàn và khung trung có người cho mỗi bối cảnh); bảng so `films/kit-acting/compare-us2.jpg` với ô kênh mẫu có `place` cùng loại. ⏸ Duyệt
+- [X] T022 [P] [US2] `my-styles/dusk-hypothetical/kit/test/sets.test.mjs`: dựng từng bối cảnh trong node, đếm `props` theo lớp, so `props_min` (tổng và mỗi lớp ≥ 1); bối cảnh ngoài trời có `sky` và nguồn sáng tự phát
+- [X] T023 [US2] `my-styles/dusk-hypothetical/kit/sets/parts.js`: `tree`, `streetLamp`, `fence`, `house` (cửa sổ sáng tự phát), `hoop`, `railing`, `parkLines`, `skyDome`, `windowGlow`, `sunBeam`; mỗi hàm ghi `{kind}` vào danh sách `props` của bối cảnh
+- [X] T024 [P] [US2] `my-styles/dusk-hypothetical/kit/sets/court.js` (sân bóng rổ: rổ, hàng rào, cột đèn, nhà sau, cây)
+- [X] T025 [P] [US2] `my-styles/dusk-hypothetical/kit/sets/rooftop.js` (lan can, bồn nước, dây đèn, đường chân trời thành phố)
+- [X] T026 [P] [US2] `my-styles/dusk-hypothetical/kit/sets/parking.js` (vạch, xe, cột đèn, hàng rào, cửa hàng sáng đèn)
+- [X] T027 [P] [US2] `my-styles/dusk-hypothetical/kit/sets/street-dusk.js` (phố có nhà cửa sổ sáng, vỉa hè, cây, xe đỗ, cột đèn, ba lớp)
+- [X] T028 [US2] Đăng ký 4 bối cảnh trong `my-styles/dusk-hypothetical/kit/sets/index.js` và `catalog.json` (`outdoor`, `sky`, `props_min`); thêm `outdoor`/`props_min` cho 7 bối cảnh cũ
+- [X] T029 [US2] Thêm đồ cho 7 bối cảnh cũ (`classroom`, `lockers`, `gym`, `bedroom`, `cafeteria`, `street`, `stadium`) tới `props_min`, kèm cửa sổ sáng hoặc `windowGlow` ở bối cảnh trong nhà; `film.js` nhận `outdoor` của `custom:` (thiếu thì false và ghi cảnh báo)
+- [X] T030 [US2] Cập nhật `my-styles/dusk-hypothetical/kit/catalog.html` (khung toàn và khung trung có người cho mỗi bối cảnh); bảng so `films/kit-acting/compare-us2.jpg` với ô kênh mẫu có `place` cùng loại. ⏸ Duyệt
 
 ## Phase 5: User Story 3 — Ánh sáng và hậu kỳ (P3)
 

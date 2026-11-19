@@ -1,6 +1,6 @@
 {
  "version": 1,
- "sets": ["classroom", "lockers", "gym", "street", "bedroom", "cafeteria", "stadium", "void"],
+ "sets": ["classroom", "lockers", "gym", "street", "bedroom", "cafeteria", "stadium", "void", "court", "rooftop", "parking", "street-dusk"],
  "poses": ["stand", "sit", "walk", "hold-phone", "hold-book", "hold-bag", "hold-cup", "hold-paper", "point", "cheer", "shrug", "hug", "run", "carry", "type"],
  "faces": ["dot", "half", "wow", "happy", "blank", "angry", "sad", "sweat"],
  "hair": ["bald", "short", "bun", "curly"],
@@ -44,7 +44,20 @@
   "ball": {"grip": "one", "size": 0.24}, "cards": {"grip": "one", "size": 0.14}, "cash": {"grip": "one", "size": 0.17},
   "box": {"grip": "both", "size": 0.42}, "keys": {"grip": "one", "size": 0.1}
  },
- "set_info": {"street": {"outdoor": true}, "stadium": {"outdoor": true}},
+ "set_info": {
+  "classroom":   {"outdoor": false, "sky": false, "props_min": {"total": 10, "kinds": 4, "layer": 1}},
+  "lockers":     {"outdoor": false, "sky": false, "props_min": {"total": 10, "kinds": 4, "layer": 1}},
+  "gym":         {"outdoor": false, "sky": false, "props_min": {"total": 10, "kinds": 4, "layer": 1}},
+  "street":      {"outdoor": true,  "sky": true,  "props_min": {"total": 10, "kinds": 4, "layer": 1}},
+  "bedroom":     {"outdoor": false, "sky": false, "props_min": {"total": 10, "kinds": 4, "layer": 1}},
+  "cafeteria":   {"outdoor": false, "sky": false, "props_min": {"total": 10, "kinds": 4, "layer": 1}},
+  "stadium":     {"outdoor": true,  "sky": true,  "props_min": {"total": 10, "kinds": 4, "layer": 1}},
+  "void":        {"outdoor": false, "sky": false, "props_min": null},
+  "court":       {"outdoor": true,  "sky": true,  "props_min": {"total": 10, "kinds": 4, "layer": 1}},
+  "rooftop":     {"outdoor": true,  "sky": true,  "props_min": {"total": 10, "kinds": 4, "layer": 1}},
+  "parking":     {"outdoor": true,  "sky": true,  "props_min": {"total": 10, "kinds": 4, "layer": 1}},
+  "street-dusk": {"outdoor": true,  "sky": true,  "props_min": {"total": 10, "kinds": 4, "layer": 1}}
+ },
  "act_prefixes": {"face": "faces", "pose": "poses", "look": ["left", "right", "up", "down", "camera"]},
  "moves": ["still", "drift-h", "drift-v", "push", "pull", "follow", "tilt"],
  "icons": ["brain", "heart-pulse", "jar", "map-path", "clipboard", "coins", "clock", "speech-stack"],
