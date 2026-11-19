@@ -3,7 +3,7 @@
 // (people/<slug>/figure.js, copied into the film by `sh bin/studio people use`). Costumes are coded by role and kept
 // muted (style §3): suits in black, navy or grey with a white shirt and a coloured tie; sweaters and hoodies in muted
 // reds and greens; extras have white faces, leads and real people get skin tone (style §1, visual report "Characters").
-import { circ, bumpy, ovalHead } from './core.js';
+import { circ, bumpy, ovalHead, poly, segOutline } from './core.js';
 
 export const ears = (/** @type {number} */ x, /** @type {string} */ skin) => `<path d="M${-x} -40 C${-x - 30} -50 ${-x - 38} -6 ${-x - 28} 22 C${-x - 22} 40 ${-x - 10} 44 ${-x + 2} 40 Z M${x} -40 C${x + 30} -50 ${x + 38} -6 ${x + 28} 22 C${x + 22} 40 ${x + 10} 44 ${x - 2} 40 Z" fill="${skin}" stroke-width="7"/>`;
 export const rearHair = (/** @type {string} */ col, top = -200) => `<path d="M-150 30 C-170 -120 -100 ${top} 0 ${top - 2} C100 ${top} 170 -120 150 30 C110 80 -110 80 -150 30 Z" fill="${col}" stroke-width="9"/>`;
@@ -40,8 +40,8 @@ const BACK = {
 };
 const HAT = {
   cap: (/** @type {string} */ c) => `<path d="M-150 -110 C-140 -200 140 -200 150 -110 Z" fill="${c}" stroke-width="9"/><path d="M60 -116 L230 -110 L60 -96 Z" fill="${c}" stroke-width="7"/>`,
-  top: (/** @type {string} */ c) => `<path d="M-110 -150 L-100 -330 L100 -330 L110 -150 Z" fill="${c}" stroke-width="9"/><path d="M-190 -150 L190 -150 L180 -126 L-180 -126 Z" fill="${c}" stroke-width="7"/>`,
-  hard: (/** @type {string} */ c) => `<path d="M-160 -100 C-150 -230 150 -230 160 -100 Z" fill="${c}" stroke-width="9"/><path d="M-190 -100 L190 -100 L180 -78 L-180 -78 Z" fill="${c}" stroke-width="7"/>`,
+  top: (/** @type {string} */ c) => `<path d="M-110 -150 L-100 -330 L100 -330 L110 -150 Z" fill="${c}" stroke-width="9"/><path d="${poly([[-190, -150], [190, -150], [180, -126], [-180, -126]])}" fill="${c}" stroke="none"/>${segOutline([[-190, -150], [190, -150], [180, -126], [-180, -126]], 7)}`,
+  hard: (/** @type {string} */ c) => `<path d="M-160 -100 C-150 -230 150 -230 160 -100 Z" fill="${c}" stroke-width="9"/><path d="${poly([[-190, -100], [190, -100], [180, -78], [-180, -78]])}" fill="${c}" stroke="none"/>${segOutline([[-190, -100], [190, -100], [180, -78], [-180, -78]], 7)}`,
 };
 
 /**

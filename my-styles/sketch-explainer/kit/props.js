@@ -1,7 +1,7 @@
 // @ts-check
 // Props of the kit (specs/028): drawn things with no figures on them. Ported from the studio's earlier SVG films.
 // Each prop is (arg, t) => markup around 0,0; place with propAt(name, x, y, scale, arg, t).
-import { circ, rrect, T, INK } from './core.js';
+import { circ, rrect, segBox, T, INK } from './core.js';
 /* eslint-disable */
 const stamp = (txt, col = '#c0584a') => `<g transform="rotate(-12)"><path d="M-150 -46 L150 -46 L150 46 L-150 46 Z" fill="none" stroke="${col}" stroke-width="9"/>${T(0, 22, 56, txt, {f: col})}</g>`;
 /** @type {Record<string, (arg?: any, t?: number) => string>} */
@@ -15,7 +15,7 @@ export const PROP = {
     <path d="M0 -180 L0 -240" fill="none" stroke-width="8"/><path d="${circ(0, -250, 16)}" fill="#c0392b" stroke-width="5"/><path d="${rrect(-180, 70, 360, 300, 30)}" fill="#8a939d" stroke-width="8"/><path d="M-180 140 L-260 260 M180 140 L260 260" fill="none" stroke-width="16"/></g>`,
   balloon: (k) => `<g><path d="M0 ${180 - 60 * k} L0 300" fill="none" stroke-width="4"/><path d="M0 ${-200 + 120 * k} C${170 - 90 * k} ${-200 + 120 * k} ${170 - 90 * k} ${180 - 60 * k} 0 ${180 - 60 * k} C${-170 + 90 * k} ${180 - 60 * k} ${-170 + 90 * k} ${-200 + 120 * k} 0 ${-200 + 120 * k} Z" fill="#e2483a" stroke-width="7"/></g>`,
   rocket: () => `<g transform="rotate(30)"><path d="M0 -220 C70 -150 80 -40 60 80 L-60 80 C-80 -40 -70 -150 0 -220 Z" fill="#e9e6df" stroke-width="8"/><path d="${circ(0, -80, 30)}" fill="#9fc0cc" stroke-width="6"/><path d="M-60 40 L-120 120 L-60 100 Z M60 40 L120 120 L60 100 Z" fill="#c0392b" stroke-width="6"/><path d="M-40 90 C-30 180 30 180 40 90 Z" fill="#f5a623" stroke-width="5"/></g>`,
-  hourglass: (t) => `<g><path d="M-120 -200 L120 -200 L120 -170 L-120 -170 Z M-120 200 L120 200 L120 170 L-120 170 Z" fill="#7a5638" stroke-width="7"/><path d="M-100 -170 C-100 -60 -10 -30 -10 0 C-10 30 -100 60 -100 170 L100 170 C100 60 10 30 10 0 C10 -30 100 -60 100 -170 Z" fill="#dfeef4" fill-opacity=".6" stroke-width="7"/>
+  hourglass: (t) => `<g>${segBox(-120, -200, 240, 30, '#7a5638', 7)}${segBox(-120, 170, 240, 30, '#7a5638', 7)}<path d="M-100 -170 C-100 -60 -10 -30 -10 0 C-10 30 -100 60 -100 170 L100 170 C100 60 10 30 10 0 C10 -30 100 -60 100 -170 Z" fill="#dfeef4" fill-opacity=".6" stroke-width="7"/>
     <path d="M-${70 - (t * 8) % 40} -140 L${70 - (t * 8) % 40} -140 L0 -10 Z" fill="#e3c27a" stroke="none"/><path d="M-80 165 C-50 ${110 - (t * 6) % 40} 50 ${110 - (t * 6) % 40} 80 165 Z" fill="#e3c27a" stroke="none"/></g>`,
   calc: () => `<g><path d="${rrect(-150, -220, 300, 440, 26)}" fill="#3a3f4a" stroke-width="8"/><path d="${rrect(-120, -190, 240, 90, 10)}" fill="#b9d3a8" stroke-width="5"/>${T(80, -125, 70, '?', {a: 'end'})}
     ${[0, 1, 2, 3].map(r => [0, 1, 2].map(q => `<path d="${rrect((-115 + q * 80), (-70 + r * 70), 66, 54, 10)}" fill="#e9e6df" stroke-width="4"/>`).join('')).join('')}</g>`,
@@ -37,7 +37,7 @@ export const PROP = {
     <g transform="translate(${-500 + ((t * 160) % 1000)} 0)"><path d="${rrect(-40, (-30 - 120 * Math.sin(((t * 160) % 1000) / 1000 * Math.PI * 3)), 80, 40, 8)}" fill="#c0392b" stroke-width="5"/></g></g>`,
   cloud: (dark) => `<path d="M-260 60 C-300 -20 -220 -90 -150 -60 C-130 -150 20 -160 50 -80 C120 -140 260 -100 240 0 C320 20 300 100 220 100 L-200 100 C-280 100 -300 70 -260 60 Z" fill="${dark ? '#6b7180' : '#e9e6df'}" stroke-width="8"/>`,
   binoculars: () => `<g><path d="${circ(-70, 0, 70)} ${circ(70, 0, 70)}" fill="#2c2c30" stroke-width="8"/><path d="${circ(-70, 0, 40)} ${circ(70, 0, 40)}" fill="#9fc0cc" stroke-width="5"/><rect x="-20" y="-40" width="40" height="50" fill="#2c2c30" stroke-width="6"/></g>`,
-  scroll: (lines2) => `<g><path d="M-260 -200 L260 -200 L260 200 L-260 200 Z" fill="#f1e6c8" stroke-width="8"/><path d="M-290 -220 L290 -220 L290 -180 L-290 -180 Z M-290 180 L290 180 L290 220 L-290 220 Z" fill="#c9a86a" stroke-width="7"/>${lines2}</g>`,
+  scroll: (lines2) => `<g><path d="M-260 -200 L260 -200 L260 200 L-260 200 Z" fill="#f1e6c8" stroke-width="8"/>${segBox(-290, -220, 580, 40, '#c9a86a', 7)}${segBox(-290, 180, 580, 40, '#c9a86a', 7)}${lines2}</g>`,
   coinstack: (n, col) => (col = typeof col === 'string' ? col : '#e3b341', Array.from({length: n}, (_, i) => `<path d="M-70 ${-i * 22} C-70 ${-i * 22 - 18} 70 ${-i * 22 - 18} 70 ${-i * 22} L70 ${-i * 22 + 14} C70 ${-i * 22 + 32} -70 ${-i * 22 + 32} -70 ${-i * 22 + 14} Z" fill="${col}" stroke-width="5"/>`).join('')),
   paperstack: (n) => Array.from({length: n}, (_, i) => `<path d="M-90 ${-i * 14} L90 ${-i * 14} L96 ${-i * 14 + 12} L-84 ${-i * 14 + 12} Z" fill="${i % 2 ? '#e8dcc0' : '#f6f2e6'}" stroke-width="4"/>`).join(''),
 };

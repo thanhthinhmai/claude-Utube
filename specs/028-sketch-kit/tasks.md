@@ -74,9 +74,9 @@ Nguồn mã khởi đầu (đọc, không sửa): `films/anthropic-ipo-15/{kit.j
 **Goal**: mọi hình của bộ dựng hiện đúng khi ghi bằng GPU.
 **Independent Test**: quét tĩnh chặn mẫu lỗi; ảnh danh mục GPU khớp phần mềm (SC-005).
 
-- [ ] T030 [P] [US4] Viết `tests/filmcheck/test_sketch_gpu.py` phần quét tĩnh theo R8 trên `my-styles/sketch-explainer/kit/**/*.js` và `people/*/figure.js`: không lệnh `A`/`a` trong chuỗi `d`, không `rx` ngoài `ellipse`, hình tô có `stroke-width` ≥ 6 và > 4 đỉnh phải dùng `segOutline`; kèm ca mẫu lỗi để test tự chứng minh bắt được
-- [ ] T031 [US4] Thêm phần so ảnh vào `tests/filmcheck/test_sketch_gpu.py`: chụp `catalog.html` bằng GPU (`PLAYWRIGHT_CHROME=tools/render/chrome-gpu.sh`) và phần mềm, lệch trung bình > 6/255 ở ô nào thì báo ô đó; bỏ qua khi `sh bin/studio status --json` không có GPU
-- [ ] T032 [US4] Sửa mọi chỗ test báo trong bộ dựng và `people/` cho tới khi đạt
+- [X] T030 [P] [US4] Viết `tests/filmcheck/test_sketch_gpu.py` phần quét tĩnh theo R8 trên `my-styles/sketch-explainer/kit/**/*.js` và `people/*/figure.js`: không lệnh `A`/`a` trong chuỗi `d`, không `rx` ngoài `ellipse`, hình tô có `stroke-width` ≥ 6 và > 4 đỉnh phải dùng `segOutline`; kèm ca mẫu lỗi để test tự chứng minh bắt được
+- [X] T031 [US4] Thêm phần so ảnh vào `tests/filmcheck/test_sketch_gpu.py`: chụp `catalog.html` bằng GPU (`PLAYWRIGHT_CHROME=tools/render/chrome-gpu.sh`) và phần mềm, lệch trung bình > 6/255 ở ô nào thì báo ô đó; bỏ qua khi `sh bin/studio status --json` không có GPU
+- [X] T032 [US4] Sửa mọi chỗ test báo trong bộ dựng và `people/` cho tới khi đạt
 
 ## Phase 7: User Story 5 — Phim mẫu (P3)
 
