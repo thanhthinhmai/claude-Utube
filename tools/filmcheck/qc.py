@@ -33,19 +33,32 @@ def load_narration(d: Path):
         durs = json.loads((d / n["durations_file"]).read_text(encoding="utf-8")) if n.get("durations_file") else {}
     except (OSError, ValueError, KeyError, TypeError) as e:
         raise QcError(f"narration.json or its voice files cannot be read: {e}") from None
+    texts = {}
+    try:                  # the script's words, to restore a spoken "dollars" the recogniser folded into "$"
+        rows = json.loads((d / n["lines_file"]).read_text(encoding="utf-8")) if n.get("lines_file") else []
+        texts = {r["id"]: r.get("text", "") for r in rows if isinstance(r, dict) and r.get("id")}
+    except (OSError, ValueError, KeyError, TypeError):
+        texts = {}
+    from filmcheck import voicecheck
     lines = []
     for ln in n.get("lines") or []:
         lid = ln.get("id")
         if lid not in words or not words[lid]:
             raise QcError(f"narration.json does not match the voice files: no words for line {lid}")
         length = float(durs[lid]) if durs and lid in durs else None
-        ws = [(w, float(ln["at"]) + s, float(ln["at"]) + e) for w, s, e in rhythm.clamp_words(words[lid], length)]   # FR-004
+        raw = [list(w) for w in words[lid]]
+        for j in sorted(voicecheck.currency_ends(raw, texts.get(lid, "")), reverse=True):
+            a = float(raw[j][2])
+            b = min(a + voicecheck.UNIT_SPOKEN, float(raw[j + 1][1]) if j + 1 < len(raw) else (length or a + voicecheck.UNIT_SPOKEN))
+            if b > a:
+                raw.insert(j + 1, ["dollars", a, b])
+        ws = [(w, float(ln["at"]) + s, float(ln["at"]) + e) for w, s, e in rhythm.clamp_words(raw, length)]   # FR-004
         if durs:          # each line's words end within 0.5 s of its audio (both ways; research R5, T037)
             if lid not in durs:
                 raise QcError(f"narration.json does not match the voice files: line {lid} is not in {n['durations_file']}")
-            if abs(float(words[lid][-1][2]) - float(durs[lid])) > 0.5:
+            if abs(float(raw[-1][2]) - float(durs[lid])) > 0.5:
                 raise QcError(f"narration.json does not match the voice files: line {lid} lasts {float(durs[lid]):.2f} s "
-                              f"but its words end at {float(words[lid][-1][2]):.2f} s")
+                              f"but its words end at {float(raw[-1][2]):.2f} s")
         lines.append({"id": lid, "para": ln.get("para") or "?", "at": float(ln["at"]), "words": ws})
     if not lines:
         raise QcError("narration.json has no lines")
@@ -274,6 +287,11 @@ def measure(d: Path, lib=None) -> dict:
         cuts = [s["t0"] for s in shots[1:]] if shots else (nar["cuts"] if nar["cuts"] else found_cuts)
         m, p, iss = narration_measures(nar, duration, cuts, texts=line_texts(d, nar), shots=shots,
                                        cues=film_cues(d, plan), style=style)
+        from filmcheck import tiers
+        tiers.apply_exceptions(iss, tiers.load_exceptions(d))   # the same per-shot exceptions as tiers 1-2 (qc except)
+        p = [rhythm.message(i) for i in iss if not i.get("excepted")]
+        measures["excepted"] = [{"rule": i["rule"], "ref": i["ref"], "text": rhythm.message(i), "reason": i["excepted"]["reason"]}
+                                for i in iss if i.get("excepted")]
         measures.update(m)
         problems += p
         issues += iss

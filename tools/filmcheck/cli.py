@@ -285,11 +285,14 @@ def cmd_qc(a) -> int:
              for w in r.get("warnings", [])]
     fin += [{"tier": "final", "ref": "film", "at": None, "rule": w["rule"], "severity": "warn", "measure": w.get("measure"),
              "limit": w.get("limit", ""), "text": w.get("text", ""), "fix": "", "excepted": None} for w in warns]
+    fin += [{"tier": "final", "ref": x["ref"], "at": None, "rule": x["rule"], "severity": "block", "measure": x["text"],
+             "limit": "", "text": "", "fix": "", "excepted": {"reason": x["reason"]}} for x in r["measures"].get("excepted", [])]
     tiers.save_tier(d, "final", tiers.result("final", fin, {k: r["measures"].get(k) for k in
                                                            ("silence_ratio", "tail_s", "av_sync", "loudness_range", "motion")},
                                              [], 0.0, tiers.fingerprint(d)))
     m = r["measures"]
     lines = [f"  ✗ {p}" for p in r["problems"]] + [f"  ! {w['text']}" for w in warns]
+    lines += [f"  · {x['text']}  (excepted: {x['reason']})" for x in m.get("excepted", [])]
     shots = tiers.load_tier(d, "shots") or {}
     open_style = [i for i in shots.get("issues", []) if i["severity"] == "warn"]
     acc = (shots.get("style_accept") or {}).get("reason")

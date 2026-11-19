@@ -233,9 +233,13 @@ def wrap(text: str):
     return best[1] if best else None
 
 
+# "U.S.", "Mr." and the like end with a period but do not end a sentence
+ABBREV = re.compile(r"^[\"'“‘(]*(?:(?:[A-Za-z]\.){2,}|Mr\.|Mrs\.|Ms\.|Dr\.|St\.|Jr\.|Sr\.|vs\.|etc\.)[,;:]?$")
+
+
 def _split_points(toks: list) -> list:
     """Where a chunk may be split: after sentence ends first, then after commas, then anywhere."""
-    ends = [i + 1 for i, t in enumerate(toks[:-1]) if re.search(r"[.?!…。？！][\"'”’)]*$", t)]
+    ends = [i + 1 for i, t in enumerate(toks[:-1]) if re.search(r"[.?!…。？！][\"'”’)]*$", t) and not ABBREV.match(t)]
     commas = [i + 1 for i, t in enumerate(toks[:-1]) if re.search(r"[,;:，、；：][\"'”’)]*$", t)]
     return [ends, commas, list(range(1, len(toks)))]
 
@@ -262,13 +266,22 @@ def _cues_for_line(text: str, words: list) -> list:
             s, e = timing(i, k)
             out.append({"start": s, "end": e, "lines": wrap(j.join(toks[i:k])) or [j.join(toks[i:k])]})
             return
-        for points in _split_points(toks[i:k]):
-            if points:
-                mid = (k - i) / 2
-                p = min(points, key=lambda x: abs(x - mid)) + i
+        mid = (k - i) / 2
+        levels = [pts for pts in _split_points(toks[i:k]) if pts]
+        for points in levels:            # prefer a split that leaves both parts long enough to read
+            # the first part is cut where the second starts (subtitle_cues), so measure it to that start
+            good = [x for x in points if timing(x + i, k)[0] - timing(i, x + i)[0] >= CUE_MIN - TOL
+                    and timing(x + i, k)[1] - timing(x + i, k)[0] >= CUE_MIN - TOL]
+            if good:
+                p = min(good, key=lambda x: abs(x - mid)) + i
                 place(i, p)
                 place(p, k)
                 return
+        for points in levels:
+            p = min(points, key=lambda x: abs(x - mid)) + i
+            place(i, p)
+            place(p, k)
+            return
 
     # each sentence is a cue when it fits; longer sentences are split at commas, then in the middle
     starts = [0] + _split_points(toks)[0] + [m]

@@ -189,3 +189,21 @@ class Command(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FoldedDollars(unittest.TestCase):          # the recogniser writes "one hundred four billion dollars" as "$104 billion."
+    def test_spoken_dollars_restored_in_the_narration(self):
+        d = Path(tempfile.mkdtemp(dir=Path(__file__).resolve().parent / ".tmp" if (Path(__file__).resolve().parent / ".tmp").is_dir() else None)) / "fd"
+        (d / "voices").mkdir(parents=True)
+        words = {"l01": [["It", 0.0, 0.3], ["lost", 0.3, 0.7], ["$104", 0.7, 1.4], ["billion.", 1.4, 1.8]]}
+        (d / "voices" / "words.json").write_text(json.dumps(words))
+        (d / "voices" / "dur.json").write_text(json.dumps({"l01": 2.55}))      # "dollars" is spoken after the last stamp
+        (d / "lines.json").write_text(json.dumps([{"id": "l01", "text": "It lost one hundred four billion dollars."}]))
+        (d / "narration.json").write_text(json.dumps({"words_file": "voices/words.json", "durations_file": "voices/dur.json",
+                                                      "lines_file": "lines.json", "lines": [{"id": "l01", "para": "P01", "at": 1.0}]}))
+        n = qc.load_narration(d)
+        self.assertEqual(n["lines"][0]["words"][-1][0], "dollars")
+        self.assertAlmostEqual(n["lines"][0]["words"][-1][2], 1.0 + 2.55, delta=0.01)
+        (d / "lines.json").write_text(json.dumps([{"id": "l01", "text": "It lost one hundred four billion."}]))
+        with self.assertRaises(qc.QcError):                                     # no "dollars" in the script: still a mismatch
+            qc.load_narration(d)

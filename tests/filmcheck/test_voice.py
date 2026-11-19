@@ -111,6 +111,31 @@ class VoiceCheck(unittest.TestCase):
         r = voicecheck.run(d, LIB)
         self.assertNotIn(("asr_mismatch", "l01"), [(i["rule"], i["ref"]) for i in r["issues"]])
 
+    def test_spoken_dollars_folded_into_a_dollar_sign(self):   # "$104 billion." then the voice still says "dollars"
+        d = voice_film(self.root, "voice-dollars", n=3)
+        rows = json.loads((d / "lines.json").read_text())
+        words = json.loads((d / "voices" / "words.json").read_text())
+        durs = json.loads((d / "voices" / "dur.json").read_text())
+        ws = stamps(6) + [["$104", 2.2, 2.8], ["billion.", 2.8, 3.2]]
+        words["l02"] = ws
+        durs["l02"] = 3.2 + 0.75                                    # "dollars" is spoken after the last stamp
+        rows[1]["text"] = "w0 w1 w2 w3 w4 w5 one hundred four billion dollars."
+        rows[1]["asr"] = "w0 w1 w2 w3 w4 w5 $104 billion."
+        wav(d / "voices" / "l02.wav", [(3.95, True)])
+        ws3 = stamps(3) + [["$83,", 1.2, 1.7], ["raising", 2.6, 3.0]] + stamps(2, start=3.04)
+        words["l03"] = ws3
+        durs["l03"] = ws3[-1][2]
+        rows[2]["text"] = "w0 w1 w2 eighty-three dollars, raising w0 w1"
+        rows[2]["asr"] = "w0 w1 w2 $83, raising w0 w1"
+        wav(d / "voices" / "l03.wav", [(1.7 + 0.6, True), (0.3, False), (ws3[-1][2] - 2.6, True)])
+        for f, x in (("lines.json", rows), ("voices/words.json", words), ("voices/dur.json", durs)):
+            (d / f).write_text(json.dumps(x))
+        r = voicecheck.run(d, LIB)
+        self.assertEqual([(i["rule"], i["ref"]) for i in r["issues"]], [], r["issues"])
+        durs["l02"] = 3.2 + 1.6                                     # far more than one spoken word: still a tail
+        (d / "voices" / "dur.json").write_text(json.dumps(durs))
+        self.assertIn(("tail_mismatch", "l02"), [(i["rule"], i["ref"]) for i in voicecheck.run(d, LIB)["issues"]])
+
     def test_percent_sign_is_a_word(self):
         self.assertGreaterEqual(voicecheck.similar("Your jumps go eleven percent higher.", "Your jumps go 11% higher."), 0.99)
         self.assertLess(voicecheck.similar("Your jumps go eleven percent higher.", "Your jumps go 11 higher."), 0.92)
