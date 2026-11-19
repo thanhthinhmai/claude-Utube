@@ -409,6 +409,21 @@ def cmd_channel_set(a, channels):
         ch[f] = float(vals[0])
     elif f in ("name", "niche", "audience", "language", "style", "voice", "title_rules", "thumbnail_rules"):
         ch[f] = " ".join(vals)
+    elif f == "hero":                                            # specs/022: hero hoodie=#d9b23a hair=bald …
+        hero = dict(ch.get("hero") or {})
+        for v in vals:
+            k, eq, x = v.partition("=")
+            if not eq or k not in channels.HERO_KEYS:
+                raise channels.ChannelError(f"hero: use key=value with keys {', '.join(channels.HERO_KEYS)}")
+            if k == "glasses":
+                if x not in ("yes", "no"):
+                    raise channels.ChannelError("hero.glasses: yes or no")
+                hero[k] = x == "yes"
+            elif k == "hat" and x in ("none", ""):
+                hero[k] = None
+            else:
+                hero[k] = x
+        ch[f] = hero
     else:
         raise channels.ChannelError(f"unknown field {f}")
     channels.save(root(), ch, lib_dir())
@@ -429,6 +444,25 @@ def cmd_channel_attach(a, channels):
     if r["warning"]:
         print(f"! {r['warning']}")
     print(f"✓ films/{a.film}: channel {a.slug} attached; read films/{a.film}/CHANNEL_BRIEF.md before the treatment")
+
+
+def cmd_kit_use(a):
+    """Copy the style's film kit into the film folder (specs/022 R1)."""
+    from filmcheck import kit
+    d = Path(root()) / "films" / a.film
+    if not d.is_dir():
+        d = film_dir(a.film)
+    try:
+        r = kit.use(root(), d, a.style, a.update)
+    except kit.KitError as e:
+        print(f"✗ kit: {e}", file=sys.stderr)
+        return 2
+    lines = ["kit: up to date" if r["status"] == "up_to_date" else
+             f"✓ kit: {r['style']} ({r['sha256'][:8]}) → films/{d.name}/kit/"]
+    if r["hint"]:
+        lines.append(f"hint: {r['hint']}")
+    out(a, r, lines)
+    return 0
 
 
 def scope_path(channels, scope):
@@ -967,6 +1001,13 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--new", action="store_true", help="the film folder does not exist yet")
     s.add_argument("--topic", type=int, help="the topic this film makes (specs/013)")
 
+    kt = sub.add_parser("kit", help="the film kit of a learned style (specs/022)").add_subparsers(dest="cmd", required=True)
+    s = kt.add_parser("use", help="copy my-styles/<style>/kit/ into films/<film>/kit/")
+    s.add_argument("film")
+    s.add_argument("--style")
+    s.add_argument("--update", action="store_true", help="replace a kit copied from an older version")
+    s.add_argument("--json", action="store_true")
+
     tp = sub.add_parser("topics", help="score topics with YouTube numbers (specs/013)").add_subparsers(dest="cmd", required=True)
     s = tp.add_parser("score")
     s.add_argument("channel")
@@ -1041,7 +1082,7 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("render-done", "render-done"): cmd_render_done,
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
-            ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach,
+            ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach, ("kit", "use"): cmd_kit_use,
             ("lesson", "list"): cmd_lesson_list, ("lesson", "draft"): cmd_lesson_draft, ("lesson", "add"): cmd_lesson_add,
             ("lesson", "approve"): cmd_lesson_approve, ("lesson", "retire"): cmd_lesson_retire,
             ("topics", "score"): cmd_topics_score, ("topics", "recheck"): cmd_topics_recheck,

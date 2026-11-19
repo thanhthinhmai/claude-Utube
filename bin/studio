@@ -14,6 +14,7 @@
 #   sh bin/studio qc [voice|plan|shots|final] <phim> · qc except|accept-style …  kiểm theo tầng (specs/020); voice asr <phim>
 #   sh bin/studio publish <phim> [--check-only] [--json]   gói đăng YouTube từ publish/pack.json (specs/011)
 #   sh bin/studio channel list|new|show|set|decide|attach … · lesson list|draft|add|approve|retire …  kênh và bài học (specs/012)
+#   sh bin/studio kit use <phim> [--style S] [--update]   chép bộ dựng của phong cách vào films/<phim>/kit/ (specs/022)
 #   sh bin/studio app start|status|stop|import [--data D]   cả xưởng trên máy này, không cần Docker (specs/014)
 #   sh bin/studio topics score|queue|take|made|type|fit|refs|recheck|usage <kênh> … · config youtube-key  chọn đề (specs/013)
 #   sh bin/studio render <phim> [--fps N] [--workers N] [--until S] [--skip-checks R] [--no-stop] [--fresh]  ghi video sau khi kiểm (019, 020)
@@ -41,7 +42,7 @@ SPARSE_BASE="$SPARSE
 !/styles/*/poster.jpg"
 
 usage() {
-  sed -n '2,20s/^# \{0,1\}//p' "$0"
+  sed -n '2,22s/^# \{0,1\}//p' "$0"
 }
 
 die2() { echo "✗ $*" >&2; exit 2; }
@@ -554,7 +555,7 @@ case ${1:-} in
     shift; cmd_filmcheck voice-asr "$@" ;;
   page) shift; cmd_page "$@" ;;
   ui | job | review | admin | app) cmd_studio "$@" ;;
-  script | web | qc | publish | channel | lesson | topics | config) cmd_filmcheck "$@" ;;
+  script | web | qc | publish | channel | lesson | topics | config | kit) cmd_filmcheck "$@" ;;
   help | -h | --help) usage ;;
   '') usage >&2; exit 2 ;;
   *) echo "✗ lệnh lạ: $1" >&2; usage >&2; exit 2 ;;

@@ -117,11 +117,42 @@ def validate(ch: dict, root: Path, lib: Path = None) -> list:
         for t in tags:
             if isinstance(t, str) and find_banned(t.lstrip("#"), banned):
                 errs.append(f"hashtags: {t} is also a banned word")
+    errs += hero_errors(ch.get("hero"), ch.get("style"), root)
     dec = ch.get("decisions") or []
     if not isinstance(dec, list) or len(dec) > 100 or not all(
             isinstance(d, dict) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(d.get("date"))) and 1 <= len(str(d.get("text", "")).strip()) <= 300
             for d in dec):
         errs.append("decisions: at most 100, each {date: YYYY-MM-DD, text: 1–300 characters}")
+    return errs
+
+
+HERO_KEYS = ("hoodie", "strings", "hair", "hat", "glasses")
+HERO_HAIR = ("bald", "short", "bun", "curly")
+HERO_HATS = ("cap", "beanie")
+HEX6 = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def hero_errors(hero, style, root: Path) -> list:
+    """specs/022 FR-015: the channel's hero costume. Missing is fine (the kit's default is used)."""
+    if hero is None:
+        return []
+    if not isinstance(hero, dict) or set(hero) - set(HERO_KEYS):
+        return [f"hero: an object with {', '.join(HERO_KEYS)}"]
+    errs = []
+    for k in ("hoodie", "strings"):
+        if hero.get(k) is not None and not (isinstance(hero[k], str) and HEX6.match(hero[k])):
+            errs.append(f"hero.{k}: a colour such as #d9b23a")
+    if hero.get("hair") is not None and hero["hair"] not in HERO_HAIR:
+        errs.append(f"hero.hair: one of {', '.join(HERO_HAIR)}")
+    if hero.get("hat") is not None and hero["hat"] not in HERO_HATS:
+        errs.append(f"hero.hat: one of {', '.join(HERO_HATS)}, or none")
+    if hero.get("glasses") is not None and not isinstance(hero["glasses"], bool):
+        errs.append("hero.glasses: yes or no")
+    if not errs and style:
+        from filmcheck import kit                                  # the costume must differ from the reference's hero
+        why = kit.hero_problem(hero, kit.catalog(root, style))
+        if why:
+            errs.append(f"hero: {why}")
     return errs
 
 
@@ -133,6 +164,8 @@ def normal(ch: dict) -> dict:
            "thumbnail_rules": (ch.get("thumbnail_rules") or "").strip(), "title_max": ch.get("title_max"),
            "hashtags": list(ch.get("hashtags") or []), "banned": [b.strip() for b in ch.get("banned") or []],
            "decisions": list(ch.get("decisions") or []), "updated": ch.get("updated")}
+    if ch.get("hero") is not None:
+        out["hero"] = ch["hero"]
     return out
 
 
@@ -197,6 +230,11 @@ def channel_md(ch: dict) -> str:
         rows.append(f"- Tiêu đề{most}: {ch.get('title_rules') or '–'}")
     if ch.get("thumbnail_rules"):
         rows.append(f"- Thumbnail: {ch['thumbnail_rules']}")
+    h = ch.get("hero")
+    if isinstance(h, dict):
+        extra = [x for x in (f"hat {h['hat']}" if h.get("hat") else "", "glasses" if h.get("glasses") else "") if x]
+        rows.append(f"- Hero: hoodie {h.get('hoodie', '–')} · strings {h.get('strings', '–')} · hair {h.get('hair', '–')}"
+                    + "".join(f" · {x}" for x in extra))
     if ch.get("decisions"):
         rows += ["", "## Quyết định", *[f"- {d['date']}: {d['text']}" for d in ch["decisions"]]]
     return "\n".join(rows) + "\n"
@@ -392,6 +430,8 @@ def attach(root: Path, film_dir: Path, slug: str, shared_path: Path = None, lib:
             "language": (override.get("language") or ch["language"]).lower(),
             "voice": override.get("voice") or ch.get("voice"),
             "speed": float(override.get("speed") or ch.get("speed") or DEFAULT_SPEED)}
+    if ch.get("hero"):
+        film["hero"] = dict(ch["hero"])                             # specs/022 FR-015: every film of the channel
     if not style_exists(film["style"], root, lib):
         raise ChannelError(f"the style \"{film['style']}\" no longer exists; change the channel or pick a style for this film")
     if not voice_ok(film["voice"]):

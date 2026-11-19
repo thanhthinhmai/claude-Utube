@@ -6,6 +6,7 @@ recogniser gap over a word it missed is not a pause). Text agreement: word simil
 and written in digits count as the same. Does not run speech recognition itself."""
 import json
 import re
+import unicodedata
 import shutil
 import subprocess
 import time
@@ -30,6 +31,7 @@ def _tokens(text: str, digits_as_number: bool) -> list:
     """Normalised words; a run of number words, or a written number, becomes one "#" (twenty-three thousand ↔ 23,000)."""
     out = []
     text = re.sub(r"(\d)\s*%", r"\1 percent", text)                 # the recogniser writes "eleven percent" as "11%"
+    text = "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c))   # café = cafe
     for raw in re.split(r"[\s\-–—]+", text.lower()):
         w = rhythm.norm(raw)
         if not w:
@@ -90,7 +92,7 @@ def run(film_dir: Path, lib=None, lang="en") -> dict:
         length = float(durs.get(lid, 0)) or None
         ws = rhythm.clamp_words(words[lid], length)                                  # FR-004
         said = re.sub(r"\s+([,.!?;:%])", r"\1", " ".join(w for w, _, _ in ws))   # "23 ,000" → "23,000"
-        sim = round(similar(text, said), 3)
+        sim = round(similar(r.get("asr") or text, said), 3)   # the line's own "asr" text, as asr_check.py reads it
         m["similarity_min"] = min(m.get("similarity_min", 1.0), sim)
         if sim < SIMILAR:
             issues.append(_issue("asr_mismatch", lid, 0.0, sim, SIMILAR, text=said[:40], fix=redo))

@@ -126,6 +126,26 @@ class SaveClean(unittest.TestCase):
         rows = [l for l in (self.p.dir / "my-styles" / "README.md").read_text().splitlines() if l.startswith("| night-ink ")]
         self.assertEqual(len(rows), 1)                                     # the catalog row is replaced, not added
 
+    def test_work_files_left_out_structure_kept(self):  # specs/022 T023; FR-013, SC-006
+        st = self.d / "style"
+        for f in ("label.log", "pipeline.log", "review-1.md", "review-2.md", ".job"):
+            (st / f).write_text("work\n")
+        (st / "STRUCTURE.md").write_text("# Structure\n\n| Act | Share |\n|---|---|\n| A1 Hook | 8 % |\n")
+        self.assertEqual(self.call(), 0)
+        s = self.p.dir / "my-styles" / "night-ink"
+        for f in ("label.log", "pipeline.log", "review-1.md", "review-2.md", ".job"):
+            self.assertFalse((s / f).exists(), f)
+        self.assertTrue((s / "STRUCTURE.md").exists())
+        # --update keeps the film kit and the demo of the saved style
+        (s / "kit").mkdir(); (s / "kit" / "film.js").write_text("export {}\n")
+        (s / "demo").mkdir(); (s / "demo" / "build.sh").write_text("echo hi\n")
+        self.assertEqual(save.save("learned-set", "night-ink", "Night Ink", "", "ink-wash", False, True), 0)
+        self.assertTrue((s / "kit" / "film.js").exists() and (s / "demo" / "build.sh").exists())
+        # a channel name in STRUCTURE.md stops the save
+        (st / "STRUCTURE.md").write_text("# Structure in the manner of Mèo Lười Studio\n")
+        with self.assertRaises(refset.StepError):
+            save.save("learned-set", "night-ink", "Night Ink", "", "ink-wash", False, True)
+
     def test_clean(self):  # FR-004a, SC-006
         self.assertEqual(save.clean("learned-set", keep=False), 0)
         self.assertFalse((self.d / "videos").exists())

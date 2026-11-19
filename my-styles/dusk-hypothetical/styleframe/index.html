@@ -1,112 +1,207 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
+<title>dusk proof — evening train</title>
 <link rel="stylesheet" href="/core/fonts/fonts.css">
 <style>
   html,body{margin:0;background:#000;overflow:hidden}
-  canvas{display:block}
-  .bar{position:fixed;left:0;right:0;height:6.67vh;background:#000;z-index:3}
+  canvas{display:block;position:fixed;left:0;top:0}
+  .bar{position:fixed;left:0;right:0;height:6.4vh;background:#000;z-index:3}
   #top{top:0} #bot{bottom:0}
-  #cap{position:fixed;top:12vh;left:0;right:0;text-align:center;z-index:2;font:400 3.6vh 'IM Fell English',serif;letter-spacing:.32em;color:#f3d9a6;text-shadow:0 0 1.4vh rgba(255,200,120,.65)}
-  .tag{position:fixed;z-index:2;font:600 1.5vh 'Fredoka',sans-serif;color:#f6e4bd;border:.18vh solid #d9b26a;border-radius:3vh;padding:.5vh 1.3vh;background:rgba(30,18,40,.65);box-shadow:0 0 1vh rgba(230,180,90,.45);text-align:center;line-height:1.1}
-  .tag b{display:block;font-size:2.4vh}
 </style>
 <script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js","three/addons/":"/node_modules/three/examples/jsm/"}}</script>
 </head><body>
 <div class="bar" id="top"></div><div class="bar" id="bot"></div>
-<div id="cap">LAST LOAD</div>
-<div class="tag" id="t1" style="left:30%;top:22%">SPIN<b>12</b></div>
-<div class="tag" id="t2" style="left:72%;top:24%">DRY<b>48</b></div>
 <script type="module">
+// Proof frame for the re-learned Dusk Hypothetical: a new place (an evening train car), the style's grade, figure
+// proportions (head ≈ 1/3 of the height), a full row of extras, a repeated grid (seats, windows, straps), practical
+// light strips with bloom, three depth layers (blurred poles in front, the row, the skyline behind).
 import * as THREE from 'three';
 import { makePost } from '/core/three/post.js';
+import { mulberry } from '/core/lib.js';
+
 const W = innerWidth, H = innerHeight;
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setSize(W, H); renderer.setPixelRatio(1);
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.12;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.8;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-const view = document.createElement('canvas'); view.width = W; view.height = H; document.body.appendChild(view);
-const vctx = view.getContext('2d');   // the capture tool can't read a software WebGL layer: copy each frame here
+document.body.appendChild(renderer.domElement);
+const view = document.createElement('canvas'); view.width = W; view.height = H; view.style.zIndex = 1; document.body.appendChild(view);
+const vctx = view.getContext('2d');   // software WebGL layers can't be captured: copy each frame here
 const scene = new THREE.Scene();
-scene.background = new THREE.Color('#3a2a52');
-scene.fog = new THREE.Fog('#2a1c40', 9, 26);
-const cam = new THREE.PerspectiveCamera(42, W / H, 0.05, 60);
+scene.background = new THREE.Color('#241a36');
+scene.fog = new THREE.Fog('#2a1e40', 8, 24);
+const cam = new THREE.PerspectiveCamera(62, W / H, 0.05, 80);
 
-const mat = (c, r = .92) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: 0 });
-const box = (w, h, d, c, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(c)); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; scene.add(m); return m; };
+const mat = (c, r = .9, e, ei = 1) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: 0, ...(e ? { emissive: e, emissiveIntensity: ei } : {}) });
+const mesh = (geo, m, p, parent = scene) => { const o = new THREE.Mesh(geo, m); o.position.set(...p); o.castShadow = o.receiveShadow = true; parent.add(o); return o; };
+const box = (w, h, d, c, x, y, z, parent) => mesh(new THREE.BoxGeometry(w, h, d), typeof c === 'string' ? mat(c) : c, [x, y, z], parent);
+const tex = (w, h, draw) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
 
-// room
-box(30, .1, 20, '#7a6070', 0, -.05, 0);                       // floor, dusty rose-brown
-box(30, 6, .2, '#5a4778', 0, 3, -5);                          // back wall
-// windows: dusk sky gradient on a plane behind the wall openings
-const sky = document.createElement('canvas'); sky.width = 4; sky.height = 256;
-const g = sky.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256);
-gr.addColorStop(0, '#5a3e86'); gr.addColorStop(.55, '#b46a9a'); gr.addColorStop(.85, '#f0a77c'); gr.addColorStop(1, '#f6c28a');
-g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
-const skyM = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(sky), fog: false });
-skyM.map.colorSpace = THREE.SRGBColorSpace;
-for (let i = -3; i <= 3; i++) {
-  const x = i * 3.2;
-  const win = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6), skyM); win.position.set(x, 3.2, -4.88); scene.add(win);
-  box(.12, 2.7, .1, '#4a3866', x, 3.2, -4.82); box(2.7, .12, .1, '#4a3866', x, 3.2, -4.82);
-  // city silhouettes in each window
-  for (let k = 0; k < 4; k++) { const h = .5 + ((i * 7 + k * 13) % 9) / 9 * 1.1; const b = new THREE.Mesh(new THREE.PlaneGeometry(.45, h), new THREE.MeshBasicMaterial({ color: '#5a4274', fog: false })); b.position.set(x - .95 + k * .62, 1.9 + h / 2, -4.86); scene.add(b); }
+// ---------- the car ----------
+const floorTex = tex(256, 256, (g, w, h) => { g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.fillStyle = 'rgba(60,30,60,.25)'; for (let i = 0; i < 16; i++) g.fillRect(0, i * 16, w, 2); });
+floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping; floorTex.repeat.set(6, 3);
+mesh(new THREE.BoxGeometry(30, .1, 8), new THREE.MeshStandardMaterial({ color: '#9c7068', map: floorTex, roughness: .8 }), [0, -.05, 0]);
+box(30, 1.35, .2, '#4d3b66', 0, .67, -2.75);               // lower wall
+box(30, .45, .25, '#5a4874', 0, 2.95, -2.7);               // upper wall band
+box(30, .1, 8, mat('#6e5c88', .9, '#4a3a66', .5), 0, 3.25, 0);                // ceiling, faintly self-lit so the far end never goes black                     // ceiling
+// windows: dusk sky + skyline with lit window grids, seen through the frames
+const sky = tex(4, 256, (g) => { const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#4a3478'); gr.addColorStop(.5, '#9a5c90'); gr.addColorStop(.82, '#e09a7c'); gr.addColorStop(1, '#f2b88a'); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); });
+mesh(new THREE.PlaneGeometry(40, 6), new THREE.MeshBasicMaterial({ map: sky, fog: false }), [0, 3, -9]);
+const r = mulberry(7);
+for (let i = 0; i < 46; i++) {                               // skyline blocks
+  const w = .6 + r() * 1.1, h = .6 + r() * 1.8, x = -19 + i * .85 + r() * .3;
+  const winT = tex(32, 64, (g, cw, ch) => { g.fillStyle = '#fff'; g.fillRect(0, 0, cw, ch); for (let y = 4; y < ch - 4; y += 8) for (let xx = 3; xx < cw - 3; xx += 7) { g.fillStyle = r() < .18 ? '#ffd29a' : '#4c3c6a'; g.fillRect(xx, y, 4, 5); } });
+  winT.wrapS = winT.wrapT = THREE.RepeatWrapping; winT.repeat.set(Math.round(w * 2), Math.round(h * 1.5));
+  mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: i % 3 ? '#3e2e58' : '#352650', map: winT, fog: false }), [x, .9 + h / 2, -7 - (i % 4) * .4]);
 }
-// washing machines along the back
-for (let i = -5; i <= 5; i++) {
-  const x = i * 1.15;
-  box(1.05, 1.1, .9, '#aaa0c2', x, .55, -4.3);
-  const door = new THREE.Mesh(new THREE.CylinderGeometry(.33, .33, .05, 32), mat('#2c2240', .4));
-  door.rotation.x = Math.PI / 2; door.position.set(x, .6, -3.84); scene.add(door);
-  const glow = new THREE.Mesh(new THREE.CircleGeometry(.26, 32), new THREE.MeshBasicMaterial({ color: i % 3 ? '#4a3d6e' : '#9fd0ff' }));
-  glow.position.set(x, .6, -3.81); scene.add(glow);
+for (let i = -6; i <= 6; i++) {                             // window frames and pillars between them
+  const x = i * 2.1;
+  box(.18, 1.6, .22, '#5a4876', x, 2.15, -2.72);
+  box(2.1, .12, .22, '#5a4876', x + 1.05, 1.38, -2.72);
 }
-// folding table
-box(3.2, .08, 1.1, '#a07862', 1.3, .85, -.2); box(.08, .85, .08, '#5a4660', -.2, .42, .2); box(.08, .85, .08, '#5a4660', 2.8, .42, .2);
-box(.7, .3, .5, '#6b5fa8', 1.7, 1.04, -.2);                  // basket
-// figure: sphere head, hoodie, stick limbs, mitten hands, dot eyes
-function figure(x, z, s, hoodie, ry, eyes = 'dot') {
+// seat row: cushions in a grid, backrest
+for (let i = -12; i <= 12; i++) {
+  const x = i * .62;
+  box(.58, .14, .62, '#a8745e', x, .52, -2.2);                 // warm wooden seats
+  box(.58, .62, .12, '#82588a', x, .9, -2.56);
+}
+box(16, .45, .1, '#6e5878', 0, .22, -1.92);                  // seat front panel
+// ceiling light strips (practicals, bloom)
+for (const z of [-1.6, 1.4]) mesh(new THREE.BoxGeometry(24, .06, .22), mat('#c8b6b8', .5, '#ffd8b0', z > 0 ? .3 : .45), [0, 3.17, z]);
+// grab rail and straps (repeated small shapes)
+box(24, .04, .04, '#b9a7c8', 0, 2.8, -1.1);
+for (let i = -16; i <= 16; i++) {
+  const x = i * .55 + .2;
+  mesh(new THREE.CylinderGeometry(.012, .012, .3, 6), mat('#cbb8d8'), [x, 2.63, -1.1]);
+  const ring = mesh(new THREE.TorusGeometry(.07, .015, 6, 16), mat('#e8d9f0', .6), [x, 2.42, -1.1]);
+}
+// route map strip with lit stops above the windows
+const mapT = tex(1024, 32, (g, w, h) => { g.fillStyle = '#2a2040'; g.fillRect(0, 0, w, h); g.fillStyle = '#d9b23a'; g.fillRect(0, 14, w, 4); for (let i = 0; i < 24; i++) { g.fillStyle = i === 9 ? '#ff8a6a' : '#f3e2b8'; g.beginPath(); g.arc(20 + i * 42, 16, 5, 0, 7); g.fill(); } });
+mesh(new THREE.PlaneGeometry(14, .3), new THREE.MeshStandardMaterial({ map: mapT, emissive: '#ffffff', emissiveMap: mapT, emissiveIntensity: .35 }), [0, 3.05, -2.57]);
+
+// ---------- figures: sphere head ≈ 1/3 of height, hoodie, stick limbs, ball hands, ink face ----------
+const ink = new THREE.MeshBasicMaterial({ color: '#120c1a' });
+const skin = new THREE.MeshStandardMaterial({ color: '#e2d6ee', roughness: .6 });   // lavender in the violet light
+function figure(x, z, s, hoodie, { sit = true, ry = 0, face = 'dot', hair, cap, tilt = 0, turn = 0, prop } = {}) {
   const f = new THREE.Group(); f.position.set(x, 0, z); f.rotation.y = ry; f.scale.setScalar(s); scene.add(f);
-  const skin = new THREE.MeshStandardMaterial({ color: '#f1ebf2', roughness: .55 });
-  const add = (geo, m, px, py, pz) => { const o = new THREE.Mesh(geo, m); o.position.set(px, py, pz); o.castShadow = true; f.add(o); return o; };
-  add(new THREE.SphereGeometry(.42, 48, 32), skin, 0, 1.62, 0);                         // head
-  add(new THREE.CylinderGeometry(.05, .05, .2, 12), skin, 0, 1.15, 0);                  // neck
-  add(new THREE.CapsuleGeometry(.26, .32, 6, 16), mat(hoodie, .95), 0, .82, 0);          // hoodie
-  add(new THREE.SphereGeometry(.17, 20, 12), mat(hoodie, .95), 0, 1.08, -.12);           // hood
+  const lift = sit ? .6 : .55;                                 // seated: hips on the cushion
+  mesh(new THREE.CylinderGeometry(.04, .04, .16, 10), skin, [0, lift + .64, 0], f);
+  mesh(new THREE.CapsuleGeometry(.23, .24, 6, 14), mat(hoodie, .95), [0, lift + .35, 0], f);
+  // hood: a thick ring around the neck plus a pouch behind, two drawstrings and a front pocket
+  const hood = mesh(new THREE.TorusGeometry(.12, .055, 10, 24), mat(hoodie, .95), [0, lift + .6, -.02], f); hood.rotation.x = Math.PI / 2 - .25;
+  mesh(new THREE.SphereGeometry(.15, 16, 10), mat(hoodie, .95), [0, lift + .6, -.13], f).scale.set(1, .8, .7);
+  for (const sx of [-1, 1]) mesh(new THREE.CylinderGeometry(.008, .008, .16, 6), mat('#f4eef8', .7), [sx * .05, lift + .5, .21], f).rotation.x = -.15;
+  const pocket = mesh(new THREE.BoxGeometry(.26, .1, .03), mat(new THREE.Color(hoodie).multiplyScalar(.82).getStyle(), .95), [0, lift + .22, .225], f); pocket.rotation.x = -.12;
+  // jointed limbs: two segments with a round joint (knee, elbow) between them
+  const limb = (p, q, r) => { const mid = p.clone().add(q).multiplyScalar(.5);
+    const o = mesh(new THREE.CylinderGeometry(r, r, p.distanceTo(q), 10), skin, [mid.x, mid.y, mid.z], f);
+    o.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), q.clone().sub(p).normalize()); };
+  const joint = (p, r) => mesh(new THREE.SphereGeometry(r, 12, 8), skin, [p.x, p.y, p.z], f);
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
   for (const sx of [-1, 1]) {
-    const leg = add(new THREE.CylinderGeometry(.045, .045, .5, 10), skin, sx * .1, .3, 0);
-    add(new THREE.SphereGeometry(.08, 12, 8), skin, sx * .11, .05, .05);                // foot
-    const arm = add(new THREE.CylinderGeometry(.04, .04, .42, 10), skin, sx * .33, .78, 0); arm.rotation.z = sx * .25;
-    add(new THREE.SphereGeometry(.075, 12, 8), skin, sx * .38, .55, .02);               // mitten
+    const hip = sit ? V(sx * .1, lift + .02, 0) : V(sx * .08, .55, 0);
+    const knee = sit ? V(sx * .12, lift + .03, .34) : V(sx * .08, .3, .03);
+    const ankle = sit ? V(sx * .13, lift - .29, .4) : V(sx * .08, .06, 0);
+    limb(hip, knee, .045); joint(knee, .05); limb(knee, ankle, .04);
+    mesh(new THREE.SphereGeometry(.065, 10, 8), skin, [ankle.x, ankle.y - .02, ankle.z + .05], f).scale.set(1, .8, 1.3);
   }
-  const ink = new THREE.MeshBasicMaterial({ color: '#120c1a' });
+  // arms: with a prop both hands meet in front of the chest; otherwise they rest on the thighs
+  const hold = !!prop;
   for (const sx of [-1, 1]) {
-    const e = add(new THREE.SphereGeometry(eyes === 'dot' ? .045 : .06, 12, 8), ink, sx * .14, 1.68, .39);
-    e.scale.set(1, eyes === 'dot' ? 1.25 : .28, .3);
-    const brow = add(new THREE.BoxGeometry(.13, .018, .01), ink, sx * .15, 1.82, .38); brow.rotation.z = -sx * .18;
+    const sh = V(sx * .22, lift + .48, 0);
+    const elbow = hold ? V(sx * .27, lift + .25, .14) : sit ? V(sx * .27, lift + .24, .08) : V(sx * .28, lift + .22, 0);
+    const hand = hold ? V(sx * .09, lift + .3, .3) : sit ? V(sx * .19, lift + .1, .26) : V(sx * .27, lift - .02, .04);
+    limb(sh, elbow, .033); joint(elbow, .036); limb(elbow, hand, .031);
+    mesh(new THREE.SphereGeometry(.07, 10, 8), skin, [hand.x, hand.y, hand.z], f);
   }
+  if (prop === 'phone') {
+    mesh(new THREE.BoxGeometry(.13, .22, .02), mat('#1c1626', .4), [0, lift + .34, .33], f).rotation.x = -.6;
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(.11, .19), new THREE.MeshBasicMaterial({ color: '#7d9cc0' }));
+    scr.position.set(0, lift + .345, .345); scr.rotation.x = -.6 - Math.PI; scr.rotation.y = Math.PI; f.add(scr);
+  }
+  if (prop === 'book') { const bk = mesh(new THREE.BoxGeometry(.3, .03, .22), mat('#c8563e'), [0, lift + .3, .32], f); bk.rotation.x = .9; }
+  if (prop === 'bag') mesh(new THREE.BoxGeometry(.34, .26, .16), mat('#5a6a3a'), [0, lift + .2, .3], f);
+  // head group: tilt and turn
+  const hg = new THREE.Group(); hg.position.set(0, lift + .72, 0); hg.rotation.set(prop === 'phone' ? .35 : 0, turn, tilt); f.add(hg);
+  const y = .3;
+  mesh(new THREE.SphereGeometry(.34, 40, 28), skin, [0, y, 0], hg);
+  for (const sx of [-1, 1]) {
+    const e = mesh(new THREE.SphereGeometry(.042, 12, 8), ink, [sx * .12, y + .05, .325], hg); e.castShadow = false;
+    e.scale.set(1, face === 'lid' ? .32 : face === 'happy' ? .3 : 1.25, .3);
+    const b = mesh(new THREE.BoxGeometry(.11, .016, .01), ink, [sx * .13, y + .17, .31], hg); b.castShadow = false;
+    b.rotation.z = face === 'lid' ? sx * .06 : -sx * .16;
+  }
+  const m = mesh(new THREE.TorusGeometry(.045, .008, 6, 18, Math.PI), ink, [face === 'lid' ? .04 : 0, y - .1, .335], hg);
+  m.rotation.z = Math.PI + (face === 'lid' ? .25 : 0); m.castShadow = false;
+  if (face === 'happy') for (const sx of [-1, 1]) mesh(new THREE.SphereGeometry(.05, 10, 8), new THREE.MeshBasicMaterial({ color: '#f2a0b4' }), [sx * .2, y - .04, .29], hg).scale.set(1, .6, .3);
+  if (hair) { const hshell = mesh(new THREE.SphereGeometry(.355, 32, 20, 0, Math.PI * 2, 0, Math.PI * .55), mat(hair, .8), [0, y + .01, -.02], hg); hshell.rotation.x = -.25; }
+  if (cap) { mesh(new THREE.SphereGeometry(.35, 28, 16, 0, Math.PI * 2, 0, Math.PI * .42), mat(cap), [0, y + .03, 0], hg); mesh(new THREE.CylinderGeometry(.2, .2, .03, 20, 1, false, -Math.PI / 2, Math.PI), mat(cap), [0, y + .17, .3], hg); }
   return f;
 }
-figure(-.1, -1.2, 1.1, '#d9d24a', .35);              // yellow hoodie, mid
-figure(2.9, -1.6, 1.05, '#3f7fd6', -.5, 'lid');      // blue hoodie, half-closed lids
-const fg = figure(-1.05, 1.9, 1.15, '#4c6fb8', 2.6); // foreground head, blurred by DOF
+// the row: the hero (our mustard hoodie) in the middle, extras on both sides told apart by hoodie, hair, cap; each
+// one busy with something (phone, book, bag, a neighbour), heads turned and tilted
+const HOODIES = ['#c0423e', '#3f9a9a', '#e07a3a', '#7a5cc0', '#4f8f4a', '#d9608c', '#3f6fc0', '#c99a2e', '#8a4a6a'];
+const HAIR = ['#4a2e22', '#1c1420', '#c8903a', '#8a4a2a'];
+const PROPS = ['phone', 'phone', 'book', 'bag', null, null];
+const rr = mulberry(21);
+for (let i = -11; i <= 11; i++) {
+  if (Math.abs(i) === 4) continue;                              // two empty seats
+  const k = (i + 30) % HOODIES.length;
+  const prop = PROPS[Math.floor(rr() * PROPS.length)];
+  const talk = !prop && rr() < .6;                              // no prop: turn to a neighbour
+  const o = { prop, ry: talk ? (i % 2 ? .7 : -.7) : (rr() - .5) * .4, tilt: (rr() - .5) * .35, turn: talk ? (i % 2 ? .3 : -.3) : 0,
+              face: prop === 'phone' ? 'lid' : talk ? (rr() < .5 ? 'happy' : 'dot') : rr() < .3 ? 'lid' : 'dot' };
+  const pick = rr(); if (pick < .4) o.hair = HAIR[Math.floor(rr() * 4)]; else if (pick < .55) o.cap = HOODIES[(k + 3) % 9];
+  figure(i * .62, -2.12, 1, HOODIES[k], o);
+}
+figure(.1, .1, 1.05, '#d9b23a', { sit: false, face: 'lid', prop: 'phone', tilt: .08, ry: -.25 });   // the hero standing in the aisle, half-lid, lit by the phone
+// depth: standing passengers further and further down the aisle, and the door at the end of the car
+const DEEP = [[1.7, -.55, '#3f9a9a', 'phone'], [2.9, -1.05, '#c99a2e', null], [4.2, -.45, '#7a5cc0', 'phone'], [5.6, -.95, '#c0423e', 'book'],
+              [7.0, -.5, '#4f8f4a', null], [8.4, -1.0, '#d9608c', 'phone'], [9.6, -.6, '#3f6fc0', null]];
+DEEP.forEach(([x, z, c, prop], i) => figure(x, z, 1.05, c, { sit: false, prop, ry: -.6 + (i % 3) * .5, hair: i % 2 ? HAIR[i % 4] : undefined, face: prop ? 'lid' : 'dot' }));
+box(.12, 3.2, 3.2, '#55436e', 11.2, 1.6, -1.2);                                   // end wall
+mesh(new THREE.BoxGeometry(.05, 2.1, .9), mat('#8c78a6', .5, '#ffd8b0', .08), [11.12, 1.05, -1.0]);   // door with a lit window
+mesh(new THREE.PlaneGeometry(.6, .5), new THREE.MeshBasicMaterial({ color: '#f0b080' }), [11.09, 1.6, -1.0]).rotation.y = -Math.PI / 2;
+// the opposite side of the car: lower wall, window band with the dusk sky, seat row
+box(14, 1.35, .2, '#5a4874', 5, .67, 2.95); box(14, .45, .25, '#5a4874', 5, 2.95, 2.9);
+for (let i = 0; i < 7; i++) {
+  const x = -.2 + i * 2.1;
+  const w = mesh(new THREE.PlaneGeometry(1.95, 1.45), new THREE.MeshBasicMaterial({ map: sky, fog: false }), [x + 1.05, 2.13, 2.97]); w.rotation.y = Math.PI; w.castShadow = false;
+  box(.16, 1.6, .22, '#5a4876', x, 2.15, 2.92);
+}
+for (let i = 2; i <= 18; i++) box(.58, .14, .62, '#a8745e', i * .62, .52, 2.45);
+// foreground: a door-side partition with a warm wooden top rail (covers the hero below the waist, as a table would)
+box(1.9, .07, .16, '#b07a5e', .15, .88, .8);                                       // wooden top rail
+mesh(new THREE.BoxGeometry(1.8, .8, .03), new THREE.MeshStandardMaterial({ color: '#8c78a6', roughness: .6 }), [.15, .44, .8]);
+for (const x of [-.8, 1.1]) mesh(new THREE.CylinderGeometry(.025, .025, .9, 10), mat('#cdbbe0', .35), [x, .44, .8]);
+// (the phone's own light was dropped: the warm rim from the windows lights the hero, as in the reference grammar)
+// standing passengers in front (mid layer) and a blurred pole + shoulder in the foreground
+figure(-4.6, -.9, 1.12, '#3f7a8a', { sit: false, ry: .6, hair: '#1c1420' });
+figure(3.6, -1.0, 1.1, '#9a4a5a', { sit: false, ry: -.6, cap: '#2a2a3a', prop: 'phone' });
+for (const x of [-3.4, 3.0]) mesh(new THREE.CylinderGeometry(.035, .035, 3.3, 10), mat('#cdbbe0', .35), [x, 1.6, .9]);
+figure(-3.9, 1.6, 1.2, '#5a4a9a', { sit: false, ry: 2.4 });
 
-// lights: warm pink key from the windows' side, violet fill
-scene.add(new THREE.HemisphereLight('#a48ad6', '#6a4658', 2.2));
-const key = new THREE.DirectionalLight('#ffb08a', 2.1); key.position.set(-6, 7, -2); key.castShadow = true;
-key.shadow.mapSize.set(1024, 1024); key.shadow.intensity = .55; Object.assign(key.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8 }); scene.add(key);
-const rim = new THREE.PointLight('#ff8fb0', 6, 9); rim.position.set(1, 3.5, -3.6); scene.add(rim);
-const lamp = new THREE.PointLight('#9fd0ff', 2.5, 4); lamp.position.set(0, .8, -3.2); scene.add(lamp);
-const low = new THREE.PointLight('#c79ad8', 5, 14); low.position.set(-.5, .6, 3); scene.add(low);   // lifts the low wall band and the foreground head
+// ---------- light: warm pink key from the windows, violet fill, practical strips ----------
+scene.add(new THREE.HemisphereLight('#9d84d0', '#7a5670', 1.9));
+const key = new THREE.DirectionalLight('#ffb08a', 1.8); key.position.set(-5, 6, -6); key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024); key.shadow.intensity = .25; Object.assign(key.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9 }); scene.add(key);
+const sun = new THREE.DirectionalLight('#ffa070', 7); sun.position.set(-4, 5, -8); sun.target.position.set(0, 0, 1); scene.add(sun.target);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10, far: 30 }); scene.add(sun);
+scene.traverse((o) => { if (o.isMesh && o.position.z < -5) o.castShadow = false; });   // the skyline must not block the sun
+for (const x of [-6, -2, 2, 6]) { const p = new THREE.PointLight('#ffe0b8', 2.6, 6); p.position.set(x, 2.45, -1.4); scene.add(p); }
+for (const x of [4, 7.5, 10.5]) { const p = new THREE.PointLight('#ffe0b8', 2.2, 5); p.position.set(x, 2.6, .2); scene.add(p); }
+const rimSun = new THREE.DirectionalLight('#ff9e70', 4.5); rimSun.position.set(-1, 2.6, -7); rimSun.target.position.set(.1, 1, .1); scene.add(rimSun, rimSun.target);   // warm rim on heads and shoulders
+const front = new THREE.PointLight('#b896e0', 4, 12); front.position.set(0, 1.6, 4); scene.add(front);
 
 const post = makePost(renderer, scene, cam, W, H, { ssaa: 1, ao: false });
-post.dof.focus = 5.2; post.dof.aper = 26; post.dof.maxCoc = 14;
-post.vig.uniforms.amt.value = .42; post.vig.uniforms.sat.value = .72; post.vig.uniforms.contrast.value = 0.25;
-post.bloom.strength = .25;
+post.dof.focus = 2.4; post.dof.aper = 4.5; post.dof.maxCoc = 14;
+post.vig.uniforms.amt.value = .26; post.vig.uniforms.sat.value = .62; post.vig.uniforms.contrast.value = .22;
+post.bloom.strength = .3;
 
 window.DUR = 2;
 window.render = (t) => {
-  const k = t / window.DUR, z = 4.2 - .35 * k;     // slow push-in
-  cam.position.set(.2, 1.75, z); cam.lookAt(.9, 1.3, -3);
+  const k = t / window.DUR;
+  cam.position.set(-1.45, 1.28, 2.15 - .1 * k); cam.lookAt(.15, 1.22, .1);     // oblique: the car recedes to the right     // medium shot on the hero, the seated row behind, slow push-in
   post.composer.render(); vctx.drawImage(renderer.domElement, 0, 0, W, H);
 };
 document.fonts.ready.then(() => { window.render(0); window.READY = true; });
