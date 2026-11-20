@@ -1,0 +1,19 @@
+{
+ "slug": "elon-musk",
+ "name": "Elon Musk",
+ "role": "chief executive of a rocket company",
+ "ref": {
+  "url": "https://upload.wikimedia.org/wikipedia/commons/6/69/Elon_Musk_-_54820081119_%283x4_cropped%2C_Rule_of_thirds%29.jpg",
+  "source": "upload.wikimedia.org",
+  "license": "CC BY 2.0",
+  "author": "see Wikimedia Commons"
+ },
+ "figure_hash": "1fce36d93c1375a0",
+ "approved": {
+  "hash": "1fce36d93c1375a0",
+  "at": "2026-11-19T12:28:06+00:00",
+  "by": "chat",
+  "note": "approved by the user in chat on 2026-11-19 (shared sheet of the new kit)"
+ },
+ "history": []
+}

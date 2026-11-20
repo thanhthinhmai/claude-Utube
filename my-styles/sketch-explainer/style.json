@@ -1,0 +1,20 @@
+{
+ "line": "Flat outlined 2D cartoon explainer: round-headed stick-limbed people act out business stories in many small line-drawn sets, with numbers on boards, screens and signs inside the scene.",
+ "line_cn": "",
+ "borrows": [],
+ "size": "1920x1080",
+ "slug": "sketch-explainer",
+ "en": "Sketch Explainer",
+ "cn": "",
+ "based_on": "halftone-dossier",
+ "library_version": "bebbbe1",
+ "created": "2026-11-19",
+ "source": "learned",
+ "reference": {
+  "videos": 12,
+  "measured_seconds": 2160.0,
+  "formats": [
+   "landscape"
+  ]
+ }
+}

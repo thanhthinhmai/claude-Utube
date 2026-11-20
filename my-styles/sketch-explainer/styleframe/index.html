@@ -1,0 +1,39 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>sketch-explainer proof</title>
+<style>
+@font-face{font-family:Hand;src:url(Kalam-Bold.ttf)}
+html,body{margin:0;background:#000;overflow:hidden;width:100%;height:100%}
+svg{display:block}
+</style></head>
+<body>
+<svg id="root" width="100%" height="100%" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <filter id="wob" x="-2%" y="-2%" width="104%" height="104%">
+    <feTurbulence type="fractalNoise" baseFrequency="0.018" numOctaves="2" seed="7" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="3.2" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <linearGradient id="dusk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b3e66"/><stop offset=".55" stop-color="#9c7290"/><stop offset="1" stop-color="#eaa57a"/></linearGradient>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f5276"/><stop offset=".55" stop-color="#7d6f8c"/><stop offset="1" stop-color="#c8908a"/></linearGradient>
+  <radialGradient id="backLight" cx=".45" cy=".38" r=".8"><stop offset="0" stop-color="#c3b49b"/><stop offset=".6" stop-color="#b3a48b"/><stop offset="1" stop-color="#998b74"/></radialGradient>
+  <linearGradient id="sidePanel" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#a39479"/><stop offset="1" stop-color="#8a7c64"/></linearGradient>
+  <radialGradient id="vig" cx=".5" cy=".46" r=".78"><stop offset=".55" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#1a1008" stop-opacity=".42"/></radialGradient>
+  <radialGradient id="glow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffe7a8" stop-opacity=".6"/><stop offset="1" stop-color="#ffe7a8" stop-opacity="0"/></radialGradient>
+  <radialGradient id="boardBack" cx=".5" cy=".4" r=".8"><stop offset="0" stop-color="#9fa9a4"/><stop offset="1" stop-color="#6f7a76"/></radialGradient>
+  <radialGradient id="woodTop" cx=".5" cy=".45" r=".8"><stop offset="0" stop-color="#8a6548"/><stop offset="1" stop-color="#5a3f2b"/></radialGradient>
+  <radialGradient id="darkTop" cx=".5" cy=".45" r=".8"><stop offset="0" stop-color="#4f4034"/><stop offset="1" stop-color="#2a221c"/></radialGradient>
+  <radialGradient id="navy" cx=".5" cy=".45" r=".8"><stop offset="0" stop-color="#2b3247"/><stop offset="1" stop-color="#141824"/></radialGradient>
+  <linearGradient id="beam" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <radialGradient id="cardBg" cx=".5" cy=".5" r=".75"><stop offset="0" stop-color="#3a3a42"/><stop offset="1" stop-color="#24242a"/></radialGradient>
+  <clipPath id="mailClip"><rect x="20" y="262" width="1360" height="640"/></clipPath>
+</defs>
+<g filter="url(#wob)" stroke="#16120f" stroke-linejoin="round" stroke-linecap="round"><g id="world"></g></g>
+<g id="ui" stroke-linejoin="round" stroke-linecap="round"></g>
+</svg>
+<script src="kit.js"></script>
+<script src="engine.js"></script>
+<script src="data.js"></script>
+<script src="cast.js"></script>
+<script src="scenes3.js"></script>
+<script src="proof.js"></script>
+<script src="film.js"></script>
+</body></html>

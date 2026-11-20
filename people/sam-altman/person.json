@@ -1,0 +1,19 @@
+{
+ "slug": "sam-altman",
+ "name": "Sam Altman",
+ "role": "chief executive of an AI company",
+ "ref": {
+  "url": "https://upload.wikimedia.org/wikipedia/commons/5/5a/Meeting_with_Masayoshi_Son_and_Sam_Altman_%28February_3%2C_2025%29_%283x4_cropped_on_Altman%29.jpg",
+  "source": "upload.wikimedia.org",
+  "license": "Public domain (U.S. government work)",
+  "author": "The White House"
+ },
+ "figure_hash": "496a36ede5222ea9",
+ "approved": {
+  "hash": "496a36ede5222ea9",
+  "at": "2026-11-19T12:28:06+00:00",
+  "by": "chat",
+  "note": "approved by the user in chat on 2026-11-19 (shared sheet of the new kit)"
+ },
+ "history": []
+}

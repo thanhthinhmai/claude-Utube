@@ -48,3 +48,6 @@ desktop/build-config.json
 
 # Demo films of learned styles are rebuilt by demo/build.sh, not committed (specs/021 R7)
 my-styles/*/test.mp4
+
+# Real-person library: model sheets carry third-party reference photos (specs/028 R2)
+people/*/.sheet/

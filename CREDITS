@@ -125,3 +125,7 @@ Python packages in each `*.dist-info/`, npm packages in `node_modules/*/`, Debia
 
 - playwright-core (Apache-2.0)
 - three (MIT)
+
+## Fonts of the studio's build kits
+
+- Kalam (font), Indian Type Foundry, SIL Open Font License 1.1, https://github.com/google/fonts/tree/main/ofl/kalam — my-styles/sketch-explainer/kit/ (specs/028)

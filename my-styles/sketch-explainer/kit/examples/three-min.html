@@ -1,0 +1,17 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>kit three minutes</title></head>
+<body>
+<script type="module">
+// A 3-minute scene table built with the kit's size helper (specs/028 T021, SC-003): sizes from suggestSizes(),
+// a new set about every 4 s, a person in every shot. A check of the shot grammar, not a film.
+import { film, CATALOG } from './kit/film.js';
+import { suggestSizes } from './kit/camera.js';
+const N = 50, sizes = suggestSizes(N, 'three-min');
+const sets = CATALOG.sets.filter(s => !['dark', 'map', 'sky'].includes(s));
+const who = ['narrator', 'banker', 'auditor', 'trader', 'critic', 'official', 'worker'];
+const scenes = sizes.map((size, i) => ({ id: 'S' + String(i + 1).padStart(3, '0'), dur: 3.6, set: sets[(i * 7) % sets.length], cam: { size },
+  cast: [{ who: who[i % who.length], x: 820 + (i % 3) * 200, pose: ['palm', 'rest', 'raise'][i % 3], expr: ['happy', 'neutral', 'excited'][i % 3] }, { who: 'extra:' + i, x: 1300 }],
+  board: size === 'insert' ? { k: 'num', text: '#' + (i + 1) } : undefined }));
+await film({ scenes });
+</script>
+</body></html>

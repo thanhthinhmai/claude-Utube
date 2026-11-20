@@ -1,0 +1,8 @@
+{
+ "pieces": 3,
+ "still_ratio": 0.333,
+ "motion720_p50": 0.17,
+ "moving_share": 1.0,
+ "clip": "out/clip.mp4",
+ "pass": true
+}

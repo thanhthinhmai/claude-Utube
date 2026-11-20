@@ -8,3 +8,5 @@ PY=python3
 command -v ffmpeg >/dev/null 2>&1 || { echo "✗ cần ffmpeg"; exit 1; }
 rm -rf "$HERE/tests/filmcheck/.tmp" && mkdir -p "$HERE/tests/filmcheck/.tmp"
 "$PY" -m unittest discover -s "$HERE/tests/filmcheck" -t "$HERE/tests/filmcheck" "$@"
+# Pure parts of the Sketch Explainer kit (specs/028)
+if command -v node >/dev/null 2>&1 && [ -d "$HERE/tests/sketchkit" ]; then node --test "$HERE"/tests/sketchkit/*.test.mjs; fi

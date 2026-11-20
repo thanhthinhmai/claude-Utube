@@ -1,0 +1,26 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>model sheet</title></head>
+<body>
+<script type="module">
+// Model sheet of one real person (specs/028 T025): front, 3/4, back and four expressions, beside the reference photo.
+// Built by tools/filmcheck/people.py → sheet(); __SLUG__ and __REF__ are filled in there.
+import { film } from './kit/film.js';
+const who = 'person:__SLUG__', ref = '__REF__';
+const X0 = ref ? 760 : 260, dx = ref ? 290 : 350;
+const cast = [
+  { who, x: X0, y: 160, s: 0.5, still: true, expr: 'neutral' },
+  { who, x: X0 + dx, y: 160, s: 0.5, still: true, face: 0.6, expr: 'happy' },
+  { who, x: X0 + dx * 2, y: 160, s: 0.5, still: true, view: 'back' },
+  ...['excited', 'worried', 'shocked', 'deadpan'].map((e, i) => ({ who, x: X0 - 40 + i * dx * 0.8, y: 640, s: 0.34, still: true, expr: e })),
+];
+await film({ scenes: [{ id: 'S1', dur: 2, set: 'custom:sheet', custom: [['backdrop', { col: '#e9e6dd' }]], cam: { size: 'huge', move: 'still', cx: 960, cy: 540, z: 1 }, vig: 0, cast }] });
+if (ref) {
+  const NS = 'http://www.w3.org/2000/svg', img = document.createElementNS(NS, 'image');
+  img.setAttribute('href', ref); img.setAttribute('x', '20'); img.setAttribute('y', '40'); img.setAttribute('width', '560'); img.setAttribute('height', '1000');
+  img.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  document.getElementById('root').appendChild(img);
+  await new Promise(r => img.addEventListener('load', r, { once: true }) || setTimeout(r, 2000));
+}
+window.render(0.5);
+</script>
+</body></html>

@@ -194,13 +194,55 @@ def tempo(audio: np.ndarray):
     return round(float(bpm), 1), ("ok" if strength > 0.3 else "low")
 
 
-def analyze(audio: np.ndarray, words: list) -> dict:
+def _inside(t: float, segments) -> bool:
+    return any(a <= t < b for a, b in segments)
+
+
+def restrict(res: dict, segments) -> dict:
+    """Keep only sound effects and music windows inside the measured segments (specs/028 R9). words.json covers only
+    those segments, so outside them speech onsets looked like effects and inflated sfx.per_min."""
+    if not segments:
+        return res
+    minutes = max(sum(b - a for a, b in segments) / 60, 1e-6)
+    on = [x for x in res["sfx"]["onsets"] if _inside(x, segments)]
+    wins = [w for w in res["music"]["windows"] if _inside(w[0], segments) and _inside(w[1] - 1e-3, segments)]
+    out = dict(res)
+    out["music"] = dict(res["music"], windows=wins)
+    out["sfx"] = {"onsets": on, "per_min": round(len(on) / minutes, 2), "segments": [list(s) for s in segments]}
+    return out
+
+
+def analyze(audio: np.ndarray, words: list, segments=None) -> dict:
     sp = speech_stats(words)
     bpm, conf = tempo(audio)
     on = off_grid(sfx_onsets(audio, words), bpm if conf == "ok" else None)
     minutes = max(len(audio) / SR / 60, 1e-6)
-    return {"speech": sp, "music": {"windows": music_windows(audio, words), "tempo": bpm, "tempo_conf": conf},
-            "sfx": {"onsets": on, "per_min": round(len(on) / minutes, 2)}}
+    res = {"speech": sp, "music": {"windows": music_windows(audio, words), "tempo": bpm, "tempo_conf": conf},
+           "sfx": {"onsets": on, "per_min": round(len(on) / minutes, 2)}}
+    return restrict(res, segments)
+
+
+def recompute_set(name: str, only=None, log=print) -> int:
+    """Re-filter stored sound.json files to the measured segments, without the videos (specs/028 T037)."""
+    from . import refset
+    data, rates = refset.load(name), []
+    for v in data["videos"]:
+        if only and v["id"] not in only:
+            continue
+        prof = refset.profile_dir(name, v["id"])
+        sf, vj = prof / "sound.json", prof / "video.json"
+        if not sf.exists() or not vj.exists():
+            log(f"= {v['id']}: không có sound.json hoặc video.json, bỏ qua")
+            continue
+        res = json.loads(sf.read_text(encoding="utf-8"))
+        segs = json.loads(vj.read_text(encoding="utf-8")).get("segments")
+        new = restrict(res, segs)
+        refset.write_json(sf, new)
+        rates.append(new["sfx"]["per_min"])
+        log(f"✓ {v['id']}: tiếng động {res['sfx']['per_min']} → {new['sfx']['per_min']}/phút (trong đoạn đo)")
+    if rates:
+        log(f"trung vị: {float(np.median(rates)):.1f}/phút")
+    return 0 if rates else 1
 
 
 def sound_set(name: str, only=None, log=print) -> int:
@@ -220,7 +262,9 @@ def sound_set(name: str, only=None, log=print) -> int:
             log(f"= {v['id']}: không có video, bỏ qua")
             continue
         words = json.loads(wf.read_text(encoding="utf-8")).get("words", [])
-        res = analyze(speech.decode_16k(path), words)
+        vj = prof / "video.json"
+        segs = json.loads(vj.read_text(encoding="utf-8")).get("segments") if vj.exists() else None
+        res = analyze(speech.decode_16k(path), words, segs)
         res["video"] = v["id"]
         refset.write_json(prof / "sound.json", res)
         mus = [w for w in res["music"]["windows"] if w[2] is not None]

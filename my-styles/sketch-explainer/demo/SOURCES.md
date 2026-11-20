@@ -1,0 +1,11 @@
+- [P01] "A latte costs five dollars": Bellwether Coffee, Coffee Shop Profit Margins: What to Expect and How to Improve Them, 2025, https://bellwethercoffee.com/blog/coffee-shop-profit-margins
+- [P01] "cost about one dollar twenty": Bellwether Coffee, Coffee Shop Profit Margins: What to Expect and How to Improve Them, 2025, https://bellwethercoffee.com/blog/coffee-shop-profit-margins
+- [P03] "a well-run café. Every month, it sells thirty thousand dollars": Bellwether Coffee, Coffee Shop Profit Margins: What to Expect and How to Improve Them, 2025, https://bellwethercoffee.com/blog/coffee-shop-profit-margins
+- [P04] "Thirty percent goes to coffee, milk and cups": Bellwether Coffee, Coffee Shop Profit Margins: What to Expect and How to Improve Them, 2025, https://bellwethercoffee.com/blog/coffee-shop-profit-margins
+- [P04] "Another thirty percent pays the staff": Bellwether Coffee, Coffee Shop Profit Margins: What to Expect and How to Improve Them, 2025, https://bellwethercoffee.com/blog/coffee-shop-profit-margins
+- [P04] "Twelve percent pays the rent": Bellwether Coffee, Coffee Shop Profit Margins: What to Expect and How to Improve Them, 2025, https://bellwethercoffee.com/blog/coffee-shop-profit-margins
+- [P05] "Power, marketing, insurance and supplies": Bellwether Coffee, Coffee Shop Profit Margins: What to Expect and How to Improve Them, 2025, https://bellwethercoffee.com/blog/coffee-shop-profit-margins
+- [P06] "About nineteen percent": Bellwether Coffee, Coffee Shop Profit Margins: What to Expect and How to Improve Them, 2025, https://bellwethercoffee.com/blog/coffee-shop-profit-margins
+- [P06] "Most cafés aim for ten to fifteen percent": Bellwether Coffee, Coffee Shop Profit Margins: What to Expect and How to Improve Them, 2025, https://bellwethercoffee.com/blog/coffee-shop-profit-margins
+- [P06] "roughly ninety-five cents": nineteen percent of the five-dollar latte, from the same source: Bellwether Coffee, Coffee Shop Profit Margins: What to Expect and How to Improve Them, 2025, https://bellwethercoffee.com/blog/coffee-shop-profit-margins
+- [P07] "selling two hundred of them a day": the source's example café serving 200 drinks daily, Bellwether Coffee, Coffee Shop Profit Margins: What to Expect and How to Improve Them, 2025, https://bellwethercoffee.com/blog/coffee-shop-profit-margins
