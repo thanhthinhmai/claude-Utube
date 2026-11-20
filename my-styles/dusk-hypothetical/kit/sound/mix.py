@@ -51,21 +51,25 @@ def mix(film: str) -> str:
     for e in ev["ev"]:
         if e["type"] == "voice":
             X.add(voice, load(os.path.join(film, "voices", e["id"] + ".wav")), e["t"], gain=1.0)
+    # specs/026: the owner's choices from the job page (mix.json); none → the style's defaults
+    cfg = j("mix.json") if os.path.exists(os.path.join(film, "mix.json")) else {}
     music = np.zeros((n, 2))
-    sc = score.compose(beats, dur, tpl, seed=7)
-    music[:len(sc)] += sc[:n]
-    fx = fxmod.place([e for e in ev["ev"] if e["type"] != "voice"], n)
-    # duck the score under the voice (−6 dB while speaking, 80 ms smoothing)
+    pick = str(cfg.get("music") or "seed:7")
+    if pick != "none":
+        sc = score.compose(beats, dur, tpl, seed=int(pick.split(":")[1]))
+        music[:len(sc)] += sc[:n]
+    fx = fxmod.place([e for e in ev["ev"] if e["type"] != "voice"], n) * 10 ** (float(cfg.get("sfx_db", 0)) / 20)
+    # duck the score under the voice (−6 dB while speaking by default, 80 ms smoothing)
     env = np.abs(voice).mean(1)
     k = int(.08 * SR)
     sm = np.convolve(env, np.ones(k) / k, "same")
     speaking = sm > .02 * (sm.max() + 1e-9)
-    duck = np.where(speaking, 10 ** (-6 / 20), 1.0)
+    duck = np.where(speaking, 10 ** (float(cfg.get("duck_db", -6)) / 20), 1.0)
     duck = np.convolve(duck, np.ones(k) / k, "same")
     music *= duck[:, None]
     # level: the score in the pauses sits at the style's level under the voice, beat by beat (template.json →
     # beats.<beat>.music_db: louder in the gains, quieter in the cost), which also gives the mix the style's loudness range
-    target = np.mean(((tpl.get("sound") or {}).get("music_under_voice_db")) or [-8.5, -3.3])
+    target = cfg.get("music_under_voice_db", np.mean(((tpl.get("sound") or {}).get("music_under_voice_db")) or [-8.5, -3.3]))
     v, mgap = rms(voice[speaking]), rms(music[~speaking])
     if v > 0 and mgap > 0:
         music *= (v * 10 ** (target / 20)) / mgap

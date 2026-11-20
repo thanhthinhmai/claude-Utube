@@ -145,9 +145,17 @@ def build(app, auth: str, role: str, ip: str = "127.0.0.1") -> MCPServer:
                 "compare": r.get("compare"), "allowed": allowed, "decision": r.get("decision")}
 
     @server.tool(description="Answer a review: value is one of the allowed answers (e.g. approve, revise, stop); "
-                             "note carries the user's words (an answer to a question, or the changes wanted).")
-    async def answer_review(review_id: str, value: str, note: str = "") -> dict:
-        return await api("POST", f"/api/v1/reviews/{review_id}/decision", {"value": value, "note": note or None})
+                             "note carries the user's words (an answer to a question, or the changes wanted). For a film's "
+                             "review point (script, voice, shots, mix, publish) base is the fingerprint from film_steps; "
+                             "without it the film as it is now is approved.")
+    async def answer_review(review_id: str, value: str, note: str = "", base: str = "") -> dict:
+        return await api("POST", f"/api/v1/reviews/{review_id}/decision",
+                         {"value": value, "note": note or None, **({"base": base} if base else {})})
+
+    @server.tool(description="The steps of a film job: each step's state, the review points (on, state, fingerprint) "
+                             "and what a change makes run again (specs/026).")
+    async def film_steps(job_id: str) -> dict:
+        return await api("GET", f"/api/v1/jobs/{job_id}/steps")
 
     @server.tool(description="A one-time link (30 minutes) to download a finished film; run the returned curl command.")
     async def film_download_url(film: str) -> dict:

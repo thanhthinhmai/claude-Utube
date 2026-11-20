@@ -45,7 +45,7 @@ export async function readRenderer(/** @type {any} */ page) {
 }
 
 const SKIP_DIRS = new Set(['out', 'stills', 'publish', '.check', 'node_modules', 'compare']);   // compare/: specs/023 sheets
-const SKIP_FILE = /\.(mp4|log|pyc)$|^(checks\.json|CHECKS\.md|qc-exceptions\.json|\.job|\.job\.out)$/;   // 020: exceptions never re-record chunks; 023: job ids, pyc
+const SKIP_FILE = /\.(mp4|log|pyc)$|^(checks\.json|CHECKS\.md|qc-exceptions\.json|\.job|\.job\.out|mix\.json)$/;   // 020: exceptions never re-record chunks; 023: job ids, pyc; 026: mix.json is not the picture
 
 /** SHA-256 over the film's source files (sorted relative path + bytes) and the output shape (data-model.md). */
 export function fingerprint(/** @type {string} */ dir, /** @type {number} */ w, /** @type {number} */ h, /** @type {number} */ fps, /** @type {number|null} */ until = null) {

@@ -33,6 +33,7 @@ def currency_ends(ws: list, text: str) -> set:
             out.add(j)
     return out
 
+
 SIL_DB, SIL_MIN = -40, 0.3        # a real silence inside the recogniser's gap confirms the pause (pet-swap l38: 0.43 s audible in a 0.80 s gap)
 
 
@@ -151,6 +152,11 @@ def run(film_dir: Path, lib=None, lang="en") -> dict:
                 m["pauses"].append({"line": lid, "at": round(a, 2), "length": round(b - a, 2)})
                 issues.append(_issue("pause_in_line", lid, a, round(b - a, 2), PAUSE,
                                      fix=redo + " (long pauses belong between paragraphs)"))
+    from filmcheck import steps                          # specs/026 FR-007: the voice says the passed script
+    why = steps.voice_problem(d) if (d / "SCRIPT.md").is_file() else None
+    if why and "do not say" in why:
+        issues.append(_issue("script_mismatch", "lines", 0.0, why, "the words of SCRIPT.md",
+                             fix="rebuild lines.json from SCRIPT.md, then: sh bin/studio voice make <film> --changed"))
     res = tiers.result("voice", issues, m, skipped, time.time() - t0, tiers.fingerprint(d, "voice"))
     tiers.save_tier(d, "voice", res)
     return res

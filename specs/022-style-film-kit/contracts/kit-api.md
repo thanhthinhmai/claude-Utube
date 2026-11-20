@@ -18,6 +18,8 @@ await film({ scenes: SCENES, cues: './cues.json' });
 </script>
 ```
 
+specs/026: `scenes` may be left out; `film()` then reads `./scenes.json` (`{custom: [names], scenes: [...]}`), which the job page edits. Each name in `custom` needs a builder in `film({custom})`.
+
 ## `film(opts)` → Promise
 
 | Tuỳ chọn | Kiểu | Mặc định | Việc |

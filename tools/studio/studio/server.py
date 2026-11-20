@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import APP_ID, VERSION, donesofar, gate, jobs, resources, reviews, store
+from . import APP_ID, VERSION, actions, donesofar, filmsteps, gate, jobs, resources, reviews, store
 from urllib.parse import urlsplit
 from .store import StudioError
 
@@ -27,6 +27,18 @@ def err(code: str, message: str, status: int) -> JSONResponse:
 class DecisionIn(BaseModel):
     value: Literal["approve", "revise", "accept_anyway", "stop"]
     note: Optional[str] = Field(default=None, max_length=4000)
+    base: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{16}$")      # review points: the content shown (026)
+
+
+class ActionIn(BaseModel):                     # specs/026 contracts/api.md
+    point: Literal["script", "voice", "shots", "mix", "publish"]
+    op: str = Field(max_length=30)
+    args: dict = Field(default_factory=dict)
+    base: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{16}$")
+
+
+class PointsIn(BaseModel):
+    on: list[Literal["script", "voice", "shots", "mix", "publish"]] = Field(max_length=5)
 
 
 class FreshStaticFiles(StaticFiles):
@@ -232,6 +244,42 @@ def create_app() -> FastAPI:
         p = donesofar.file(_film_job(job_id, request), path)
         return FileResponse(p, media_type=donesofar.content_type(path), headers={"Cache-Control": "no-cache"})
 
+    # ---------- review points and edits (specs/026) ----------
+    @app.get(api + "/jobs/{job_id}/steps")
+    def job_steps(job_id: str, request: Request):
+        v = filmsteps.view(_film_job(job_id, request))
+        tag = filmsteps.etag(v)
+        if request.headers.get("if-none-match") == tag:
+            from fastapi.responses import Response
+            return Response(status_code=304, headers={"ETag": tag})
+        return JSONResponse(v, headers={"ETag": tag, "Cache-Control": "no-cache"})
+
+    @app.post(api + "/jobs/{job_id}/actions", status_code=202)
+    def job_action(job_id: str, body: ActionIn, request: Request):
+        j = _film_job(job_id, request)
+        a = actions.create(j, body.point, body.op, body.args, body.base, owner(request) or "local")
+        return {"id": a["id"], "status": a["status"]}
+
+    @app.get(api + "/jobs/{job_id}/actions/{aid}")
+    def job_action_get(job_id: str, aid: str, request: Request):
+        _film_job(job_id, request)
+        return actions.load(aid, job_id)
+
+    @app.put(api + "/jobs/{job_id}/points")
+    def job_points(job_id: str, body: PointsIn, request: Request):
+        from filmcheck import points
+        j = _film_job(job_id, request)
+        d = donesofar.film_dir(j)
+        if d is None:
+            raise StudioError("not_found", "this job has no film folder yet", 404)
+        rv = filmsteps.pending_review(j)
+        try:
+            on = points.set_on(d, body.on, origin="this film", pending={rv["kind"]} if rv and not rv["decision"] else set())
+        except points.PointError as e:
+            raise StudioError("point_locked", str(e), 409) from None
+        jobs.log(job_id, f"Review points: {', '.join(on) or 'none'}")
+        return {"on": on}
+
     # ---------- reviews ----------
     def _review_out(r: dict) -> dict:
         r = dict(r)
@@ -248,8 +296,11 @@ def create_app() -> FastAPI:
 
     @app.post(api + "/reviews/{rid}/decision", status_code=201)
     def post_decision(rid: str, body: DecisionIn, request: Request):
-        reviews.load(rid, owner(request))             # another customer's review is not found
-        return reviews.decide(rid, body.value, body.note, "ui")
+        r = reviews.load(rid, owner(request))         # another customer's review is not found
+        via_token = getattr(request.state, "token", None) is not None      # specs/009: an API token or MCP
+        if r["kind"] in reviews.POINT_KINDS and body.value == "approve" and not body.base and not via_token:
+            raise StudioError("invalid", "approving a review point needs base (the fingerprint shown)", 422)
+        return reviews.decide(rid, body.value, body.note, "api" if via_token else "ui", body.base, owner(request) or "local")
 
     # ---------- films ----------
     @app.get(api + "/films")

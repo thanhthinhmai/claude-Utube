@@ -104,6 +104,30 @@ class Pack(Base):
         self.assertEqual(" ".join(" ".join(c["lines"]) for c in cues), text)
         self.assertTrue(all(c["end"] - c["start"] <= 7.0 + 1e-3 for c in cues))
 
+    def test_split_leaves_no_cue_too_short(self):        # a comma near the start must not make a 0.7 s cue
+        text = ("In about three years, it bought nearly five billion dollars of Nvidia chips and hardware, "
+                "which made it one of the biggest foreign customers of the company.")
+        words = [[w, i * 0.33, i * 0.33 + 0.3] for i, w in enumerate(text.split())]
+        cues = publish._cues_for_line(text, words)
+        self.assertGreater(len(cues), 1)
+        self.assertEqual(" ".join(" ".join(c["lines"]) for c in cues), text)
+        self.assertTrue(all(c["end"] - c["start"] >= 1.0 - 1e-3 for c in cues), [(c["lines"], c["end"] - c["start"]) for c in cues])
+
+    def test_split_when_the_recogniser_heard_fewer_words(self):   # "five billion" heard as "$5 billion"
+        text = "In about three years, it bought nearly five billion dollars of Nvidia chips and hardware."
+        heard = "In about three years, it bought nearly $5 billion dollars of Nvidia chips and hardware.".split()
+        words = [[w, i * 0.4, i * 0.4 + 0.35] for i, w in enumerate(heard)]
+        cues = publish._cues_for_line(text, words)
+        for a, b in zip(cues, cues[1:]):
+            self.assertGreaterEqual(b["start"] - a["start"], 1.0 - 1e-3, [c["lines"] for c in cues])
+
+    def test_abbreviation_is_not_a_sentence_end(self):    # "U.S." stays with its sentence
+        text = "U.S. investigators say she used her industry contacts and a chain of shell companies."
+        words = [[w, i * 0.4, i * 0.4 + 0.35] for i, w in enumerate(text.split())]
+        cues = publish._cues_for_line(text, words)
+        self.assertNotEqual(cues[0]["lines"], ["U.S."])
+        self.assertTrue(" ".join(cues[0]["lines"]).startswith("U.S. investigators"))
+
     def test_description_order_and_sources(self):
         desc = (self.good / "publish" / "description.md").read_text()
         i = [desc.index(x) for x in ("Archaeologists found", "A short look", "0:00", "Sources:", "#honey")]
@@ -149,6 +173,39 @@ class Pack(Base):
         r = studio("publish", d, "--check-only")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertLess(time.time() - t0, 10)            # SC-003
+
+
+class Chosen(Base):                                                # specs/026 T050
+    def test_chosen_title_first(self):
+        d = self.copy("chosen")
+        pk = json.loads((d / "publish" / "pack.json").read_text())
+        pk["chosen"] = 2
+        (d / "publish" / "pack.json").write_text(json.dumps(pk))
+        p = publish.read_pack(d)
+        publish.write_publish_md(d, p, [], [])
+        rows = [l for l in (d / "publish" / "PUBLISH.md").read_text().splitlines() if l.startswith("| ")]
+        self.assertTrue(rows[1].startswith("| 2 (chosen) |"), rows)   # rows[0] is the header
+        pk["chosen"] = 4
+        (d / "publish" / "pack.json").write_text(json.dumps(pk))
+        with self.assertRaises(publish.PublishError):
+            publish.read_pack(d)
+
+    def test_publish_edit(self):
+        import os
+        from filmcheck import edit, points
+        d = self.copy("pub-edit")
+        os.environ["STUDIO_EDIT_NO_RUN"] = "1"
+        try:
+            base = points.fingerprint(d, "publish")
+            self.assertEqual(edit.run(d, "publish", {"hashtags": "#a,#b"}, base=base)["code"], 2)
+            self.assertEqual(edit.run(d, "publish", {"chosen": "4"}, base=base)["code"], 2)
+            r = edit.run(d, "publish", {"chosen": "3", "hashtags": "egypt,history,tombs"}, base=base)
+            self.assertEqual(r["code"], 0, r)
+            pk = json.loads((d / "publish" / "pack.json").read_text())
+            self.assertEqual((pk["chosen"], pk["hashtags"]), (3, ["#egypt", "#history", "#tombs"]))
+            self.assertEqual(r["stale"], [])
+        finally:
+            os.environ.pop("STUDIO_EDIT_NO_RUN", None)
 
 
 class Report(Base):

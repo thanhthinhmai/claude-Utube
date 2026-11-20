@@ -53,7 +53,7 @@ class Mcp(McpBase):
         from studio import tokens
         member_tools = self.agent.tools()
         for t in ("list_styles", "make_film", "revise_film", "start_upload", "learn_style", "list_jobs", "get_job",
-                  "get_review", "answer_review", "film_download_url", "list_operations", "describe_operation",
+                  "get_review", "answer_review", "film_steps", "film_download_url", "list_operations", "describe_operation",
                   "api_request"):
             self.assertIn(t, member_tools)
         self.assertNotIn("worker_status", member_tools)

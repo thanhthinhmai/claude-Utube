@@ -1,5 +1,6 @@
 """Stands in for tools/runner/agent.py in tests (no Claude). Behaviour comes from tags in the idea:
 [ask] ask a question first (exit 10), finish after the answer · [treatment] same, as a treatment review
+[point-script] with [narration]: the script review point of specs/026 (exit 10 until approved)
 [fail] / [fail-customer] job fail --by studio|customer · [loud] deliver a film at about −4 LUFS
 [spend N] call the API N times through the proxy · [529] keep calling an API that is overloaded
 [slow S] wait S seconds before finishing · [noreport] exit without job done · [crash] exit 3
@@ -264,6 +265,17 @@ def main() -> int:
         if not script_step(idea, inp["film"]):
             result("ended")
             return 0
+    if narration and "[point-script]" in idea:              # specs/026: the script review point
+        ok = WORK / ".point_script_ok"
+        if not ok.exists():
+            if resumed and "approved the script review" in msg:
+                ok.write_text("1")
+            else:
+                sm = WORK / "script-summary.md"
+                sm.write_text("# Script\nReady for your review.")
+                studio("review", "request", JOB, "--kind", "script", "--film", inp["film"], "--summary", str(sm))
+                result("waiting")
+                return 10
     treat_ok = WORK / ".treatment_ok"
     if (inp.get("review_treatment") or "[treatment]" in idea) and not treat_ok.exists():
         if resumed and "treatment review" in msg and ": Approve." in msg:

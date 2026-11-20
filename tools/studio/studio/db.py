@@ -12,7 +12,7 @@ import threading
 import time
 from pathlib import Path
 
-SCHEMA_VERSION = 3           # 2: Claude plan accounts, calls (specs/008); 3: API tokens, worker beats, tickets (specs/009)
+SCHEMA_VERSION = 4           # 2: Claude plan accounts, calls (specs/008); 3: API tokens, worker beats, tickets (specs/009); 4: action docs (specs/026)
 
 SETTINGS_DEFAULT = {
     "quota_films_default": 2,
@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS tokens (
 );
 CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY CHECK (id = 1), data TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS docs (
-  kind TEXT NOT NULL CHECK (kind IN ('job', 'review', 'decision')),
+  kind TEXT NOT NULL CHECK (kind IN ('job', 'review', 'decision', 'action')),
   id TEXT NOT NULL,
   owner TEXT NOT NULL,
   status TEXT,
@@ -205,11 +205,11 @@ def _table_sql(name: str) -> str:
     raise KeyError(name)
 
 
-def _upgrade_to_2(con: sqlite3.Connection) -> None:
+def _upgrade_to_2(con: sqlite3.Connection, tables=REBUILT_V2) -> None:
     """Version 1 (007) → 2. SQLite cannot change a column's constraints, so each changed table is copied into a
     new one built from SCHEMA, the old one dropped and the copy renamed (the order SQLite documents).
-    The caller has turned foreign keys off for this."""
-    for name in REBUILT_V2:
+    The caller has turned foreign keys off for this. Also used for version 4 (docs: action, specs/026)."""
+    for name in tables:
         cols = [r[1] for r in con.execute(f'PRAGMA table_info("{name}")')]
         con.execute(_table_sql(name).replace(f"CREATE TABLE IF NOT EXISTS {name} (", f"CREATE TABLE {name}_new (", 1))
         quoted = ", ".join(f'"{c}"' for c in cols)
@@ -247,6 +247,8 @@ def _migrate(con: sqlite3.Connection) -> None:
         old = int(row[0]) if row else None             # read under the lock: another process may have upgraded
         if old == 1:
             _upgrade_to_2(con)
+        if old is not None and old < 4 and con.execute("SELECT 1 FROM sqlite_master WHERE name = 'docs'").fetchone():
+            _upgrade_to_2(con, ("docs",))                # the kinds of documents: + action (specs/026)
         for stmt in [s for s in SCHEMA.split(";") if s.strip()]:
             con.execute(stmt)
         if "last_login_at" not in [r[1] for r in con.execute("PRAGMA table_info(accounts)")]:

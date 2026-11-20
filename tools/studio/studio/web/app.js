@@ -9,13 +9,14 @@ const STATUS = {
 };
 const KIND = { learn: "Learn a style", film: "Make a film", topics: "Score topics" };
 const REVIEW = { "style-1": "Review 1: style draft", "style-2": "Review 2: proof frame", question: "Question from the studio",
-  treatment: "Treatment review" };
+  treatment: "Treatment review", script: "Script review", voice: "Voice review", shots: "Shots review", mix: "Mix review",
+  publish: "Publish review" };
 // Online mode (specs/007): the same page serves many customers; MODE comes from GET /health
 let MODE = "local";
 /** @type {any} */
 let ME = null;
 const DECISION = { approve: "Approve", revise: "Request changes", accept_anyway: "Accept anyway", stop: "Stop" };
-const SOURCE = { ui: "the studio", chat: "the chat" };
+const SOURCE = { ui: "the studio", chat: "the chat", api: "the API" };
 
 // ---------- helpers ----------
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -279,6 +280,12 @@ async function pageChannels() {
   });
 }
 
+const POINTS = [["script", "Script"], ["voice", "Voice"], ["shots", "Shots (before render)"], ["mix", "Mix"], ["publish", "Publish"]];
+/** Five boxes: where a film stops for this person's review (specs/026). @param {string} id @param {string[]} on */
+const pointBoxes = (id, on) => `<fieldset class="points" id="${id}"><legend>Stop for my review at <span class="hint">You can change and approve each one on the job page</span></legend>
+  ${POINTS.map(([k, l]) => `<label class="check"><input type="checkbox" value="${k}" ${on.includes(k) ? "checked" : ""}> <span>${l}</span></label>`).join("")}</fieldset>`;
+const pointsOf = (/** @type {string} */ id) => Array.from(document.querySelectorAll(`#${id} input:checked`)).map((x) => /** @type {HTMLInputElement} */ (x).value);
+
 async function pageChannel(slug) {
   const c = await get(`/channels/${encodeURIComponent(slug)}`);
   const base = `/channels/${encodeURIComponent(slug)}/lessons`;
@@ -293,6 +300,7 @@ async function pageChannel(slug) {
       ${a("title_rules", "Title rules", "In your own words")}${t("title_max", "Longest title", "20–100 characters, or empty")}
       ${a("thumbnail_rules", "Thumbnail rules", "In your own words")}
       ${a("hashtags", "Hashtags always used", "One per line, like #science; at most 5")}${a("banned", "Words never used", "One per line")}
+      ${pointBoxes("p-reviews", c.reviews || ["script", "shots"])}
       <div><button class="primary" type="submit">Save the profile</button></div></form><p id="msg" class="muted" role="status"></p>
     <div class="panel"><p class="section-title">Decisions</p>
       ${(c.decisions || []).length ? `<ul>${c.decisions.map((/** @type {any} */ d) => `<li>${esc(d.date)}: ${esc(d.text)}</li>`).join("")}</ul>` : `<p class="muted">None yet.</p>`}
@@ -308,7 +316,7 @@ async function pageChannel(slug) {
       language: field("p-language").value.trim(), seconds: num("seconds"), style: field("p-style").value.trim(),
       voice: field("p-voice").value.trim() || null, speed: num("speed") ?? 1, title_rules: field("p-title_rules").value.trim(),
       title_max: num("title_max"), thumbnail_rules: field("p-thumbnail_rules").value.trim(),
-      hashtags: lines(field("p-hashtags").value), banned: lines(field("p-banned").value) });
+      hashtags: lines(field("p-hashtags").value), banned: lines(field("p-banned").value), reviews: pointsOf("p-reviews") });
     return "Saved.";
   });
   /** @type {HTMLButtonElement} */ (document.getElementById("d-add")).onclick = async () => {
@@ -456,6 +464,10 @@ async function doneOpen(j) {
     shotCount: 24, lines: null, dur: null, labels: null, drawn: {} });
   DONE.job = j;
   DONE.drawn = {};
+  RAIL.editing = {}; RAIL.last = {};
+  await railRefresh();
+  const rv = RAIL.data && RAIL.data.review;
+  if (rv && !rv.decision) DONE.tab = rv.kind;            // open on the step that waits for this person
   await doneRefresh();
 }
 /** @param {boolean} [clicked] a click on a step: always draw it (live updates leave a playing section alone) */
@@ -490,6 +502,35 @@ async function doneRefresh(clicked = false) {
   DONE.drawn.key = key;
   stopAudio();
   await ({ script: doneScript, voice: doneVoice, shots: doneShots, mix: doneMix, render: doneRender }[DONE.tab] || (() => {}))(body, sec);
+  await editPanel(body);
+}
+/** specs/026: the edit part of the open section. @param {HTMLElement} body */
+async function editPanel(body) {
+  if (!RAIL.data) return;
+  const pt = TAB_POINT[DONE.tab];
+  if (!pt) return;
+  if (MODE === "online" && ["running", "queued"].includes(DONE.job.status)) {
+    const n = document.createElement("p"); n.className = "muted small"; n.textContent = "Edits open when the film stops for your review.";
+    body.prepend(n);
+  }
+  const edit = { script: async () => { const sc = body.querySelector(".script"); if (sc) sc.remove(); await editScript(body); },
+    voice: async () => { body.querySelectorAll(".tbl, .done-actions").forEach((x) => x.remove()); await editVoice(body); },
+    mix: async () => editMix(body),
+    publish: async () => editPublish(body),
+    shots: async () => {
+      body.querySelectorAll(".thumbs, .sheet-img, .done-actions.spread, .sheet-img + p, #done-more-shots").forEach((x) => x.remove());
+      await editShots(body);
+    } }[pt];
+  if (edit && (pendingFor(pt) || RAIL.open === pt)) { await edit(); return; }
+  if (edit && canEdit(pt)) {                          // not waiting: the read-only view stays, with a way in
+    const btn = document.createElement("button");
+    btn.className = "btn"; btn.id = "open-edit";
+    btn.textContent = { script: "Edit paragraphs", shots: "Change shots", voice: "Change the voice", mix: "Change the mix",
+      publish: "Change the publish pack" }[pt];
+    btn.onclick = () => { RAIL.open = pt; DONE.drawn = {}; doneRefresh(true); };
+    body.prepend(btn);
+  }
+  approveBar(body, pt);
 }
 function stopAudio() {
   if (DONE.audio) { DONE.audio.pause(); DONE.audio = null; }
@@ -622,6 +663,408 @@ function doneRender(body, s) {
       `<i class="${i < done ? "d" : i < done + w && done < total ? "r" : ""}"></i>`).join("")}</div>`;
 }
 
+// ---------- review points and edits (specs/026) ----------
+/** @type {any} */
+const RAIL = { data: null, editing: {}, last: {}, msg: {} };
+const STATE_LABEL = { done: "Done", running: "Running", waiting: "Waiting for you", todo: "Not yet", stale: "Must run again", skipped: "Skipped" };
+const STEP_TAB = { Script: "script", Voice: "voice", Shots: "shots", Mix: "mix", Render: "render", "Self-check": "selfcheck", Publish: "publish" };
+const TAB_POINT = { script: "script", voice: "voice", shots: "shots", mix: "mix", publish: "publish" };
+const POINT_STEP = { script: "Script", voice: "Voice", shots: "Shots", mix: "Mix", publish: "Publish" };
+
+async function railRefresh() {
+  const slot = document.getElementById("rail-slot");
+  if (!slot || !DONE.job) return;
+  let v;
+  try { v = await get(`/jobs/${encodeURIComponent(DONE.job.id)}/steps`); } catch { slot.hidden = true; return; }
+  RAIL.data = v;
+  slot.hidden = false;
+  const wait = v.review && !v.review.decision ? POINT_STEP[v.review.kind] : null;
+  slot.innerHTML = `<div class="rail-head"><p class="section-title">Steps</p>
+      ${wait ? `<span class="badge s-waiting_review">Waiting for you: ${esc(wait)}</span>` : v.busy ? `<span class="badge">Busy: ${esc(v.busy.step)}</span>` : ""}</div>
+    <ol class="rail" role="tablist">${v.steps.map((/** @type {any} */ s, i) => `<li><button class="rs st-${s.state}" data-step="${esc(s.name)}"
+        ${STEP_TAB[s.name] ? "" : "disabled"} aria-selected="${STEP_TAB[s.name] === DONE.tab}">
+        <span class="n"><span>${i + 1}</span>${s.review_on ? `<span class="gate">REVIEW</span>` : ""}</span>
+        <span class="t">${esc(s.name)}</span><span class="s">${esc(s.state === "stale" ? STATE_LABEL.stale : s.approved_at
+          ? `Approved ${new Date(s.approved_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`
+          : s.note || STATE_LABEL[s.state] || s.state)}</span></button></li>`).join("")}</ol>
+    <div id="impact"></div>
+    <div class="point-toggles" id="point-toggles"><span class="muted small">Stop for my review at:</span>
+      ${POINTS.map(([k, l]) => {
+        const pt = v.points[k], locked = ["approved", "waiting", "skipped"].includes(pt.state) || ["done", "failed", "stopped"].includes(DONE.job.status);
+        return `<label class="check small" title="${locked ? esc(`${l}: ${pt.state}`) : ""}"><input type="checkbox" value="${k}" ${pt.on ? "checked" : ""} ${locked ? "disabled" : ""}> <span>${esc(l.replace(" (before render)", ""))}</span></label>`;
+      }).join("")}<span class="msg small" id="points-msg"></span></div>`;
+  slot.querySelectorAll("#point-toggles input").forEach((el) => { /** @type {HTMLInputElement} */ (el).onchange = async () => {
+    const on = Array.from(slot.querySelectorAll("#point-toggles input:checked")).map((x) => /** @type {HTMLInputElement} */ (x).value);
+    try { await send("PUT", `/jobs/${encodeURIComponent(DONE.job.id)}/points`, { on }); await railRefresh(); }
+    catch (err) { const m = document.getElementById("points-msg"); if (m) m.textContent = /** @type {Error} */ (err).message; }
+  }; });
+  slot.querySelectorAll("button[data-step]:not([disabled])").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+    const tab = STEP_TAB[/** @type {HTMLElement} */ (el).dataset.step];
+    if (DONE.data && DONE.data.sections[tab]) { DONE.tab = tab; DONE.drawn = {}; doneRefresh(true); railMarks(); }
+  }; });
+  railMarks();
+}
+function railMarks() {
+  const v = RAIL.data, box = document.getElementById("impact");
+  if (!v || !box) return;
+  document.querySelectorAll("#rail-slot button[data-step]").forEach((el) =>
+    el.setAttribute("aria-selected", String(STEP_TAB[/** @type {HTMLElement} */ (el).dataset.step] === DONE.tab)));
+  const pt = TAB_POINT[DONE.tab];
+  const hit = pt ? v.impact[pt] : null;
+  box.innerHTML = pt ? `<p class="impact"><b>If you change ${esc(POINT_STEP[pt])}:</b> ${hit.length
+    ? hit.map((/** @type {string} */ x) => `<span class="chip">↻ ${esc(x)}</span>`).join(" ") + ` <span class="muted">run again, and their approvals stop counting.</span>`
+    : `<span class="muted">nothing else runs again.</span>`}</p>` : "";
+}
+/** The point is waiting for this person's review. @param {string} pt */
+const pendingFor = (pt) => RAIL.data && RAIL.data.review && !RAIL.data.review.decision && RAIL.data.review.kind === pt ? RAIL.data.review : null;
+/** Edits are open while the job is not finished and the step is not busy. @param {string} pt */
+function canEdit(pt) {
+  const v = RAIL.data;
+  if (!v || !DONE.job || ["done", "failed", "stopped"].includes(DONE.job.status)) return false;
+  if (MODE === "online" && !["waiting_review", "waiting_resume"].includes(DONE.job.status)) return false;   // edits run while it waits
+  if (v.busy && (v.busy.step === POINT_STEP[pt] || (v.impact[pt] || []).includes(v.busy.step))) return false;
+  return v.points[pt] && v.points[pt].state !== "skipped";
+}
+/** Send one edit and wait for its result (the page never writes a file itself). @param {string} point @param {string} op @param {any} args */
+async function sendEdit(point, op, args) {
+  const base = RAIL.data.points[point].fingerprint;
+  const a = await post(`/jobs/${encodeURIComponent(DONE.job.id)}/actions`, { point, op, args, base });
+  for (let i = 0; i < 1200; i++) {
+    await new Promise((r) => setTimeout(r, i < 20 ? 300 : 1000));
+    const x = await get(`/jobs/${encodeURIComponent(DONE.job.id)}/actions/${a.id}`);
+    if (!["queued", "running"].includes(x.status)) { await railRefresh(); return x; }
+  }
+  throw new Error("The edit is taking long; its result will show in the log.");
+}
+const editMsg = (/** @type {any} */ x) => x.status === "conflict" ? "Changed since you opened it: reload the page."
+  : x.status === "busy" ? (x.result && x.result.error) || "Busy: try again when the running step ends."
+  : x.status === "invalid" || x.status === "failed" ? (x.result && x.result.error) || "The edit was not saved."
+  : x.result && x.result.code === 1 ? "Saved, but the check does not pass yet." : "Saved.";
+/** Approve / request changes for the point shown. @param {HTMLElement} body @param {string} pt @param {string} [blocked] why approve is off */
+function approveBar(body, pt, blocked) {
+  const r = pendingFor(pt);
+  const old = body.querySelector(".approve-bar"); if (old) old.remove();
+  if (!r) return;
+  const bar = document.createElement("div");
+  bar.className = "approve-bar";
+  bar.innerHTML = `<div class="row spread"><span class="muted" id="approve-why">${esc(blocked || `Approving lets the film go on after ${POINT_STEP[pt]}.`)}</span>
+      <span class="row"><button class="btn" id="ask-changes">Request changes…</button>
+      <button class="primary" id="approve" ${blocked ? "disabled" : ""}>Approve ${esc(POINT_STEP[pt].toLowerCase())}</button></span></div>
+    <div id="changes-box" hidden><textarea id="changes-note" maxlength="4000" placeholder="What should change?"></textarea>
+      <div class="row"><button class="btn" id="send-note">Send back with this note</button></div></div>
+    <p class="muted small" id="approve-msg" role="status"></p>`;
+  body.prepend(bar);
+  const msg = /** @type {HTMLElement} */ (bar.querySelector("#approve-msg"));
+  /** @type {HTMLElement} */ (bar.querySelector("#ask-changes")).onclick = () => { /** @type {HTMLElement} */ (bar.querySelector("#changes-box")).hidden = false; };
+  /** @type {HTMLElement} */ (bar.querySelector("#approve")).onclick = async (e) => {
+    const btn = /** @type {HTMLButtonElement} */ (e.currentTarget); btn.disabled = true;
+    try { await post(`/reviews/${encodeURIComponent(r.id)}/decision`, { value: "approve", base: RAIL.data.points[pt].fingerprint }); route(); }
+    catch (err) { msg.className = "fail small"; msg.textContent = err.message; btn.disabled = false; }
+  };
+  /** @type {HTMLElement} */ (bar.querySelector("#send-note")).onclick = async () => {
+    const note = /** @type {HTMLTextAreaElement} */ (bar.querySelector("#changes-note")).value.trim();
+    if (note.length < 3) { msg.className = "fail small"; msg.textContent = "Say what should change (at least 3 characters)."; return; }
+    try { await post(`/reviews/${encodeURIComponent(r.id)}/decision`, { value: "revise", note }); route(); }
+    catch (err) { msg.className = "fail small"; msg.textContent = err.message; }
+  };
+}
+
+/** Script panel: every paragraph, edit one, run the check, approve (US1). @param {HTMLElement} body */
+async function editScript(body) {
+  let text = "";
+  try { text = await (await fetch(fileUrl("SCRIPT.md"), { credentials: "same-origin", cache: "no-store" })).text(); } catch { return; }
+  const paras = [];
+  for (const ln of text.split("\n")) {
+    const m = ln.match(/^\s*\[(P\d+)\]\s*(.*)$/);
+    if (m) paras.push({ id: m[1], text: m[2] });
+    else if (paras.length && ln.trim() && !ln.trim().startsWith(">")) paras[paras.length - 1].text += " " + ln.trim();
+  }
+  const box = document.createElement("div");
+  box.className = "edit-script";
+  const open = () => Object.keys(RAIL.editing).some((k) => k.startsWith("script:"));
+  const draw = () => {
+    box.innerHTML = paras.map((p) => {
+      const ed = RAIL.editing[`script:${p.id}`] !== undefined, last = RAIL.last[`script:${p.id}`];
+      return `<div class="para" data-p="${esc(p.id)}"><div class="row spread"><span class="pid">${esc(p.id)}</span>
+          ${last ? `<span class="${last.ok ? "pass" : "fail"} small">${esc(last.text)}</span>` : ""}</div>
+        ${ed ? `<textarea maxlength="4000" aria-label="Paragraph ${esc(p.id)}">${esc(RAIL.editing[`script:${p.id}`])}</textarea>
+          <div class="row"><button class="primary" data-check>Run script check</button><button class="btn" data-cancel>Cancel</button></div>`
+        : `<p>${esc(p.text)}</p>${canEdit("script") ? `<button class="btn small" data-edit>Edit</button>` : ""}`}</div>`;
+    }).join("");
+    box.querySelectorAll("[data-edit]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+      const id = /** @type {HTMLElement} */ (el.closest(".para")).dataset.p;
+      RAIL.editing[`script:${id}`] = paras.find((p) => p.id === id).text; draw(); bar();
+    }; });
+    box.querySelectorAll("[data-cancel]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+      delete RAIL.editing[`script:${/** @type {HTMLElement} */ (el.closest(".para")).dataset.p}`]; draw(); bar();
+    }; });
+    box.querySelectorAll("[data-check]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = async () => {
+      const div = /** @type {HTMLElement} */ (el.closest(".para")), id = div.dataset.p;
+      const val = /** @type {HTMLTextAreaElement} */ (div.querySelector("textarea")).value;
+      /** @type {HTMLButtonElement} */ (el).disabled = true; /** @type {HTMLElement} */ (el).textContent = "Checking…";
+      try {
+        const x = await sendEdit("script", "script-para", { para: id, text: val });
+        const c = (x.result && x.result.check) || {};
+        RAIL.last[`script:${id}`] = { ok: x.status === "done" && x.result.code === 0,
+          text: editMsg(x) + (c.score != null ? ` Score ${c.score}/10${c.failed && c.failed.length ? ` · failed: ${c.failed.join(", ")}` : ""}` : "") };
+        if (x.status === "done") { delete RAIL.editing[`script:${id}`]; paras.find((p) => p.id === id).text = val.replace(/\s+/g, " ").trim(); }
+      } catch (err) { RAIL.last[`script:${id}`] = { ok: false, text: /** @type {Error} */ (err).message }; }
+      draw(); bar();
+    }; });
+  };
+  const bar = () => {
+    const failed = Object.entries(RAIL.last).some(([k, v]) => k.startsWith("script:") && !(/** @type {any} */ (v)).ok);
+    approveBar(body, "script", open() ? "Run the script check on your edits before you approve." : failed ? "The script check does not pass yet." : "");
+  };
+  body.append(box);
+  draw(); bar();
+}
+
+/** Shots panel: one frame per shot, change set / camera / acting from the kit's catalogue, keep a shot with a reason,
+ * run the shot check, approve and render (US2). @param {HTMLElement} body */
+async function editShots(body) {
+  const v = RAIL.data;
+  /** @type {any} */ let doc = null, checks = null;
+  try { checks = await (await fetch(fileUrl("checks.json"), { credentials: "same-origin", cache: "no-store" })).json(); } catch { checks = {}; }
+  if (v.editable.shots) {
+    try { doc = await (await fetch(fileUrl("scenes.json"), { credentials: "same-origin", cache: "no-store" })).json(); } catch { doc = null; }
+  }
+  const tier = ((checks || {}).tiers || {}).shots || { issues: [] };
+  const issues = tier.issues || [];
+  const accepted = (tier.style_accept || {}).reason;
+  const stale = (v.steps.find((/** @type {any} */ s) => s.name === "Shots") || {}).base !== "done";   // the files, not the review
+  RAIL.changed = RAIL.changed || new Set();
+  const box = document.createElement("div");
+  box.className = "edit-shots";
+  RAIL.shotPage = RAIL.shotPage || 24;
+  const draw = () => {
+    const scenes = doc ? doc.scenes : [];
+    const sel = (/** @type {string} */ id, /** @type {string} */ k, /** @type {string[]} */ list, /** @type {string} */ cur) =>
+      `<select data-k="${k}" aria-label="${k} of ${esc(id)}" ${canEdit("shots") ? "" : "disabled"}>${(list.includes(cur) ? list : [cur, ...list]).map((x) =>
+        `<option${x === cur ? " selected" : ""}>${esc(x)}</option>`).join("")}</select>`;
+    const acts = v.catalog ? [...v.catalog.acts, ...Object.entries(v.catalog.act_prefixes).flatMap(([p, xs]) => (/** @type {string[]} */ (xs)).map((x) => `${p}:${x}`))] : [];
+    box.innerHTML = (v.editable.shots ? "" : `<p class="muted small">Shots cannot be changed here: ${esc(v.editable.reason)}. You can still keep a shot with a reason and approve.</p>`)
+      + `<div class="row done-actions"><button class="btn" id="run-shots" ${canEdit("shots") ? "" : "disabled"}>Run shot check</button>
+        <span class="muted small">${stale ? "The shot check has not run on the current film." : `Shot check: ${tier.pass ? "pass" : "not yet"}`}${accepted ? ` · style accepted: ${esc(accepted)}` : ""}</span></div>
+      ${(() => {                                     // warnings about the whole film, not one shot
+        const ids = new Set(scenes.map((/** @type {any} */ x) => x.id));
+        const fw = issues.filter((/** @type {any} */ i) => !ids.has(i.ref) && (i.severity === "warn" || !i.excepted));
+        return fw.length ? `<div class="film-warn" data-id="film"><p class="small"><b>The whole film</b></p>
+          ${fw.map((/** @type {any} */ i) => `<p class="small"><span class="tag ${i.severity === "warn" ? "warn" : "bad"}">${esc(i.rule)}</span>
+            ${esc(String(i.measure ?? ""))}${i.limit ? ` outside ${esc(String(i.limit))}` : ""}</p>`).join("")}
+          ${!accepted && fw.some((/** @type {any} */ i) => i.severity === "warn") ? `<button class="btn small" data-style>Keep the style as it is…</button>` : accepted ? `<p class="small pass">Accepted: ${esc(accepted)}</p>` : ""}
+          <span class="msg small">${esc(RAIL.msg.film || "")}</span></div>` : "";
+      })()}
+      <div class="shot-grid">${scenes.slice(0, RAIL.shotPage).map((/** @type {any} */ s) => {
+        const mine = issues.filter((/** @type {any} */ i) => i.ref === s.id);
+        const blk = mine.filter((/** @type {any} */ i) => i.severity === "block" && !i.excepted), wrn = mine.filter((/** @type {any} */ i) => i.severity === "warn");
+        const cam = typeof s.cam === "string" ? s.cam : (s.cam || {}).name || "";
+        const act = ((((s.cast || [])[0] || {}).act || [])[0] || [])[1] || "";
+        const changed = RAIL.changed.has(s.id);
+        return `<figure class="shot ${changed ? "changed" : blk.length ? "issue" : wrn.length && !accepted ? "warn" : ""}" data-id="${esc(s.id)}">
+          <img src="${fileUrl(`.check/shots/${s.id}.jpg`)}?v=${Date.now()}" alt="Frame of ${esc(s.id)}" loading="lazy" onerror="this.style.visibility='hidden'">
+          <figcaption><span class="row spread"><code>${esc(s.id)}</code><span class="muted small">${Number(s.dur).toFixed(1)} s</span></span>
+          ${v.catalog ? `<span class="sel3">${sel(s.id, "set", v.catalog.sets, s.set)}${sel(s.id, "cam", v.catalog.cams, cam)}${act ? sel(s.id, "act", acts, act) : ""}</span>` : ""}
+          ${changed ? `<span class="tag acc">changed · run the shot check</span>` : ""}
+          ${blk.map((/** @type {any} */ i) => `<span class="tag bad">${esc(i.rule)}</span> <button class="btn small" data-keep="${esc(i.rule)}">Keep it this way…</button>`).join("")}
+          ${!accepted ? wrn.map((/** @type {any} */ i) => `<span class="tag warn">style: ${esc(i.rule)}</span> <button class="btn small" data-style>Keep the style as it is…</button>`).join("") : ""}
+          <span class="msg small">${esc(RAIL.msg[s.id] || "")}</span></figcaption></figure>`;
+      }).join("")}</div>
+      ${scenes.length > RAIL.shotPage ? `<p><button class="btn" id="more-shots">Show more (${scenes.length - RAIL.shotPage} left)</button></p>` : ""}`;
+    box.querySelectorAll("select[data-k]").forEach((el) => { /** @type {HTMLSelectElement} */ (el).onchange = async () => {
+      const fig = /** @type {HTMLElement} */ (el.closest(".shot")), id = fig.dataset.id, msg = /** @type {HTMLElement} */ (fig.querySelector(".msg"));
+      msg.textContent = RAIL.msg[id] = "Saving and drawing the shot again…";
+      try {
+        const x = await sendEdit("shots", "shot", { shot: id, [/** @type {HTMLElement} */ (el).dataset.k]: /** @type {HTMLSelectElement} */ (el).value });
+        if (x.status === "done") RAIL.changed.add(id);
+        RAIL.msg[id] = editMsg(x);
+      } catch (err) { RAIL.msg[id] = /** @type {Error} */ (err).message; }
+      DONE.drawn = {}; doneRefresh(true);                 // the page may have been drawn again meanwhile
+    }; });
+    box.querySelectorAll("[data-keep], [data-style]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+      const fig = /** @type {HTMLElement} */ (el.closest("[data-id]")), id = fig.dataset.id, rule = /** @type {HTMLElement} */ (el).dataset.keep;
+      const msg = /** @type {HTMLElement} */ (fig.querySelector(".msg"));
+      msg.innerHTML = `<input class="reason" maxlength="400" placeholder="Why keep it? (needed)"> <button class="btn small">Keep</button>`;
+      /** @type {HTMLElement} */ (msg.querySelector("button")).onclick = async () => {
+        const reason = /** @type {HTMLInputElement} */ (msg.querySelector("input")).value.trim();
+        if (!reason) { msg.append(" A reason is needed."); return; }
+        try {
+          const x = rule ? await sendEdit("shots", "except", { shot: id, rule, reason }) : await sendEdit("shots", "accept-style", { reason });
+          RAIL.msg[id] = x.status === "done" ? "Kept." : editMsg(x);
+        } catch (err) { RAIL.msg[id] = /** @type {Error} */ (err).message; }
+        DONE.drawn = {}; doneRefresh(true);
+      };
+    }; });
+    const more = /** @type {HTMLElement | null} */ (box.querySelector("#more-shots"));
+    if (more) more.onclick = () => { RAIL.shotPage += 24; draw(); };
+    const run = /** @type {HTMLButtonElement} */ (box.querySelector("#run-shots"));
+    run.onclick = async () => {
+      run.disabled = true; run.textContent = "Checking every shot…";
+      try {
+        const x = await sendEdit("shots", "shots-check", {});
+        if (x.status === "done") { RAIL.changed.clear(); RAIL.msg = {}; }
+      } catch (err) { RAIL.msg.film = /** @type {Error} */ (err).message; }
+      DONE.drawn = {}; await doneRefresh(true);
+    };
+  };
+  const bar = () => {
+    const open = issues.filter((/** @type {any} */ i) => i.severity === "block" && !i.excepted).length;
+    const warns = issues.filter((/** @type {any} */ i) => i.severity === "warn").length && !accepted;
+    approveBar(body, "shots", RAIL.changed.size || stale ? "Run the shot check on the current film before you approve."
+      : open ? `${open} frame problem(s) open: fix the shot or keep it with a reason.`
+      : warns ? "Style warnings are open: fix the shot or keep the style with a reason." : "");
+    const b = body.querySelector("#approve"); if (b) b.textContent = "Approve and render";
+  };
+  body.append(box);
+  draw(); bar();
+}
+
+/** Voice panel: play each line, fix how a word is said ("say"), make one line again, or change the voice or speed
+ * of the whole film after a confirmation on the page (US3). The written words come from the script only. @param {HTMLElement} body */
+async function editVoice(body) {
+  const v = RAIL.data;
+  /** @type {any[]} */ let rows = [];
+  /** @type {any} */ let checks = {};
+  try { rows = await (await fetch(fileUrl("lines.json"), { cache: "no-store" })).json(); } catch { rows = []; }
+  try { checks = await (await fetch(fileUrl("checks.json"), { cache: "no-store" })).json(); } catch { checks = {}; }
+  const issues = (((checks.tiers || {}).voice || {}).issues) || [];
+  const first = rows.find((r) => r && r.id) || {};
+  RAIL.voiceAll = RAIL.voiceAll ?? rows.length <= 40;
+  const box = document.createElement("div");
+  box.className = "edit-voice";
+  const ed = canEdit("voice");
+  const draw = () => {
+    const shown = rows.filter((r) => r && r.id && (RAIL.voiceAll || r.say || issues.some((/** @type {any} */ i) => i.ref === r.id)));
+    const speeds = ["0.85", "0.9", "0.95", "1", "1.05", "1.1", "1.15"];
+    const sp = String(first.speed ?? 1);
+    box.innerHTML = `<div class="row done-actions"><label>Voice <select id="v-voice" ${ed ? "" : "disabled"}>${(v.voices.includes(first.voice) ? v.voices : [first.voice, ...v.voices]).map((x) =>
+        `<option${x === first.voice ? " selected" : ""}>${esc(x)}</option>`).join("")}</select></label>
+      <label>Speed <select id="v-speed" ${ed ? "" : "disabled"}>${(speeds.includes(sp) ? speeds : [sp, ...speeds]).map((x) => `<option${x === sp ? " selected" : ""}>${x}</option>`).join("")}</select></label>
+      <span class="muted small" id="v-confirm"></span>
+      <span class="seg"><button data-f="all" aria-pressed="${RAIL.voiceAll}">All lines</button><button data-f="some" aria-pressed="${!RAIL.voiceAll}">With say or warnings</button></span></div>
+      ${issues.filter((/** @type {any} */ i) => i.ref === "lines").map((/** @type {any} */ i) => `<p class="notice warn small">${esc(i.measure)}: ${esc(i.fix)}</p>`).join("")}
+      <div class="vlines">${shown.map((r) => {
+        const mine = issues.filter((/** @type {any} */ i) => i.ref === r.id);
+        return `<div class="vline ${mine.length ? "warnl" : ""}" data-id="${esc(r.id)}"><button class="play" data-a="${esc(r.id)}" aria-label="Play ${esc(r.id)}">▶</button>
+          <div class="vtxt"><div><code>${esc(r.id)}</code> ${esc(r.text)}</div>
+            <label class="small muted">say <input class="say-in" maxlength="400" value="${esc(r.say || "")}" placeholder="as written" ${ed ? "" : "disabled"}></label>
+            ${mine.map((/** @type {any} */ i) => `<span class="tag warn small">${esc(i.rule)}${i.text ? `: ${esc(i.text)}` : ""}</span>`).join(" ")}
+            <span class="msg small">${esc(RAIL.msg[r.id] || "")}</span></div>
+          <div class="vact">${ed ? `<button class="btn small" data-save>Save say</button><button class="btn small" data-remake>Remake line</button>` : ""}</div></div>`;
+      }).join("") || `<p class="muted">No line has a "say" or a warning.</p>`}</div>`;
+    box.querySelectorAll(".seg button").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => { RAIL.voiceAll = /** @type {HTMLElement} */ (el).dataset.f === "all"; draw(); }; });
+    box.querySelectorAll(".play[data-a]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = () => {
+      const was = DONE.playing === el; stopAudio(); if (was) return;
+      const a = new Audio(fileUrl(`voices/${/** @type {HTMLElement} */ (el).dataset.a}.wav`) + `?v=${Date.now()}`);
+      DONE.audio = a; DONE.playing = el; el.classList.add("on"); el.textContent = "❚❚";
+      a.onended = () => stopAudio(); a.play().catch(() => stopAudio());
+    }; });
+    const act = async (/** @type {Element} */ el, /** @type {string} */ op) => {
+      const line = /** @type {HTMLElement} */ (el.closest(".vline")), id = line.dataset.id;
+      RAIL.msg[id] = op === "voice-remake" ? "Making the line again…" : "Saving…";
+      /** @type {HTMLElement} */ (line.querySelector(".msg")).textContent = RAIL.msg[id];
+      try {
+        if (op === "voice-say") {
+          const x = await sendEdit("voice", "voice-say", { line: id, say: /** @type {HTMLInputElement} */ (line.querySelector(".say-in")).value });
+          RAIL.msg[id] = editMsg(x) + (x.status === "done" ? " Remake the line to hear it." : "");
+        } else {
+          const x = await sendEdit("voice", "voice-remake", { line: id });
+          RAIL.msg[id] = editMsg(x);
+        }
+      } catch (err) { RAIL.msg[id] = /** @type {Error} */ (err).message; }
+      DONE.drawn = {}; doneRefresh(true);
+    };
+    box.querySelectorAll("[data-save]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => act(el, "voice-say"); });
+    box.querySelectorAll("[data-remake]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => act(el, "voice-remake"); });
+    const ask = () => {                                // the whole film is made again: confirm on the page
+      const c = /** @type {HTMLElement} */ (box.querySelector("#v-confirm"));
+      const voice = /** @type {HTMLSelectElement} */ (box.querySelector("#v-voice")).value, speed = /** @type {HTMLSelectElement} */ (box.querySelector("#v-speed")).value;
+      c.innerHTML = `This makes all ${rows.length} lines again. <button class="btn small" id="v-go">Make all again</button> <button class="btn small" id="v-no">Cancel</button>`;
+      /** @type {HTMLElement} */ (c.querySelector("#v-no")).onclick = () => draw();
+      /** @type {HTMLElement} */ (c.querySelector("#v-go")).onclick = async () => {
+        c.textContent = "Making every line again…";
+        try { const x = await sendEdit("voice", "voice-set", { voice, speed, confirm: "all" }); RAIL.msg = { film: editMsg(x) }; }
+        catch (err) { RAIL.msg = { film: /** @type {Error} */ (err).message }; }
+        DONE.drawn = {}; doneRefresh(true);
+      };
+    };
+    /** @type {HTMLElement} */ (box.querySelector("#v-voice")).onchange = ask;
+    /** @type {HTMLElement} */ (box.querySelector("#v-speed")).onchange = ask;
+  };
+  body.append(box);
+  draw();
+  approveBar(body, "voice", issues.some((/** @type {any} */ i) => i.severity === "block") ? "The voice check has problems: make those lines again." : "");
+}
+
+/** Mix panel: pick the music, set the levels inside the allowed ranges, mix again; the picture is not drawn again (US4).
+ * @param {HTMLElement} body */
+function editMix(body) {
+  const r = RAIL.data.mix_ranges, cur = { ...r.defaults, ...(r.current || {}) };
+  const ed = canEdit("mix");
+  const names = { "seed:7": "Score A (the style's own)", "seed:3": "Score B", "seed:11": "Score C", none: "No music" };
+  const box = document.createElement("div");
+  box.className = "edit-mix";
+  const slider = (/** @type {string} */ k, /** @type {string} */ label, /** @type {number[]} */ rg, /** @type {number} */ val) =>
+    `<div class="mixrow"><label for="mx-${k}">${label}</label><input type="range" id="mx-${k}" data-k="${k}" min="${rg[0]}" max="${rg[1]}" step="0.5" value="${val}" ${ed ? "" : "disabled"}>
+      <span class="num small" id="mx-${k}-v">${Number(val).toFixed(1)} dB</span></div>`;
+  box.innerHTML = `<p class="muted small">A new mix does not draw the picture again: only the sound goes back on the video.</p>
+    <div class="choices">${r.music.map((/** @type {string} */ m) => `<button class="choice${m === cur.music ? " on" : ""}" data-m="${m}" ${ed ? "" : "disabled"}>${esc(names[m] || m)}</button>`).join("")}</div>
+    ${slider("under", "Music in the pauses (below the voice)", r.under, cur.music_under_voice_db)}
+    ${slider("duck", "Music while the voice speaks", r.duck, cur.duck_db)}
+    ${slider("sfx", "Sound effects", r.sfx, cur.sfx_db)}
+    <div class="row done-actions"><button class="primary" id="mix-go" ${ed ? "" : "disabled"}>Mix again</button><span class="msg small">${esc(RAIL.msg.mix || "")}</span></div>`;
+  let music = cur.music;
+  box.querySelectorAll(".choice").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+    music = /** @type {HTMLElement} */ (el).dataset.m;
+    box.querySelectorAll(".choice").forEach((x) => x.classList.toggle("on", x === el));
+  }; });
+  box.querySelectorAll("input[type=range]").forEach((el) => { /** @type {HTMLInputElement} */ (el).oninput = () => {
+    /** @type {HTMLElement} */ (box.querySelector(`#mx-${/** @type {HTMLElement} */ (el).dataset.k}-v`)).textContent = `${Number(/** @type {HTMLInputElement} */ (el).value).toFixed(1)} dB`;
+  }; });
+  /** @type {HTMLElement} */ (box.querySelector("#mix-go")).onclick = async (e) => {
+    const btn = /** @type {HTMLButtonElement} */ (e.currentTarget); btn.disabled = true; btn.textContent = "Mixing…";
+    const val = (/** @type {string} */ k) => /** @type {HTMLInputElement} */ (box.querySelector(`#mx-${k}`)).value;
+    try { const x = await sendEdit("mix", "mix", { music, under: val("under"), duck: val("duck"), sfx: val("sfx") }); RAIL.msg.mix = editMsg(x); }
+    catch (err) { RAIL.msg.mix = /** @type {Error} */ (err).message; }
+    DONE.drawn = {}; doneRefresh(true);
+  };
+  body.append(box);
+  approveBar(body, "mix");
+}
+
+/** Publish panel: pick one of the three titles (with its thumbnail), change the description and hashtags (US5).
+ * @param {HTMLElement} body */
+async function editPublish(body) {
+  /** @type {any} */ let pk = null;
+  try { pk = await (await fetch(fileUrl("publish/pack.json"), { cache: "no-store" })).json(); } catch { pk = null; }
+  if (!pk || !Array.isArray(pk.titles)) { approveBar(body, "publish"); return; }
+  const ed = canEdit("publish");
+  let chosen = pk.chosen || 1;
+  const box = document.createElement("div");
+  box.className = "edit-publish";
+  box.innerHTML = `<div class="titles">${pk.titles.map((/** @type {any} */ t, /** @type {number} */ i) => `<label class="title-pick${i + 1 === chosen ? " on" : ""}">
+      <input type="radio" name="pub-title" value="${i + 1}" ${i + 1 === chosen ? "checked" : ""} ${ed ? "" : "disabled"}>
+      <img src="${fileUrl(`publish/thumbnail-${i + 1}.png`)}" alt="Thumbnail ${i + 1}" onerror="this.onerror=null;this.src=this.src.replace('.png','.jpg')">
+      <span><b>${esc(t.text)}</b><span class="muted small">${esc(t.angle)} · on the picture: “${esc((t.thumb || {}).text || "")}”</span></span></label>`).join("")}</div>
+    <label class="small muted" for="pub-desc">Description</label><textarea id="pub-desc" maxlength="4000" ${ed ? "" : "disabled"}>${esc(pk.summary || "")}</textarea>
+    <label class="small muted" for="pub-tags">Hashtags (3–5, comma between)</label><input id="pub-tags" value="${esc((pk.hashtags || []).join(", "))}" ${ed ? "" : "disabled"}>
+    <div class="row done-actions"><button class="primary" id="pub-save" ${ed ? "" : "disabled"}>Save and check</button><span class="msg small">${esc(RAIL.msg.publish || "")}</span></div>`;
+  box.querySelectorAll("input[name=pub-title]").forEach((el) => { /** @type {HTMLInputElement} */ (el).onchange = () => {
+    chosen = Number(/** @type {HTMLInputElement} */ (el).value);
+    box.querySelectorAll(".title-pick").forEach((x) => x.classList.toggle("on", x.contains(el)));
+  }; });
+  /** @type {HTMLElement} */ (box.querySelector("#pub-save")).onclick = async (e) => {
+    const btn = /** @type {HTMLButtonElement} */ (e.currentTarget); btn.disabled = true;
+    const args = { chosen: String(chosen), description: /** @type {HTMLTextAreaElement} */ (box.querySelector("#pub-desc")).value,
+      hashtags: /** @type {HTMLInputElement} */ (box.querySelector("#pub-tags")).value };
+    try { const x = await sendEdit("publish", "publish", args); RAIL.msg.publish = editMsg(x) + ((x.result && x.result.check && x.result.check.problems || []).length ? ` ${x.result.check.problems[0]}` : ""); }
+    catch (err) { RAIL.msg.publish = /** @type {Error} */ (err).message; }
+    DONE.drawn = {}; doneRefresh(true);
+  };
+  body.append(box);
+  approveBar(body, "publish");
+}
+
 /** Live updates on a job page: only what changed, so a playing line or the open section stays (specs/025 R5).
  * @param {string} id */
 async function refreshJob(id) {
@@ -634,6 +1077,8 @@ async function refreshJob(id) {
   const pr = document.getElementById("job-progress"); if (pr) pr.textContent = j.progress ? `${j.progress.done}/${j.progress.total}` : "—";
   const lg = document.getElementById("job-log");
   if (lg) lg.textContent = j.log.map((/** @type {any} */ l) => `${new Date(l.t).toLocaleTimeString("en-GB")}  ${l.line}`).join("\n") || "No lines yet.";
+  await railRefresh();
+  if (Object.keys(RAIL.editing).length) return;          // an open edit box stays as it is
   await doneRefresh();
 }
 
@@ -656,6 +1101,7 @@ async function pageJob(id) {
       <div class="md">${open.summary_html}</div>
       <textarea id="answer" maxlength="4000" placeholder="Your answer"></textarea>
       <div class="row" style="margin-top:8px"><button class="primary" id="send-answer">Send</button></div><p id="answer-msg" class="muted" role="status"></p></div>`
+    : open && TAB_POINT[open.kind] ? `<p class="notice">This film is waiting for your ${esc(REVIEW[open.kind].toLowerCase())}: change what you want below, then approve.</p>`
     : open ? `<p class="notice">This job is waiting for your review: <a href="#/reviews/${esc(open.id)}">${open.kind === "treatment" ? "review the treatment" : "open the review"}</a>.</p>` : ""}
     ${j.status === "queued" ? `<p class="notice">${j.step === "Waiting for a Claude account" ? "Waiting for a Claude account: the studio owner needs to sign one in on AI accounts." : `In the queue${j.queue_position ? `: number ${j.queue_position}` : ""}. It starts by itself when the studio is free.`}</p>` : ""}
     ${MODE === "online" && j.status === "done" && j.links.film ? `<p><a class="button primary" href="${API}/films/${encodeURIComponent(j.links.film)}/download">Download the film</a>
@@ -668,6 +1114,7 @@ async function pageJob(id) {
     ${j.status === "waiting_resume" ? `<p class="notice">You decided, but the Claude session is no longer waiting. Open Claude Code again and say “continue job ${esc(j.name)}”.</p>` : ""}
     ${j.status === "inactive" ? `<p class="notice">No updates for over 10 minutes: the Claude session may have closed or stopped.</p>` : ""}
     ${j.error ? `<p class="error">${esc(j.error)}</p>` : ""}
+    ${j.kind === "film" ? `<div class="panel rail-panel" id="rail-slot" hidden></div>` : ""}
     <div class="panel" id="step-panel">${stepHtml(j)}</div>
     ${j.kind === "film" ? `<div class="panel done" id="done-slot" hidden></div>` : ""}
     ${qualityHtml(j.qa)}
@@ -732,6 +1179,10 @@ function metricRows(c) {
 
 async function pageReview(id) {
   const r = await get(`/reviews/${encodeURIComponent(id)}`);
+  if (TAB_POINT[r.kind]) {                          // specs/026: a review point is edited and approved on the job page
+    location.replace(`#/jobs/${encodeURIComponent(r.job_id)}`);
+    return;
+  }
   const c = r.compare;
   const file = (p) => (p || "").split("/").pop();
   const proof = c ? `<div class="pair">
@@ -1112,6 +1563,7 @@ async function pageNew() {
       <label>Length in seconds <span class="hint">Up to ${max} seconds.</span>
         <input id="seconds" type="number" min="5" max="${max}" value="${Math.min(30, max)}" required></label>
       <label class="check"><input id="treat" type="checkbox"> <span>Let me review the treatment (the written plan) before the picture is made</span></label>
+      ${pointBoxes("f-reviews", ["script", "shots"])}
       <div><button class="primary" type="submit" ${left === 0 || !ME.verified ? "disabled" : ""}>Make the film (uses 1 credit)</button></div>
     </form><p id="msg" class="muted" role="status"></p>`;
   $app.querySelector("input[name=style]:checked")?.closest("label")?.scrollIntoView({ block: "nearest" });
@@ -1122,13 +1574,16 @@ async function pageNew() {
     const r = /** @type {HTMLInputElement | null} */ ($app.querySelector(`input[name=style][value="${CSS.escape(c.style)}"]`));
     if (r) { r.checked = true; r.closest("label")?.scrollIntoView({ block: "nearest" }); }
     field("seconds").value = String(Math.min(c.seconds, max));
+    const on = c.reviews || ["script", "shots"];        // the channel's review points, changeable for this film
+    document.querySelectorAll("#f-reviews input").forEach((x) => { /** @type {HTMLInputElement} */ (x).checked = on.includes(/** @type {HTMLInputElement} */ (x).value); });
   };
   if (chSel) { chSel.onchange = fillFromChannel; if (chSel.value) fillFromChannel(); }
   onSubmit(async () => {
     const style = /** @type {HTMLInputElement | null} */ ($app.querySelector("input[name=style]:checked"));
     if (!style) throw new Error("Pick a style first.");
     const j = await post("/jobs", { kind: "film", style: style.value, idea: field("idea").value.trim(),
-      seconds: Number(field("seconds").value), review_treatment: field("treat").checked, ...(chSel && chSel.value ? { channel: chSel.value } : {}),
+      seconds: Number(field("seconds").value), review_treatment: field("treat").checked, reviews: pointsOf("f-reviews"),
+      ...(chSel && chSel.value ? { channel: chSel.value } : {}),
       ...(topic && chSel && chSel.value === params.get("channel") ? { topic: topic.n } : {}) });
     await loadMe();
     location.hash = `#/jobs/${j.id}`;

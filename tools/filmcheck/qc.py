@@ -287,6 +287,11 @@ def measure(d: Path, lib=None) -> dict:
         cuts = [s["t0"] for s in shots[1:]] if shots else (nar["cuts"] if nar["cuts"] else found_cuts)
         m, p, iss = narration_measures(nar, duration, cuts, texts=line_texts(d, nar), shots=shots,
                                        cues=film_cues(d, plan), style=style)
+        from filmcheck import tiers
+        tiers.apply_exceptions(iss, tiers.load_exceptions(d))   # the same per-shot exceptions as tiers 1-2 (qc except)
+        p = [rhythm.message(i) for i in iss if not i.get("excepted")]
+        measures["excepted"] = [{"rule": i["rule"], "ref": i["ref"], "text": rhythm.message(i), "reason": i["excepted"]["reason"]}
+                                for i in iss if i.get("excepted")]
         measures.update(m)
         problems += p
         issues += iss

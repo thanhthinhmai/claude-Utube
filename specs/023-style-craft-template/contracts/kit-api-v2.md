@@ -1,5 +1,7 @@
 # Contract: bộ dựng v2 (phần thêm vào specs/022 `contracts/kit-api.md`)
 
+> Phần thêm của bộ dựng v3 (đồ cầm tay, act `body`/`pair`, qua vai mặc định, máy `hands`/`hero-low`, bối cảnh ngoài trời, `window.CRAFT`): `specs/027-kit-craft-upgrade/contracts/kit-api-v3.md`.
+
 Hợp đồng của 022 giữ nguyên. Bảng cảnh của phim cũ vẫn chạy và cho cùng bố cục; khác duy nhất là nhân vật tự chớp mắt và thở. Các trường dưới đây là phần thêm.
 
 ```js

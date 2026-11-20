@@ -124,6 +124,9 @@ def read_pack(d: Path) -> dict:
     if not isinstance(pk.get("hashtags"), list) or not all(isinstance(x, str) for x in pk["hashtags"]):
         raise PublishError("pack.json: 'hashtags' must be a list of strings")
     pk.setdefault("language", "")
+    ch_ = pk.setdefault("chosen", 1)                     # specs/026: the title the owner picked on the job page
+    if ch_ not in (1, 2, 3):
+        raise PublishError("pack.json: 'chosen' must be 1, 2 or 3")
     return pk
 
 
@@ -233,9 +236,13 @@ def wrap(text: str):
     return best[1] if best else None
 
 
+# "U.S.", "Mr." and the like end with a period but do not end a sentence
+ABBREV = re.compile(r"^[\"'“‘(]*(?:(?:[A-Za-z]\.){2,}|Mr\.|Mrs\.|Ms\.|Dr\.|St\.|Jr\.|Sr\.|vs\.|etc\.)[,;:]?$")
+
+
 def _split_points(toks: list) -> list:
     """Where a chunk may be split: after sentence ends first, then after commas, then anywhere."""
-    ends = [i + 1 for i, t in enumerate(toks[:-1]) if re.search(r"[.?!…。？！][\"'”’)]*$", t)]
+    ends = [i + 1 for i, t in enumerate(toks[:-1]) if re.search(r"[.?!…。？！][\"'”’)]*$", t) and not ABBREV.match(t)]
     commas = [i + 1 for i, t in enumerate(toks[:-1]) if re.search(r"[,;:，、；：][\"'”’)]*$", t)]
     return [ends, commas, list(range(1, len(toks)))]
 
@@ -262,13 +269,22 @@ def _cues_for_line(text: str, words: list) -> list:
             s, e = timing(i, k)
             out.append({"start": s, "end": e, "lines": wrap(j.join(toks[i:k])) or [j.join(toks[i:k])]})
             return
-        for points in _split_points(toks[i:k]):
-            if points:
-                mid = (k - i) / 2
-                p = min(points, key=lambda x: abs(x - mid)) + i
+        mid = (k - i) / 2
+        levels = [pts for pts in _split_points(toks[i:k]) if pts]
+        for points in levels:            # prefer a split that leaves both parts long enough to read
+            # the first part is cut where the second starts (subtitle_cues), so measure it to that start
+            good = [x for x in points if timing(x + i, k)[0] - timing(i, x + i)[0] >= CUE_MIN - TOL
+                    and timing(x + i, k)[1] - timing(x + i, k)[0] >= CUE_MIN - TOL]
+            if good:
+                p = min(good, key=lambda x: abs(x - mid)) + i
                 place(i, p)
                 place(p, k)
                 return
+        for points in levels:
+            p = min(points, key=lambda x: abs(x - mid)) + i
+            place(i, p)
+            place(p, k)
+            return
 
     # each sentence is a cue when it fits; longer sentences are split at commas, then in the middle
     starts = [0] + _split_points(toks)[0] + [m]
@@ -489,9 +505,11 @@ def write_publish_md(d: Path, pack: dict, notes: list, problems: list) -> None:
     rows = [f"# Publish: {title}", "",
             f"Video: ../{d.name}.mp4" + (f" · Subtitles: subtitles.srt ({lang})" if has_srt else ""), "",
             "## Pick one pair", "", "| # | Angle | Title | Thumbnail | Text on it |", "|---|---|---|---|---|"]
-    for i, t in enumerate(pack["titles"]):
+    chosen = pack.get("chosen", 1) - 1
+    for i in [chosen] + [k for k in range(len(pack["titles"])) if k != chosen]:     # the picked title first (026)
+        t = pack["titles"][i]
         cell = lambda s: str(s).replace("|", "\\|")        # noqa: E731
-        rows.append(f"| {i + 1} | {ANGLE_LABEL.get(t['angle'], t['angle'])} | {cell(t['text'])} | {files[i]} | "
+        rows.append(f"| {i + 1}{' (chosen)' if i == chosen else ''} | {ANGLE_LABEL.get(t['angle'], t['angle'])} | {cell(t['text'])} | {files[i]} | "
                     f"{cell(t['thumb']['text'])} |")
     desc = (d / "publish" / "description.md")
     rows += ["", "## Description (copy all)", "", "```text", desc.read_text(encoding="utf-8").rstrip() if desc.is_file() else "",

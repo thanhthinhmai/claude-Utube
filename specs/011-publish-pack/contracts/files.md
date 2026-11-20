@@ -27,6 +27,8 @@ Mọi tệp nằm trong `films/<tên>/publish/`:
 
 Luật của từng trường xem ở data-model.md. Số trong ví dụ trên phải có trong `SCRIPT.md` hoặc `SOURCES.md`.
 
+specs/026: trường tuỳ chọn `"chosen": 1|2|3` là tiêu đề chủ phim chọn trên trang việc (mặc định 1); `PUBLISH.md` xếp tiêu đề đó lên đầu, ghi "(chosen)".
+
 ## titles.md
 
 ```markdown
