@@ -103,12 +103,12 @@ class PathSafety(unittest.TestCase):
 
     def test_bad_film_names_and_image_names(self):
         before = tree(self.p.dir)
-        for name in ("Bad_Name", "..", "%2e%2e", "a.b", "x%20y", "-" * 61):        # reach the handler: 400 bad_name
+        for name in ("Bad_Name", "%2e%2e", "a.b", "x%20y", "-" * 61):        # reach the handler: 400 bad_name
             for method, url, body in self.routes(name):
                 r = self.call(method, url, body)
                 self.assertEqual(r.status_code, 400, (method, url, r.text))
                 self.assertEqual(r.json()["error"]["code"], "bad_name", url)
-        for name in ("..%2Fx", "a%2Fb", "%2e%2e%2fsecret.txt", "..%2F..%2Fetc"):          # never served, never written
+        for name in ("..", "..%2Fx", "a%2Fb", "%2e%2e%2fsecret.txt", "..%2F..%2Fetc"):          # never served, never written
             for method, url, body in self.routes(name):
                 r = self.call(method, url, body)
                 self.assertIn(r.status_code, (400, 404, 405), (method, url))
@@ -334,6 +334,178 @@ class ShotsApi(unittest.TestCase):
         self.assertEqual(r["problems"][0]["row"], 2)
         self.assertEqual(self.c.get(f"{API}/demo-film/shots?prev=1").status_code, 404)
         self.assertEqual(self.c.get(f"{API}/demo-film/video?prev=1").status_code, 404)
+
+
+# ---------- US2: the notes book (T019–T022) ----------
+def note(text="tay bị bàn che", at=None, images=(), done=False, **kw):
+    return {"at": at, "text": text, "images": list(images), "done": done, **kw}
+
+
+class NotesApi(unittest.TestCase):
+    def setUp(self):
+        self.p = Project()
+        self.c = client()
+        self.d = make_film(self.p.dir, "demo-film", 3.0, 3)         # S1 0–1, S2 1–2, S3 2–3
+        self.url = f"{API}/demo-film/notes"
+
+    def tearDown(self):
+        self.p.close()
+
+    def get(self):
+        r = self.c.get(self.url)
+        self.assertEqual(r.status_code, 200, r.text)
+        return r.json()
+
+    def put(self, doc, base=None, client=None):
+        base = self.get()["base"] if base is None else base
+        return (client or self.c).put(self.url, json={"base": base, "doc": doc}, headers=W)
+
+    def shot(self, notes, status="none", by="auto"):
+        return {"status": status, "status_by": by, "notes": notes}
+
+    def image(self, data=PNG, name="a.png", client=None):
+        return (client or self.c).post(f"{self.url}/images", files={"file": (name, data, "image/png")}, headers=W)
+
+    # T019
+    def test_validation(self):
+        g = self.get()
+        self.assertEqual((g["base"], g["doc"], g["orphans"]), (hashlib.sha256(b"").hexdigest(), {"version": 1, "shots": {}}, []))
+        self.assertEqual(self.put({"version": 1, "shots": {"S1": self.shot([note("x" * 2000)])}}).status_code, 200)
+        img = self.image().json()["file"]
+        cases = [
+            ({"S1": self.shot([note("x" * 2001)])}, "text"),
+            ({"S1": self.shot([note("   ")])}, "text"),
+            ({"S1": self.shot([note("", images=[img] * 5)])}, "images"),
+            ({"S1": self.shot([note("a", images=["../x.png"])])}, "images"),
+            ({"S1": self.shot([note("a", images=["img-000000000000.png"])])}, "images"),
+            ({"S1": self.shot([note("a")], status="broken")}, "status"),
+            ({"S1": self.shot([note("a", at=-0.1)])}, "at"),
+            ({"S1": self.shot([note("a", at=1.5)])}, "at"),          # S1 is 1 s long
+            ({"S1": self.shot([note("a", at="5")])}, "at"),
+            ({"S1": self.shot([note("a", done="yes")])}, "done"),
+            ({"S1": self.shot([note("a", reply="r" * 2001)])}, "reply"),
+            ({"S1": {"status": "none", "status_by": "auto", "notes": "nope"}}, "notes"),
+        ]
+        for shots, field in cases:
+            r = self.put({"version": 1, "shots": shots})
+            self.assertEqual(r.status_code, 422, (field, r.text))
+            e = r.json()["error"]
+            self.assertEqual(e["code"], "invalid")
+            self.assertIn(field, e["field"], e)
+        r = self.put({"version": 1, "shots": {"S1": self.shot([note("", images=[img])])}})        # a picture only is fine
+        self.assertEqual(r.status_code, 200, r.text)
+        n = r.json()["doc"]["shots"]["S1"]["notes"][0]
+        self.assertRegex(n["id"], r"^n-[0-9a-f]{8}$")
+        self.assertEqual((n["by"], n["images"]), ("local", [img]))
+        self.assertTrue(n["created"] and n["updated"])
+        self.assertEqual(self.put({"version": 1, "shots": {}}, base="0" * 64).status_code, 409)
+
+    # T020
+    def test_status_rules(self):
+        r = self.put({"version": 1, "shots": {"S2": self.shot([note("a"), note("b")])}}).json()
+        self.assertEqual(r["doc"]["shots"]["S2"]["status"], "fix")
+        ns = r["doc"]["shots"]["S2"]["notes"]
+        ns[0]["done"] = True
+        r = self.put(r["doc"], r["base"]).json()
+        self.assertEqual(r["doc"]["shots"]["S2"]["status"], "fix")              # one still open
+        r["doc"]["shots"]["S2"]["notes"][1]["done"] = True
+        r = self.put(r["doc"], r["base"]).json()
+        self.assertEqual((r["doc"]["shots"]["S2"]["status"], r["doc"]["shots"]["S2"]["status_by"]), ("fixed", "auto"))
+        r["doc"]["shots"]["S2"]["notes"][1]["done"] = False
+        r = self.put(r["doc"], r["base"]).json()
+        self.assertEqual(r["doc"]["shots"]["S2"]["status"], "fix")
+        r["doc"]["shots"]["S2"].update(status="ok", status_by="user")             # set by hand: kept
+        r = self.put(r["doc"], r["base"]).json()
+        self.assertEqual((r["doc"]["shots"]["S2"]["status"], r["doc"]["shots"]["S2"]["status_by"]), ("ok", "user"))
+        r = self.put(r["doc"], r["base"]).json()                                  # saving again keeps it
+        self.assertEqual(r["doc"]["shots"]["S2"]["status"], "ok")
+        r["doc"]["shots"]["S2"]["notes"].append(note("c"))                        # the next note change: auto again
+        r = self.put(r["doc"], r["base"]).json()
+        self.assertEqual((r["doc"]["shots"]["S2"]["status"], r["doc"]["shots"]["S2"]["status_by"]), ("fix", "auto"))
+        r["doc"]["shots"]["S2"]["notes"] = []
+        r = self.put(r["doc"], r["base"]).json()
+        self.assertEqual(r["doc"]["shots"].get("S2", {}).get("status", "none"), "none")
+        r["doc"]["shots"]["S3"] = self.shot([], status="ok", by="user")           # "No issue" on a shot with no notes
+        r = self.put(r["doc"], r["base"]).json()
+        self.assertEqual(r["doc"]["shots"]["S3"]["status"], "ok")
+        r["doc"]["shots"]["S9"] = self.shot([note("old shot")])                   # a shot no longer in shots.json
+        r = self.put(r["doc"], r["base"]).json()
+        self.assertEqual(self.get()["orphans"], ["S9"])
+        on_disk = json.loads((self.d / "shot-notes.json").read_text())
+        self.assertEqual(on_disk, self.get()["doc"])
+        self.assertEqual(hashlib.sha256((self.d / "shot-notes.json").read_bytes()).hexdigest(), self.get()["base"])
+
+    # T021
+    def test_concurrent_saves_lose_nothing(self):
+        c2 = client()
+        lost = []
+        for k in range(20):
+            base = self.get()["base"]
+            gate = threading.Barrier(2)
+            res = {}
+
+            def add(who, cl):
+                g = cl.get(self.url).json()
+                doc = g["doc"]
+                gate.wait()
+                doc.setdefault("shots", {}).setdefault("S1", self.shot([]))["notes"].append(note(f"{who}-{k}"))
+                r = cl.put(self.url, json={"base": g["base"], "doc": doc}, headers=W)
+                if r.status_code == 409:
+                    cur = r.json()["error"]["current"]
+                    doc = cur["doc"]
+                    doc.setdefault("shots", {}).setdefault("S1", self.shot([]))["notes"].append(note(f"{who}-{k}"))
+                    r = cl.put(self.url, json={"base": cur["base"], "doc": doc}, headers=W)
+                res[who] = r.status_code
+            ts = [threading.Thread(target=add, args=(w, cl)) for w, cl in (("a", self.c), ("b", c2))]
+            [t.start() for t in ts]
+            [t.join() for t in ts]
+            if set(res.values()) != {200}:
+                lost.append((k, res, base))
+        self.assertEqual(lost, [])
+        texts = [n["text"] for n in self.get()["doc"]["shots"]["S1"]["notes"]]
+        self.assertEqual(len(texts), 40)
+        self.assertEqual(len(set(texts)), 40)
+
+    # T022
+    def test_images(self):
+        from studio import store
+        got = {}
+        for data, ext in ((PNG, "png"), (JPG, "jpg"), (WEBP, "webp")):
+            r = self.image(data, f"x.{ext}")
+            self.assertEqual(r.status_code, 201, r.text)
+            self.assertRegex(r.json()["file"], rf"^img-[0-9a-f]{{12}}\.{ext}$")
+            got[ext] = r.json()["file"]
+            g = self.c.get(f"{self.url}/images/{got[ext]}")
+            self.assertEqual((g.status_code, g.content), (200, data))
+        big = self.image(PNG + b"\0" * (10 * 1024 * 1024 + 1 - len(PNG)))
+        self.assertEqual((big.status_code, big.json()["error"]["code"]), (413, "too_large"))
+        self.assertEqual(self.image(PNG + b"\0" * (10 * 1024 * 1024 - len(PNG))).status_code, 201)     # exactly 10 MB
+        for bad in (PDF, b"GIF89a" + b"\0" * 20, b"not a png at all"):
+            r = self.image(bad, "fake.png")
+            self.assertEqual((r.status_code, r.json()["error"]["code"]), (415, "bad_image"))
+        self.assertEqual(self.c.get(f"{self.url}/images/img-0123456789ab.png").status_code, 404)
+        folder = self.d / "shot-notes"
+        keep = got["png"]
+        r = self.put({"version": 1, "shots": {"S1": self.shot([note("with picture", images=[keep])])}})
+        self.assertEqual(r.status_code, 200, r.text)
+        real = store.clock
+        try:
+            store.clock = lambda: real() + shotnotes.ORPHAN_IMAGE_AGE + 60      # an hour later
+            fresh = self.image().json()["file"]                                  # just added, not in a note yet
+            r = self.put(r.json()["doc"], r.json()["base"])
+            self.assertEqual(r.status_code, 200)
+            names = {f.name for f in folder.iterdir() if not f.name.endswith(".lock")}
+            self.assertIn(keep, names)                                           # in a note
+            self.assertIn(fresh, names)                                          # younger than an hour
+            self.assertNotIn(got["jpg"], names)                                  # old and in no note
+            self.assertNotIn(got["webp"], names)
+            doc = r.json()["doc"]
+            doc["shots"]["S1"]["notes"][0]["images"] = []                        # taken off the note: gone now
+            r = self.put(doc, r.json()["base"])
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertFalse((folder / keep).exists())
+        finally:
+            store.clock = real
 
 
 if __name__ == "__main__":

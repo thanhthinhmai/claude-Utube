@@ -325,3 +325,230 @@ def thumb(film_dir, n, which: str):
     if f.is_file():                       # written whole (tmp then rename), so safe to serve while the rest is made
         return f, "ready"
     return None, "missing" if state == "ready" else "building"
+
+
+# ---------- the notes book (T023, data-model "Sổ ghi chú") ----------
+def _sha(b: bytes) -> str:
+    return hashlib.sha256(b).hexdigest()
+
+
+def _dump(doc: dict) -> bytes:
+    return (json.dumps(doc, ensure_ascii=False, indent=1) + "\n").encode("utf-8")
+
+
+def _read_raw(film_dir) -> tuple:
+    """(bytes, doc) of shot-notes.json; a missing file is b"" and an empty book."""
+    f = film_paths(film_dir)["notes"]
+    try:
+        raw = f.read_bytes()
+    except FileNotFoundError:
+        return b"", {"version": 1, "shots": {}}
+    try:
+        doc = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, ValueError):
+        doc = None
+    if not isinstance(doc, dict) or not isinstance(doc.get("shots"), dict):
+        doc = {"version": 1, "shots": {}}
+    return raw, doc
+
+
+def orphans_of(doc: dict, shots: dict) -> list:
+    """Shot ids with notes that are not in the current shot marks (FR-015); [] when the marks are missing or broken."""
+    if not shots.get("valid"):
+        return []
+    ids = {s["id"] for s in shots["shots"]}
+    return sorted(k for k, v in doc.get("shots", {}).items() if k not in ids and isinstance(v, dict) and v.get("notes"))
+
+
+def read_notes(film_dir) -> dict:
+    raw, doc = _read_raw(film_dir)
+    return {"base": _sha(raw), "doc": doc, "orphans": orphans_of(doc, load_shots(film_dir))}
+
+
+def _invalid(field: str, message: str):
+    return ShotError("invalid", f"{field}: {message}", 422, {"field": field})
+
+
+def validate(doc, shots: list, images_dir: Path = None) -> None:
+    """Raise ShotError invalid (422, extra.field) at the first broken field (data-model "Sổ ghi chú")."""
+    if not isinstance(doc, dict) or doc.get("version", 1) != 1 or not isinstance(doc.get("shots"), dict):
+        raise _invalid("doc", "cần {\"version\": 1, \"shots\": {…}}")
+    length = {s["id"]: s["t1"] - s["t0"] for s in shots}
+    if len(doc["shots"]) > MAX_SHOTS * 2:
+        raise _invalid("shots", "quá nhiều shot")
+    seen = set()
+    for sid, sh in doc["shots"].items():
+        f = f"shots.{sid}"
+        if not isinstance(sid, str) or not sid.strip() or len(sid) > 100:
+            raise _invalid("shots", "mã shot phải là chuỗi 1–100 ký tự")
+        if not isinstance(sh, dict):
+            raise _invalid(f, "phải là một đối tượng")
+        if sh.get("status", "none") not in STATUSES:
+            raise _invalid(f"{f}.status", f"phải là một trong {', '.join(STATUSES)}")
+        if sh.get("status_by", "auto") not in ("auto", "user"):
+            raise _invalid(f"{f}.status_by", "phải là auto hoặc user")
+        notes = sh.get("notes", [])
+        if not isinstance(notes, list):
+            raise _invalid(f"{f}.notes", "phải là một danh sách")
+        if len(notes) > 200:
+            raise _invalid(f"{f}.notes", "quá 200 ghi chú")
+        for i, n in enumerate(notes):
+            nf = f"{f}.notes[{i}]"
+            if not isinstance(n, dict):
+                raise _invalid(nf, "phải là một đối tượng")
+            nid = n.get("id")
+            if nid is not None:
+                if not isinstance(nid, str) or not re.fullmatch(NOTE_ID, nid):
+                    raise _invalid(f"{nf}.id", "phải có dạng n-<8 ký tự hex>")
+                if nid in seen:
+                    raise _invalid(f"{nf}.id", "trùng mã ghi chú")
+                seen.add(nid)
+            text = n.get("text", "")
+            if not isinstance(text, str) or len(text) > MAX_TEXT:
+                raise _invalid(f"{nf}.text", f"chữ tối đa {MAX_TEXT} ký tự")
+            imgs = n.get("images", [])
+            if not isinstance(imgs, list) or len(imgs) > MAX_IMAGES:
+                raise _invalid(f"{nf}.images", f"tối đa {MAX_IMAGES} ảnh")
+            for im in imgs:
+                if not isinstance(im, str) or not re.fullmatch(IMAGE_NAME, im):
+                    raise _invalid(f"{nf}.images", "tên ảnh không hợp lệ")
+                if images_dir is not None and not (images_dir / im).is_file():
+                    raise _invalid(f"{nf}.images", f"không có ảnh {im} trong shot-notes/")
+            if len(set(imgs)) != len(imgs):
+                raise _invalid(f"{nf}.images", "ảnh bị lặp")
+            if not text.strip() and not imgs:
+                raise _invalid(f"{nf}.text", "ghi chú cần chữ hoặc ít nhất 1 ảnh")
+            at = n.get("at")
+            if at is not None:
+                if not isinstance(at, (int, float)) or isinstance(at, bool) or at < 0 or (
+                        sid in length and at > length[sid] + 1e-6):
+                    raise _invalid(f"{nf}.at", "mốc giây phải là null hoặc từ 0 tới độ dài shot")
+            if not isinstance(n.get("done", False), bool):
+                raise _invalid(f"{nf}.done", "phải là true hoặc false")
+            reply = n.get("reply")
+            if reply is not None and (not isinstance(reply, str) or len(reply) > MAX_TEXT):
+                raise _invalid(f"{nf}.reply", f"trả lời tối đa {MAX_TEXT} ký tự")
+
+
+def _note_key(n: dict) -> tuple:
+    return (n.get("id"), n.get("text", ""), tuple(n.get("images", [])), n.get("at"), bool(n.get("done", False)))
+
+
+def derive_status(notes: list) -> str:
+    if not notes:
+        return "none"
+    return "fix" if any(not n.get("done") for n in notes) else "fixed"
+
+
+def derive(doc: dict, prev_doc: dict) -> None:
+    """FR-007 on `doc` in place: a shot whose notes changed goes back to auto; an auto shot takes the status its notes
+    give; a status changed by hand with the notes unchanged is the user's."""
+    prev = prev_doc.get("shots", {}) if isinstance(prev_doc, dict) else {}
+    for sid in list(doc["shots"]):
+        sh = doc["shots"][sid]
+        old = prev.get(sid) if isinstance(prev.get(sid), dict) else {}
+        notes = sh.get("notes", [])
+        changed = [_note_key(n) for n in notes] != [_note_key(n) for n in old.get("notes", [])]
+        status = sh.get("status", "none")
+        if changed:
+            sh["status_by"] = "auto"
+        elif status != old.get("status", "none"):
+            sh["status_by"] = "user"
+        else:
+            sh["status_by"] = sh.get("status_by", old.get("status_by", "auto"))
+        if sh["status_by"] == "auto":
+            sh["status"] = derive_status(notes)
+        sh["notes"] = notes
+        if not notes and sh["status"] == "none":
+            del doc["shots"][sid]                    # a shot not in the book = no notes
+
+
+def _clean_note(n: dict, old: dict, by: str, now: str) -> dict:
+    out = {"id": n.get("id") or f"n-{secrets.token_hex(4)}", "at": None if n.get("at") is None else round(float(n["at"]), 1),
+           "text": n.get("text", ""), "images": list(n.get("images", [])), "done": bool(n.get("done", False))}
+    if old:
+        out["by"], out["created"] = old.get("by", by), old.get("created", now)
+        same = (old.get("text", ""), old.get("images", []), old.get("at")) == (out["text"], out["images"], out["at"])
+        out["updated"] = old.get("updated", now) if same and bool(old.get("done", False)) == out["done"] else now
+    else:
+        out["by"], out["created"], out["updated"] = by, now, now
+    if n.get("reply") is not None:
+        out["reply"] = n["reply"]
+    return out
+
+
+def _images_in(doc: dict) -> set:
+    return {im for sh in doc.get("shots", {}).values() if isinstance(sh, dict)
+            for n in sh.get("notes", []) if isinstance(n, dict) for im in n.get("images", []) if isinstance(im, str)}
+
+
+def save_notes(film_dir, base: str, doc, by: str = "local", now: float = None) -> dict:
+    """Write the whole book if `base` is still the file's fingerprint (FR-009). Returns {base, doc}.
+    ShotError changed (409, extra.current = {base, doc}) when someone saved first; invalid (422) on a broken field."""
+    p = film_paths(film_dir)
+    t = clock() if now is None else now
+    stamp = now_iso(t)
+    with locked(p["notes"]):
+        raw, cur = _read_raw(film_dir)
+        if base != _sha(raw):
+            raise ShotError("changed", "ghi chú vừa được người khác đổi: tải lại rồi lưu lại", 409,
+                            {"current": {"base": _sha(raw), "doc": cur}})
+        shots = load_shots(film_dir)
+        validate(doc, shots["shots"] if shots["valid"] else [], p["images"])
+        old_notes = {n.get("id"): n for sh in cur.get("shots", {}).values() if isinstance(sh, dict)
+                     for n in sh.get("notes", []) if isinstance(n, dict) and n.get("id")}
+        new = {"version": 1, "shots": {}}
+        for sid, sh in doc["shots"].items():
+            new["shots"][sid] = {"status": sh.get("status", "none"), "status_by": sh.get("status_by", "auto"),
+                                 "notes": [_clean_note(n, old_notes.get(n.get("id")), by, stamp) for n in sh.get("notes", [])]}
+        derive(new, cur)
+        data = _dump(new)
+        write_atomic(p["notes"], data)
+        _tidy_images(p["images"], _images_in(new), _images_in(cur), t)
+        return {"base": _sha(data), "doc": new}
+
+
+def _tidy_images(folder: Path, used: set, used_before: set, now: float) -> None:
+    """Pictures taken off a note go now; pictures never put in a note go after ORPHAN_IMAGE_AGE (data-model)."""
+    if not folder.is_dir():
+        return
+    for f in folder.iterdir():
+        if not re.fullmatch(IMAGE_NAME, f.name) or f.name in used:
+            continue
+        try:
+            if f.name in used_before or now - f.stat().st_mtime > ORPHAN_IMAGE_AGE:
+                f.unlink()
+        except OSError:
+            pass
+
+
+# ---------- pictures for notes (T024, research R9) ----------
+MAGIC = ((b"\x89PNG", "png"), (b"\xff\xd8\xff", "jpg"))
+
+
+def image_kind(data: bytes):
+    for head, ext in MAGIC:
+        if data.startswith(head):
+            return ext
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "webp"
+    return None
+
+
+def save_image(film_dir, data: bytes, now: float = None) -> str:
+    """Store one picture under a server-made name; its file time is the app's clock (for the one-hour tidy)."""
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ShotError("too_large", f"ảnh tối đa {MAX_IMAGE_BYTES // (1024 * 1024)} MB", 413)
+    ext = image_kind(data)
+    if not ext:
+        raise ShotError("bad_image", "chỉ nhận ảnh PNG, JPEG hoặc WebP", 415)
+    folder = film_paths(film_dir)["images"]
+    while True:
+        name = f"img-{secrets.token_hex(6)}.{ext}"
+        if not (folder / name).exists():
+            break
+    path = image_path(film_dir, name)
+    write_atomic(path, data)
+    t = clock() if now is None else now
+    os.utime(path, (t, t))
+    return name

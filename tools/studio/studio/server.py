@@ -38,6 +38,14 @@ class ActionIn(BaseModel):                     # specs/026 contracts/api.md
     base: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{16}$")
 
 
+class NotesIn(BaseModel):                      # specs/029 contracts/api.md
+    base: str = Field(pattern=r"^[0-9a-f]{64}$")
+    doc: dict
+
+
+WRITE_ROLES = {"customer", "admin"}            # a token limited to reading (any other role) may not change notes
+
+
 class PointsIn(BaseModel):
     on: list[Literal["script", "voice", "shots", "mix", "publish"]] = Field(max_length=5)
 
@@ -166,7 +174,8 @@ def create_app() -> FastAPI:
             return err("not_local", "chỉ truy cập được từ chính máy này", 403)
         if request.method not in SAFE_METHODS:                 # CSRF: needs a header a foreign page cannot send
             ctype = request.headers.get("content-type", "")
-            if request.headers.get("x-studio") != "1" or not ctype.startswith("application/json"):
+            multipart = ctype.startswith("multipart/form-data") and request.url.path.endswith("/notes/images")
+            if request.headers.get("x-studio") != "1" or not (ctype.startswith("application/json") or multipart):
                 return err("csrf", "thiếu header X-Studio hoặc nội dung không phải JSON", 403)
         resp = await call_next(request)
         resp.headers["X-Content-Type-Options"] = "nosniff"
@@ -352,6 +361,48 @@ def create_app() -> FastAPI:
     def film_subtitles(name: str):
         srt = resources.film_file(name, "srt").read_text(encoding="utf-8", errors="replace")
         return Response(resources.srt_to_vtt(srt), media_type="text/vtt; charset=utf-8")
+
+    def _note_writer(request: Request) -> str:
+        """Who writes (online: the account's email, else "local"); 403 for a read-only token (FR-016)."""
+        a = getattr(request.state, "account", None)
+        if a is None:
+            return "local"
+        if a["role"] not in WRITE_ROLES:
+            raise StudioError("forbidden", "mã này chỉ được đọc, không sửa được ghi chú", 403)
+        return a["email"]
+
+    @app.get(api + "/films/{name}/notes")
+    def film_notes(name: str):
+        resources.film_path(name, "notes")
+        return resources.shot_call(shotnotes.read_notes, resources.film_dir(name))
+
+    @app.put(api + "/films/{name}/notes")
+    def film_notes_put(name: str, body: NotesIn, request: Request):
+        resources.film_path(name, "notes")
+        by = _note_writer(request)
+        return resources.shot_call(shotnotes.save_notes, resources.film_dir(name), body.base, body.doc, by, store.clock())
+
+    @app.post(api + "/films/{name}/notes/images", status_code=201)
+    async def film_note_image(name: str, request: Request):
+        resources.film_path(name, "images")
+        _note_writer(request)
+        form = await request.form(max_files=1, max_fields=4)
+        f = form.get("file")
+        if f is None or isinstance(f, str):
+            raise StudioError("invalid", "cần trường file (multipart/form-data)", 422)
+        data = await f.read(shotnotes.MAX_IMAGE_BYTES + 1)
+        await f.close()
+        name_ = resources.shot_call(shotnotes.save_image, resources.film_dir(name), data, store.clock())
+        return {"file": name_}
+
+    @app.get(api + "/films/{name}/notes/images/{file}")
+    def film_note_image_get(name: str, file: str):
+        resources.film_path(name, "images")
+        p = resources.shot_call(shotnotes.image_path, resources.film_dir(name), file)
+        if not p.is_file():
+            raise StudioError("not_found", "không có ảnh này", 404)
+        types = {".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp"}
+        return FileResponse(p, media_type=types[p.suffix], headers={"Cache-Control": "max-age=86400"})
 
     # ---------- publish pack (specs/011) ----------
     @app.get(api + "/films/{name}/publish")

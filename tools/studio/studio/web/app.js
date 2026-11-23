@@ -67,6 +67,8 @@ const ERR = {
   too_many_queued: "You already have 3 jobs in progress. Wait for one to finish.", too_long: "The film is too long.",
   content_rejected: "The studio cannot make this idea.", style_not_found: "This style does not exist any more.",
   in_use: "A job is still using this.", rights_required: "Please confirm your right to use the channel's videos.",
+  bad_image: "Only PNG, JPEG or WebP pictures can be added.", forbidden: "You can only read this.",
+  changed: "Someone else just changed these notes.",
   too_many_questions: "The studio already asked 3 questions.", too_many_videos: "Too many videos for one style.", too_large: "The file is too large.", bad_video: "This file is not a video the studio can read.",
 };
 const errText = (body, status) => {
@@ -1334,19 +1336,28 @@ async function filmShots(name, f) {
     return;
   }
   SH = { name, path, api: API + path, f, shots: r.shots, stamp: r.video_stamp, duration: r.duration, sel: 0, filter: "all",
-    doc: { version: 1, shots: {} }, base: "", orphans: [], stopper: 0, selfSeek: false, prev: null, pending: [] };
+    doc: { version: 1, shots: {} }, base: "", orphans: [], stopper: 0, selfSeek: false, prev: null, pending: [], draft: "",
+    pin: true, notesError: "" };
   slot.innerHTML = `<div class="panel shots" id="shots">
     <div class="shots-head"><p class="section-title">Shots</p><span class="muted small">${r.shots.length} shots · ${mss1(r.duration || 0)}</span></div>
     <div class="timeline" id="sh-timeline" role="group" aria-label="Shots on the timeline"></div>
     <div class="sh-legend small muted" id="sh-legend"></div>
     <div class="chips sh-filters" id="sh-filters" role="group" aria-label="Filter shots"></div>
-    <div class="shots-body"><ol class="shot-list" id="sh-list"></ol><div class="shot-pane" id="sh-pane"></div></div>
+    <div class="shots-body"><div><ol class="shot-list" id="sh-list"></ol><div id="sh-orphans"></div></div><div class="shot-pane" id="sh-pane"></div></div>
   </div>`;
   const v = shotVideo();
   if (v) {
     v.addEventListener("seeking", () => { if (!SH || SH.selfSeek) return; stopShot(); });
     v.addEventListener("seeked", () => { if (SH) SH.selfSeek = false; });
   }
+  drawShots();
+  loadNotes();
+}
+async function loadNotes() {
+  try {
+    const n = await get(`${SH.path}/notes`);
+    SH.doc = n.doc; SH.base = n.base; SH.orphans = n.orphans || [];
+  } catch (e) { SH.notesError = e.message; }
   drawShots();
 }
 /** @returns {HTMLVideoElement | null} */
@@ -1368,7 +1379,7 @@ function wireThumbs(root) {
     img.removeAttribute("data-src");
   });
 }
-function drawShots() { drawTimeline(); drawFilters(); drawList(); drawPane(); }
+function drawShots() { drawTimeline(); drawFilters(); drawList(); drawPane(); drawOrphans(); }
 function drawTimeline() {
   const el = document.getElementById("sh-timeline");
   if (!el) return;
@@ -1453,11 +1464,183 @@ function drawPane() {
       <button type="button" class="primary" id="sh-play">▶ Play this shot</button>
       <button type="button" id="sh-next"${SH.sel === SH.shots.length - 1 ? " disabled" : ""} aria-label="Next shot">Next →</button></div>
     <div id="sh-notes"></div>`;
+  drawNotes();
   wireThumbs(el);
   zoomable(el);
   /** @type {HTMLElement} */ (el.querySelector("#sh-prev")).onclick = () => selectShot(SH.sel - 1, true);
   /** @type {HTMLElement} */ (el.querySelector("#sh-next")).onclick = () => selectShot(SH.sel + 1, true);
   /** @type {HTMLElement} */ (el.querySelector("#sh-play")).onclick = () => { const v = shotVideo(); if (v) playRange(v, s.t0, s.t1); };
+}
+
+/** One note as a list item. @param {any} n @param {string} sid @param {boolean} canEdit */
+function noteHtml(n, sid, canEdit) {
+  const s = SH.shots.find((/** @type {any} */ x) => x.id === sid);
+  const at = n.at === null || n.at === undefined ? "" : s
+    ? `<button type="button" class="link sh-at" data-at="${s.t0 + n.at}" title="Jump to ${mss1(s.t0 + n.at)} in the film">at ${mss1(n.at)}</button>`
+    : `<span class="muted">at ${mss1(n.at)}</span>`;
+  return `<li class="sh-note${n.done ? " done" : ""}" data-id="${esc(n.id)}">
+    ${canEdit ? `<input type="checkbox" class="sh-done" ${n.done ? "checked" : ""} aria-label="Fixed" title="Fixed">` : `<span>${n.done ? "✓" : "•"}</span>`}
+    <div class="sh-note-body">
+      <div class="sh-note-text">${at} ${esc(n.text)}</div>
+      ${n.images && n.images.length ? `<div class="sh-note-imgs">${n.images.map((/** @type {string} */ f) => `<img src="${SH.api}/notes/images/${esc(f)}" data-zoom alt="Picture of this note">`).join("")}</div>` : ""}
+      ${n.reply ? `<div class="sh-reply small"><strong>Claude:</strong> ${esc(n.reply)}</div>` : ""}
+      <div class="muted small">${esc(n.by || "")} · ${when(n.updated || n.created)}</div>
+    </div>
+    ${canEdit ? `<div class="sh-note-tools"><button type="button" class="link sh-edit">Edit</button><button type="button" class="link danger sh-del">Delete</button></div>` : ""}
+  </li>`;
+}
+function drawNotes() {
+  const el = document.getElementById("sh-notes");
+  if (!el) return;
+  const s = SH.shots[SH.sel], sh = SH.doc.shots[s.id] || { status: "none", notes: [] }, st = sh.status || "none";
+  el.innerHTML = `${SH.notesError ? `<p class="error">${esc(SH.notesError)}</p>` : ""}
+    <div class="seg sh-status" role="group" aria-label="Shot status">${["ok", "fix", "fixed"].map((k) => `<button type="button" data-st="${k}" class="${st === k ? "on" : ""}" aria-pressed="${st === k}">${SHOT_STATUS[k]}</button>`).join("")}</div>
+    <ul class="sh-notes">${(sh.notes || []).map((/** @type {any} */ n) => noteHtml(n, s.id, true)).join("") || `<li class="muted small">No notes on this shot yet.</li>`}</ul>
+    <div class="sh-add">
+      <textarea id="sh-note" maxlength="2000" rows="3" placeholder="What is wrong in this shot? Paste a screenshot here with Ctrl+V.">${esc(SH.draft || "")}</textarea>
+      <div class="sh-pending" id="sh-pending"></div>
+      <div class="row sh-add-row">
+        <label class="check"><input type="checkbox" id="sh-pin"${SH.pin ? " checked" : ""}> <span>Pin to current time</span></label>
+        <label class="button sh-file">Add picture<input type="file" id="sh-file" accept="image/png,image/jpeg,image/webp" hidden></label>
+        <span class="muted small" id="sh-count">${(SH.draft || "").length}/2000</span>
+        <button type="button" class="primary" id="sh-add">Add note</button>
+      </div>
+      <p class="small" id="sh-msg" role="status"></p>
+    </div>`;
+  drawPending();
+  zoomable(el);
+  const ta = /** @type {HTMLTextAreaElement} */ (el.querySelector("#sh-note"));
+  ta.addEventListener("input", () => { SH.draft = ta.value; /** @type {HTMLElement} */ (el.querySelector("#sh-count")).textContent = `${ta.value.length}/2000`; });
+  ta.addEventListener("paste", (e) => {
+    const items = Array.from(/** @type {ClipboardEvent} */ (e).clipboardData?.items || []).filter((it) => it.kind === "file" && it.type.startsWith("image/"));
+    if (!items.length) return;                     // text goes into the box as usual
+    e.preventDefault();
+    items.forEach((it) => { const f = it.getAsFile(); if (f) addPicture(f); });
+  });
+  const pin = /** @type {HTMLInputElement} */ (el.querySelector("#sh-pin"));
+  pin.onchange = () => { SH.pin = pin.checked; };
+  const file = /** @type {HTMLInputElement} */ (el.querySelector("#sh-file"));
+  file.onchange = () => { Array.from(file.files || []).forEach(addPicture); file.value = ""; };
+  /** @type {HTMLElement} */ (el.querySelector("#sh-add")).onclick = () => addNote();
+  el.querySelectorAll(".sh-status button").forEach((b) => b.addEventListener("click", () => {
+    const k = /** @type {HTMLElement} */ (b).dataset.st;
+    saveNotes((doc) => { const x = doc.shots[s.id] || (doc.shots[s.id] = { status: "none", status_by: "auto", notes: [] }); x.status = k; x.status_by = "user"; });
+  }));
+  wireNoteItems(el, s.id);
+}
+/** Ticks, edits, deletes and jumps of the notes under `root` (a shot's pane or the gone-shots list). @param {ParentNode} root @param {string} sid */
+function wireNoteItems(root, sid) {
+  /** @param {any} doc @param {string} id */
+  const find = (doc, id) => { const ns = (doc.shots[sid] || {}).notes || []; return { ns, i: ns.findIndex((/** @type {any} */ n) => n.id === id) }; };
+  root.querySelectorAll(".sh-note").forEach((li) => {
+    const id = /** @type {HTMLElement} */ (li).dataset.id || "";
+    const done = /** @type {HTMLInputElement | null} */ (li.querySelector(".sh-done"));
+    if (done) done.onchange = () => saveNotes((doc) => { const { ns, i } = find(doc, id); if (i >= 0) ns[i].done = done.checked; });
+    const del = /** @type {HTMLElement | null} */ (li.querySelector(".sh-del"));
+    if (del) del.onclick = () => {
+      if (!confirm("Delete this note?")) return;
+      saveNotes((doc) => { const { ns, i } = find(doc, id); if (i >= 0) ns.splice(i, 1); });
+    };
+    const edit = /** @type {HTMLElement | null} */ (li.querySelector(".sh-edit"));
+    if (edit) edit.onclick = () => {
+      const body = /** @type {HTMLElement} */ (li.querySelector(".sh-note-text"));
+      const cur = find(SH.doc, id);
+      if (cur.i < 0) return;
+      body.innerHTML = `<textarea maxlength="2000" rows="3" class="sh-edit-box">${esc(cur.ns[cur.i].text)}</textarea>
+        <div class="row"><button type="button" class="primary sh-save">Save</button><button type="button" class="sh-cancel">Cancel</button></div>`;
+      const box = /** @type {HTMLTextAreaElement} */ (body.querySelector("textarea"));
+      box.focus();
+      /** @type {HTMLElement} */ (body.querySelector(".sh-cancel")).onclick = () => drawShots();
+      /** @type {HTMLElement} */ (body.querySelector(".sh-save")).onclick = () => {
+        const text = box.value;
+        saveNotes((doc) => { const { ns, i } = find(doc, id); if (i >= 0) ns[i].text = text; });
+      };
+    };
+    const at = /** @type {HTMLElement | null} */ (li.querySelector(".sh-at"));
+    if (at) at.onclick = () => { const v = shotVideo(); if (v) { stopShot(); v.currentTime = +(at.dataset.at || 0); } };
+  });
+}
+function drawPending() {
+  const el = document.getElementById("sh-pending");
+  if (!el) return;
+  el.innerHTML = SH.pending.map((/** @type {string} */ f, /** @type {number} */ i) => `<span class="sh-pend"><img src="${SH.api}/notes/images/${esc(f)}" data-zoom alt="Picture to add">
+    <button type="button" class="link" data-i="${i}" aria-label="Remove this picture">×</button></span>`).join("");
+  zoomable(el);
+  el.querySelectorAll("button[data-i]").forEach((b) => b.addEventListener("click", () => { SH.pending.splice(+(/** @type {HTMLElement} */ (b).dataset.i || 0), 1); drawPending(); }));
+}
+/** @param {string} text @param {boolean} [bad] */
+function shotMsg(text, bad = false) {
+  const m = document.getElementById("sh-msg");
+  if (m) { m.className = `small ${bad ? "fail" : "muted"}`; m.textContent = text; }
+}
+/** Upload one picture (pasted or chosen) for the note being written. @param {File} file */
+async function addPicture(file) {
+  if (SH.pending.length >= 4) { shotMsg("A note can have up to 4 pictures.", true); return; }
+  if (file.size > 10 * 1024 * 1024) { shotMsg("The picture is larger than 10 MB.", true); return; }
+  shotMsg("Adding the picture…");
+  const fd = new FormData();
+  fd.append("file", file, file.name || "pasted.png");
+  try {
+    const r = await fetch(`${SH.api}/notes/images`, { method: "POST", headers: { "X-Studio": "1" }, body: fd });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw failed(r, body);
+    SH.pending.push(body.file);
+    drawPending();
+    shotMsg("");
+  } catch (e) { shotMsg(e.message, true); }
+}
+function addNote() {
+  const s = SH.shots[SH.sel], text = (SH.draft || "").trim();
+  if (!text && !SH.pending.length) { shotMsg("Write the note or add a picture first.", true); return; }
+  if (text.length > 2000) { shotMsg("A note can have up to 2,000 characters.", true); return; }
+  const v = shotVideo();
+  let at = null;
+  if (SH.pin && v && v.currentTime >= s.t0 && v.currentTime <= s.t1) at = Math.round((v.currentTime - s.t0) * 10) / 10;
+  const images = SH.pending.slice();
+  saveNotes((doc) => {
+    const x = doc.shots[s.id] || (doc.shots[s.id] = { status: "none", status_by: "auto", notes: [] });
+    x.notes.push({ at, text, images, done: false });
+  }, () => { SH.draft = ""; SH.pending = []; });
+}
+/** Save the notes book with the fingerprint read (FR-009); on "changed" apply the same change to the new book once.
+ * @param {(doc: any) => void} op @param {() => void} [ok] */
+async function saveNotes(op, ok) {
+  /** @param {string} base @param {any} doc */
+  const put = async (base, doc) => {
+    const r = await fetch(`${SH.api}/notes`, { method: "PUT", headers: { "Content-Type": "application/json", "X-Studio": "1" },
+      body: JSON.stringify({ base, doc }) });
+    return { r, body: await r.json().catch(() => ({})) };
+  };
+  let doc = structuredClone(SH.doc);
+  op(doc);
+  try {
+    let { r, body } = await put(SH.base, doc);
+    if (r.status === 409 && body.error && body.error.current) {
+      doc = structuredClone(body.error.current.doc);
+      op(doc);
+      ({ r, body } = await put(body.error.current.base, doc));
+      if (r.status === 409) {
+        await loadNotes();
+        shotMsg("Someone else just changed these notes; they were loaded again. Try once more.", true);
+        return;
+      }
+    }
+    if (!r.ok) throw failed(r, body);
+    SH.doc = body.doc; SH.base = body.base;
+    if (ok) ok();
+    drawShots();
+  } catch (e) { shotMsg(e.message, true); }
+}
+function drawOrphans() {
+  const el = document.getElementById("sh-orphans");
+  if (!el) return;
+  if (!SH.orphans.length) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="sh-gone"><p class="section-title">Notes of shots that are gone</p>
+    <p class="muted small">These shots are not in the film's shot marks any more. Their notes are kept.</p>
+    ${SH.orphans.map((/** @type {string} */ id) => `<div class="sh-gone-shot" data-sid="${esc(id)}"><strong>${esc(id)}</strong>
+      <ul class="sh-notes">${((SH.doc.shots[id] || {}).notes || []).map((/** @type {any} */ n) => noteHtml(n, id, true)).join("")}</ul></div>`).join("")}</div>`;
+  el.querySelectorAll(".sh-gone-shot").forEach((g) => wireNoteItems(g, /** @type {HTMLElement} */ (g).dataset.sid || ""));
+  zoomable(el);
 }
 
 async function pageSets() {

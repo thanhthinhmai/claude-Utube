@@ -590,3 +590,31 @@ fieldset.points legend { font-size: 13px; padding: 0 4px; }
   .sh-thumb { width: 54px; }
   .sh-row { grid-template-columns: 26px auto minmax(0, 1fr); gap: 6px; }
 }
+.sh-status { margin: 4px 0 2px; }
+.sh-status button[data-st="fix"].on { color: #9a3412; } .sh-status button[data-st="fixed"].on { color: var(--st-fixed); }
+button.link { border: 0; background: none; padding: 0 2px; color: var(--accent-ink); font-weight: 500; }
+button.link:hover { background: none; text-decoration: underline; }
+button.link.danger { color: var(--bad); }
+.sh-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.sh-note { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: start; padding: 8px 10px;
+           border: 1px solid var(--line); border-radius: 8px; }
+.sh-note input[type=checkbox] { margin-top: 4px; }
+.sh-note.done .sh-note-text { text-decoration: line-through; opacity: .55; }
+.sh-note-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.sh-note-tools { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; }
+.sh-note-imgs, .sh-pending { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.sh-note-imgs img, .sh-pend img { width: 72px; height: 48px; object-fit: cover; border-radius: 4px; cursor: zoom-in; border: 1px solid var(--line); }
+.sh-pend { position: relative; display: inline-block; }
+.sh-pend button { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; justify-content: center; border-radius: 50%;
+                  background: var(--panel); border: 1px solid var(--line); line-height: 1; }
+.sh-reply { margin-top: 4px; padding: 4px 8px; border-left: 3px solid var(--accent-line); background: var(--accent-soft); border-radius: 4px; }
+.sh-add textarea { min-height: 72px; }
+.sh-add-row { gap: 8px; margin-top: 6px; }
+.sh-add-row #sh-add { margin-left: auto; }
+label.button { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px;
+               cursor: pointer; color: var(--ink); font-weight: 500; background: var(--panel); }
+label.button:hover { background: var(--hover); }
+label.button:focus-within { outline: 2px solid var(--accent-line); }
+.sh-gone { margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.sh-gone-shot { margin-bottom: 10px; }
+.sh-at { font-variant-numeric: tabular-nums; }
