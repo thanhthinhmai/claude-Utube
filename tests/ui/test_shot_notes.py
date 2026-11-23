@@ -675,6 +675,8 @@ class BrowserShots(unittest.TestCase):
             self.assertEqual((out["paneTitle"], out["nextTitle"], out["nextDisabled"]), ("Shot 2", "Shot 3", True))
             if out["playable"]:
                 self.assertLessEqual(abs(out["stoppedAt"] - 2.0), 0.2, out)       # SC-003
+                self.assertEqual((out["pauseShown"], out["afterStopLabel"]), ("Pause", "Play this shot"), out)   # toggle
+                self.assertEqual((out["pausedByHand"], out["afterPauseLabel"]), (True, "Play this shot"), out)
             self.assertEqual((out["otherShotBox"], out["backBox"], out["unsavedMsg"]), ("", "nháp shot 2", "Saved"))   # box per shot, saved
             self.assertEqual(len(out["typedSaved"]), 1, out)                                                          # typing alone saves:
             self.assertTrue(out["typedSaved"][0].endswith("gõ là lưu"), out)                                          # one note, last text

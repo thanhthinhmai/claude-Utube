@@ -1359,6 +1359,7 @@ async function filmShots(name, f) {
   pv.src = `${SH.api}/video`;
   pv.addEventListener("seeking", () => { if (!SH || SH.selfSeek) return; stopShot(); });
   pv.addEventListener("seeked", () => { if (SH) SH.selfSeek = false; });
+  ["play", "pause", "ended"].forEach((ev) => pv.addEventListener(ev, playButtonState));
   SH.pv = pv;
   drawShots();
   loadNotes();
@@ -1505,9 +1506,25 @@ function drawPane() {
   zoomable(el);
   /** @type {HTMLElement} */ (el.querySelector("#sh-prev")).onclick = () => selectShot(SH.sel - 1, true);
   /** @type {HTMLElement} */ (el.querySelector("#sh-next")).onclick = () => selectShot(SH.sel + 1, true);
-  /** @type {HTMLElement} */ (el.querySelector("#sh-play")).onclick = () => { const v = shotVideo(); if (v) playRange(v, s.t0, s.t1); };
+  /** @type {HTMLElement} */ (el.querySelector("#sh-play")).onclick = () => {
+    const v = shotVideo();
+    if (!v) return;
+    if (!v.paused) { stopShot(); v.pause(); playButtonState(); return; }      // playing: the button is a pause button
+    playRange(v, s.t0, s.t1);
+  };
+  playButtonState();
   const pv = /** @type {HTMLElement | null} */ (el.querySelector("#sh-prev-version"));
   if (pv) pv.onclick = () => playPrevious(s.id);
+}
+/** "▶ Play this shot" while stopped; a round pause button while the shot plays (click it to stop). */
+function playButtonState() {
+  const b = document.getElementById("sh-play"), v = shotVideo();
+  if (!b || !v) return;
+  const playing = !v.paused && !v.ended;
+  b.classList.toggle("sh-pausebtn", playing);
+  b.setAttribute("aria-label", playing ? "Pause" : "Play this shot");
+  b.title = playing ? "Pause" : "";
+  b.innerHTML = playing ? '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>' : "▶ Play this shot";
 }
 /** The same shot (by id) in the one previous video kept by `film replace` (FR-014a). @param {string} id */
 async function playPrevious(id) {

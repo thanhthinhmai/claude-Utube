@@ -38,8 +38,14 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     if (out.playable) {
       await page.evaluate(() => { /** @type {HTMLVideoElement} */ (document.getElementById("sh-pane-video")).muted = true; });
       await page.click("#sh-play");
+      await page.waitForTimeout(300);
+      out.pauseShown = await page.getAttribute("#sh-play", "aria-label");
       await page.waitForFunction(() => { const v = /** @type {HTMLVideoElement} */ (document.getElementById("sh-pane-video")); return v.paused && v.currentTime > 1.5; }, null, { timeout: 8000 }).catch(() => {});
       out.stoppedAt = await page.evaluate(() => /** @type {HTMLVideoElement} */ (document.getElementById("sh-pane-video")).currentTime);
+      out.afterStopLabel = await page.getAttribute("#sh-play", "aria-label");
+      await page.click("#sh-play"); await page.waitForTimeout(300); await page.click("#sh-play");   // play, then pause by hand
+      out.pausedByHand = await page.evaluate(() => /** @type {HTMLVideoElement} */ (document.getElementById("sh-pane-video")).paused);
+      out.afterPauseLabel = await page.getAttribute("#sh-play", "aria-label");
     }
     await page.click("#sh-next");
     out.nextTitle = (await page.locator("#sh-pane .sh-pane-head strong").innerText()).trim();

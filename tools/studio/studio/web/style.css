@@ -626,3 +626,5 @@ label.button:focus-within { outline: 2px solid var(--accent-line); }
 .sh-prev { display: grid; gap: 6px; }
 .sh-prev-video { max-height: 240px; }
 .shot-notes-link { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+#sh-play.sh-pausebtn { width: 44px; height: 44px; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
