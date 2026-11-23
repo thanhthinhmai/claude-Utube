@@ -582,7 +582,8 @@ fieldset.points legend { font-size: 13px; padding: 0 4px; }
 .shot-pane { position: sticky; top: 16px; display: grid; gap: 8px; min-width: 0; }
 .sh-pane-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sh-pane-head .badge { margin-left: auto; }
-.sh-big { width: 100%; cursor: zoom-in; }
+.sh-media { width: 100%; }
+.sh-pane-video { display: block; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 10px; }
 .sh-nav button { padding: 6px 12px; }
 @media (max-width: 760px) {
   .shots-body { grid-template-columns: minmax(0, 1fr); }

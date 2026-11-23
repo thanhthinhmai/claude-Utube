@@ -28,17 +28,17 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     out.prevDisabled = await page.locator("#sh-prev").isDisabled();
     // play one shot (H.264 may be missing in a test Chromium: then only the controls are checked)
     out.playable = await page.evaluate(() => new Promise((res) => {
-      const v = /** @type {HTMLVideoElement} */ (document.getElementById("film-video"));
+      const v = /** @type {HTMLVideoElement} */ (document.getElementById("sh-pane-video"));
       if (v.readyState >= 1) return res(true);
       v.addEventListener("loadedmetadata", () => res(true), { once: true });
       v.addEventListener("error", () => res(false), { once: true });
       setTimeout(() => res(v.readyState >= 1), 4000);
     }));
     if (out.playable) {
-      await page.evaluate(() => { /** @type {HTMLVideoElement} */ (document.getElementById("film-video")).muted = true; });
+      await page.evaluate(() => { /** @type {HTMLVideoElement} */ (document.getElementById("sh-pane-video")).muted = true; });
       await page.click("#sh-play");
-      await page.waitForFunction(() => { const v = /** @type {HTMLVideoElement} */ (document.getElementById("film-video")); return v.paused && v.currentTime > 1.5; }, null, { timeout: 8000 }).catch(() => {});
-      out.stoppedAt = await page.evaluate(() => /** @type {HTMLVideoElement} */ (document.getElementById("film-video")).currentTime);
+      await page.waitForFunction(() => { const v = /** @type {HTMLVideoElement} */ (document.getElementById("sh-pane-video")); return v.paused && v.currentTime > 1.5; }, null, { timeout: 8000 }).catch(() => {});
+      out.stoppedAt = await page.evaluate(() => /** @type {HTMLVideoElement} */ (document.getElementById("sh-pane-video")).currentTime);
     }
     await page.click("#sh-next");
     out.nextTitle = (await page.locator("#sh-pane .sh-pane-head strong").innerText()).trim();

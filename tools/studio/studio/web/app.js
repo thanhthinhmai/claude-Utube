@@ -1339,7 +1339,7 @@ async function filmShots(name, f) {
     return;
   }
   SH = { name, path, api: API + path, f, shots: r.shots, stamp: r.video_stamp, duration: r.duration, sel: 0, filter: "all",
-    doc: { version: 1, shots: {} }, base: "", orphans: [], stopper: 0, selfSeek: false, prev: null, pending: [], draft: "",
+    doc: { version: 1, shots: {} }, base: "", orphans: [], stopper: 0, selfSeek: false, prev: null, pending: [], draft: "", pv: /** @type {HTMLVideoElement | null} */ (null),
     pin: true, notesError: "" };
   slot.innerHTML = `<div class="panel shots" id="shots">
     <div class="shots-head"><p class="section-title">Shots</p><span class="muted small">${r.shots.length} shots · ${mss1(r.duration || 0)}</span></div>
@@ -1353,11 +1353,13 @@ async function filmShots(name, f) {
   </div>`;
   const cp = /** @type {HTMLButtonElement} */ (document.getElementById("sh-claude-copy"));
   cp.onclick = () => copyCommand(cp, `Sửa theo ghi chú phim ${name}`);
-  const v = shotVideo();
-  if (v) {
-    v.addEventListener("seeking", () => { if (!SH || SH.selfSeek) return; stopShot(); });
-    v.addEventListener("seeked", () => { if (SH) SH.selfSeek = false; });
-  }
+  // the selected shot plays in the shot pane itself: one video element kept across redraws (moved, not rebuilt)
+  const pv = document.createElement("video");
+  pv.id = "sh-pane-video"; pv.className = "sh-pane-video"; pv.controls = true; pv.preload = "metadata"; pv.playsInline = true;
+  pv.src = `${SH.api}/video`;
+  pv.addEventListener("seeking", () => { if (!SH || SH.selfSeek) return; stopShot(); });
+  pv.addEventListener("seeked", () => { if (SH) SH.selfSeek = false; });
+  SH.pv = pv;
   drawShots();
   loadNotes();
 }
@@ -1384,7 +1386,8 @@ async function copyCommand(btn, text) {
   setTimeout(() => { btn.textContent = "Copy"; }, 1500);
 }
 /** @returns {HTMLVideoElement | null} */
-const shotVideo = () => /** @type {HTMLVideoElement | null} */ (document.getElementById("film-video"));
+/** The video the Shots section drives: the shot pane's own player. @returns {HTMLVideoElement | null} */
+const shotVideo = () => (SH && SH.pv) ? SH.pv : /** @type {HTMLVideoElement | null} */ (document.getElementById("film-video"));
 /** Status of a shot by id (US2 fills the notes book). @param {string} id */
 const shotStatus = (id) => ((SH && SH.doc.shots[id]) || {}).status || "none";
 /** @param {any} s */
@@ -1455,11 +1458,11 @@ function drawList() {
 function selectShot(i, seek) {
   SH.sel = Math.max(0, Math.min(SH.shots.length - 1, i));
   stopShot();
-  const v = shotVideo();
-  if (seek && v) { v.pause(); SH.selfSeek = true; v.currentTime = SH.shots[SH.sel].t0; }
   document.querySelectorAll("#sh-timeline .sh-cell").forEach((b) => b.classList.toggle("on", /** @type {HTMLElement} */ (b).dataset.i === String(SH.sel)));
   document.querySelectorAll("#sh-list .sh-row").forEach((b) => b.classList.toggle("on", /** @type {HTMLElement} */ (b).dataset.i === String(SH.sel)));
   drawPane();
+  const v = shotVideo();
+  if (seek && v) { v.pause(); SH.selfSeek = true; v.currentTime = SH.shots[SH.sel].t0; }
 }
 function stopShot() { if (SH && SH.stopper) { cancelAnimationFrame(SH.stopper); SH.stopper = 0; } }
 /** Play one shot from its start and stop at its end (research R4). @param {HTMLVideoElement} v @param {number} t0 @param {number} t1 */
@@ -1481,13 +1484,15 @@ function drawPane() {
   const s = SH.shots[SH.sel], st = shotStatus(s.id);
   el.innerHTML = `<div class="sh-pane-head"><strong>Shot ${s.n}</strong> <span class="muted small">${esc(s.id)}${s.set ? ` · ${esc(s.set)}` : ""}</span>
       <span class="badge st-badge st-${st}">${SHOT_STATUS[st]}</span></div>
-    <img class="sh-thumb sh-big" data-src="${shotThumb(s, "b")}" data-zoom alt="Middle of shot ${s.n}">
+    <div class="sh-media" id="sh-media"></div>
     <p class="small muted">${mss1(s.t0)}–${mss1(s.t1)} · ${(s.t1 - s.t0).toFixed(1)} s</p>
     <div class="row sh-nav"><button type="button" id="sh-prev"${SH.sel === 0 ? " disabled" : ""} aria-label="Previous shot">← Prev</button>
       <button type="button" class="primary" id="sh-play">▶ Play this shot</button>
       <button type="button" id="sh-next"${SH.sel === SH.shots.length - 1 ? " disabled" : ""} aria-label="Next shot">Next →</button></div>
     ${SH.f.has_prev ? `<div class="sh-prev"><button type="button" id="sh-prev-version">Watch the previous version</button><div id="sh-prev-slot"></div></div>` : ""}
     <div id="sh-notes"></div>`;
+  const media = el.querySelector("#sh-media");
+  if (media && SH.pv) { SH.pv.poster = shotThumb(s, "b"); media.appendChild(SH.pv); }
   drawNotes();
   wireThumbs(el);
   zoomable(el);
