@@ -1299,13 +1299,15 @@ async function pageFilm(name) {
         <source src="${base}/video" type="video/mp4">
         ${f.has_subtitles ? `<track kind="subtitles" srclang="vi" label="Subtitles" src="${base}/subtitles.vtt" default>` : ""}
       </video></div><p class="muted">Turn subtitles on or off with the player’s CC button.</p>
-      ${MODE === "online" ? `<p><a class="button primary" href="${base}/download">Download</a> <button class="danger" id="del-film">Delete this film</button></p>` : ""}`
+      ${MODE === "online" ? `<p class="film-actions" id="film-actions"><a class="button primary" href="${base}/download">Download</a> <button class="danger" id="del-film">Delete this film</button></p>` : ""}`
     : `<p class="notice">${f.rendering ? "The film is still rendering: see progress on the Jobs page." : "No film file yet."}</p>`}
     ${f.has_video ? `<div id="shots-slot"><div class="panel"><p class="section-title">Shots</p><p class="muted">Loading…</p></div></div>` : ""}
     ${tiersHtml(f.tiers)}
     ${f.treatment_html ? `<h2>Script (TREATMENT)</h2><div class="panel md">${f.treatment_html}</div>` : ""}
     ${f.credits ? `<h2>Third-party assets (CREDITS)</h2><pre class="log">${esc(f.credits)}</pre>` : ""}</div>
-    ${f.has_video ? `<aside class="shot-pane sh-inspector film-inspector" id="sh-pane" aria-label="Inspector"><p class="section-title">Inspector</p><p class="muted small">Loading…</p></aside>` : ""}</div>`;
+    ${f.has_video ? `<div class="film-side" id="film-side"><aside class="shot-pane sh-inspector film-inspector" id="sh-pane" aria-label="Inspector"><div class="insp-head"><p class="section-title">Inspector</p><p class="muted small">Loading…</p></div></aside></div>` : ""}</div>`;
+  const acts = document.getElementById("film-actions"), side = document.getElementById("film-side");
+  if (acts && side) side.appendChild(acts);
   if (f.has_video) filmShots(name, f);
   const del = document.getElementById("del-film");
   if (del) del.onclick = async () => {
@@ -1330,7 +1332,12 @@ async function filmShots(name, f) {
   let r;
   try { r = await get(`${path}/shots`); }
   catch (e) { slot.innerHTML = `<div class="panel"><p class="section-title">Shots</p><p class="error">${esc(e.message)}</p></div>`; return; }
-  const noInspector = () => { const a = document.getElementById("sh-pane"); if (a) a.remove(); $app.classList.remove("wide-film"); };
+  const noInspector = () => { // no shot marks: back to one column, Download / Delete under the film again
+    const a = document.getElementById("sh-pane"), acts = document.getElementById("film-actions"), fp = document.getElementById("film-player");
+    if (a) a.remove();
+    if (acts && fp && fp.parentNode) fp.parentNode.insertBefore(acts, fp.nextSibling);
+    $app.classList.remove("wide-film");
+  };
   if (r.missing || !r.valid) noInspector();
   if (r.missing) {
     slot.innerHTML = `<div class="panel" id="shots"><p class="section-title">Shots</p><p>This film has no shot marks yet.</p>
@@ -1583,11 +1590,13 @@ function drawPane() {
       <button type="button" class="primary sh-roundbtn" id="sh-play" aria-label="Play this shot" title="Play this shot"></button>
       <button type="button" id="sh-next"${SH.sel === SH.shots.length - 1 ? " disabled" : ""} aria-label="Next shot">Next →</button>
       <span class="small muted sh-range">${mss1(s.t0)}–${mss1(s.t1)} · ${(s.t1 - s.t0).toFixed(1)} s</span></div>`;
-  el.innerHTML = `<p class="section-title sh-insp-title">Inspector</p>
-    <div class="sh-pane-head"><strong>Shot ${s.n}</strong> <span class="muted small">${esc(s.id)}${s.set ? ` · ${esc(s.set)}` : ""}</span>
-      <span class="badge st-badge st-${st}">${SHOT_STATUS[st]}</span></div>
-    <p class="small muted">${mss1(s.t0)}–${mss1(s.t1)} · ${(s.t1 - s.t0).toFixed(1)} s</p>
-    ${SH.f.has_prev ? `<div class="sh-prev"><button type="button" id="sh-prev-version">Watch the previous version</button><div id="sh-prev-slot"></div></div>` : ""}
+  const nn = ((SH.doc.shots[s.id] || {}).notes || []).length;
+  el.innerHTML = `<div class="insp-head">
+      <p class="section-title">Inspector</p>
+      <div class="sh-pane-head insp-title"><strong>Shot ${s.n}</strong><span class="badge st-badge st-${st}">${SHOT_STATUS[st]}</span></div>
+      <div class="insp-tags"><span class="tag">${esc(s.id)}</span><span class="tag">${mss1(s.t0)}–${mss1(s.t1)}</span><span class="tag">${(s.t1 - s.t0).toFixed(1)} s</span>${s.set ? `<span class="tag">${esc(s.set)}</span>` : ""}<span class="tag">${nn} note${nn === 1 ? "" : "s"}</span></div>
+    </div>
+    ${SH.f.has_prev ? `<div class="insp-sec sh-prev"><button type="button" class="insp-btn" id="sh-prev-version"><span aria-hidden="true">↺</span> Watch the previous version</button><div id="sh-prev-slot"></div></div>` : ""}
     <div id="sh-notes"></div>`;
   const media = cv.querySelector("#sh-media");
   if (media && SH.pv) { SH.pv.poster = shotThumb(s, "b"); media.appendChild(SH.pv); }
@@ -1656,9 +1665,9 @@ function drawNotes() {
   if (!el) return;
   const s = SH.shots[SH.sel], sh = SH.doc.shots[s.id] || { status: "none", notes: [] }, st = sh.status || "none";
   el.innerHTML = `${SH.notesError ? `<p class="error">${esc(SH.notesError)}</p>` : ""}
-    <div class="seg sh-status" role="group" aria-label="Shot status">${["ok", "fix", "fixed"].map((k) => `<button type="button" data-st="${k}" class="${st === k ? "on" : ""}" aria-pressed="${st === k}">${SHOT_STATUS[k]}</button>`).join("")}</div>
-    <ul class="sh-notes">${(sh.notes || []).filter((/** @type {any} */ n) => !SH.live[s.id] || n.id !== SH.live[s.id].id).map((/** @type {any} */ n) => noteHtml(n, s.id, true)).join("") || (SH.live[s.id] ? "" : `<li class="muted small">No notes on this shot yet.</li>`)}</ul>
-    <div class="sh-add">
+    <div class="insp-sec"><p class="insp-label">Status</p><div class="seg sh-status" role="group" aria-label="Shot status">${["ok", "fix", "fixed"].map((k) => `<button type="button" data-st="${k}" class="${st === k ? "on" : ""}" aria-pressed="${st === k}">${SHOT_STATUS[k]}</button>`).join("")}</div></div>
+    <div class="insp-sec"><p class="insp-label">Notes</p><ul class="sh-notes">${(sh.notes || []).filter((/** @type {any} */ n) => !SH.live[s.id] || n.id !== SH.live[s.id].id).map((/** @type {any} */ n) => noteHtml(n, s.id, true)).join("") || (SH.live[s.id] ? "" : `<li class="muted small">No notes on this shot yet.</li>`)}</ul></div>
+    <div class="insp-sec sh-add"><p class="insp-label">Add a note</p>
       <textarea id="sh-note" maxlength="2000" rows="3" placeholder="What is wrong in this shot? Type it (saved as you type) or paste a screenshot with Ctrl+V.">${esc(SH.draft || "")}</textarea>
       <div class="sh-pending" id="sh-pending"></div>
       <div class="row sh-add-row">
