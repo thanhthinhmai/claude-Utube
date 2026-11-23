@@ -17,28 +17,28 @@ description: "Tasks: sửa ghi chú phim After Effects tự động trên app (0
 
 ## Phase 1: Setup
 
-- [ ] T001 Tạo `tools/ae/` (`__init__.py`, `kit/`), `tests/ae/run.sh` (unittest như `tests/filmcheck/run.sh`), `tests/ae/test_ae.py` rỗng; thêm `sh tests/ae/run.sh` vào danh sách test của CLAUDE.md
-- [ ] T002 Chép bộ dựng chung từ `films/ae-crayon-test/ae/` (ngoài git) vào `tools/ae/kit/`: `lib.jsx`, `chars.jsx`, `scene.jsx`, `persp.jsx`, `build_core.jsx`; thay mọi đường dẫn `E:/claude-utube-ae/crayon10/…` bằng `CU.WORK + "/…"`; ghi nguồn gốc trong đầu mỗi tệp
+- [X] T001 Tạo `tools/ae/` (`__init__.py`, `kit/`), `tests/ae/run.sh` (unittest như `tests/filmcheck/run.sh`), `tests/ae/test_ae.py` rỗng; thêm `sh tests/ae/run.sh` vào danh sách test của CLAUDE.md
+- [X] T002 Chép bộ dựng chung từ `films/ae-crayon-test/ae/` (ngoài git) vào `tools/ae/kit/`: `lib.jsx`, `chars.jsx`, `scene.jsx`, `persp.jsx`, `build_core.jsx`; thay mọi đường dẫn `E:/claude-utube-ae/crayon10/…` bằng `CU.WORK + "/…"`; ghi nguồn gốc trong đầu mỗi tệp
 
 ---
 
 ## Phase 2: Foundational
 
-- [ ] T003 `tools/ae/film.py`: đọc `film.json` (data-model: `engine`, `fps`, `size`, `shots`, `ae_files`, `audio`); `require_ae(film_dir)` từ chối phim không phải `"ae"` với thông báo nói bộ máy hiện tại (FR-002); thêm `engine` vào `tools/studio/studio/resources.py` `film_summary`
-- [ ] T004 [P] `tools/ae/bundle.py`: tạo `bundle.tar` gồm `kit/*.jsx` + `ae/<ae_files>` + `entry.jsx` (đặt `CU.WORK` lúc chạy từ biến của app/lệnh, `CU.PROJ`, `CU.build([...])`, ghi `log.txt` với `START`, `CHECK …`, `DONE`) theo contracts/film-ae.md
-- [ ] T005 [P] `tools/ae/splice.py`: ghép nhiều shot vào video hiện có theo khung trong một lần mã hoá (từ `fixshots.sh`: `trim=start_frame/end_frame`, `setpts=N/FPS/TB`, ép fps, giữ tiếng), đọc mốc từ `shots.json`
-- [ ] T006a [P] `desktop/test/fake-ae.mjs`: AE giả đóng vai `AfterFX` (đọc entry, ghi `log.txt` với `START`/`DONE`, chế độ treo để thử thời hạn) và `aerender` (sinh mp4 ngắn bằng ffmpeg hoặc chép mp4 mẫu nhỏ ở `desktop/test/vectors/`); dùng chung cho T010 và T019
-- [ ] T006 [P] Test `tests/ae/test_ae.py`: `film.json` thiếu/sai; phim web bị từ chối; gói chứa đúng tệp và không chép thừa; ghép 2 shot vào video thử 30 khung/giây (ffmpeg testsrc) → đúng số khung, các đoạn ngoài shot trùng khung gốc (PSNR > 40 dB)
+- [X] T003 `tools/ae/film.py`: đọc `film.json` (data-model: `engine`, `fps`, `size`, `shots`, `ae_files`, `audio`); `require_ae(film_dir)` từ chối phim không phải `"ae"` với thông báo nói bộ máy hiện tại (FR-002); thêm `engine` vào `tools/studio/studio/resources.py` `film_summary`
+- [X] T004 [P] `tools/ae/bundle.py`: tạo `bundle.tar` gồm `kit/*.jsx` + `ae/<ae_files>` + `entry.jsx` (đặt `CU.WORK` lúc chạy từ biến của app/lệnh, `CU.PROJ`, `CU.build([...])`, ghi `log.txt` với `START`, `CHECK …`, `DONE`) theo contracts/film-ae.md
+- [X] T005 [P] `tools/ae/splice.py`: ghép nhiều shot vào video hiện có theo khung trong một lần mã hoá (từ `fixshots.sh`: `trim=start_frame/end_frame`, `setpts=N/FPS/TB`, ép fps, giữ tiếng), đọc mốc từ `shots.json`
+- [X] T006a [P] `desktop/test/fake-ae.mjs`: AE giả đóng vai `AfterFX` (đọc entry, ghi `log.txt` với `START`/`DONE`, chế độ treo để thử thời hạn) và `aerender` (sinh mp4 ngắn bằng ffmpeg hoặc chép mp4 mẫu nhỏ ở `desktop/test/vectors/`); dùng chung cho T010 và T019
+- [X] T006 [P] Test `tests/ae/test_ae.py`: `film.json` thiếu/sai; phim web bị từ chối; gói chứa đúng tệp và không chép thừa; ghép 2 shot vào video thử 30 khung/giây (ffmpeg testsrc) → đúng số khung, các đoạn ngoài shot trùng khung gốc (PSNR > 40 dB)
 
 ---
 
 ## Phase 3: User Story 1 - Bộ dựng chung và lệnh `ae` (P1) 🎯 MVP
 
-- [ ] T007 [US1] `tools/ae/local.py`: chạy AE trên máy từ dòng lệnh (WSL: `AfterFX.exe -r` + chờ `log.txt`, tắt AfterFX, `aerender` từng comp; macOS: `osascript … DoScriptFile`), đường dẫn từ `~/.config/claude-utube/ae.json`; mã lỗi `ae_missing`, `ae_scripting_off`, `ae_stalled`, `shot_timeout`, `build_error`, `render_error`, `disk_low` (kiểm thư mục làm việc còn ≥ 2 GB trống trước khi dựng) (data-model)
-- [ ] T008 [US1] `tools/ae/uses.py`: quét `ae/*.jsx` tìm `CU.<hàm>` (kèm bảng gọi trong `kit/`), `shots_using(film_dir, funcs)` (FR-005, R6)
-- [ ] T009 [US1] `tools/ae/cli.py` + `bin/studio`: `ae build|render|fix|uses|status|new` và `config ae` theo contracts/cli.md; trong việc (`STUDIO_PROXY` có) thì đi qua cầu nối (US2), ngoài việc thì `local.py`; `ae fix` ngoài việc gọi `shotnotes.replace_video`
-- [ ] T010 [P] [US1] Test: `ae uses` trên phim thử (2 shot gọi hàm khác nhau); `config ae` lưu và đọc; `ae build` với AE giả (biến `STUDIO_AE_FAKE=1` dùng `desktop/test/fake-ae.mjs`) báo `ae_missing` ≤ 10 s khi đường dẫn sai (SC-004)
-- [ ] T011 [US1] (phim tập luyện, ngoài git) Chuyển `films/ae-crayon-test` sang `film.json` + `ae/shots_a…e3.jsx`; `sh bin/studio ae fix ae-crayon-test S13` so với video hiện có: 4128 khung, 0 khung dưới 30 dB, ≤ 60 s (SC-001, FR-015)
+- [X] T007 [US1] `tools/ae/local.py`: chạy AE trên máy từ dòng lệnh (WSL: `AfterFX.exe -r` + chờ `log.txt`, tắt AfterFX, `aerender` từng comp; macOS: `osascript … DoScriptFile`), đường dẫn từ `~/.config/claude-utube/ae.json`; mã lỗi `ae_missing`, `ae_scripting_off`, `ae_stalled`, `shot_timeout`, `build_error`, `render_error`, `disk_low` (kiểm thư mục làm việc còn ≥ 2 GB trống trước khi dựng) (data-model)
+- [X] T008 [US1] `tools/ae/uses.py`: quét `ae/*.jsx` tìm `CU.<hàm>` (kèm bảng gọi trong `kit/`), `shots_using(film_dir, funcs)` (FR-005, R6)
+- [X] T009 [US1] `tools/ae/cli.py` + `bin/studio`: `ae build|render|fix|uses|status|new` và `config ae` theo contracts/cli.md; trong việc (`STUDIO_PROXY` có) thì đi qua cầu nối (US2), ngoài việc thì `local.py`; `ae fix` ngoài việc gọi `shotnotes.replace_video`
+- [X] T010 [P] [US1] Test: `ae uses` trên phim thử (2 shot gọi hàm khác nhau); `config ae` lưu và đọc; `ae build` với AE giả (biến `STUDIO_AE_FAKE=1` dùng `desktop/test/fake-ae.mjs`) báo `ae_missing` ≤ 10 s khi đường dẫn sai (SC-004)
+- [X] T011 [US1] (phim tập luyện, ngoài git) Chuyển `films/ae-crayon-test` sang `film.json` + `ae/shots_a…e3.jsx`; `sh bin/studio ae fix ae-crayon-test S13` so với video hiện có: 4128 khung, 0 khung dưới 30 dB, ≤ 60 s (SC-001, FR-015)
 
 **Checkpoint**: dựng phim AE bằng bộ dựng chung từ dòng lệnh.
 

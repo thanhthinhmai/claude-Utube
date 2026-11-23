@@ -4,6 +4,7 @@
 1. `sh bin/studio config ae --afterfx "/mnt/c/Program Files/Adobe/Adobe After Effects 2027/Support Files/AfterFX.exe" --aerender ".../aerender.exe" --work /mnt/e/claude-utube-ae/work`
 2. Chuyển `ae-crayon-test` sang `film.json` + `ae/` (tệp riêng của phim).
 3. `sh bin/studio ae fix ae-crayon-test S13` → ≤ 60 s; so với video hiện có: 4128 khung, 0 khung dưới 30 dB ở các shot khác, shot 13 trùng bản dựng bằng bộ code cũ.
+   - **Kết quả 2026-11-24** (AE 2027, WSL): `ae build ae-crayon-test --shots S13` 32 s + ghép 11 s = 43 s; 4128 khung, 0 khung dưới 30 dB ngoài shot 13 (thấp nhất 39,1 dB), shot 13 trùng bản cũ (thấp nhất 41,9 dB, trung bình 43,6 dB).
 4. Đổi tên tạm `AfterFX.exe` trong cấu hình → `ae build` báo thiếu AE trong ≤ 10 s, mã 3.
 
 ## US2 – cầu nối (Windows, rồi macOS)

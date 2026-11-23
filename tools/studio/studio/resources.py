@@ -11,6 +11,7 @@ from .store import StudioError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))     # tools/: filmcheck (shot notes, specs/029)
 from filmcheck import shotnotes  # noqa: E402
+from ae import film as aefilm  # noqa: E402  (specs/031: which engine draws the film)
 
 NAME = re.compile(r"^[a-z0-9-]{1,60}$")
 SHEET = re.compile(r"^v\d{2}_\d{4}\.jpg$")
@@ -79,7 +80,8 @@ def film_summary(name: str) -> dict:
     has_video = (d / f"{name}.mp4").is_file()
     return {"name": name, "has_video": has_video, "has_poster": (d / "poster.jpg").is_file(),
             "has_subtitles": (d / f"{name}.srt").is_file(), "rendering": not has_video and (d / "out").exists(),
-            "has_shots": (d / "shots.json").is_file(), "has_prev": (d / f"{name}.prev.mp4").is_file()}
+            "has_shots": (d / "shots.json").is_file(), "has_prev": (d / f"{name}.prev.mp4").is_file(),
+            "engine": aefilm.engine(d)}
 
 
 def shot_call(fn, *args, **kw):
