@@ -412,6 +412,12 @@ class Worker:
         if job_id not in self.runs:      # media go first, as for done jobs
             self.purge(jobs.load(job_id))
         j = quotas.fail(job_id, error, by)
+        if j.get("kind") == "fix":       # specs/031: the notes are free again; the video and the notes stay as they were
+            try:
+                from filmcheck import shotnotes
+                shotnotes.end_lot(store.account_dir(j["owner"]) / "films" / (j.get("input") or {}).get("film", ""), job_id)
+            except Exception:            # noqa: BLE001
+                log.exception("job %s: end lot", job_id)
         refund = ("Your credit was given back." if by == "studio" and not j.get("charged")
                   else "This job used one credit.")
         self.notify(j, "job_failed", error=error, refund=refund)
@@ -522,6 +528,20 @@ class Worker:
         if (acct / "my-styles").is_dir() and not mine.exists():
             shutil.copytree(acct / "my-styles", mine)
         inp = j.get("input") or {}
+        if j["kind"] == "fix":                        # specs/031: the AE film with its notes; videos as hard links
+            src, dst = acct / "films" / inp["film"], work / "films" / inp["film"]
+            if src.is_dir() and not dst.exists():
+                def link_or_copy(a, b):
+                    if a.endswith(".mp4"):
+                        try:
+                            os.link(a, b)            # read only: the job writes a new out/fix.mp4, never into these
+                            return b
+                        except OSError:
+                            pass
+                    return shutil.copy2(a, b)
+                shutil.copytree(src, dst, copy_function=link_or_copy,
+                                ignore=shutil.ignore_patterns("*.lock", ".shots", "out"))
+            return {}, None
         if j["kind"] != "learn":
             old = inp.get("revise_of")
             if old and (acct / "films" / old).is_dir() and not (work / "films" / old).exists():
@@ -614,6 +634,9 @@ class Worker:
             self.finish_topics(j, work, result)
             return
         rep = j.get("reported") or {}
+        if j["kind"] == "fix":                     # specs/031: put the fixed video and the answers in the library
+            self.finish_fix(j, work, rep, result, rc)
+            return
         cut = j.get("publish_cut") if j["kind"] == "film" else None
         if cut and not rep.get("done"):            # stopped during Publish: the film is delivered (specs/011 R7)
             rep = {**rep, "done": True, "film": rep.get("film") or (j.get("input") or {}).get("film")}
@@ -676,6 +699,43 @@ class Worker:
         self.notify(j, "job_done")
         shutil.rmtree(work, ignore_errors=True)
         log.info("job %s done", job_id)
+
+    def finish_fix(self, j: dict, work: Path, rep: dict, result: dict, rc: int) -> None:
+        """A fix run ended (specs/031 R7, FR-011, FR-014). Done: the film's AE files and, when shots were rebuilt, the
+        new video (previous kept) go to the library, then Claude's answers on the lot's notes. Failed: nothing changes
+        but the lot is dropped (in failed())."""
+        from filmcheck import shotnotes
+        inp = j.get("input") or {}
+        film = inp.get("film")
+        lib, wf = store.account_dir(j["owner"]) / "films" / film, work / "films" / film
+        if rep.get("done") is False or not rep.get("done"):
+            self.failed(j["id"], rep.get("error") or result.get("error") or f"The fix run stopped without finishing (exit code {rc}).",
+                        rep.get("by", "studio"))
+            return
+        try:
+            for name in ("film.json",):
+                if (wf / name).is_file():
+                    shutil.copy2(wf / name, lib / name)
+            if (wf / "ae").is_dir():
+                shutil.copytree(wf / "ae", lib / "ae", dirs_exist_ok=True)
+            fix = wf / "out" / "fix.mp4"
+            replaced = None
+            if fix.is_file():
+                marks = wf / "out" / "fix-shots.json"
+                replaced = shotnotes.replace_video(lib, fix, marks if marks.is_file() else None)
+            got = shotnotes.merge_lot_replies(lib, wf, j["id"])
+            shotnotes.end_lot(lib, j["id"])
+        except Exception as e:      # noqa: BLE001 - a broken result is the studio's fault; the old video stays
+            log.exception("job %s: fix result", j["id"])
+            self.failed(j["id"], f"The fixed film could not be put in place: {e}")
+            return
+        note = (f"{got['replied']} notes answered" + (f", {got['unanswered']} without an answer" if got["unanswered"] else "")
+                + (f" · video replaced ({replaced['new']:.1f} s, previous kept)" if replaced else " · video unchanged"))
+        jobs.update(j["id"], lambda x: x["log"].append(jobs._line(note)))
+        j = jobs.finish(j["id"], "done", links={"film": film})
+        self.notify(j, "job_done")
+        shutil.rmtree(work, ignore_errors=True)
+        log.info("job %s done (fix)", j["id"])
 
     def finish_topics(self, j: dict, work: Path, result: dict) -> None:
         from filmcheck import topics

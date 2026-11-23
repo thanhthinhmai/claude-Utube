@@ -42,6 +42,18 @@ class AeBridgeApi(unittest.TestCase):
         self.assertEqual(self.c.get(f"/api/v1/ae/bridge/{rid}/bundle", headers=h).status_code, 409)        # finished
         self.assertEqual(self.c.get("/api/v1/ae/bridge/nope/bundle", headers=h).status_code, 404)
 
+    def test_fix_needs_an_ae_film_and_the_app(self):
+        r = self.c.post("/api/v1/films/demo-film/fix", json={}, headers={"X-Studio": "1"})
+        self.assertEqual((r.status_code, r.json()["error"]["code"]), (422, "not_ae"))
+        d = self.p.dir / "films" / "demo-film"
+        (d / "ae").mkdir()
+        (d / "ae" / "s.jsx").write_text("")
+        (d / "film.json").write_text(json.dumps({"engine": "ae", "shots": ["S1"], "ae_files": ["s.jsx"]}))
+        r = self.c.post("/api/v1/films/demo-film/fix", json={}, headers={"X-Studio": "1"})
+        self.assertEqual((r.status_code, r.json()["error"]["code"]), (409, "app_only"))     # local mode has no worker
+        f = self.c.get("/api/v1/films/demo-film").json()
+        self.assertEqual((f["engine"], f["ae_ready"]), ("ae", False))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -111,6 +111,18 @@ def film(name: str) -> dict:
     f["credits"] = credits.read_text(encoding="utf-8", errors="replace") if credits.is_file() else None
     f["treatment_html"] = to_html(treat.read_text(encoding="utf-8", errors="replace")) if treat.is_file() else None
     f["tiers"] = tiers_view(d)
+    if f["engine"] == "ae":                     # specs/031: the fix run in progress and whether AE can build now
+        from . import jobs
+        from ae import aequeue
+        lot = None
+        try:
+            lot = shotnotes.active_lot(d, live=jobs.is_live)
+        except Exception:                       # noqa: BLE001 - a broken book never hides the film page
+            lot = None
+        f["lot"] = lot
+        st = aequeue.bridge_status()
+        f["ae_ready"] = st["ready"]
+        f["ae_message"] = None if st["ready"] else st["message"]
     return f
 
 

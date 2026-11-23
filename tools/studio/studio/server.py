@@ -436,6 +436,33 @@ def create_app() -> FastAPI:
             raise StudioError("forbidden", "mã này chỉ được đọc, không sửa được ghi chú", 403)
         return a["email"]
 
+    @app.post(api + "/films/{name}/fix", status_code=201)
+    def film_fix(name: str, request: Request):
+        """"Fix with Claude" (specs/031 FR-010, FR-011): a fix job on the film's open notes (≤ 10, film order)."""
+        _note_writer(request)
+        d = resources.film_dir(name)
+        if not d.is_dir():
+            raise StudioError("not_found", f"không có phim \"{name}\"", 404)
+        from ae import aequeue, film as aefilm
+        if aefilm.engine(d) != "ae":
+            raise StudioError("not_ae", "only After Effects films can be fixed with Claude from their notes", 422)
+        if not online:
+            raise StudioError("app_only", "Fix with Claude runs in the app (sh bin/studio app start)", 409)
+        st = aequeue.bridge_status()
+        if not st["ready"]:
+            raise StudioError(st["code"], st["message"], 409)
+        a = request.state.account
+        j = jobs.build("fix", f"Fix notes of {name}"[:80], {"film": name}, owner=a["id"], status="queued",
+                       extra={"charged": False})
+        lot = resources.shot_call(shotnotes.start_lot, d, j["id"], shotnotes.LOT_LIMIT, jobs.is_live)
+        j["input"] = {"kind": "fix", "film": name, "notes": lot["lot"]["notes"], "left": lot["left"]}
+        try:
+            store.doc_put("job", j["id"], j)
+        except Exception:
+            shotnotes.end_lot(d, j["id"])
+            raise
+        return {"job": j["id"], "notes": lot["lot"]["notes"], "left": lot["left"]}
+
     @app.get(api + "/films/{name}/notes")
     def film_notes(name: str):
         resources.film_path(name, "notes")

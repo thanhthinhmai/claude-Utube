@@ -31,6 +31,7 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 | `PUT /films/{name}/notes` body `{base, doc}` | `{base, doc}`: ghi cả sổ nếu `base` còn đúng (029) | `409 changed` (kèm `current`) · `422 invalid` (kèm `field`) · `403 forbidden` (mã chỉ đọc) · `404` |
 | `POST /films/{name}/notes/images` multipart `file` | `201 {file}`: ảnh PNG/JPEG/WebP ≤ 10 MB cho ghi chú (029; cũng nhận `multipart/form-data` có `X-Studio: 1`) | `413 too_large` · `415 bad_image` · `403 forbidden` · `404` |
 | `GET /films/{name}/notes/images/{file}` | ảnh đính kèm, `file` dạng `img-<12 hex>.(png\|jpg\|webp)` (029) | `400 bad_name` · `404` |
+| `POST /films/{name}/fix` body `{}` | `201 {job, notes, left}`: việc `fix` "Fix with Claude" trên ≤ 10 ghi chú mở theo thứ tự trong phim (specs/031, chỉ trong app); `GET /films/{name}` của phim AE có thêm `engine`, `lot`, `ae_ready`, `ae_message` | `422 not_ae` · `422 no_open_notes` · `409 in_progress` · `409 ae_unavailable` · `409 ae_missing` · `409 app_only` (chế độ local) |
 | `GET /films/{name}/poster` | `image/jpeg` | `404` |
 | `GET /films/{name}/subtitles.vtt` | WebVTT (chuyển từ `.srt`) | `404` |
 | `GET /films/{name}/publish` | gói đăng: `{titles, description, subtitles, files, check}` (specs/011) | `404` |
