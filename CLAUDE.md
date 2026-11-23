@@ -51,6 +51,14 @@ Mỗi yêu cầu đi đúng **một** luồng:
 - **Cập nhật của Client** đi qua Host (`/__cu/update`, bằng lease của Host); Client kiểm chữ ký như 017.
 - **Test**: `desktop/test/share.test.js`, Host giả `desktop/test/fake-host.mjs`, chứng chỉ thử ở `desktop/test/vectors/share-cert.json`.
 
+### Phim After Effects (specs/031, hiến pháp 3.0.0 nguyên tắc VII)
+- Mỗi phim một bộ máy, ghi ở `films/<tên>/film.json` → `engine`: `"page"` (vắng tệp = trang web, như cũ) hoặc `"ae"`. Lệnh `ae …` từ chối phim trang web và ngược lại.
+- Phim AE chỉ giữ phần riêng: `film.json` (`shots`, `ae_files`, `fps`, `audio`), `ae/*.jsx` (mỗi shot một hàm `CU.shot<n>`), `ae/data/` (đường máy đo được, snaps). Bộ dựng chung ở `tools/ae/kit/` (`lib`, `chars`, `scene`, `persp`, `build_core`); không chép vào phim. Đường dẫn trong jsx lấy từ `CU.WORK`.
+- Lệnh: `sh bin/studio ae build <phim> [--shots S1,S13]` · `ae fix <phim> S13 …` (dựng đúng các shot đó rồi ghép theo khung vào video hiện có, giữ bản trước) · `ae render <phim>` · `ae uses <phim> <hàm…>` (shot nào dùng hàm nào của bộ dựng chung) · `ae status` · `ae new <phim>`. Ngoài app: AE chạy thẳng trên máy theo `sh bin/studio config ae --afterfx … --aerender … --work /mnt/<ổ>/…` (thư mục làm việc Windows thấy được). Trong việc của app: đi qua cầu nối của app desktop.
+- **Cầu nối** (app desktop, `desktop/aebridge.js`): app tạo khoá mỗi lần khởi động (`app start --bridge`), hỏi hàng đợi `$STUDIO_DATA/ae/` của phần lõi, chạy AE + aerender trên máy (mỗi lúc một lượt dựng AE, 120 s chờ script, 300 s mỗi shot), gửi video và kết quả. Khay → "After Effects…" để chọn đường dẫn và bấm Test. AE là phần mềm có bản quyền của người dùng: xưởng không cài, không mua.
+- **Fix with Claude** trên trang phim AE (chế độ app): tạo việc `fix` trên ≤ 10 ghi chú mở theo thứ tự trong phim (lượt sửa ghi trong `shot-notes.json` → `lot`); Claude sửa shot, `ae fix`, trả lời từng ghi chú; worker thay video (giữ bản trước), chép `ae/` và trả lời về kho. Ghi chú thêm trong lúc chạy chờ lượt sau. Lỗi ở bộ dựng chung: ghi đè hàm trong `ae/kit_fixes.jsx` của phim, không sửa `tools/ae/kit` trong việc.
+- Phim AE mới: New film → "After Effects" (`engine: "ae"`), cần app desktop có AE. Kịch bản, giọng, điểm duyệt, trộn tiếng, gói đăng như phim thường; phần hình theo `SHOTS.md` → `ae/*.jsx` → `ae build` → `ae render`.
+
 ### Luồng làm phim
 1. Chạy `sh bin/studio status`. Nếu chưa sẵn sàng thì chạy `sh bin/studio setup` và báo người dùng công cụ còn thiếu (xưởng không tự cài phần mềm hệ thống).
 2. Đọc `lib/lemo-opuscar/AGENTS.md` và làm theo, **ở chế độ skill** của thư viện, với các điểm thay thế sau:
@@ -171,7 +179,8 @@ Lệnh phụ: `/speckit-checklist <lĩnh vực>` tạo checklist kiểm tra ch�
 - `tools/style-learn/`: công cụ đo và lưu phong cách (venv riêng `tools/.venv`, không vào git), có `learn shots|label` cho cách quay (specs/021, dùng `tools/filmcheck/focus.py` và `labeler.py`); skill `.claude/skills/style-learn/`
 - `library.lock`: phiên bản thư viện đã ghim; `lib/lemo-opuscar/`: thư viện (không vào git, không sửa)
 - `channels/`: hồ sơ kênh của chính xưởng và bài học (vào git, specs/012) · `people/`: thư viện người thật (hình vẽ và duyệt vào git, ảnh tham chiếu trong `.sheet/` không vào git; `tools/filmcheck/people.py`, specs/028) · `my-styles/`: phong cách riêng (vào git) · `films/`: phim (không vào git) · `references/`: video tham chiếu (không vào git) · `tools/`: công cụ tự viết
-- `desktop/`: app desktop (Electron, specs/015) · `CREDITS`: giấy phép của phần mềm bên thứ ba
+- `tools/ae/` (specs/031): bộ dựng After Effects dùng chung `kit/`, `film.py` (`film.json`), `bundle.py` (gói jsx + `entry.jsx`), `splice.py` (ghép shot theo khung), `uses.py`, `local.py` (AE trên máy), `remote.py` (qua proxy), `aequeue.py` (hàng đợi của cầu nối), `cli.py`; test: `sh tests/ae/run.sh`
+- `desktop/`: app desktop (Electron, specs/015; cầu nối AE `aebridge.js`, `ae.html`, specs/031) · `CREDITS`: giấy phép của phần mềm bên thứ ba
 - `.specify/memory/constitution.md`: hiến pháp
 - `.specify/templates/`: mẫu cho spec, plan, tasks, checklist
 - `.specify/scripts/bash/`: script tạo nhánh và thư mục tính năng

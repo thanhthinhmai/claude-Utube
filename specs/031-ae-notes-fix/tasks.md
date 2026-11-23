@@ -94,8 +94,8 @@ description: "Tasks: sửa ghi chú phim After Effects tự động trên app (0
 
 ## Phase 8: Polish
 
-- [ ] T036 CLAUDE.md: luồng làm phim AE (bộ máy, `ae …`, cầu nối, chỉ chế độ app), mục Cấu trúc thêm `tools/ae/`, `desktop/aebridge.js`
-- [ ] T037 Chạy đủ: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ae/run.sh`
+- [X] T036 CLAUDE.md: luồng làm phim AE (bộ máy, `ae …`, cầu nối, chỉ chế độ app), mục Cấu trúc thêm `tools/ae/`, `desktop/aebridge.js`
+- [X] T037 Chạy đủ: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ae/run.sh`
 
 ---
 
