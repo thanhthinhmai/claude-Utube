@@ -89,13 +89,16 @@ def _servers() -> list:
 
 
 def _owner(port):
-    """Project folder a server serves; "" for an older server that does not say; None if it does not answer."""
+    """Project folder a server serves; "" for an older local server that does not say; None if it does not answer
+    or is an online-mode server (the app of specs/014 runs one from this same code folder: never ours to stop)."""
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/v1/health", timeout=1.0) as r:
             d = json.loads(r.read())
     except Exception:
         return None
-    return d.get("root", "") if d.get("app") == APP_ID else None
+    if d.get("app") != APP_ID or d.get("mode") == "online":
+        return None
+    return d.get("root", "")
 
 
 def _orphans() -> list:

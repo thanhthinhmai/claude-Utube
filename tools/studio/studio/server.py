@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import APP_ID, VERSION, actions, donesofar, filmsteps, gate, jobs, resources, reviews, store
+from .resources import shotnotes
 from urllib.parse import urlsplit
 from .store import StudioError
 
@@ -35,6 +36,14 @@ class ActionIn(BaseModel):                     # specs/026 contracts/api.md
     op: str = Field(max_length=30)
     args: dict = Field(default_factory=dict)
     base: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{16}$")
+
+
+class NotesIn(BaseModel):                      # specs/029 contracts/api.md
+    base: str = Field(pattern=r"^[0-9a-f]{64}$")
+    doc: dict
+
+
+WRITE_ROLES = {"customer", "admin"}            # a token limited to reading (any other role) may not change notes
 
 
 class PointsIn(BaseModel):
@@ -165,7 +174,8 @@ def create_app() -> FastAPI:
             return err("not_local", "chỉ truy cập được từ chính máy này", 403)
         if request.method not in SAFE_METHODS:                 # CSRF: needs a header a foreign page cannot send
             ctype = request.headers.get("content-type", "")
-            if request.headers.get("x-studio") != "1" or not ctype.startswith("application/json"):
+            multipart = ctype.startswith("multipart/form-data") and request.url.path.endswith("/notes/images")
+            if request.headers.get("x-studio") != "1" or not (ctype.startswith("application/json") or multipart):
                 return err("csrf", "thiếu header X-Studio hoặc nội dung không phải JSON", 403)
         resp = await call_next(request)
         resp.headers["X-Content-Type-Options"] = "nosniff"
@@ -312,8 +322,36 @@ def create_app() -> FastAPI:
         return resources.film(name)
 
     @app.get(api + "/films/{name}/video")
-    def film_video(name: str):
+    def film_video(name: str, prev: Optional[str] = None):
+        if prev:                                    # the one previous video kept by `film replace` (specs/029)
+            p = resources.film_path(name, "video_prev")
+            if not p.is_file():
+                raise StudioError("not_found", "phim chưa có bản trước", 404)
+            return FileResponse(p, media_type="video/mp4")
         return FileResponse(resources.film_file(name, "video"), media_type="video/mp4")
+
+    # ---------- shots and shot notes (specs/029 contracts/api.md) ----------
+    @app.get(api + "/films/{name}/shots")
+    def film_shots(name: str, prev: Optional[str] = None):
+        resources.film_path(name, "shots")                 # bad name 400, no film 404
+        d = resources.film_dir(name)
+        r = resources.shot_call(shotnotes.load_shots, d, bool(prev))
+        video = resources.film_path(name, "video_prev" if prev else "video")
+        r["video_stamp"] = shotnotes.video_stamp(video) if video.is_file() else None
+        r["thumbs"] = None
+        if r["valid"] and not prev and video.is_file():
+            r["thumbs"], r["video_stamp"] = shotnotes.thumbs_state(d, r["shots"])
+        return r
+
+    @app.get(api + "/films/{name}/shots/thumbs/{n}/{which}.jpg")
+    def film_shot_thumb(name: str, n: str, which: str):
+        resources.film_path(name, "thumbs")
+        f, state = resources.shot_call(shotnotes.thumb, resources.film_dir(name), n, which)
+        if f is None and state == "building":
+            return JSONResponse({"status": "building"}, status_code=202, headers={"Cache-Control": "no-store"})
+        if f is None:
+            raise StudioError("not_found", "không cắt được ảnh này", 404)
+        return FileResponse(f, media_type="image/jpeg", headers={"Cache-Control": "max-age=86400"})
 
     @app.get(api + "/films/{name}/poster")
     def film_poster(name: str):
@@ -323,6 +361,54 @@ def create_app() -> FastAPI:
     def film_subtitles(name: str):
         srt = resources.film_file(name, "srt").read_text(encoding="utf-8", errors="replace")
         return Response(resources.srt_to_vtt(srt), media_type="text/vtt; charset=utf-8")
+
+    def _note_writer(request: Request) -> str:
+        """Who writes (online: the account's email, else "local"); 403 for a read-only token (FR-016)."""
+        a = getattr(request.state, "account", None)
+        if a is None:
+            return "local"
+        if a["role"] not in WRITE_ROLES:
+            raise StudioError("forbidden", "mã này chỉ được đọc, không sửa được ghi chú", 403)
+        return a["email"]
+
+    @app.get(api + "/films/{name}/notes")
+    def film_notes(name: str):
+        resources.film_path(name, "notes")
+        return resources.shot_call(shotnotes.read_notes, resources.film_dir(name))
+
+    @app.put(api + "/films/{name}/notes")
+    def film_notes_put(name: str, body: NotesIn, request: Request):
+        resources.film_path(name, "notes")
+        by = _note_writer(request)
+        return resources.shot_call(shotnotes.save_notes, resources.film_dir(name), body.base, body.doc, by, store.clock())
+
+    @app.post(api + "/films/{name}/notes/images", status_code=201)
+    async def film_note_image(name: str, request: Request):
+        resources.film_path(name, "images")
+        _note_writer(request)
+        try:                                       # refuse a body far over the limit before reading it
+            too_big = int(request.headers.get("content-length") or 0) > shotnotes.MAX_IMAGE_BYTES + 64 * 1024
+        except ValueError:
+            too_big = False
+        if too_big:
+            raise StudioError("too_large", f"ảnh tối đa {shotnotes.MAX_IMAGE_BYTES // (1024 * 1024)} MB", 413)
+        form = await request.form(max_files=1, max_fields=4)
+        f = form.get("file")
+        if f is None or isinstance(f, str):
+            raise StudioError("invalid", "cần trường file (multipart/form-data)", 422)
+        data = await f.read(shotnotes.MAX_IMAGE_BYTES + 1)
+        await f.close()
+        name_ = resources.shot_call(shotnotes.save_image, resources.film_dir(name), data, store.clock())
+        return {"file": name_}
+
+    @app.get(api + "/films/{name}/notes/images/{file}")
+    def film_note_image_get(name: str, file: str):
+        resources.film_path(name, "images")
+        p = resources.shot_call(shotnotes.image_path, resources.film_dir(name), file)
+        if not p.is_file():
+            raise StudioError("not_found", "không có ảnh này", 404)
+        types = {".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp"}
+        return FileResponse(p, media_type=types[p.suffix], headers={"Cache-Control": "max-age=86400"})
 
     # ---------- publish pack (specs/011) ----------
     @app.get(api + "/films/{name}/publish")
@@ -392,14 +478,37 @@ def create_app() -> FastAPI:
                             headers={"Cache-Control": "max-age=86400"})
 
     # ---------- live events ----------
+    def film_stamps(owner: str = None) -> dict:
+        """specs/029: one stamp per film (video, shot marks, notes book) so an open film page follows changes made
+        elsewhere (Claude replacing the video or answering notes from the command line)."""
+        base = (store.account_dir(owner) if owner else store.root()) / "films"
+        out = {}
+        try:
+            dirs = [d for d in base.iterdir() if d.is_dir() and resources.NAME.match(d.name)]
+        except OSError:
+            return out
+        for d in dirs:
+            parts = []
+            for f in (d / f"{d.name}.mp4", d / "shots.json", d / "shot-notes.json"):
+                try:
+                    st = f.stat()
+                    parts.append(f"{st.st_size}-{st.st_mtime_ns}")
+                except OSError:
+                    parts.append("-")
+            out["film:" + d.name] = "|".join(parts)
+        return out
+
     def snapshot(owner: str = None) -> dict:
-        return store.doc_versions(owner)
+        return {**store.doc_versions(owner), **film_stamps(owner)}
 
     def changes(old: dict, new: dict):
         for name, t in new.items():
             if old.get(name) == t:
                 continue
-            if name.startswith("j-"):
+            if name.startswith("film:"):
+                if name in old:
+                    yield "film.updated", name[5:]
+            elif name.startswith("j-"):
                 yield "job.updated", name[:-5]
             elif name.endswith(".decision.json"):
                 yield "review.decided", name[: -len(".decision.json")]

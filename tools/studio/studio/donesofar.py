@@ -15,6 +15,9 @@ ALLOWED = re.compile(r"^(SCRIPT\.md|SOURCES\.md|lines\.json|checks\.json|CHECKS\
                      r"|out/mix\.wav|\.check/review-r\d+\.json|\.check/labels\.json"
                      r"|\.check/shots/(sheet|label-sheet)-\d+\.jpg|\.check/shots/S\d{2,4}(~[A-Za-z0-9._~-]+)?\.jpg"
                      r"|scenes\.json|mix\.json|publish/pack\.json|publish/thumbnail-[123]\.(png|jpg))$")       # 026: scene table, mix settings, publish pack
+# Never listed nor served, even if the allow list grows (specs/029 contracts/files.md): shot notes' pictures, the
+# small-picture cache, the previous video and its shot marks
+EXCLUDED = re.compile(r"^(shot-notes/|\.shots/|shots\.prev\.json$|[^/]*\.prev\.mp4$)")
 TYPES = {".md": "text/markdown; charset=utf-8", ".json": "application/json", ".wav": "audio/wav", ".jpg": "image/jpeg",
          ".png": "image/png"}
 SHOT = re.compile(r"^S\d{2,4}\.jpg$")
@@ -48,7 +51,7 @@ def safe_path(base: Path, rel: str) -> Path:
     """A file of the film folder by its relative path; refuses .., absolute paths, links out and unlisted files."""
     if not rel or rel.startswith("/") or "\\" in rel or ".." in rel.split("/"):
         raise StudioError("bad_name", "đường dẫn không hợp lệ", 400)
-    if not ALLOWED.match(rel):
+    if EXCLUDED.match(rel) or not ALLOWED.match(rel):
         raise StudioError("not_found", "không xem được tệp này", 404)
     root = base.resolve()
     p = (base / rel).resolve()

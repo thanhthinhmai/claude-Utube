@@ -273,9 +273,11 @@ def cmd_qc(a) -> int:
         print(f"✗ {e}", file=sys.stderr)
         return 2
 
+    r["shots_file"] = qc.film_shots(d, lib)                    # specs/029: shots.json beside the film (not a check)
+
     def save(x):
         x["film"] = {"pass": r["pass"], "measures": r["measures"], "problems": r["problems"],
-                     "warnings": r.get("warnings", []), "at": now()}
+                     "warnings": r.get("warnings", []), "shots_file": r["shots_file"], "at": now()}
         if x.get("narration") is None:
             x["narration"] = r["narration"]
     report.update(d, save)
@@ -304,6 +306,7 @@ def cmd_qc(a) -> int:
         lines.append(f"  silence {m['silence_ratio']:.0%} · tail {m['tail_s']:.1f} s · {len(m.get('cuts', []))} cuts")
     if not m["texts_checked"]:
         lines.append("  on-screen text not checked (the film has no window.TEXTS); subtitles checked")
+    lines.append(f"  {r['shots_file']}")
     lines.append(f"{'✓' if r['pass'] else '✗'} qc: " + ("all checks pass" if r["pass"] else f"{len(r['problems'])} problem(s)"))
     out(a, r, lines)
     return 0 if r["pass"] else 1
@@ -1229,6 +1232,94 @@ def cmd_edit(a) -> int:
     return r["code"]
 
 
+# ---------- shot marks, shot notes, the previous video (specs/029 contracts/cli.md) ----------
+def app_film(name: str):
+    """The film in the studio owner's library when the app runs for this project and has it (research R8), else None."""
+    try:
+        sys.path.insert(0, str(HERE.parent / "studio"))
+        from studio import host
+        project = Path(os.environ.get("STUDIO_ROOT") or HERE.parents[1])
+        ptr = host.running_pointer(project)
+        if not ptr:
+            return None
+        owner = host.owner_id(Path(ptr["data"]))
+        d = Path(ptr["data"]) / "accounts" / owner / "films" / name if owner else None
+        return d if d and d.is_dir() else None
+    except Exception:                       # never let the app's state stop a command on the project's own film
+        return None
+
+
+def shot_film(a, quiet=False) -> Path:
+    """--dir, else the app owner's copy of the film, else films/<film> of the project. Prints `film: <folder>`."""
+    import re
+    if getattr(a, "dir", None):
+        d = Path(a.dir).expanduser().resolve()
+    else:
+        if not re.fullmatch(r"[a-z0-9-]{1,60}", a.film or ""):
+            print(f"✗ bad film name: {a.film!r}", file=sys.stderr)
+            raise SystemExit(2)
+        d = app_film(a.film) or (Path(os.environ.get("STUDIO_ROOT") or HERE.parents[1]) / "films" / a.film).resolve()
+    if not d.is_dir():
+        print(f"✗ film folder not found: {d}", file=sys.stderr)
+        raise SystemExit(2)
+    print(f"film: {d}", file=sys.stderr if quiet else sys.stdout, flush=True)
+    return d
+
+
+def cmd_shots_export(a) -> int:
+    from filmcheck import shotsexport
+    d = shot_film(a)
+    code, lines = shotsexport.export(d, os.environ.get("STUDIO_LIB"))
+    print("\n".join(lines), file=sys.stdout if code == 0 else sys.stderr)
+    return code
+
+
+def cmd_notes_show(a) -> int:
+    from filmcheck import shotnotes
+    d = shot_film(a, quiet=a.json)
+    try:
+        if a.json:
+            g = shotnotes.read_notes(d)
+            print(json.dumps({"film": str(d), "base": g["base"], "doc": g["doc"], "orphans": g["orphans"],
+                              "shots": shotnotes.load_shots(d)["shots"]}, ensure_ascii=False))
+        else:
+            print("\n".join(shotnotes.show_lines(d, a.all)[0]))
+    except shotnotes.ShotError as e:
+        print(f"✗ {e.message}", file=sys.stderr)
+        return 2
+    return 0
+
+
+def cmd_notes_reply(a) -> int:
+    from filmcheck import shotnotes
+    d = shot_film(a)
+    done = True if a.done else False if a.open else None
+    try:
+        r = shotnotes.reply(d, a.note_id, a.text, done, a.base)
+    except shotnotes.ShotError as e:
+        print(f"✗ {e.message}", file=sys.stderr)
+        return {"changed": 4, "not_found": 1}.get(e.code, 2)
+    n = next(n for sh in r["doc"]["shots"].values() for n in sh["notes"] if n["id"] == a.note_id)
+    print(f"✓ {a.note_id}: {'fixed' if n['done'] else 'open'} · reply saved")
+    print(f"base: {r['base']}")
+    return 0
+
+
+def cmd_film_replace(a) -> int:
+    from filmcheck import shotnotes
+    d = shot_film(a)
+    try:
+        r = shotnotes.replace_video(d, a.video, a.shots)
+    except shotnotes.ShotError as e:
+        print(f"✗ {e.message}; nothing was changed", file=sys.stderr)
+        return 1
+    old = f"{r['old']:.2f} s" if r["old"] is not None else "none"
+    marks = (f"{r['shots']} shots" + (" (kept from before)" if r["kept_marks"] else "")) if r["shots"] else \
+        "no shots.json: the old marks do not fit the new video (give --shots)"
+    print(f"✓ video replaced: {old} → {r['new']:.2f} s · {marks}" + (" · previous kept" if r["prev"] else ""))
+    return 0
+
+
 def not_yet(a) -> int:
     print(f"✗ not built yet: {a.cmd}", file=sys.stderr)
     return 2
@@ -1442,6 +1533,22 @@ def parser() -> argparse.ArgumentParser:
         s.add_argument("scope")
         s.add_argument("n", type=int)
 
+    sh = sub.add_parser("shots", help="the shot marks of a film (specs/029)").add_subparsers(dest="cmd", required=True)
+    s = sh.add_parser("export", help="write shots.json from the page's window.SHOTS (no frames drawn)")
+    s.add_argument("film"); s.add_argument("--dir")
+
+    nt = sub.add_parser("notes", help="shot notes written on the film page (specs/029)").add_subparsers(dest="cmd", required=True)
+    s = nt.add_parser("show", help="the open notes, grouped by shot")
+    s.add_argument("film"); s.add_argument("--all", action="store_true"); s.add_argument("--json", action="store_true")
+    s.add_argument("--dir")
+    s = nt.add_parser("reply", help="answer a note; --done ticks it, --open opens it again")
+    s.add_argument("film"); s.add_argument("note_id"); s.add_argument("text")
+    g = s.add_mutually_exclusive_group(); g.add_argument("--done", action="store_true"); g.add_argument("--open", action="store_true")
+    s.add_argument("--base", required=True); s.add_argument("--dir")
+    fm = sub.add_parser("film", help="the film's video (specs/029)").add_subparsers(dest="cmd", required=True)
+    s = fm.add_parser("replace", help="put a new video in place, keeping one previous")
+    s.add_argument("film"); s.add_argument("video"); s.add_argument("--shots"); s.add_argument("--dir")
+
     c = sub.add_parser("config", help="local settings").add_subparsers(dest="cmd", required=True)
     c.add_parser("youtube-key", help="save your YouTube Data API key (typed in, not shown)")
     s = c.add_parser("model", help="the studio's one Claude model (specs/024); no value prints it")
@@ -1464,6 +1571,8 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach, ("kit", "use"): cmd_kit_use,
+            ("shots", "export"): cmd_shots_export,
+            ("notes", "show"): cmd_notes_show, ("notes", "reply"): cmd_notes_reply, ("film", "replace"): cmd_film_replace,
             ("people", "list"): cmd_people_list, ("people", "new"): cmd_people_new, ("people", "sheet"): cmd_people_sheet,
             ("people", "approve"): cmd_people_approve, ("people", "use"): cmd_people_use, ("people", "check"): cmd_people_check,
             ("lesson", "list"): cmd_lesson_list, ("lesson", "draft"): cmd_lesson_draft, ("lesson", "add"): cmd_lesson_add,

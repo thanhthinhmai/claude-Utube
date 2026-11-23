@@ -169,8 +169,22 @@ async function run() {
   const got = +execFileSync('ffprobe', ['-v', 'error', '-select_streams', 'v', '-count_packets', '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0', tmp], { encoding: 'utf8' }).trim();
   if (got !== N) { fs.rmSync(tmp, { force: true }); throw new Error(`joined video has ${got} frames, expected ${N}`); }
   fs.renameSync(tmp, OUT);
+  writeShots(shots, N);
   for (const d of fs.readdirSync(base)) if (path.join(base, d) !== CH) fs.rmSync(path.join(base, d), { recursive: true, force: true });
   log(`video ${OUT} · ${N} frames · ${mode} · ${secs()}s`);
+}
+
+/** specs/029: out/shots.json next to the joined video, from the SHOTS read above; `sh bin/studio qc` copies it beside
+ * the muxed film as shots.json (data-model "Mốc shot"). A part render (--until) writes none. */
+function writeShots(/** @type {any[]} */ shots, /** @type {number} */ frames) {
+  const f = path.join(FILM, 'out', 'shots.json');
+  try {
+    if (UNTIL != null || !shots.length) { fs.rmSync(f, { force: true }); return; }
+    const rows = shots.map(s => [+(+s[0]).toFixed(3), +(+s[1]).toFixed(3), String(s[2] ?? ''), String(s[3] ?? '')]);
+    fs.writeFileSync(f + '.tmp', JSON.stringify({ version: 1, video: path.basename(OUT), duration: +(frames / FPS).toFixed(3),
+      fps: FPS, source: 'page', shots: rows }, null, 1) + '\n');
+    fs.renameSync(f + '.tmp', f);
+  } catch (e) { log(`render: out/shots.json not written (${String(/** @type {any} */ (e)?.message || e)})`); }
 }
 
 let reused = 0;

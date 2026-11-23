@@ -67,6 +67,8 @@ const ERR = {
   too_many_queued: "You already have 3 jobs in progress. Wait for one to finish.", too_long: "The film is too long.",
   content_rejected: "The studio cannot make this idea.", style_not_found: "This style does not exist any more.",
   in_use: "A job is still using this.", rights_required: "Please confirm your right to use the channel's videos.",
+  bad_image: "Only PNG, JPEG or WebP pictures can be added.", forbidden: "You can only read this.",
+  changed: "Someone else just changed these notes.",
   too_many_questions: "The studio already asked 3 questions.", too_many_videos: "Too many videos for one style.", too_large: "The file is too large.", bad_video: "This file is not a video the studio can read.",
 };
 const errText = (body, status) => {
@@ -1136,7 +1138,10 @@ async function pageJob(id) {
   if (j.status === "done" && j.links.film && j.qa && j.qa.publish) fillPublish(j.links.film, j.qa.publish);
   if (j.kind === "film") doneOpen(j);
   if (j.links.film) get(`/films/${encodeURIComponent(j.links.film)}`).then((/** @type {any} */ f) => {
-    const slot = document.getElementById("tiers-slot"); if (slot) slot.innerHTML = tiersHtml(f.tiers);
+    const slot = document.getElementById("tiers-slot");
+    if (!slot) return;
+    slot.innerHTML = (f.has_video ? `<p class="shot-notes-link"><a class="button" href="#/films/${esc(j.links.film)}">Shot notes</a>
+      <span class="muted small">Watch the film shot by shot and write what to fix (specs/029).</span></p>` : "") + tiersHtml(f.tiers);
   }).catch(() => {});
   const sendAnswer = /** @type {HTMLButtonElement | null} */ (document.getElementById("send-answer"));
   if (sendAnswer) sendAnswer.onclick = async () => {
@@ -1288,21 +1293,592 @@ function tiersHtml(t) {
 async function pageFilm(name) {
   const f = await get(`/films/${encodeURIComponent(name)}`);
   const base = `${API}/films/${encodeURIComponent(name)}`;
-  $app.innerHTML = `${back("#/films", "Films")}${head("Film", esc(f.name), "")}
-    ${f.has_video ? `<video controls preload="metadata" ${f.has_poster ? `poster="${base}/poster"` : ""}>
+  $app.classList.toggle("wide-film", !!f.has_video);      // room for the Inspector column on the right
+  $app.innerHTML = `<div class="film-layout"><div class="film-main"><div class="film-head">${back("#/films", "Films")}${head("Film", esc(f.name), "")}</div>
+    ${f.has_video ? `<div id="film-player"><video id="film-video" controls preload="metadata" ${f.has_poster ? `poster="${base}/poster"` : ""}>
         <source src="${base}/video" type="video/mp4">
         ${f.has_subtitles ? `<track kind="subtitles" srclang="vi" label="Subtitles" src="${base}/subtitles.vtt" default>` : ""}
-      </video><p class="muted">Turn subtitles on or off with the player’s CC button.</p>
-      ${MODE === "online" ? `<p><a class="button primary" href="${base}/download">Download</a> <button class="danger" id="del-film">Delete this film</button></p>` : ""}`
+      </video></div><p class="muted">Turn subtitles on or off with the player’s CC button.</p>
+      ${MODE === "online" ? `<p class="film-actions" id="film-actions"><a class="button primary" href="${base}/download">Download</a> <button class="danger" id="del-film">Delete this film</button></p>` : ""}`
     : `<p class="notice">${f.rendering ? "The film is still rendering: see progress on the Jobs page." : "No film file yet."}</p>`}
+    ${f.has_video ? `<div id="shots-slot"><div class="panel"><p class="section-title">Shots</p><p class="muted">Loading…</p></div></div>` : ""}
     ${tiersHtml(f.tiers)}
     ${f.treatment_html ? `<h2>Script (TREATMENT)</h2><div class="panel md">${f.treatment_html}</div>` : ""}
-    ${f.credits ? `<h2>Third-party assets (CREDITS)</h2><pre class="log">${esc(f.credits)}</pre>` : ""}`;
+    ${f.credits ? `<h2>Third-party assets (CREDITS)</h2><pre class="log">${esc(f.credits)}</pre>` : ""}</div>
+    ${f.has_video ? `<div class="film-side" id="film-side"><aside class="shot-pane sh-inspector film-inspector" id="sh-pane" aria-label="Inspector"><div class="insp-head"><p class="section-title">Inspector</p><p class="muted small">Loading…</p></div></aside></div>` : ""}</div>`;
+  const acts = document.getElementById("film-actions"), side = document.getElementById("film-side");
+  if (acts && side) side.appendChild(acts);
+  if (f.has_video) filmShots(name, f);
   const del = document.getElementById("del-film");
   if (del) del.onclick = async () => {
     if (!confirm("Delete this film for good?")) return;
     try { await send("DELETE", `/films/${encodeURIComponent(name)}`); location.hash = "#/films"; } catch (e) { alert(e.message); }
   };
+}
+
+// ---------- shots and shot notes on the film page (specs/029) ----------
+const SHOT_STATUS = { none: "No notes", ok: "No issue", fix: "Needs fix", fixed: "Fixed" };
+const SHOT_FILTERS = [["all", "All"], ["fix", "Needs fix"], ["fixed", "Fixed"], ["none", "No notes"]];
+/** m:ss.s @param {number} t */
+const mss1 = (t) => { const m = Math.floor(t / 60), s = t - 60 * m; return `${m}:${s.toFixed(1).padStart(4, "0")}`; };
+/** The Shots section's state (one film page at a time). @type {any} */
+let SH = null;
+
+/** @param {string} name @param {any} f */
+async function filmShots(name, f) {
+  const slot = document.getElementById("shots-slot");
+  if (!slot) return;
+  const path = `/films/${encodeURIComponent(name)}`;
+  let r;
+  try { r = await get(`${path}/shots`); }
+  catch (e) { slot.innerHTML = `<div class="panel"><p class="section-title">Shots</p><p class="error">${esc(e.message)}</p></div>`; return; }
+  const noInspector = () => { // no shot marks: back to one column, Download / Delete under the film again
+    const a = document.getElementById("sh-pane"), acts = document.getElementById("film-actions"), fp = document.getElementById("film-player");
+    if (a) a.remove();
+    if (acts && fp && fp.parentNode) fp.parentNode.insertBefore(acts, fp.nextSibling);
+    $app.classList.remove("wide-film");
+  };
+  if (r.missing || !r.valid) noInspector();
+  if (r.missing) {
+    slot.innerHTML = `<div class="panel" id="shots"><p class="section-title">Shots</p><p>This film has no shot marks yet.</p>
+      <p class="muted">Make them from the film's page (no new render): <code>sh bin/studio shots export ${esc(name)}</code></p></div>`;
+    return;
+  }
+  if (!r.valid) {
+    slot.innerHTML = `<div class="panel" id="shots"><p class="section-title">Shots</p><p class="fail">The shot marks file (shots.json) is not valid:</p>
+      <ul class="plain">${r.problems.map((/** @type {any} */ p) => `<li>${p.row ? `Row ${p.row}` : "File"} · ${esc(p.rule)}: ${esc(p.detail)}</li>`).join("")}</ul></div>`;
+    return;
+  }
+  SH = { name, path, api: API + path, f, shots: r.shots, stamp: r.video_stamp, duration: r.duration, sel: 0, filter: "all",
+    doc: { version: 1, shots: {} }, base: "", orphans: [], stopper: 0, selfSeek: false, prev: null, pending: [], draft: "", drafts: /** @type {Record<string, {text: string, pending: string[]}>} */ ({}), live: /** @type {Record<string, {id: string, at: number | null}>} */ ({}), liveTimer: 0, pv: /** @type {HTMLVideoElement | null} */ (null),
+    pin: true, notesError: "", pps: 34 };
+  slot.innerHTML = `<div class="panel shots" id="shots">
+    <div class="shots-head"><p class="section-title">Shots</p><span class="muted small">${r.shots.length} shots · ${mss1(r.duration || 0)}</span></div>
+    <div class="timeline" id="sh-timeline" role="group" aria-label="Shots on the timeline"></div>
+    <div class="sh-legend small muted" id="sh-legend"></div>
+    <div class="chips sh-filters" id="sh-filters" role="group" aria-label="Filter shots"></div>
+
+    <div class="sh-strip-wrap">
+      <div class="row sh-strip-tools"><label class="small muted sh-zoom">Zoom <input type="range" id="sh-zoom" min="10" max="160" step="1" value="34" aria-label="Timeline zoom"></label>
+        <span class="small muted" id="sh-zoom-val">34px/s</span><span class="small muted sh-strip-count">${r.shots.length} shots · ${mss1(r.duration || 0)}</span></div>
+      <div class="sh-strip-scroll" id="sh-strip-scroll"><div class="sh-ruler" id="sh-ruler"></div><ol class="sh-strip" id="sh-list"></ol></div>
+    </div>
+    <div id="sh-orphans"></div>
+    <div class="sh-claude"><p class="section-title">Fix with Claude</p>
+      <p class="muted small">Paste this into your Claude Code chat. Claude lists the open notes, fixes those shots, renders again, replaces the video and ticks each note with a short reply.</p>
+      <div class="row"><code id="sh-claude-text">${esc(`Sửa theo ghi chú phim ${name}`)}</code><button type="button" id="sh-claude-copy">Copy</button></div></div>
+  </div>`;
+  // the shot player takes the film player's place at the top of the page
+  const fp = document.getElementById("film-player");
+  if (fp) {
+    fp.innerHTML = `<div class="sh-canvas" id="sh-canvas"></div>`;
+    // the shot strip (and its filters) sits right under the player: click a shot and watch it without scrolling
+    const strip = document.querySelector("#shots .sh-strip-wrap"), filters = document.getElementById("sh-filters");
+    if (strip) { fp.appendChild(strip); const tools = strip.querySelector(".sh-strip-tools"); if (filters && tools) tools.prepend(filters); }
+    if (window.ResizeObserver) new ResizeObserver(() => alignInspector()).observe(fp);
+    window.addEventListener("resize", alignInspector);
+  }
+  const zm = /** @type {HTMLInputElement} */ (document.getElementById("sh-zoom"));
+  zm.oninput = () => { SH.pps = +zm.value; /** @type {HTMLElement} */ (document.getElementById("sh-zoom-val")).textContent = `${SH.pps}px/s`; drawList(); };
+  const cp = /** @type {HTMLButtonElement} */ (document.getElementById("sh-claude-copy"));
+  cp.onclick = () => copyCommand(cp, `Sửa theo ghi chú phim ${name}`);
+  // the selected shot plays in the shot pane itself: one video element kept across redraws (moved, not rebuilt)
+  const pv = document.createElement("video");
+  pv.id = "sh-pane-video"; pv.className = "sh-pane-video"; pv.controls = true; pv.preload = "metadata"; pv.playsInline = true;
+  pv.src = `${SH.api}/video?v=${encodeURIComponent(SH.stamp || "")}`;
+  if (f.has_subtitles) { const tr = document.createElement("track"); tr.kind = "subtitles"; tr.srclang = "vi"; tr.label = "Subtitles"; tr.src = `${SH.api}/subtitles.vtt`; tr.default = true; pv.appendChild(tr); }
+  pv.addEventListener("loadedmetadata", () => { if (SH && SH.pv === pv && pv.currentTime < 0.01) { SH.selfSeek = true; pv.currentTime = SH.shots[SH.sel].t0 + 0.04; } }, { once: true });   // show the real first frame
+  pv.addEventListener("seeking", () => { if (!SH || SH.selfSeek) return; stopShot(); });
+  pv.addEventListener("seeked", () => { if (SH) SH.selfSeek = false; });
+  ["play", "pause", "ended"].forEach((ev) => pv.addEventListener(ev, playButtonState));
+  SH.pv = pv;
+  drawShots();
+  loadNotes();
+}
+/** A film changed on the server (video replaced, notes answered). Only the open page of that film reacts.
+ * @param {Event} e */
+function onFilmUpdated(e) {
+  let id = "";
+  try { id = JSON.parse(/** @type {MessageEvent} */ (e).data).id; } catch { return; }
+  if (!SH || SH.name !== id || !location.hash.startsWith("#/films/")) return;
+  if (SH.liveRefresh) clearTimeout(SH.liveRefresh);
+  SH.liveRefresh = setTimeout(() => { SH.liveRefresh = 0; refreshFilmLive(); }, 300);
+}
+/** The right column (Inspector, then Download / Delete) spans exactly the shot player: from the top of the video to the
+ * Prev / Play / Next row. Long notes scroll inside the Inspector. Off on narrow screens (one column). */
+function alignInspector() {
+  const side = document.getElementById("film-side"), pl = document.getElementById("film-player"), lay = document.querySelector(".film-layout");
+  const insp = document.getElementById("sh-pane"), acts = document.getElementById("film-actions");
+  if (!side || !insp) return;
+  if (!pl || !lay || !$app.classList.contains("wide-film") || window.innerWidth <= 1100) { side.style.marginTop = ""; insp.style.height = ""; return; }
+  const pr = pl.getBoundingClientRect();
+  side.style.marginTop = `${Math.max(0, Math.round(pr.top - lay.getBoundingClientRect().top))}px`;
+  const gap = acts && acts.parentNode === side ? acts.getBoundingClientRect().height + 12 : 0;
+  insp.style.height = `${Math.max(260, Math.round(pr.height - gap))}px`;
+}
+/** True while the person is typing a note or editing one: their box is never rebuilt under them. */
+const typingNote = () => !!(document.activeElement && (document.activeElement.id === "sh-note" || document.activeElement.classList.contains("sh-edit-box"))) || !!document.querySelector(".sh-edit-box");
+async function refreshFilmLive() {
+  if (!SH) return;
+  try {
+    const n = await get(`${SH.path}/notes`);
+    if (n.base !== SH.base && !SH.liveTimer) {
+      SH.doc = n.doc; SH.base = n.base; SH.orphans = n.orphans || [];
+      drawTimeline(); drawFilters(); drawList(); drawOrphans();
+      if (typingNote()) refreshPaneStatus(); else drawNotes();
+    }
+  } catch { /* next event tries again */ }
+  try {
+    const r = await get(`${SH.path}/shots`);
+    if (r.video_stamp && r.video_stamp !== SH.stamp) {
+      SH.pendingVideo = r;
+      const main = /** @type {HTMLVideoElement | null} */ (document.getElementById("film-video"));
+      if ((SH.pv && !SH.pv.paused) || (main && !main.paused)) newVersionBar(true); else applyNewVideo();
+    }
+  } catch { /* next event tries again */ }
+}
+/** "A new version of the film is ready" while a video is playing; the person loads it when they want. @param {boolean} on */
+function newVersionBar(on) {
+  let bar = document.getElementById("sh-newver");
+  if (!on) { if (bar) bar.remove(); return; }
+  if (bar) return;
+  const slot = document.getElementById("shots-slot");
+  if (!slot) return;
+  bar = document.createElement("div");
+  bar.id = "sh-newver"; bar.className = "notice sh-newver"; bar.setAttribute("role", "status");
+  bar.innerHTML = `<span>A new version of the film is ready.</span> <button type="button" class="primary" id="sh-newver-load">Load it</button>`;
+  slot.prepend(bar);
+  /** @type {HTMLElement} */ (bar.querySelector("#sh-newver-load")).onclick = () => applyNewVideo();
+}
+/** Swap in the replaced video (both players), its shot marks and small pictures; the selected shot stays. */
+function applyNewVideo() {
+  const r = SH.pendingVideo;
+  if (!r) return;
+  SH.pendingVideo = null;
+  SH.stamp = r.video_stamp;
+  if (r.valid) { SH.shots = r.shots; SH.duration = r.duration; SH.sel = Math.min(SH.sel, SH.shots.length - 1); }
+  SH.prev = null; SH.f.has_prev = true;
+  const src = `${SH.api}/video?v=${encodeURIComponent(SH.stamp)}`;
+  const main = /** @type {HTMLVideoElement | null} */ (document.getElementById("film-video"));
+  if (main) { main.pause(); main.src = src; main.load(); }
+  if (SH.pv) {
+    stopShot(); SH.pv.pause();
+    const t0 = SH.shots[SH.sel] ? SH.shots[SH.sel].t0 : 0, pv = SH.pv;
+    pv.addEventListener("loadedmetadata", () => { SH.selfSeek = true; pv.currentTime = t0 + 0.04; }, { once: true });
+    pv.src = src; pv.load();
+  }
+  newVersionBar(false);
+  if (typingNote()) { drawTimeline(); drawFilters(); drawList(); } else drawShots();
+}
+async function loadNotes() {
+  try {
+    const n = await get(`${SH.path}/notes`);
+    SH.doc = n.doc; SH.base = n.base; SH.orphans = n.orphans || [];
+  } catch (e) { SH.notesError = e.message; }
+  drawShots();
+}
+/** Copy, falling back to a selected text box when the clipboard API is refused; "Copied" for 1.5 s.
+ * @param {HTMLButtonElement} btn @param {string} text */
+async function copyCommand(btn, text) {
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch {
+    const t = document.createElement("textarea");
+    t.value = text; t.setAttribute("readonly", ""); t.style.position = "fixed"; t.style.opacity = "0";
+    document.body.appendChild(t); t.select();
+    try { ok = document.execCommand("copy"); } catch { ok = false; }
+    t.remove();
+  }
+  if (!ok) { prompt("Copy this:", text); return; }
+  btn.textContent = "Copied";
+  setTimeout(() => { btn.textContent = "Copy"; }, 1500);
+}
+/** @returns {HTMLVideoElement | null} */
+/** The video the Shots section drives: the shot pane's own player. @returns {HTMLVideoElement | null} */
+const shotVideo = () => (SH && SH.pv) ? SH.pv : /** @type {HTMLVideoElement | null} */ (document.getElementById("film-video"));
+/** Status of a shot by id (US2 fills the notes book). @param {string} id */
+const shotStatus = (id) => ((SH && SH.doc.shots[id]) || {}).status || "none";
+/** @param {any} s */
+const shotThumb = (s, w) => `${SH.api}/shots/thumbs/${s.n}/${w}.jpg?v=${encodeURIComponent(SH.stamp || "")}`;
+/** img tag that retries every second while the server is still cutting the small pictures (202) */
+const thumbImg = (s, w, cls = "") => `<img class="sh-thumb ${cls}" data-src="${shotThumb(s, w)}" alt="" loading="lazy">`;
+/** @param {ParentNode} root */
+function wireThumbs(root) {
+  root.querySelectorAll("img.sh-thumb[data-src]").forEach((el) => {
+    const img = /** @type {HTMLImageElement} */ (el), src = img.dataset.src || "";
+    let tries = 0;
+    img.onerror = () => { if (++tries <= 60) setTimeout(() => { img.src = `${src}&r=${tries}`; }, 1000); };
+    img.onload = () => { img.classList.add("ok"); };
+    img.src = src;
+    img.removeAttribute("data-src");
+  });
+}
+function drawShots() { drawTimeline(); drawFilters(); drawList(); drawPane(); drawOrphans(); }
+function drawTimeline() {
+  const el = document.getElementById("sh-timeline");
+  if (!el) return;
+  el.innerHTML = SH.shots.map((/** @type {any} */ s, /** @type {number} */ i) => `<button type="button" class="sh-cell st-${shotStatus(s.id)}${i === SH.sel ? " on" : ""}"
+    style="flex-grow:${Math.max(0.001, s.t1 - s.t0).toFixed(3)}" data-i="${i}" title="Shot ${s.n} · ${mss1(s.t0)}–${mss1(s.t1)} · ${esc(SHOT_STATUS[shotStatus(s.id)])}"
+    aria-label="Shot ${s.n}, ${esc(SHOT_STATUS[shotStatus(s.id)])}"></button>`).join("");
+  el.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => selectShot(+(/** @type {HTMLElement} */ (b).dataset.i || 0), true)));
+  const lg = document.getElementById("sh-legend");
+  if (lg) lg.innerHTML = ["fix", "fixed", "ok", "none"].map((k) => `<span><i class="sw st-${k}"></i>${SHOT_STATUS[k]}</span>`).join("")
+    + `<span><i class="sw sw-on"></i>Selected</span>`;
+}
+function shotCounts() {
+  /** @type {Record<string, number>} */
+  const c = { all: SH.shots.length, fix: 0, fixed: 0, none: 0, ok: 0 };
+  for (const s of SH.shots) c[shotStatus(s.id)]++;
+  return c;
+}
+function drawFilters() {
+  const el = document.getElementById("sh-filters");
+  if (!el) return;
+  const c = shotCounts();
+  el.innerHTML = SHOT_FILTERS.map(([k, label]) => `<button type="button" class="chip${SH.filter === k ? " on" : ""}" data-f="${k}" aria-pressed="${SH.filter === k}">${label}<span>${c[k]}</span></button>`).join("");
+  el.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { SH.filter = /** @type {HTMLElement} */ (b).dataset.f; drawFilters(); drawList(); }));
+}
+/** Open notes of a shot. @param {string} id */
+const openNotes = (id) => ((SH.doc.shots[id] || {}).notes || []).filter((/** @type {any} */ n) => !n.done);
+function drawList() {
+  const el = document.getElementById("sh-list"), ruler = document.getElementById("sh-ruler");
+  if (!el) return;
+  const pps = SH.pps || 34, all = SH.filter === "all";
+  const rows = SH.shots.map((/** @type {any} */ s, /** @type {number} */ i) => ({ s, i }))
+    .filter((/** @type {any} */ x) => all || shotStatus(x.s.id) === SH.filter);
+  el.innerHTML = rows.length ? rows.map(({ s, i }) => {
+    const st = shotStatus(s.id), open = openNotes(s.id), w = Math.max(44, Math.round((s.t1 - s.t0) * pps)) - (all ? 2 : 0);
+    const tip = `Shot ${s.n} · ${mss1(s.t0)}–${mss1(s.t1)} · ${(s.t1 - s.t0).toFixed(1)} s · ${SHOT_STATUS[st]}${open.length ? ` · ${open.length} open: ${String(open[0].text || "(picture)").slice(0, 80)}` : ""}`;
+    return `<li class="sh-row sh-clip${i === SH.sel ? " on" : ""}" data-i="${i}" tabindex="0" role="button" aria-label="${esc(tip)}" title="${esc(tip)}" style="width:${w}px">
+      <span class="sh-thumbs">${thumbImg(s, "a")}${w >= 90 ? thumbImg(s, "b") : ""}${w >= 140 ? thumbImg(s, "c") : ""}</span>
+      <span class="sh-n">${s.n}</span>${open.length ? `<span class="sh-dot" aria-hidden="true">${open.length}</span>` : ""}
+      <span class="sh-stripe st-${st}"></span>
+    </li>`;
+  }).join("") : `<li class="muted">No shots with this status.</li>`;
+  if (ruler) { // a time ruler under the clips while the whole film shows (filters break the time line)
+    ruler.hidden = !all;
+    const step = pps >= 20 ? 5 : 10, total = SH.duration || (SH.shots.length ? SH.shots[SH.shots.length - 1].t1 : 0);
+    let t = 0, h = "";
+    for (; t <= total; t += step) h += `<span style="left:${Math.round(t * pps)}px">${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, "0")}</span>`;
+    ruler.innerHTML = h; ruler.style.width = `${Math.ceil(total * pps)}px`;
+  }
+  el.querySelectorAll("li.sh-row").forEach((li) => {
+    const go = () => selectShot(+(/** @type {HTMLElement} */ (li).dataset.i || 0), true);
+    li.addEventListener("click", go);
+    li.addEventListener("keydown", (e) => { if (/** @type {KeyboardEvent} */ (e).key === "Enter" || /** @type {KeyboardEvent} */ (e).key === " ") { e.preventDefault(); go(); } });
+  });
+  wireThumbs(el);
+  if (document.getElementById("sh-msg")) unsavedHint();
+}
+/** @param {number} i @param {boolean} seek */
+function selectShot(i, seek) {
+  // each shot keeps its own unsaved note (text and pictures): it never follows you to another shot
+  const was = SH.shots[SH.sel];
+  if (was) flushLive();
+  if (was) { if ((SH.draft || "").trim() || SH.pending.length) SH.drafts[was.id] = { text: SH.draft || "", pending: SH.pending }; else delete SH.drafts[was.id]; }
+  SH.sel = Math.max(0, Math.min(SH.shots.length - 1, i));
+  const d = SH.drafts[SH.shots[SH.sel].id];
+  SH.draft = d ? d.text : ""; SH.pending = d ? d.pending : [];
+  stopShot();
+  document.querySelectorAll("#sh-timeline .sh-cell").forEach((b) => b.classList.toggle("on", /** @type {HTMLElement} */ (b).dataset.i === String(SH.sel)));
+  document.querySelectorAll("#sh-list .sh-row").forEach((b) => b.classList.toggle("on", /** @type {HTMLElement} */ (b).dataset.i === String(SH.sel)));
+  const onClip = document.querySelector("#sh-list .sh-row.on");
+  if (onClip) onClip.scrollIntoView({ block: "nearest", inline: "nearest" });
+  drawPane();
+  const v = shotVideo();
+  if (seek && v) { v.pause(); SH.selfSeek = true; v.currentTime = SH.shots[SH.sel].t0 + 0.04; }   // just inside the shot: the cut frame belongs to the shot before
+}
+function stopShot() { if (SH && SH.stopper) { cancelAnimationFrame(SH.stopper); SH.stopper = 0; } }
+/** Play one shot from its start and stop at its end (research R4). @param {HTMLVideoElement} v @param {number} t0 @param {number} t1 */
+function playRange(v, t0, t1) {
+  if (v === shotVideo()) { stopShot(); SH.selfSeek = true; }
+  v.currentTime = t0;
+  v.play().catch(() => {});
+  const tick = () => {
+    if (v.currentTime >= t1 - 0.03 || v.ended) { v.pause(); if (v === shotVideo()) SH.stopper = 0; return; }
+    const id = requestAnimationFrame(tick);
+    if (v === shotVideo()) SH.stopper = id;
+  };
+  const id = requestAnimationFrame(tick);
+  if (v === shotVideo()) SH.stopper = id;
+}
+function drawPane() {
+  const el = document.getElementById("sh-pane"), cv = document.getElementById("sh-canvas");
+  if (!el || !cv) return;
+  const s = SH.shots[SH.sel], st = shotStatus(s.id);
+  cv.innerHTML = `<div class="sh-media" id="sh-media"></div>
+    <div class="row sh-nav"><button type="button" id="sh-prev"${SH.sel === 0 ? " disabled" : ""} aria-label="Previous shot">← Prev</button>
+      <button type="button" class="primary sh-roundbtn" id="sh-play" aria-label="Play this shot" title="Play this shot"></button>
+      <button type="button" id="sh-next"${SH.sel === SH.shots.length - 1 ? " disabled" : ""} aria-label="Next shot">Next →</button>
+      <span class="small muted sh-range">${mss1(s.t0)}–${mss1(s.t1)} · ${(s.t1 - s.t0).toFixed(1)} s</span></div>`;
+  const nn = ((SH.doc.shots[s.id] || {}).notes || []).length;
+  el.innerHTML = `<div class="insp-head">
+      <p class="section-title">Inspector</p>
+      <div class="sh-pane-head insp-title"><strong>Shot ${s.n}</strong><span class="badge st-badge st-${st}">${SHOT_STATUS[st]}</span></div>
+      <div class="insp-tags"><span class="tag">${esc(s.id)}</span><span class="tag">${mss1(s.t0)}–${mss1(s.t1)}</span><span class="tag">${(s.t1 - s.t0).toFixed(1)} s</span>${s.set ? `<span class="tag">${esc(s.set)}</span>` : ""}<span class="tag">${nn} note${nn === 1 ? "" : "s"}</span></div>
+    </div>
+    ${SH.f.has_prev ? `<div class="insp-sec sh-prev"><button type="button" class="insp-btn" id="sh-prev-version"><span aria-hidden="true">↺</span> Watch the previous version</button><div id="sh-prev-slot"></div></div>` : ""}
+    <div id="sh-notes"></div>`;
+  const media = cv.querySelector("#sh-media");
+  if (media && SH.pv) media.appendChild(SH.pv);   // no poster: the small strip picture blown up looks blurred; the real frame shows
+  drawNotes();
+  wireThumbs(el);
+  zoomable(el);
+  /** @type {HTMLElement} */ (cv.querySelector("#sh-prev")).onclick = () => selectShot(SH.sel - 1, true);
+  /** @type {HTMLElement} */ (cv.querySelector("#sh-next")).onclick = () => selectShot(SH.sel + 1, true);
+  /** @type {HTMLElement} */ (cv.querySelector("#sh-play")).onclick = () => {
+    const v = shotVideo();
+    if (!v) return;
+    if (!v.paused) { stopShot(); v.pause(); playButtonState(); return; }      // playing: the button is a pause button
+    playRange(v, s.t0, s.t1);
+  };
+  playButtonState();
+  const pv = /** @type {HTMLElement | null} */ (el.querySelector("#sh-prev-version"));
+  if (pv) pv.onclick = () => playPrevious(s.id);
+}
+/** "▶ Play this shot" while stopped; a round pause button while the shot plays (click it to stop). */
+function playButtonState() {
+  const b = document.getElementById("sh-play"), v = shotVideo();
+  if (!b || !v) return;
+  const playing = !v.paused && !v.ended;
+  b.setAttribute("aria-label", playing ? "Pause" : "Play this shot");
+  b.title = playing ? "Pause" : "Play this shot";
+  b.innerHTML = playing ? '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>';
+}
+/** The same shot (by id) in the one previous video kept by `film replace` (FR-014a). @param {string} id */
+async function playPrevious(id) {
+  const slot = document.getElementById("sh-prev-slot");
+  if (!slot) return;
+  try {
+    if (!SH.prev) SH.prev = await get(`${SH.path}/shots?prev=1`);
+  } catch (e) { slot.innerHTML = `<p class="small fail">${esc(e.message)}</p>`; return; }
+  const ps = (SH.prev.shots || []).find((/** @type {any} */ x) => x.id === id);
+  if (!ps) { slot.innerHTML = `<p class="small muted">This shot is not in the previous version.</p>`; return; }
+  slot.innerHTML = `<p class="small muted">Previous version · shot ${ps.n} · ${mss1(ps.t0)}–${mss1(ps.t1)}</p>
+    <video id="sh-prev-video" class="sh-prev-video" controls muted preload="metadata" src="${SH.api}/video?prev=1"></video>`;
+  const v = /** @type {HTMLVideoElement} */ (slot.querySelector("video"));
+  const main = shotVideo();
+  if (main) { stopShot(); main.pause(); }
+  const go = () => playRange(v, ps.t0, ps.t1);
+  if (v.readyState >= 1) go(); else v.addEventListener("loadedmetadata", go, { once: true });
+}
+
+/** One note as a list item. @param {any} n @param {string} sid @param {boolean} canEdit */
+function noteHtml(n, sid, canEdit) {
+  const s = SH.shots.find((/** @type {any} */ x) => x.id === sid);
+  const at = n.at === null || n.at === undefined ? "" : s
+    ? `<button type="button" class="link sh-at" data-at="${s.t0 + n.at}" title="Jump to ${mss1(s.t0 + n.at)} in the film">at ${mss1(n.at)}</button>`
+    : `<span class="muted">at ${mss1(n.at)}</span>`;
+  return `<li class="sh-note${n.done ? " done" : ""}" data-id="${esc(n.id)}">
+    ${canEdit ? `<input type="checkbox" class="sh-done" ${n.done ? "checked" : ""} aria-label="Fixed" title="Fixed">` : `<span>${n.done ? "✓" : "•"}</span>`}
+    <div class="sh-note-body">
+      <div class="sh-note-text">${at} ${esc(n.text)}</div>
+      ${n.images && n.images.length ? `<div class="sh-note-imgs">${n.images.map((/** @type {string} */ f) => `<img src="${SH.api}/notes/images/${esc(f)}" data-zoom alt="Picture of this note">`).join("")}</div>` : ""}
+      ${n.reply ? `<div class="sh-reply small"><strong>Claude:</strong> ${esc(n.reply)}</div>` : ""}
+      <div class="muted small">${esc(n.by || "")} · ${when(n.updated || n.created)}</div>
+    </div>
+    ${canEdit ? `<div class="sh-note-tools"><button type="button" class="link sh-edit">Edit</button><button type="button" class="link danger sh-del">Delete</button></div>` : ""}
+  </li>`;
+}
+function drawNotes() {
+  const el = document.getElementById("sh-notes");
+  if (!el) return;
+  const s = SH.shots[SH.sel], sh = SH.doc.shots[s.id] || { status: "none", notes: [] }, st = sh.status || "none";
+  el.innerHTML = `${SH.notesError ? `<p class="error">${esc(SH.notesError)}</p>` : ""}
+    <div class="insp-sec"><p class="insp-label">Status</p><div class="seg sh-status" role="group" aria-label="Shot status">${["ok", "fix", "fixed"].map((k) => `<button type="button" data-st="${k}" class="${st === k ? "on" : ""}" aria-pressed="${st === k}">${SHOT_STATUS[k]}</button>`).join("")}</div></div>
+    <div class="insp-sec"><p class="insp-label">Notes</p><ul class="sh-notes">${(sh.notes || []).filter((/** @type {any} */ n) => !SH.live[s.id] || n.id !== SH.live[s.id].id).map((/** @type {any} */ n) => noteHtml(n, s.id, true)).join("") || (SH.live[s.id] ? "" : `<li class="muted small">No notes on this shot yet.</li>`)}</ul></div>
+    <div class="insp-sec sh-add"><p class="insp-label">Add a note</p>
+      <textarea id="sh-note" maxlength="2000" rows="3" placeholder="What is wrong in this shot? Type it (saved as you type) or paste a screenshot with Ctrl+V.">${esc(SH.draft || "")}</textarea>
+      <div class="sh-pending" id="sh-pending"></div>
+      <div class="row sh-add-row">
+        <label class="check"><input type="checkbox" id="sh-pin"${SH.pin ? " checked" : ""}> <span>Pin to current time</span></label>
+        <label class="button sh-file">Add picture<input type="file" id="sh-file" accept="image/png,image/jpeg,image/webp" hidden></label>
+        <span class="muted small" id="sh-count">${(SH.draft || "").length}/2000</span>
+        <button type="button" id="sh-add" title="Keep this note and start another one for this shot">New note</button>
+      </div>
+      <p class="small" id="sh-msg" role="status"></p>
+    </div>`;
+  drawPending();
+  unsavedHint();
+  zoomable(el);
+  const ta = /** @type {HTMLTextAreaElement} */ (el.querySelector("#sh-note"));
+  ta.addEventListener("input", () => { SH.draft = ta.value; /** @type {HTMLElement} */ (el.querySelector("#sh-count")).textContent = `${ta.value.length}/2000`; unsavedHint(); scheduleLive(); });
+  ta.addEventListener("blur", () => flushLive());
+  ta.addEventListener("paste", (e) => {
+    const items = Array.from(/** @type {ClipboardEvent} */ (e).clipboardData?.items || []).filter((it) => it.kind === "file" && it.type.startsWith("image/"));
+    if (!items.length) return;                     // text goes into the box as usual
+    e.preventDefault();
+    items.forEach((it) => { const f = it.getAsFile(); if (f) addPicture(f); });
+  });
+  const pin = /** @type {HTMLInputElement} */ (el.querySelector("#sh-pin"));
+  pin.onchange = () => { SH.pin = pin.checked; };
+  const file = /** @type {HTMLInputElement} */ (el.querySelector("#sh-file"));
+  file.onchange = () => { Array.from(file.files || []).forEach(addPicture); file.value = ""; };
+  /** @type {HTMLElement} */ (el.querySelector("#sh-add")).onclick = () => addNote();
+  el.querySelectorAll(".sh-status button").forEach((b) => b.addEventListener("click", () => {
+    const k = /** @type {HTMLElement} */ (b).dataset.st;
+    saveNotes((doc) => { const x = doc.shots[s.id] || (doc.shots[s.id] = { status: "none", status_by: "auto", notes: [] }); x.status = k; x.status_by = "user"; });
+  }));
+  wireNoteItems(el, s.id);
+}
+/** Ticks, edits, deletes and jumps of the notes under `root` (a shot's pane or the gone-shots list). @param {ParentNode} root @param {string} sid */
+function wireNoteItems(root, sid) {
+  /** @param {any} doc @param {string} id */
+  const find = (doc, id) => { const ns = (doc.shots[sid] || {}).notes || []; return { ns, i: ns.findIndex((/** @type {any} */ n) => n.id === id) }; };
+  root.querySelectorAll(".sh-note").forEach((li) => {
+    const id = /** @type {HTMLElement} */ (li).dataset.id || "";
+    const done = /** @type {HTMLInputElement | null} */ (li.querySelector(".sh-done"));
+    if (done) done.onchange = () => saveNotes((doc) => { const { ns, i } = find(doc, id); if (i >= 0) ns[i].done = done.checked; });
+    const del = /** @type {HTMLElement | null} */ (li.querySelector(".sh-del"));
+    if (del) del.onclick = () => {
+      if (!confirm("Delete this note?")) return;
+      saveNotes((doc) => { const { ns, i } = find(doc, id); if (i >= 0) ns.splice(i, 1); });
+    };
+    const edit = /** @type {HTMLElement | null} */ (li.querySelector(".sh-edit"));
+    if (edit) edit.onclick = () => {
+      const body = /** @type {HTMLElement} */ (li.querySelector(".sh-note-text"));
+      const cur = find(SH.doc, id);
+      if (cur.i < 0) return;
+      body.innerHTML = `<textarea maxlength="2000" rows="3" class="sh-edit-box">${esc(cur.ns[cur.i].text)}</textarea>
+        <div class="row"><button type="button" class="primary sh-save">Save</button><button type="button" class="sh-cancel">Cancel</button></div>`;
+      const box = /** @type {HTMLTextAreaElement} */ (body.querySelector("textarea"));
+      box.focus();
+      /** @type {HTMLElement} */ (body.querySelector(".sh-cancel")).onclick = () => drawShots();
+      /** @type {HTMLElement} */ (body.querySelector(".sh-save")).onclick = () => {
+        const text = box.value;
+        saveNotes((doc) => { const { ns, i } = find(doc, id); if (i >= 0) ns[i].text = text; });
+      };
+    };
+    const at = /** @type {HTMLElement | null} */ (li.querySelector(".sh-at"));
+    if (at) at.onclick = () => { const v = shotVideo(); if (v) { stopShot(); v.currentTime = +(at.dataset.at || 0); } };
+  });
+}
+/** After a save made while typing: the shot's badge and status buttons, without rebuilding the note box. */
+function refreshPaneStatus() {
+  const s = SH.shots[SH.sel];
+  if (!s) return;
+  const st = shotStatus(s.id), b = document.querySelector("#sh-pane .sh-pane-head .badge");
+  if (b) { b.className = `badge st-badge st-${st}`; b.textContent = SHOT_STATUS[st]; }
+  const cur = (SH.doc.shots[s.id] || {}).status || "none";
+  document.querySelectorAll("#sh-notes .sh-status button").forEach((x) => { const on = /** @type {HTMLElement} */ (x).dataset.st === cur; x.classList.toggle("on", on); x.setAttribute("aria-pressed", String(on)); });
+}
+function drawPending() {
+  const el = document.getElementById("sh-pending");
+  if (!el) return;
+  el.innerHTML = SH.pending.map((/** @type {string} */ f, /** @type {number} */ i) => `<span class="sh-pend"><img src="${SH.api}/notes/images/${esc(f)}" data-zoom alt="Picture to add">
+    <button type="button" class="link" data-i="${i}" aria-label="Remove this picture">×</button></span>`).join("");
+  zoomable(el);
+  el.querySelectorAll("button[data-i]").forEach((b) => b.addEventListener("click", () => { SH.pending.splice(+(/** @type {HTMLElement} */ (b).dataset.i || 0), 1); drawPending(); flushLive(); }));
+}
+/** Save state of the note being typed: "Saving…" while a save waits, then "Saved". */
+function unsavedHint() {
+  const m = document.getElementById("sh-msg");
+  if (!m || (m.textContent && !m.dataset.unsaved)) return;
+  const dirty = !!((SH.draft || "").trim() || SH.pending.length), cur = SH.shots[SH.sel];
+  m.dataset.unsaved = "1"; m.className = "small muted";
+  m.textContent = SH.liveTimer ? "Saving…" : (dirty && cur && SH.live[cur.id] ? "Saved" : "");
+}
+function scheduleLive() {
+  if (SH.liveTimer) clearTimeout(SH.liveTimer);
+  SH.liveTimer = setTimeout(() => { SH.liveTimer = 0; flushLive(); }, 1000);
+  unsavedHint();
+}
+/** Typing is the note (no Add button): create the shot's note on the first save, then keep updating that same note;
+ * an emptied box removes it. Called after 1 s without typing, on a picture, on leaving the box and on switching shots. */
+function flushLive() {
+  if (SH.liveTimer) { clearTimeout(SH.liveTimer); SH.liveTimer = 0; }
+  const s = SH.shots[SH.sel];
+  if (!s) return;
+  const text = (SH.draft || "").trim().slice(0, 2000), images = SH.pending.slice();
+  let live = SH.live[s.id];
+  if (!live) {
+    if (!text && !images.length) { unsavedHint(); return; }
+    const v = shotVideo();
+    let at = null;
+    if (SH.pin && v && v.currentTime >= s.t0 && v.currentTime <= s.t1) at = Math.round((v.currentTime - s.t0) * 10) / 10;
+    live = SH.live[s.id] = { id: "n-" + Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(16).padStart(2, "0")).join(""), at };
+  }
+  const id = live.id, at = live.at, sid = s.id;
+  if (!text && !images.length) delete SH.live[sid];
+  saveNotes((doc) => {
+    const x = doc.shots[sid] || (doc.shots[sid] = { status: "none", status_by: "auto", notes: [] });
+    const i = x.notes.findIndex((/** @type {any} */ n) => n.id === id);
+    if (!text && !images.length) { if (i >= 0) x.notes.splice(i, 1); return; }
+    if (i < 0) x.notes.push({ id, at, text, images, done: false });
+    else { x.notes[i].text = text; x.notes[i].images = images; }
+  }, () => unsavedHint(), true);
+}
+/** @param {string} text @param {boolean} [bad] */
+function shotMsg(text, bad = false) {
+  const m = document.getElementById("sh-msg");
+  if (m) { m.dataset.unsaved = ""; m.className = `small ${bad ? "fail" : "muted"}`; m.textContent = text; }
+}
+/** Upload one picture (pasted or chosen) for the note being written. @param {File} file */
+async function addPicture(file) {
+  const pend = SH.pending;                          // the picture belongs to the shot it was added on
+  if (pend.length >= 4) { shotMsg("A note can have up to 4 pictures.", true); return; }
+  if (file.size > 10 * 1024 * 1024) { shotMsg("The picture is larger than 10 MB.", true); return; }
+  shotMsg("Adding the picture…");
+  const fd = new FormData();
+  fd.append("file", file, file.name || "pasted.png");
+  try {
+    const r = await fetch(`${SH.api}/notes/images`, { method: "POST", headers: { "X-Studio": "1" }, body: fd });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw failed(r, body);
+    pend.push(body.file);
+    drawPending();
+    shotMsg("");
+    if (pend === SH.pending) flushLive();
+  } catch (e) { shotMsg(e.message, true); }
+}
+function addNote() {
+  const s = SH.shots[SH.sel];
+  if (!(SH.draft || "").trim() && !SH.pending.length) { shotMsg("Type the note or paste a picture first.", true); return; }
+  if ((SH.draft || "").length > 2000) { shotMsg("A note can have up to 2,000 characters.", true); return; }
+  flushLive();
+  delete SH.live[s.id]; delete SH.drafts[s.id];
+  SH.draft = ""; SH.pending = [];
+  drawPane();
+}
+/** Save the notes book with the fingerprint read (FR-009); on "changed" apply the same change to the new book once.
+ * @param {(doc: any) => void} op @param {() => void} [ok] @param {boolean} [quiet] keep the pane (and the box being typed in) */
+async function saveNotes(op, ok, quiet = false) {
+  /** @param {string} base @param {any} doc */
+  const put = async (base, doc) => {
+    const r = await fetch(`${SH.api}/notes`, { method: "PUT", headers: { "Content-Type": "application/json", "X-Studio": "1" },
+      body: JSON.stringify({ base, doc }) });
+    return { r, body: await r.json().catch(() => ({})) };
+  };
+  let doc = structuredClone(SH.doc);
+  op(doc);
+  try {
+    let { r, body } = await put(SH.base, doc);
+    if (r.status === 409 && body.error && body.error.current) {
+      doc = structuredClone(body.error.current.doc);
+      op(doc);
+      ({ r, body } = await put(body.error.current.base, doc));
+      if (r.status === 409) {
+        await loadNotes();
+        shotMsg("Someone else just changed these notes; they were loaded again. Try once more.", true);
+        return;
+      }
+    }
+    if (!r.ok) throw failed(r, body);
+    SH.doc = body.doc; SH.base = body.base;
+    if (ok) ok();
+    if (quiet) { drawTimeline(); drawFilters(); drawList(); refreshPaneStatus(); } else drawShots();
+  } catch (e) { shotMsg(e.message, true); }
+}
+function drawOrphans() {
+  const el = document.getElementById("sh-orphans");
+  if (!el) return;
+  if (!SH.orphans.length) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="sh-gone"><p class="section-title">Notes of shots that are gone</p>
+    <p class="muted small">These shots are not in the film's shot marks any more. Their notes are kept.</p>
+    ${SH.orphans.map((/** @type {string} */ id) => `<div class="sh-gone-shot" data-sid="${esc(id)}"><strong>${esc(id)}</strong>
+      <ul class="sh-notes">${((SH.doc.shots[id] || {}).notes || []).map((/** @type {any} */ n) => noteHtml(n, id, true)).join("")}</ul></div>`).join("")}</div>`;
+  el.querySelectorAll(".sh-gone-shot").forEach((g) => wireNoteItems(g, /** @type {HTMLElement} */ (g).dataset.sid || ""));
+  zoomable(el);
 }
 
 async function pageSets() {
@@ -2232,6 +2808,7 @@ const PUBLIC = [
 let rendering = null;
 async function route() {
   const h = location.hash || "#/";
+  $app.classList.remove("wide-film");
   if (MODE === "online") {
     for (const [re, fn] of PUBLIC) {
       const m = h.match(/** @type {RegExp} */ (re));
@@ -2296,6 +2873,7 @@ function connect() {
   es.onopen = () => { live().classList.add("on"); live().textContent = "● Live updates on"; };
   es.onerror = () => { live().classList.remove("on"); live().textContent = "Disconnected, reconnecting…"; };      // EventSource reconnects by itself
   ["job.updated", "review.created", "review.decided"].forEach((t) => es.addEventListener(t, onChange));
+  es.addEventListener("film.updated", onFilmUpdated);       // specs/029: the open film page follows outside changes
 }
 
 window.addEventListener("hashchange", route);

@@ -21,9 +21,16 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 | `GET /reviews?status=pending` | `{reviews: [Review]}` | |
 | `GET /reviews/{id}` | `Review` kèm `summary_html`, `decision\|null` | `404` |
 | `POST /reviews/{id}/decision` body `{value, note?, base?}` | `201 Decision` (`source: ui`); điểm duyệt (026): `approve` cần `base` | `409 already_decided` · `409 changed` · `422 checks_not_passed` · `422 note_required` · `422 value_not_allowed` · `404` |
-| `GET /films` | `{films: [{name, has_video, has_poster, has_subtitles, rendering}]}` | |
+| `GET /films` | `{films: [{name, has_video, has_poster, has_subtitles, rendering, has_shots, has_prev}]}` (`has_shots`, `has_prev`: 029) | |
 | `GET /films/{name}` | `{name, credits, treatment_html, …}` | `404` |
 | `GET /films/{name}/video` | `video/mp4`, hỗ trợ `Range` (206) | `404` |
+| `GET /films/{name}/video?prev=1` | bản video trước giữ bởi `film replace` (specs/029) | `404` |
+| `GET /films/{name}/shots?prev=1` | mốc shot: `{valid, missing, problems: [{row, rule, detail}], duration, fps, source, shots: [{n, id, set, t0, t1}], thumbs: ready\|building, video_stamp}` (029); `prev=1`: của bản trước | `400 bad_name` · `404` |
+| `GET /films/{name}/shots/thumbs/{n}/{which}.jpg` | ảnh nhỏ 320 px của shot `n` ở 12/50/88% (`which` = `a\|b\|c`), `Cache-Control: max-age=86400`; `202 {status: building}` khi đang cắt (029) | `404` · `400 bad_name` |
+| `GET /films/{name}/notes` | sổ ghi chú: `{base, doc, orphans}` (029) | `400 bad_name` · `404` |
+| `PUT /films/{name}/notes` body `{base, doc}` | `{base, doc}`: ghi cả sổ nếu `base` còn đúng (029) | `409 changed` (kèm `current`) · `422 invalid` (kèm `field`) · `403 forbidden` (mã chỉ đọc) · `404` |
+| `POST /films/{name}/notes/images` multipart `file` | `201 {file}`: ảnh PNG/JPEG/WebP ≤ 10 MB cho ghi chú (029; cũng nhận `multipart/form-data` có `X-Studio: 1`) | `413 too_large` · `415 bad_image` · `403 forbidden` · `404` |
+| `GET /films/{name}/notes/images/{file}` | ảnh đính kèm, `file` dạng `img-<12 hex>.(png\|jpg\|webp)` (029) | `400 bad_name` · `404` |
 | `GET /films/{name}/poster` | `image/jpeg` | `404` |
 | `GET /films/{name}/subtitles.vtt` | WebVTT (chuyển từ `.srt`) | `404` |
 | `GET /films/{name}/publish` | gói đăng: `{titles, description, subtitles, files, check}` (specs/011) | `404` |

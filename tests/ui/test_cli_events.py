@@ -74,6 +74,32 @@ class CliAndEvents(unittest.TestCase):
             self.assertEqual(json.loads(r.read())["root"], str(self.p.dir.resolve()))
         self.assertEqual(self.p.cli("ui", "stop").returncode, 0)
 
+    def test_online_server_left_alone(self):  # the app (specs/014) runs an online-mode server from this code folder
+        import sys
+        from pathlib import Path
+        tools = Path(__file__).resolve().parents[2] / "tools" / "studio"
+        fake = ("import http.server, json\n"
+                "class H(http.server.BaseHTTPRequestHandler):\n"
+                "    def do_GET(self):\n"
+                "        b = json.dumps({'ok': True, 'app': 'claude-utube-studio', 'mode': 'online'}).encode()\n"
+                "        self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers(); self.wfile.write(b)\n"
+                "    def log_message(self, *a): pass\n"
+                "http.server.HTTPServer(('127.0.0.1', 18829), H).serve_forever()\n")
+        srv = subprocess.Popen([sys.executable, "-c", fake, "studio.server:app", "--app-dir", str(tools), "--port", "18829"])
+        try:
+            for _ in range(50):
+                try:
+                    urllib.request.urlopen("http://127.0.0.1:18829/api/v1/health", timeout=0.3).read()
+                    break
+                except OSError:
+                    time.sleep(0.1)
+            self.assertEqual(self.p.cli("ui").returncode, 0)
+            self.assertEqual(self.p.cli("ui", "stop").returncode, 0)
+            self.assertIsNone(srv.poll())                   # still running: neither `ui` nor `ui stop` touched it
+        finally:
+            srv.kill()
+            srv.wait()
+
     def test_job_commands(self):
         jid, _ = self.start_job()
         self.assertEqual(self.p.cli("job", "step", jid, "Đo video", "--progress", "3/5").returncode, 0)
