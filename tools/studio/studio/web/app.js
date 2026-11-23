@@ -1340,17 +1340,28 @@ async function filmShots(name, f) {
   }
   SH = { name, path, api: API + path, f, shots: r.shots, stamp: r.video_stamp, duration: r.duration, sel: 0, filter: "all",
     doc: { version: 1, shots: {} }, base: "", orphans: [], stopper: 0, selfSeek: false, prev: null, pending: [], draft: "", drafts: /** @type {Record<string, {text: string, pending: string[]}>} */ ({}), live: /** @type {Record<string, {id: string, at: number | null}>} */ ({}), liveTimer: 0, pv: /** @type {HTMLVideoElement | null} */ (null),
-    pin: true, notesError: "" };
+    pin: true, notesError: "", pps: 34 };
   slot.innerHTML = `<div class="panel shots" id="shots">
     <div class="shots-head"><p class="section-title">Shots</p><span class="muted small">${r.shots.length} shots · ${mss1(r.duration || 0)}</span></div>
     <div class="timeline" id="sh-timeline" role="group" aria-label="Shots on the timeline"></div>
     <div class="sh-legend small muted" id="sh-legend"></div>
     <div class="chips sh-filters" id="sh-filters" role="group" aria-label="Filter shots"></div>
-    <div class="shots-body"><div><ol class="shot-list" id="sh-list"></ol><div id="sh-orphans"></div></div><div class="shot-pane" id="sh-pane"></div></div>
+    <div class="sh-editor">
+      <div class="sh-canvas" id="sh-canvas"></div>
+      <aside class="shot-pane sh-inspector" id="sh-pane" aria-label="Inspector"></aside>
+    </div>
+    <div class="sh-strip-wrap">
+      <div class="row sh-strip-tools"><label class="small muted sh-zoom">Zoom <input type="range" id="sh-zoom" min="10" max="160" step="1" value="34" aria-label="Timeline zoom"></label>
+        <span class="small muted" id="sh-zoom-val">34px/s</span><span class="small muted sh-strip-count">${r.shots.length} shots · ${mss1(r.duration || 0)}</span></div>
+      <div class="sh-strip-scroll" id="sh-strip-scroll"><div class="sh-ruler" id="sh-ruler"></div><ol class="sh-strip" id="sh-list"></ol></div>
+    </div>
+    <div id="sh-orphans"></div>
     <div class="sh-claude"><p class="section-title">Fix with Claude</p>
       <p class="muted small">Paste this into your Claude Code chat. Claude lists the open notes, fixes those shots, renders again, replaces the video and ticks each note with a short reply.</p>
       <div class="row"><code id="sh-claude-text">${esc(`Sửa theo ghi chú phim ${name}`)}</code><button type="button" id="sh-claude-copy">Copy</button></div></div>
   </div>`;
+  const zm = /** @type {HTMLInputElement} */ (document.getElementById("sh-zoom"));
+  zm.oninput = () => { SH.pps = +zm.value; /** @type {HTMLElement} */ (document.getElementById("sh-zoom-val")).textContent = `${SH.pps}px/s`; drawList(); };
   const cp = /** @type {HTMLButtonElement} */ (document.getElementById("sh-claude-copy"));
   cp.onclick = () => copyCommand(cp, `Sửa theo ghi chú phim ${name}`);
   // the selected shot plays in the shot pane itself: one video element kept across redraws (moved, not rebuilt)
@@ -1421,7 +1432,7 @@ function applyNewVideo() {
   if (SH.pv) {
     stopShot(); SH.pv.pause();
     const t0 = SH.shots[SH.sel] ? SH.shots[SH.sel].t0 : 0, pv = SH.pv;
-    pv.addEventListener("loadedmetadata", () => { SH.selfSeek = true; pv.currentTime = t0; }, { once: true });
+    pv.addEventListener("loadedmetadata", () => { SH.selfSeek = true; pv.currentTime = t0 + 0.04; }, { once: true });
     pv.src = src; pv.load();
   }
   newVersionBar(false);
@@ -1497,20 +1508,27 @@ function drawFilters() {
 /** Open notes of a shot. @param {string} id */
 const openNotes = (id) => ((SH.doc.shots[id] || {}).notes || []).filter((/** @type {any} */ n) => !n.done);
 function drawList() {
-  const el = document.getElementById("sh-list");
+  const el = document.getElementById("sh-list"), ruler = document.getElementById("sh-ruler");
   if (!el) return;
+  const pps = SH.pps || 34, all = SH.filter === "all";
   const rows = SH.shots.map((/** @type {any} */ s, /** @type {number} */ i) => ({ s, i }))
-    .filter((/** @type {any} */ x) => SH.filter === "all" || shotStatus(x.s.id) === SH.filter);
+    .filter((/** @type {any} */ x) => all || shotStatus(x.s.id) === SH.filter);
   el.innerHTML = rows.length ? rows.map(({ s, i }) => {
-    const st = shotStatus(s.id), open = openNotes(s.id);
-    return `<li class="sh-row${i === SH.sel ? " on" : ""}" data-i="${i}" tabindex="0" role="button" aria-label="Shot ${s.n}">
-      <span class="sh-n">${s.n}</span>
-      <span class="sh-thumbs">${thumbImg(s, "a")}${thumbImg(s, "b")}${thumbImg(s, "c")}</span>
-      <span class="sh-meta"><span>${mss1(s.t0)}–${mss1(s.t1)} <span class="muted">· ${(s.t1 - s.t0).toFixed(1)} s</span></span>
-        <span class="badge st-badge st-${st}">${SHOT_STATUS[st]}</span>
-        ${open.length ? `<span class="sh-open small">${open.length} open: ${esc(String(open[0].text || "(picture)").slice(0, 60))}</span>` : ""}</span>
+    const st = shotStatus(s.id), open = openNotes(s.id), w = Math.max(44, Math.round((s.t1 - s.t0) * pps)) - (all ? 2 : 0);
+    const tip = `Shot ${s.n} · ${mss1(s.t0)}–${mss1(s.t1)} · ${(s.t1 - s.t0).toFixed(1)} s · ${SHOT_STATUS[st]}${open.length ? ` · ${open.length} open: ${String(open[0].text || "(picture)").slice(0, 80)}` : ""}`;
+    return `<li class="sh-row sh-clip${i === SH.sel ? " on" : ""}" data-i="${i}" tabindex="0" role="button" aria-label="${esc(tip)}" title="${esc(tip)}" style="width:${w}px">
+      <span class="sh-thumbs">${thumbImg(s, "a")}${w >= 90 ? thumbImg(s, "b") : ""}${w >= 140 ? thumbImg(s, "c") : ""}</span>
+      <span class="sh-n">${s.n}</span>${open.length ? `<span class="sh-dot" aria-hidden="true">${open.length}</span>` : ""}
+      <span class="sh-stripe st-${st}"></span>
     </li>`;
   }).join("") : `<li class="muted">No shots with this status.</li>`;
+  if (ruler) { // a time ruler under the clips while the whole film shows (filters break the time line)
+    ruler.hidden = !all;
+    const step = pps >= 20 ? 5 : 10, total = SH.duration || (SH.shots.length ? SH.shots[SH.shots.length - 1].t1 : 0);
+    let t = 0, h = "";
+    for (; t <= total; t += step) h += `<span style="left:${Math.round(t * pps)}px">${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, "0")}</span>`;
+    ruler.innerHTML = h; ruler.style.width = `${Math.ceil(total * pps)}px`;
+  }
   el.querySelectorAll("li.sh-row").forEach((li) => {
     const go = () => selectShot(+(/** @type {HTMLElement} */ (li).dataset.i || 0), true);
     li.addEventListener("click", go);
@@ -1531,9 +1549,11 @@ function selectShot(i, seek) {
   stopShot();
   document.querySelectorAll("#sh-timeline .sh-cell").forEach((b) => b.classList.toggle("on", /** @type {HTMLElement} */ (b).dataset.i === String(SH.sel)));
   document.querySelectorAll("#sh-list .sh-row").forEach((b) => b.classList.toggle("on", /** @type {HTMLElement} */ (b).dataset.i === String(SH.sel)));
+  const onClip = document.querySelector("#sh-list .sh-row.on");
+  if (onClip) onClip.scrollIntoView({ block: "nearest", inline: "nearest" });
   drawPane();
   const v = shotVideo();
-  if (seek && v) { v.pause(); SH.selfSeek = true; v.currentTime = SH.shots[SH.sel].t0; }
+  if (seek && v) { v.pause(); SH.selfSeek = true; v.currentTime = SH.shots[SH.sel].t0 + 0.04; }   // just inside the shot: the cut frame belongs to the shot before
 }
 function stopShot() { if (SH && SH.stopper) { cancelAnimationFrame(SH.stopper); SH.stopper = 0; } }
 /** Play one shot from its start and stop at its end (research R4). @param {HTMLVideoElement} v @param {number} t0 @param {number} t1 */
@@ -1550,26 +1570,28 @@ function playRange(v, t0, t1) {
   if (v === shotVideo()) SH.stopper = id;
 }
 function drawPane() {
-  const el = document.getElementById("sh-pane");
-  if (!el) return;
+  const el = document.getElementById("sh-pane"), cv = document.getElementById("sh-canvas");
+  if (!el || !cv) return;
   const s = SH.shots[SH.sel], st = shotStatus(s.id);
-  el.innerHTML = `<div class="sh-pane-head"><strong>Shot ${s.n}</strong> <span class="muted small">${esc(s.id)}${s.set ? ` · ${esc(s.set)}` : ""}</span>
-      <span class="badge st-badge st-${st}">${SHOT_STATUS[st]}</span></div>
-    <div class="sh-media" id="sh-media"></div>
-    <p class="small muted">${mss1(s.t0)}–${mss1(s.t1)} · ${(s.t1 - s.t0).toFixed(1)} s</p>
+  cv.innerHTML = `<div class="sh-media" id="sh-media"></div>
     <div class="row sh-nav"><button type="button" id="sh-prev"${SH.sel === 0 ? " disabled" : ""} aria-label="Previous shot">← Prev</button>
       <button type="button" class="primary sh-roundbtn" id="sh-play" aria-label="Play this shot" title="Play this shot"></button>
-      <button type="button" id="sh-next"${SH.sel === SH.shots.length - 1 ? " disabled" : ""} aria-label="Next shot">Next →</button></div>
+      <button type="button" id="sh-next"${SH.sel === SH.shots.length - 1 ? " disabled" : ""} aria-label="Next shot">Next →</button>
+      <span class="small muted sh-range">${mss1(s.t0)}–${mss1(s.t1)} · ${(s.t1 - s.t0).toFixed(1)} s</span></div>`;
+  el.innerHTML = `<p class="section-title sh-insp-title">Inspector</p>
+    <div class="sh-pane-head"><strong>Shot ${s.n}</strong> <span class="muted small">${esc(s.id)}${s.set ? ` · ${esc(s.set)}` : ""}</span>
+      <span class="badge st-badge st-${st}">${SHOT_STATUS[st]}</span></div>
+    <p class="small muted">${mss1(s.t0)}–${mss1(s.t1)} · ${(s.t1 - s.t0).toFixed(1)} s</p>
     ${SH.f.has_prev ? `<div class="sh-prev"><button type="button" id="sh-prev-version">Watch the previous version</button><div id="sh-prev-slot"></div></div>` : ""}
     <div id="sh-notes"></div>`;
-  const media = el.querySelector("#sh-media");
+  const media = cv.querySelector("#sh-media");
   if (media && SH.pv) { SH.pv.poster = shotThumb(s, "b"); media.appendChild(SH.pv); }
   drawNotes();
   wireThumbs(el);
   zoomable(el);
-  /** @type {HTMLElement} */ (el.querySelector("#sh-prev")).onclick = () => selectShot(SH.sel - 1, true);
-  /** @type {HTMLElement} */ (el.querySelector("#sh-next")).onclick = () => selectShot(SH.sel + 1, true);
-  /** @type {HTMLElement} */ (el.querySelector("#sh-play")).onclick = () => {
+  /** @type {HTMLElement} */ (cv.querySelector("#sh-prev")).onclick = () => selectShot(SH.sel - 1, true);
+  /** @type {HTMLElement} */ (cv.querySelector("#sh-next")).onclick = () => selectShot(SH.sel + 1, true);
+  /** @type {HTMLElement} */ (cv.querySelector("#sh-play")).onclick = () => {
     const v = shotVideo();
     if (!v) return;
     if (!v.paused) { stopShot(); v.pause(); playButtonState(); return; }      // playing: the button is a pause button

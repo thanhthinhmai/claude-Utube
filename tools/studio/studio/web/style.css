@@ -629,3 +629,29 @@ label.button:focus-within { outline: 2px solid var(--accent-line); }
 
 #sh-play.sh-roundbtn { width: 44px; height: 44px; min-width: 44px; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
 .sh-newver { display: flex; align-items: center; gap: 12px; justify-content: space-between; margin-bottom: 10px; }
+
+/* specs/029 layout like an editor: canvas in the middle, inspector on the right, the shots as a strip at the bottom */
+.sh-editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 380px); gap: 16px; align-items: start; }
+.sh-canvas { display: grid; gap: 10px; min-width: 0; }
+.sh-canvas .sh-nav { justify-content: center; align-items: center; }
+.sh-canvas .sh-range { margin-left: 8px; font-variant-numeric: tabular-nums; }
+.sh-inspector { position: static; border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; background: var(--panel); max-height: 680px; overflow-y: auto; }
+.sh-insp-title { margin: 0 0 2px; }
+.sh-strip-wrap { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
+.sh-strip-tools { align-items: center; gap: 10px; margin-bottom: 4px; }
+.sh-zoom { display: inline-flex; align-items: center; gap: 6px; }
+.sh-zoom input { width: 120px; }
+.sh-strip-count { margin-left: auto; }
+.sh-strip-scroll { overflow-x: auto; padding-bottom: 8px; }
+.sh-ruler { position: relative; height: 20px; border-bottom: 1px solid var(--line); }
+.sh-ruler span { position: absolute; top: 0; height: 19px; padding-left: 3px; border-left: 1px solid var(--line); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sh-strip { list-style: none; margin: 6px 0 0; padding: 0; display: flex; gap: 2px; width: max-content; }
+.sh-strip .sh-row.sh-clip { position: relative; display: block; flex: 0 0 auto; height: 60px; padding: 0; border: 2px solid transparent; border-radius: 6px; overflow: hidden; background: var(--hover); cursor: pointer; }
+.sh-strip .sh-row.sh-clip.on { border-color: var(--accent); background: var(--accent-soft); }
+.sh-clip .sh-thumbs { display: flex; gap: 0; height: 100%; }
+.sh-clip .sh-thumb { width: auto; height: 100%; flex: 1 1 0; min-width: 0; border-radius: 0; }
+.sh-clip .sh-n { position: absolute; left: 3px; top: 3px; padding: 0 5px; border-radius: 4px; background: rgba(0, 0, 0, .62); color: #fff; font-size: 11px; font-weight: 700; text-align: left; }
+.sh-clip .sh-dot { position: absolute; right: 3px; top: 3px; min-width: 16px; padding: 0 4px; border-radius: 8px; background: var(--st-fix); color: #fff; font-size: 11px; font-weight: 700; text-align: center; }
+.sh-clip .sh-stripe { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: var(--st-none); }
+.sh-clip .sh-stripe.st-fix { background: var(--st-fix); } .sh-clip .sh-stripe.st-fixed { background: var(--st-fixed); } .sh-clip .sh-stripe.st-ok { background: var(--st-ok); }
+@media (max-width: 900px) { .sh-editor { grid-template-columns: minmax(0, 1fr); } .sh-inspector { max-height: none; } }
