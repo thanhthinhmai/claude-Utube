@@ -197,5 +197,144 @@ class OnlineAccess(unittest.TestCase):
             tokens.resolve = real
 
 
+# ---------- T007: the shot marks file (data-model "Mốc shot") ----------
+class LoadShots(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+        cls.tmp = Path(tempfile.mkdtemp(prefix="shots."))
+        cls.d = cls.tmp / "films" / "long-film"
+        make_video(cls.d / "long-film.mp4", 30.0, 30, color="gray")
+
+    @classmethod
+    def tearDownClass(cls):
+        import shutil
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def load(self, rows, **kw):
+        (self.d / "shots.json").write_text(json.dumps(shots_doc(rows, 30.0, video="long-film.mp4", **kw)))
+        return shotnotes.load_shots(self.d)
+
+    def rules(self, rows):
+        r = self.load(rows)
+        self.assertFalse(r["valid"])
+        self.assertEqual(r["shots"], [])
+        for p in r["problems"]:
+            self.assertEqual(set(p), {"row", "rule", "detail"})
+        return {p["rule"] for p in r["problems"]}
+
+    def test_good_files(self):
+        r = self.load(even_rows(40, 30.0), source="ae")
+        self.assertTrue(r["valid"], r["problems"])
+        self.assertEqual(len(r["shots"]), 40)
+        self.assertEqual(r["shots"][36], {"n": 37, "id": "S37", "set": "", "t0": 27.0, "t1": 27.75})
+        self.assertEqual((r["source"], r["fps"], r["duration"]), ("ae", 30, 30.0))
+        self.assertTrue(self.load(even_rows(300, 30.0))["valid"])
+        rows = even_rows(3, 30.0)
+        rows[1][0] += 0.02                                   # within one frame (1/30 s)
+        rows[2][1] = 30.03
+        self.assertTrue(self.load(rows)["valid"])
+
+    def test_each_rule(self):
+        self.assertIn("count", self.rules(even_rows(301, 30.0)))
+        self.assertIn("count", self.rules([]))
+        rows = even_rows(3, 30.0); rows[0][0] = 0.5
+        self.assertIn("start", self.rules(rows))
+        rows = even_rows(3, 30.0); rows[1][1] = rows[1][0]
+        self.assertIn("length", self.rules(rows))
+        rows = even_rows(3, 30.0); rows[2][0] += 0.5
+        self.assertIn("gap", self.rules(rows))
+        rows = even_rows(3, 30.0); rows[1][0] -= 0.5
+        self.assertIn("gap", self.rules(rows))                # overlap
+        rows = even_rows(3, 30.0); rows[2][1] = 31.0
+        self.assertIn("end", self.rules(rows))
+        rows = even_rows(3, 30.0); rows[2][1] = 29.0
+        self.assertIn("end", self.rules(rows))
+        rows = even_rows(3, 30.0); rows[2][3] = "S1"
+        self.assertIn("duplicate_id", self.rules(rows))
+        rows = even_rows(3, 30.0); rows[1] = "nope"
+        self.assertIn("row", self.rules(rows))
+        rows = even_rows(3, 30.0); rows[1][3] = ""
+        self.assertIn("id", self.rules(rows))
+        r = self.rules(even_rows(3, 30.0)[:2] + [[19.5, 25.0, "", "S3"], [25.0, 30.0, "", "S3"]])
+        self.assertTrue({"gap", "duplicate_id"} <= r, r)
+
+    def test_missing_and_broken(self):
+        (self.d / "shots.json").unlink(missing_ok=True)
+        r = shotnotes.load_shots(self.d)
+        self.assertEqual((r["valid"], r["missing"], r["shots"]), (False, True, []))
+        (self.d / "shots.json").write_text("{not json")
+        r = shotnotes.load_shots(self.d)
+        self.assertEqual((r["valid"], r["missing"]), (False, False))
+        self.assertEqual(r["problems"][0]["rule"], "json")
+        with self.assertRaises(shotnotes.ShotError):
+            shotnotes.load_shots(self.d, prev=True)            # no previous set
+
+
+# ---------- T008: GET /shots and the small pictures ----------
+class ShotsApi(unittest.TestCase):
+    def setUp(self):
+        self.p = Project()
+        self.c = client()
+        self.d = make_film(self.p.dir, "demo-film", 3.0, 3)
+
+    def tearDown(self):
+        self.p.close()
+
+    def wait_thumb(self, url, timeout=30):
+        t = time.time()
+        while time.time() - t < timeout:
+            r = self.c.get(url)
+            if r.status_code != 202:
+                return r
+            time.sleep(0.2)
+        self.fail("small pictures never came")
+
+    def test_shots_and_thumbs(self):
+        f = self.c.get(f"{API}/demo-film").json()
+        self.assertEqual((f["has_shots"], f["has_prev"]), (True, False))
+        r = self.c.get(f"{API}/demo-film/shots").json()
+        self.assertTrue(r["valid"], r)
+        self.assertEqual([s["id"] for s in r["shots"]], ["S1", "S2", "S3"])
+        self.assertEqual(r["shots"][1]["n"], 2)
+        self.assertIn(r["thumbs"], ("ready", "building"))
+        stamp = r["video_stamp"]
+        first = self.c.get(f"{API}/demo-film/shots/thumbs/2/b.jpg")
+        self.assertIn(first.status_code, (200, 202))
+        if first.status_code == 202:
+            self.assertEqual(first.json()["status"], "building")
+        got = self.wait_thumb(f"{API}/demo-film/shots/thumbs/2/b.jpg")
+        self.assertEqual(got.status_code, 200)
+        self.assertEqual(got.headers["content-type"], "image/jpeg")
+        self.assertIn("max-age=86400", got.headers["cache-control"])
+        self.assertTrue(got.content.startswith(b"\xff\xd8"))
+        for n, w in ((0, "a"), (4, "a"), (2, "d"), ("x", "a")):
+            self.assertEqual(self.c.get(f"{API}/demo-film/shots/thumbs/{n}/{w}.jpg").status_code, 404, (n, w))
+        self.assertEqual(self.wait_thumb(f"{API}/demo-film/shots/thumbs/3/c.jpg").status_code, 200)
+        self.assertEqual(self.c.get(f"{API}/demo-film/shots").json()["thumbs"], "ready")
+        old = self.d / ".shots" / "thumbs" / stamp
+        self.assertTrue(old.is_dir())
+        time.sleep(0.05)
+        make_video(self.d / "demo-film.mp4", 3.0, 30, size="192x108")       # a new video: new stamp, old cache gone
+        r2 = self.c.get(f"{API}/demo-film/shots").json()
+        self.assertNotEqual(r2["video_stamp"], stamp)
+        self.assertEqual(self.wait_thumb(f"{API}/demo-film/shots/thumbs/1/a.jpg").status_code, 200)
+        self.assertFalse(old.exists())
+        self.assertTrue((self.d / ".shots" / "thumbs" / r2["video_stamp"]).is_dir())
+
+    def test_missing_and_invalid(self):
+        (self.d / "shots.json").unlink()
+        r = self.c.get(f"{API}/demo-film/shots").json()
+        self.assertEqual((r["valid"], r["missing"], r["shots"]), (False, True, []))
+        self.assertFalse(self.c.get(f"{API}/demo-film").json()["has_shots"])
+        self.assertEqual(self.c.get(f"{API}/demo-film/shots/thumbs/1/a.jpg").status_code, 404)
+        (self.d / "shots.json").write_text(json.dumps(shots_doc([[0, 1, "", "S1"], [1.5, 3, "", "S2"]], 3.0)))
+        r = self.c.get(f"{API}/demo-film/shots").json()
+        self.assertFalse(r["valid"])
+        self.assertEqual(r["problems"][0]["row"], 2)
+        self.assertEqual(self.c.get(f"{API}/demo-film/shots?prev=1").status_code, 404)
+        self.assertEqual(self.c.get(f"{API}/demo-film/video?prev=1").status_code, 404)
+
+
 if __name__ == "__main__":
     unittest.main()

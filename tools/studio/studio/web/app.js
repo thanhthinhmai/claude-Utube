@@ -1289,20 +1289,175 @@ async function pageFilm(name) {
   const f = await get(`/films/${encodeURIComponent(name)}`);
   const base = `${API}/films/${encodeURIComponent(name)}`;
   $app.innerHTML = `${back("#/films", "Films")}${head("Film", esc(f.name), "")}
-    ${f.has_video ? `<video controls preload="metadata" ${f.has_poster ? `poster="${base}/poster"` : ""}>
+    ${f.has_video ? `<video id="film-video" controls preload="metadata" ${f.has_poster ? `poster="${base}/poster"` : ""}>
         <source src="${base}/video" type="video/mp4">
         ${f.has_subtitles ? `<track kind="subtitles" srclang="vi" label="Subtitles" src="${base}/subtitles.vtt" default>` : ""}
       </video><p class="muted">Turn subtitles on or off with the player’s CC button.</p>
       ${MODE === "online" ? `<p><a class="button primary" href="${base}/download">Download</a> <button class="danger" id="del-film">Delete this film</button></p>` : ""}`
     : `<p class="notice">${f.rendering ? "The film is still rendering: see progress on the Jobs page." : "No film file yet."}</p>`}
+    ${f.has_video ? `<div id="shots-slot"><div class="panel"><p class="section-title">Shots</p><p class="muted">Loading…</p></div></div>` : ""}
     ${tiersHtml(f.tiers)}
     ${f.treatment_html ? `<h2>Script (TREATMENT)</h2><div class="panel md">${f.treatment_html}</div>` : ""}
     ${f.credits ? `<h2>Third-party assets (CREDITS)</h2><pre class="log">${esc(f.credits)}</pre>` : ""}`;
+  if (f.has_video) filmShots(name, f);
   const del = document.getElementById("del-film");
   if (del) del.onclick = async () => {
     if (!confirm("Delete this film for good?")) return;
     try { await send("DELETE", `/films/${encodeURIComponent(name)}`); location.hash = "#/films"; } catch (e) { alert(e.message); }
   };
+}
+
+// ---------- shots and shot notes on the film page (specs/029) ----------
+const SHOT_STATUS = { none: "No notes", ok: "No issue", fix: "Needs fix", fixed: "Fixed" };
+const SHOT_FILTERS = [["all", "All"], ["fix", "Needs fix"], ["fixed", "Fixed"], ["none", "No notes"]];
+/** m:ss.s @param {number} t */
+const mss1 = (t) => { const m = Math.floor(t / 60), s = t - 60 * m; return `${m}:${s.toFixed(1).padStart(4, "0")}`; };
+/** The Shots section's state (one film page at a time). @type {any} */
+let SH = null;
+
+/** @param {string} name @param {any} f */
+async function filmShots(name, f) {
+  const slot = document.getElementById("shots-slot");
+  if (!slot) return;
+  const path = `/films/${encodeURIComponent(name)}`;
+  let r;
+  try { r = await get(`${path}/shots`); }
+  catch (e) { slot.innerHTML = `<div class="panel"><p class="section-title">Shots</p><p class="error">${esc(e.message)}</p></div>`; return; }
+  if (r.missing) {
+    slot.innerHTML = `<div class="panel" id="shots"><p class="section-title">Shots</p><p>This film has no shot marks yet.</p>
+      <p class="muted">Make them from the film's page (no new render): <code>sh bin/studio shots export ${esc(name)}</code></p></div>`;
+    return;
+  }
+  if (!r.valid) {
+    slot.innerHTML = `<div class="panel" id="shots"><p class="section-title">Shots</p><p class="fail">The shot marks file (shots.json) is not valid:</p>
+      <ul class="plain">${r.problems.map((/** @type {any} */ p) => `<li>${p.row ? `Row ${p.row}` : "File"} · ${esc(p.rule)}: ${esc(p.detail)}</li>`).join("")}</ul></div>`;
+    return;
+  }
+  SH = { name, path, api: API + path, f, shots: r.shots, stamp: r.video_stamp, duration: r.duration, sel: 0, filter: "all",
+    doc: { version: 1, shots: {} }, base: "", orphans: [], stopper: 0, selfSeek: false, prev: null, pending: [] };
+  slot.innerHTML = `<div class="panel shots" id="shots">
+    <div class="shots-head"><p class="section-title">Shots</p><span class="muted small">${r.shots.length} shots · ${mss1(r.duration || 0)}</span></div>
+    <div class="timeline" id="sh-timeline" role="group" aria-label="Shots on the timeline"></div>
+    <div class="sh-legend small muted" id="sh-legend"></div>
+    <div class="chips sh-filters" id="sh-filters" role="group" aria-label="Filter shots"></div>
+    <div class="shots-body"><ol class="shot-list" id="sh-list"></ol><div class="shot-pane" id="sh-pane"></div></div>
+  </div>`;
+  const v = shotVideo();
+  if (v) {
+    v.addEventListener("seeking", () => { if (!SH || SH.selfSeek) return; stopShot(); });
+    v.addEventListener("seeked", () => { if (SH) SH.selfSeek = false; });
+  }
+  drawShots();
+}
+/** @returns {HTMLVideoElement | null} */
+const shotVideo = () => /** @type {HTMLVideoElement | null} */ (document.getElementById("film-video"));
+/** Status of a shot by id (US2 fills the notes book). @param {string} id */
+const shotStatus = (id) => ((SH && SH.doc.shots[id]) || {}).status || "none";
+/** @param {any} s */
+const shotThumb = (s, w) => `${SH.api}/shots/thumbs/${s.n}/${w}.jpg?v=${encodeURIComponent(SH.stamp || "")}`;
+/** img tag that retries every second while the server is still cutting the small pictures (202) */
+const thumbImg = (s, w, cls = "") => `<img class="sh-thumb ${cls}" data-src="${shotThumb(s, w)}" alt="" loading="lazy">`;
+/** @param {ParentNode} root */
+function wireThumbs(root) {
+  root.querySelectorAll("img.sh-thumb[data-src]").forEach((el) => {
+    const img = /** @type {HTMLImageElement} */ (el), src = img.dataset.src || "";
+    let tries = 0;
+    img.onerror = () => { if (++tries <= 60) setTimeout(() => { img.src = `${src}&r=${tries}`; }, 1000); };
+    img.onload = () => { img.classList.add("ok"); };
+    img.src = src;
+    img.removeAttribute("data-src");
+  });
+}
+function drawShots() { drawTimeline(); drawFilters(); drawList(); drawPane(); }
+function drawTimeline() {
+  const el = document.getElementById("sh-timeline");
+  if (!el) return;
+  el.innerHTML = SH.shots.map((/** @type {any} */ s, /** @type {number} */ i) => `<button type="button" class="sh-cell st-${shotStatus(s.id)}${i === SH.sel ? " on" : ""}"
+    style="flex-grow:${Math.max(0.001, s.t1 - s.t0).toFixed(3)}" data-i="${i}" title="Shot ${s.n} · ${mss1(s.t0)}–${mss1(s.t1)} · ${esc(SHOT_STATUS[shotStatus(s.id)])}"
+    aria-label="Shot ${s.n}, ${esc(SHOT_STATUS[shotStatus(s.id)])}"></button>`).join("");
+  el.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => selectShot(+(/** @type {HTMLElement} */ (b).dataset.i || 0), true)));
+  const lg = document.getElementById("sh-legend");
+  if (lg) lg.innerHTML = ["fix", "fixed", "ok", "none"].map((k) => `<span><i class="sw st-${k}"></i>${SHOT_STATUS[k]}</span>`).join("")
+    + `<span><i class="sw sw-on"></i>Selected</span>`;
+}
+function shotCounts() {
+  /** @type {Record<string, number>} */
+  const c = { all: SH.shots.length, fix: 0, fixed: 0, none: 0, ok: 0 };
+  for (const s of SH.shots) c[shotStatus(s.id)]++;
+  return c;
+}
+function drawFilters() {
+  const el = document.getElementById("sh-filters");
+  if (!el) return;
+  const c = shotCounts();
+  el.innerHTML = SHOT_FILTERS.map(([k, label]) => `<button type="button" class="chip${SH.filter === k ? " on" : ""}" data-f="${k}" aria-pressed="${SH.filter === k}">${label}<span>${c[k]}</span></button>`).join("");
+  el.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { SH.filter = /** @type {HTMLElement} */ (b).dataset.f; drawFilters(); drawList(); }));
+}
+/** Open notes of a shot. @param {string} id */
+const openNotes = (id) => ((SH.doc.shots[id] || {}).notes || []).filter((/** @type {any} */ n) => !n.done);
+function drawList() {
+  const el = document.getElementById("sh-list");
+  if (!el) return;
+  const rows = SH.shots.map((/** @type {any} */ s, /** @type {number} */ i) => ({ s, i }))
+    .filter((/** @type {any} */ x) => SH.filter === "all" || shotStatus(x.s.id) === SH.filter);
+  el.innerHTML = rows.length ? rows.map(({ s, i }) => {
+    const st = shotStatus(s.id), open = openNotes(s.id);
+    return `<li class="sh-row${i === SH.sel ? " on" : ""}" data-i="${i}" tabindex="0" role="button" aria-label="Shot ${s.n}">
+      <span class="sh-n">${s.n}</span>
+      <span class="sh-thumbs">${thumbImg(s, "a")}${thumbImg(s, "b")}${thumbImg(s, "c")}</span>
+      <span class="sh-meta"><span>${mss1(s.t0)}–${mss1(s.t1)} <span class="muted">· ${(s.t1 - s.t0).toFixed(1)} s</span></span>
+        <span class="badge st-badge st-${st}">${SHOT_STATUS[st]}</span>
+        ${open.length ? `<span class="sh-open small">${open.length} open: ${esc(String(open[0].text || "(picture)").slice(0, 60))}</span>` : ""}</span>
+    </li>`;
+  }).join("") : `<li class="muted">No shots with this status.</li>`;
+  el.querySelectorAll("li.sh-row").forEach((li) => {
+    const go = () => selectShot(+(/** @type {HTMLElement} */ (li).dataset.i || 0), true);
+    li.addEventListener("click", go);
+    li.addEventListener("keydown", (e) => { if (/** @type {KeyboardEvent} */ (e).key === "Enter" || /** @type {KeyboardEvent} */ (e).key === " ") { e.preventDefault(); go(); } });
+  });
+  wireThumbs(el);
+}
+/** @param {number} i @param {boolean} seek */
+function selectShot(i, seek) {
+  SH.sel = Math.max(0, Math.min(SH.shots.length - 1, i));
+  stopShot();
+  const v = shotVideo();
+  if (seek && v) { v.pause(); SH.selfSeek = true; v.currentTime = SH.shots[SH.sel].t0; }
+  document.querySelectorAll("#sh-timeline .sh-cell").forEach((b) => b.classList.toggle("on", /** @type {HTMLElement} */ (b).dataset.i === String(SH.sel)));
+  document.querySelectorAll("#sh-list .sh-row").forEach((b) => b.classList.toggle("on", /** @type {HTMLElement} */ (b).dataset.i === String(SH.sel)));
+  drawPane();
+}
+function stopShot() { if (SH && SH.stopper) { cancelAnimationFrame(SH.stopper); SH.stopper = 0; } }
+/** Play one shot from its start and stop at its end (research R4). @param {HTMLVideoElement} v @param {number} t0 @param {number} t1 */
+function playRange(v, t0, t1) {
+  if (v === shotVideo()) { stopShot(); SH.selfSeek = true; }
+  v.currentTime = t0;
+  v.play().catch(() => {});
+  const tick = () => {
+    if (v.currentTime >= t1 - 0.03 || v.ended) { v.pause(); if (v === shotVideo()) SH.stopper = 0; return; }
+    const id = requestAnimationFrame(tick);
+    if (v === shotVideo()) SH.stopper = id;
+  };
+  const id = requestAnimationFrame(tick);
+  if (v === shotVideo()) SH.stopper = id;
+}
+function drawPane() {
+  const el = document.getElementById("sh-pane");
+  if (!el) return;
+  const s = SH.shots[SH.sel], st = shotStatus(s.id);
+  el.innerHTML = `<div class="sh-pane-head"><strong>Shot ${s.n}</strong> <span class="muted small">${esc(s.id)}${s.set ? ` · ${esc(s.set)}` : ""}</span>
+      <span class="badge st-badge st-${st}">${SHOT_STATUS[st]}</span></div>
+    <img class="sh-thumb sh-big" data-src="${shotThumb(s, "b")}" data-zoom alt="Middle of shot ${s.n}">
+    <p class="small muted">${mss1(s.t0)}–${mss1(s.t1)} · ${(s.t1 - s.t0).toFixed(1)} s</p>
+    <div class="row sh-nav"><button type="button" id="sh-prev"${SH.sel === 0 ? " disabled" : ""} aria-label="Previous shot">← Prev</button>
+      <button type="button" class="primary" id="sh-play">▶ Play this shot</button>
+      <button type="button" id="sh-next"${SH.sel === SH.shots.length - 1 ? " disabled" : ""} aria-label="Next shot">Next →</button></div>
+    <div id="sh-notes"></div>`;
+  wireThumbs(el);
+  zoomable(el);
+  /** @type {HTMLElement} */ (el.querySelector("#sh-prev")).onclick = () => selectShot(SH.sel - 1, true);
+  /** @type {HTMLElement} */ (el.querySelector("#sh-next")).onclick = () => selectShot(SH.sel + 1, true);
+  /** @type {HTMLElement} */ (el.querySelector("#sh-play")).onclick = () => { const v = shotVideo(); if (v) playRange(v, s.t0, s.t1); };
 }
 
 async function pageSets() {

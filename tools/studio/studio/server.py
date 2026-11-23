@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import APP_ID, VERSION, actions, donesofar, filmsteps, gate, jobs, resources, reviews, store
+from .resources import shotnotes
 from urllib.parse import urlsplit
 from .store import StudioError
 
@@ -312,8 +313,36 @@ def create_app() -> FastAPI:
         return resources.film(name)
 
     @app.get(api + "/films/{name}/video")
-    def film_video(name: str):
+    def film_video(name: str, prev: Optional[str] = None):
+        if prev:                                    # the one previous video kept by `film replace` (specs/029)
+            p = resources.film_path(name, "video_prev")
+            if not p.is_file():
+                raise StudioError("not_found", "phim chưa có bản trước", 404)
+            return FileResponse(p, media_type="video/mp4")
         return FileResponse(resources.film_file(name, "video"), media_type="video/mp4")
+
+    # ---------- shots and shot notes (specs/029 contracts/api.md) ----------
+    @app.get(api + "/films/{name}/shots")
+    def film_shots(name: str, prev: Optional[str] = None):
+        resources.film_path(name, "shots")                 # bad name 400, no film 404
+        d = resources.film_dir(name)
+        r = resources.shot_call(shotnotes.load_shots, d, bool(prev))
+        video = resources.film_path(name, "video_prev" if prev else "video")
+        r["video_stamp"] = shotnotes.video_stamp(video) if video.is_file() else None
+        r["thumbs"] = None
+        if r["valid"] and not prev and video.is_file():
+            r["thumbs"], r["video_stamp"] = shotnotes.thumbs_state(d, r["shots"])
+        return r
+
+    @app.get(api + "/films/{name}/shots/thumbs/{n}/{which}.jpg")
+    def film_shot_thumb(name: str, n: str, which: str):
+        resources.film_path(name, "thumbs")
+        f, state = resources.shot_call(shotnotes.thumb, resources.film_dir(name), n, which)
+        if f is None and state == "building":
+            return JSONResponse({"status": "building"}, status_code=202, headers={"Cache-Control": "no-store"})
+        if f is None:
+            raise StudioError("not_found", "không cắt được ảnh này", 404)
+        return FileResponse(f, media_type="image/jpeg", headers={"Cache-Control": "max-age=86400"})
 
     @app.get(api + "/films/{name}/poster")
     def film_poster(name: str):

@@ -583,7 +583,7 @@ case ${1:-} in
     esac ;;
   page) shift; cmd_page "$@" ;;
   ui | job | review | admin | app) cmd_studio "$@" ;;
-  script | web | qc | publish | channel | lesson | topics | config | kit | point | edit | people) cmd_filmcheck "$@" ;;
+  script | web | qc | publish | channel | lesson | topics | config | kit | point | edit | people | shots | notes | film) cmd_filmcheck "$@" ;;
   help | -h | --help) usage ;;
   '') usage >&2; exit 2 ;;
   *) echo "✗ lệnh lạ: $1" >&2; usage >&2; exit 2 ;;

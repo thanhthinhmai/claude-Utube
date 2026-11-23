@@ -433,3 +433,36 @@ def loudness_range(mp4: Path):
                        capture_output=True, text=True)
     m = re.findall(r"LRA:\s*([\d.]+)\s*LU", p.stderr)
     return float(m[-1]) if m else None
+
+
+def film_shots(d: Path, lib=None) -> str:
+    """specs/029 T015: give the muxed film its shots.json, never blocking qc. From out/shots.json of the render when its
+    length matches <name>.mp4 (≤ 1 frame), else from the page's cached plan, else `shots export`. One line for the
+    report."""
+    from filmcheck import shotnotes, shotsexport
+    try:
+        p = shotnotes.film_paths(d)
+        if not p["video"].is_file():
+            return "shots.json: no video"
+        rendered = d / "out" / "shots.json"
+        cur = shotnotes.load_shots(d)
+        if cur["valid"] and not (rendered.is_file() and rendered.stat().st_mtime > p["shots"].stat().st_mtime):
+            return f"shots.json: {len(cur['shots'])} shots (kept)"
+        code, lines = 1, []
+        if rendered.is_file():
+            try:
+                rows = json.loads(rendered.read_text(encoding="utf-8")).get("shots") or []
+            except (OSError, ValueError, AttributeError):
+                rows = []
+            if rows:
+                code, lines = shotsexport.write_from_rows(d, rows)
+        if code != 0:
+            plan = plan_input(d)
+            if plan and plan.get("shots"):
+                code, lines = shotsexport.write_from_rows(d, [[s["t0"], s["t1"], s.get("set") or "", s["id"]]
+                                                               for s in plan["shots"]])
+        if code != 0 and (d / "index.html").is_file():
+            code, lines = shotsexport.export(d, lib)
+        return ("" if code == 0 else "! ") + (lines[0].lstrip("✓✗ ") if lines else "shots.json: not made")
+    except Exception as e:                      # noqa: BLE001 — a report line, never a qc failure
+        return f"! shots.json: not made ({e})"
