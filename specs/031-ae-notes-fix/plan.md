@@ -28,6 +28,10 @@
 
 **Scale/Scope**: Một máy, một người, phim 20–60 shot; vài lượt sửa mỗi ngày.
 
+**Giả định**:
+- Worker chạy một việc mỗi người cùng lúc, nên một lượt sửa dài (nhiều lượt dựng AE) chặn các việc khác của cùng người; chấp nhận ở bản đầu.
+- Chế độ Client (specs/018): Client mở cùng giao diện qua Host, nên "Fix with Claude" tạo việc trên Host và dùng cầu nối AE của app desktop chạy Host; Client không cần AE và không có việc riêng.
+
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*

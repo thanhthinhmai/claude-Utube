@@ -46,7 +46,7 @@ Người làm phim (Claude hoặc người dùng) có một bộ dựng AE dùng
 
 ### User Story 2 - Cầu nối After Effects trong app desktop (Priority: P1)
 
-App desktop đang chạy trên máy của người dùng nhận yêu cầu dựng từ phần lõi (dựng lại các shot nào của phim nào), gọi After Effects trên máy, báo tiến độ (đang dựng shot nào, bao lâu) và trả kết quả (tệp video của shot, hoặc lỗi kèm nhật ký). Mỗi lúc chỉ một yêu cầu dùng AE; yêu cầu sau chờ tới lượt. Máy không có AE, AE không mở được, hoặc bản quyền AE không còn dùng được thì cầu nối báo rõ lý do.
+App desktop đang chạy trên máy của người dùng nhận yêu cầu dựng từ phần lõi (dựng lại các shot nào của phim nào), gọi After Effects trên máy, báo tiến độ (đang dựng shot nào, bao lâu) và trả kết quả (tệp video của shot, hoặc lỗi kèm nhật ký). Mỗi lúc chỉ một lượt dựng AE; yêu cầu sau chờ tới lượt. Máy không có AE, AE không mở được, hoặc bản quyền AE không còn dùng được thì cầu nối báo rõ lý do.
 
 **Why this priority**: Phần lõi chạy trong môi trường không gọi thẳng được AE. Cầu nối là đường duy nhất để app tự dựng phim AE, kể cả trên máy cài bằng bộ cài.
 
@@ -57,7 +57,7 @@ App desktop đang chạy trên máy của người dùng nhận yêu cầu dựn
 1. **Given** app desktop đang chạy trên máy có AE, **When** phần lõi gửi yêu cầu dựng một danh sách shot, **Then** cầu nối dựng và render từng shot, báo tiến độ ít nhất sau mỗi shot, và trả tệp video của từng shot.
 2. **Given** một yêu cầu đang dùng AE, **When** yêu cầu thứ hai tới, **Then** yêu cầu thứ hai được xếp hàng và báo "đang chờ AE", không chạy song song.
 3. **Given** máy không có AE (hoặc đường dẫn sai), **When** có yêu cầu dựng, **Then** cầu nối trả lỗi "không tìm thấy After Effects" kèm đường dẫn đã thử, trong ≤ 10 giây.
-4. **Given** AE treo hoặc render quá thời hạn, **When** hết thời hạn đặt cho mỗi shot, **Then** cầu nối dừng tiến trình AE của lượt đó, báo lỗi kèm nhật ký, và nhận yêu cầu tiếp theo.
+4. **Given** AE treo hoặc render quá thời hạn, **When** hết thời hạn đặt cho mỗi shot, **Then** cầu nối dừng tiến trình AE của lượt dựng AE đó, báo lỗi kèm nhật ký, và nhận yêu cầu tiếp theo.
 5. **Given** app desktop không chạy, **When** phần lõi cần dựng AE, **Then** phần lõi báo "mở app desktop để dựng phim After Effects" thay vì chờ mãi.
 6. **Given** yêu cầu đến từ nơi không phải phần lõi của chính máy này, **When** cầu nối nhận được, **Then** cầu nối từ chối (chỉ phần lõi của máy được gọi AE).
 
@@ -138,7 +138,7 @@ Người dùng tạo phim mới trên app, chọn bộ máy After Effects, nhậ
 - **FR-004**: Đường dẫn tới After Effects, tới trình render và thư mục làm việc của máy PHẢI nằm trong cấu hình của máy, đặt bằng lệnh hoặc trong app desktop; không tệp nào của phim hay bộ dựng chứa đường dẫn riêng của một máy.
 - **FR-005**: Xưởng PHẢI liệt kê được các shot dùng một phần của bộ dựng dùng chung, để chỉ dựng lại các shot bị ảnh hưởng.
 - **FR-006**: App desktop PHẢI có cầu nối AE nhận yêu cầu dựng (phim, danh sách shot) chỉ từ phần lõi của chính máy đó, chạy After Effects và trình render của máy, báo tiến độ ít nhất sau mỗi shot, trả tệp video từng shot hoặc lỗi kèm nhật ký.
-- **FR-007**: Cầu nối PHẢI chạy tối đa một lượt dùng AE mỗi lúc, xếp hàng các yêu cầu khác, và có thời hạn cho mỗi shot (dừng tiến trình AE khi quá hạn, báo lỗi).
+- **FR-007**: Cầu nối PHẢI chạy tối đa một lượt dựng AE mỗi lúc, xếp hàng các yêu cầu khác, và có thời hạn cho mỗi shot (dừng tiến trình AE khi quá hạn, báo lỗi).
 - **FR-008**: Cầu nối PHẢI báo rõ khi không tìm thấy AE, AE không khởi động được, hoặc AE không tiến triển (ví dụ chờ hộp thoại), trong thời gian quy định.
 - **FR-009**: Phần lõi PHẢI báo "mở app desktop để dựng phim After Effects" khi cầu nối không chạy, thay vì chờ không giới hạn.
 - **FR-010**: Trang phim AE PHẢI có nút "Fix with Claude" tạo một việc sửa ghi chú (không tạo trùng khi một việc của phim đó đang chạy); nút tắt kèm lời giải thích khi phim không phải AE hoặc không có ghi chú mở.
@@ -180,6 +180,7 @@ Người dùng tạo phim mới trên app, chọn bộ máy After Effects, nhậ
 - Tạo phim AE mới trên app nằm trong phạm vi (User Story 5). Tiếng của phim mới là giọng đọc và nhạc của xưởng (hiến pháp: câu chuyện, giọng, nhạc là của mình), không dùng tiếng của video tham chiếu như phim tập luyện.
 - Video mới thay luôn sau khi dựng xong (đã chốt ở Clarifications), giữ một bản trước như spec 029; không có bước duyệt trước khi thay.
 - Kiểm chứng với AE thật trên cả Windows và macOS (đã chốt ở Clarifications). Máy chạy GitHub Actions không có AE, nên luồng build chỉ thử với AE giả; bước thử AE thật trên macOS cần người dùng cho dùng một máy Mac có cài AE (ghi trong quickstart).
-- Giới hạn mặc định 10 ghi chú mỗi lượt và 5 phút mỗi shot; đổi được trong cấu hình. Không có trần token riêng cho mỗi việc (đã chốt ở Clarifications).
+- Thuật ngữ: "lượt sửa" là một lần sửa ghi chú (một việc `fix`); "lượt dựng AE" là một lần cầu nối dùng After Effects. Một lượt sửa có thể gồm nhiều lượt dựng AE.
+- Giới hạn mặc định 10 ghi chú mỗi lượt sửa và 5 phút mỗi shot; đổi được trong cấu hình. Không có trần token riêng cho mỗi việc (đã chốt ở Clarifications).
 - Bản quyền After Effects do người dùng tự lo (trial hiện hết hạn 2026-11-29). Hết bản quyền thì AE không chạy và cầu nối báo lỗi theo FR-008.
 - Chạy luồng phát hành (gắn tag, tạo bộ cài thật) tốn phút chạy GitHub: chỉ làm khi người dùng bảo; spec này chỉ bắt buộc luồng build thử.

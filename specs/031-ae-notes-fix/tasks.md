@@ -27,13 +27,14 @@ description: "Tasks: sửa ghi chú phim After Effects tự động trên app (0
 - [ ] T003 `tools/ae/film.py`: đọc `film.json` (data-model: `engine`, `fps`, `size`, `shots`, `ae_files`, `audio`); `require_ae(film_dir)` từ chối phim không phải `"ae"` với thông báo nói bộ máy hiện tại (FR-002); thêm `engine` vào `tools/studio/studio/resources.py` `film_summary`
 - [ ] T004 [P] `tools/ae/bundle.py`: tạo `bundle.tar` gồm `kit/*.jsx` + `ae/<ae_files>` + `entry.jsx` (đặt `CU.WORK` lúc chạy từ biến của app/lệnh, `CU.PROJ`, `CU.build([...])`, ghi `log.txt` với `START`, `CHECK …`, `DONE`) theo contracts/film-ae.md
 - [ ] T005 [P] `tools/ae/splice.py`: ghép nhiều shot vào video hiện có theo khung trong một lần mã hoá (từ `fixshots.sh`: `trim=start_frame/end_frame`, `setpts=N/FPS/TB`, ép fps, giữ tiếng), đọc mốc từ `shots.json`
+- [ ] T006a [P] `desktop/test/fake-ae.mjs`: AE giả đóng vai `AfterFX` (đọc entry, ghi `log.txt` với `START`/`DONE`, chế độ treo để thử thời hạn) và `aerender` (sinh mp4 ngắn bằng ffmpeg hoặc chép mp4 mẫu nhỏ ở `desktop/test/vectors/`); dùng chung cho T010 và T019
 - [ ] T006 [P] Test `tests/ae/test_ae.py`: `film.json` thiếu/sai; phim web bị từ chối; gói chứa đúng tệp và không chép thừa; ghép 2 shot vào video thử 30 khung/giây (ffmpeg testsrc) → đúng số khung, các đoạn ngoài shot trùng khung gốc (PSNR > 40 dB)
 
 ---
 
 ## Phase 3: User Story 1 - Bộ dựng chung và lệnh `ae` (P1) 🎯 MVP
 
-- [ ] T007 [US1] `tools/ae/local.py`: chạy AE trên máy từ dòng lệnh (WSL: `AfterFX.exe -r` + chờ `log.txt`, tắt AfterFX, `aerender` từng comp; macOS: `osascript … DoScriptFile`), đường dẫn từ `~/.config/claude-utube/ae.json`; mã lỗi `ae_missing`, `ae_scripting_off`, `ae_stalled`, `shot_timeout`, `build_error`, `render_error` (data-model)
+- [ ] T007 [US1] `tools/ae/local.py`: chạy AE trên máy từ dòng lệnh (WSL: `AfterFX.exe -r` + chờ `log.txt`, tắt AfterFX, `aerender` từng comp; macOS: `osascript … DoScriptFile`), đường dẫn từ `~/.config/claude-utube/ae.json`; mã lỗi `ae_missing`, `ae_scripting_off`, `ae_stalled`, `shot_timeout`, `build_error`, `render_error`, `disk_low` (kiểm thư mục làm việc còn ≥ 2 GB trống trước khi dựng) (data-model)
 - [ ] T008 [US1] `tools/ae/uses.py`: quét `ae/*.jsx` tìm `CU.<hàm>` (kèm bảng gọi trong `kit/`), `shots_using(film_dir, funcs)` (FR-005, R6)
 - [ ] T009 [US1] `tools/ae/cli.py` + `bin/studio`: `ae build|render|fix|uses|status|new` và `config ae` theo contracts/cli.md; trong việc (`STUDIO_PROXY` có) thì đi qua cầu nối (US2), ngoài việc thì `local.py`; `ae fix` ngoài việc gọi `shotnotes.replace_video`
 - [ ] T010 [P] [US1] Test: `ae uses` trên phim thử (2 shot gọi hàm khác nhau); `config ae` lưu và đọc; `ae build` với AE giả (biến `STUDIO_AE_FAKE=1` dùng `desktop/test/fake-ae.mjs`) báo `ae_missing` ≤ 10 s khi đường dẫn sai (SC-004)
@@ -49,10 +50,10 @@ description: "Tasks: sửa ghi chú phim After Effects tự động trên app (0
 - [ ] T013 [US2] `tools/studio/studio/server.py`: `/api/v1/ae/bridge/{next,hello}` và `/{id}/{bundle,progress,result/<shot>,finish}` theo contracts/bridge-api.md: chỉ nhận header `X-CU-Bridge` khớp `STUDIO_AE_BRIDGE` (so sánh hằng thời gian) và client 127.0.0.1, bỏ qua phiên/CSRF chỉ cho các đường này
 - [ ] T014 [US2] `tools/studio/studio/host.py` + `bin/studio app start --bridge <tệp>`: đọc khoá vào `STUDIO_AE_BRIDGE` cho web và proxy (như `--gate`)
 - [ ] T015 [US2] `tools/runner/proxy.py`: `/internal/ae/requests` (POST multipart gói, GET trạng thái, GET kết quả) cho việc; 409 `ae_unavailable` khi app desktop chưa `hello` trong 30 s (FR-009)
-- [ ] T016 [US2] `desktop/aebridge.js` (logic thuần, `@ts-check`): tìm AE theo hệ điều hành (chỗ cài mặc định, bản mới nhất), lệnh AfterFX/osascript/aerender, vòng hỏi việc (1 s khi bận, 5 s khi rảnh), khoá một lượt, thời hạn 120 s chờ `START` và 300 s mỗi shot, dừng tiến trình khi quá hạn, `hello` mỗi 10 s
+- [ ] T016 [US2] `desktop/aebridge.js` (logic thuần, `@ts-check`): tìm AE theo hệ điều hành (chỗ cài mặc định, bản mới nhất), lệnh AfterFX/osascript/aerender, vòng hỏi việc (1 s khi bận, 5 s khi rảnh), khoá một lượt, thời hạn 120 s chờ `START` và 300 s mỗi shot, dừng tiến trình khi quá hạn, `hello` mỗi 10 s; kiểm thư mục làm việc còn ≥ 2 GB trống trước mỗi lượt dựng AE, thiếu thì trả `disk_low`
 - [ ] T017 [US2] `desktop/main.js` + `desktop/core.js`: tạo khoá 32 byte mỗi lần khởi động vào `CONFIG_DIR/bridge.json`, thêm `--bridge` (Windows: `wslPath`) vào `app start`; chạy cầu nối khi phần lõi sẵn sàng; dừng khi thoát
 - [ ] T018 [US2] `desktop/ae.html` + `preload.js` + mục khay "After Effects…": hiện đường dẫn tìm được, chọn đường dẫn, nút "Test" (chạy một entry thử ghi `DONE`), lưu vào `config.json` → `ae`
-- [ ] T019 [P] [US2] `desktop/test/fake-ae.mjs` + `desktop/test/aebridge.test.js`: AE giả (log `START/DONE`, aerender chép mp4 mẫu nhỏ ở `desktop/test/vectors/`), 10 lần hai yêu cầu cùng lúc → 0 lần song song, yêu cầu 2 bắt đầu ≤ 2 s sau (SC-003); thiếu AE ≤ 10 s; treo → dừng khi hết hạn (SC-004)
+- [ ] T019 [P] [US2] `desktop/test/aebridge.test.js` (dùng AE giả của T006a): 10 lần hai yêu cầu cùng lúc → 0 lần song song, yêu cầu 2 bắt đầu ≤ 2 s sau (SC-003); thiếu AE ≤ 10 s; treo → dừng khi hết hạn (SC-004); thư mục làm việc tên "thư mục thử" (tiếng Việt, khoảng trắng) chạy đúng; ổ thiếu chỗ → `disk_low`
 - [ ] T020 [P] [US2] Test phần lõi `tests/ui/test_ae_bridge.py`: khoá sai, thiếu, từ IP khác → 403 (SC-006); `next` chỉ giao một yêu cầu; hết nhịp → `bridge_lost`; proxy 409 khi không `hello`
 
 **Checkpoint**: app desktop dựng AE theo yêu cầu của phần lõi.
