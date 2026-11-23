@@ -8,6 +8,15 @@
 
 **Input**: User description: "Sửa ghi chú phim After Effects tự động ngay trên app: (1) đưa bộ dựng AE đang nằm trong phim tập luyện films/ae-crayon-test/ae thành công cụ dùng chung của xưởng, mỗi phim AE chỉ giữ phần shot riêng; lệnh dựng, render, sửa từng shot; cấu hình đường dẫn AE và thư mục làm việc thay cho đường dẫn viết cứng; (2) cầu nối AE trong app desktop: app desktop chạy trên Windows (hoặc macOS) nhận yêu cầu dựng từ phần lõi rồi gọi After Effects và aerender trên máy, báo tiến độ và kết quả; mỗi lúc chỉ một lượt dùng AE; báo rõ khi máy không có AE; (3) nút "Fix with Claude" trên trang phim tạo một việc sửa ghi chú: Claude của app đọc ghi chú mở, sửa code của đúng các shot đó, dựng lại chỉ các shot đó qua cầu nối, thay video (giữ một bản trước), trả lời và tick từng ghi chú; khoá sổ ghi chú trong lúc sửa, giới hạn số ghi chú mỗi lượt, ghi lại token đã dùng; (4) build bộ cài app desktop qua GitHub Actions có phần cầu nối AE. Phụ thuộc spec 029."
 
+## Clarifications
+
+### Session 2026-11-23
+
+- Q: Bản đầu có tạo phim AE mới từ đầu trên app không, hay chỉ sửa phim AE đã có? → A: Có cả tạo phim AE mới từ đầu trên app (từ ý tưởng tới video), ngoài phần sửa phim đã có.
+- Q: Video mới thay luôn hay chờ duyệt? → A: Thay luôn sau khi dựng xong; bản cũ giữ lại để so ("Watch the previous version").
+- Q: Bản đầu có chạy với After Effects thật trên macOS không? → A: Có: cả Windows và macOS đều phải thử với AE thật trước khi xong.
+- Q: Có giới hạn chi phí Claude cho mỗi việc không? → A: Không giới hạn riêng; chỉ ghi lại số token và dùng hạn mức chung hiện có của app (specs/007–008).
+
 ## Bối cảnh
 
 - Người dùng đổi hướng làm phim sang After Effects vì hình dựng bằng trang web của xưởng chưa đạt. Hiến pháp 3.0.0 (nguyên tắc VII) đã nhận AE làm bộ máy dựng hình thứ hai; AE là phần mềm có bản quyền của người dùng.
@@ -89,6 +98,25 @@ Bộ cài app desktop build qua GitHub Actions có sẵn cầu nối AE. Cài v�
 
 ---
 
+### User Story 5 - Tạo phim After Effects mới từ đầu trên app (Priority: P3)
+
+Người dùng tạo phim mới trên app, chọn bộ máy After Effects, nhập ý tưởng (và độ dài, kênh, phong cách nếu có). Việc làm phim của app chạy từ đầu tới cuối: kịch bản được chấm như các phim khác của xưởng, giọng đọc, bảng shot, viết code từng shot bằng bộ dựng AE dùng chung, dựng và render qua cầu nối, trộn tiếng, kiểm theo tầng, rồi giao phim kèm mốc shot để người dùng ghi chú và bấm "Fix with Claude" như User Story 3. Các điểm duyệt của xưởng (kịch bản, bảng shot…) vẫn áp dụng.
+
+**Why this priority**: Người dùng muốn làm phim AE mới mà không cần chat; cần User Story 1–3 chạy trước vì cùng dùng bộ dựng, cầu nối và vòng sửa.
+
+**Independent Test**: Tạo phim AE mới "thu-ae-1" dài khoảng 30 giây từ một ý tưởng trên app: việc chạy qua các bước, dừng ở các điểm duyệt đang bật; khi xong, trang phim có video, mốc shot khớp video (lệch ≤ 1 khung), và phim chỉ chứa phần shot riêng (không chép bộ dựng chung).
+
+**Acceptance Scenarios**:
+
+1. **Given** app có cầu nối AE, **When** tạo phim mới chọn bộ máy After Effects và nhập ý tưởng, **Then** một việc làm phim AE được tạo; phim mới khai báo bộ máy After Effects.
+2. **Given** việc làm phim AE đang chạy, **When** tới bước kịch bản và giọng, **Then** dùng đúng các bước chấm kịch bản, giọng đọc và kiểm tầng 0 của xưởng (không có đường tắt riêng cho AE).
+3. **Given** kịch bản và giọng đã đạt, **When** tới bước hình, **Then** Claude viết code từng shot theo bảng shot bằng bộ dựng chung, dựng qua cầu nối, và mỗi shot qua luật dàn cảnh trước khi ghép bản tổng.
+4. **Given** điểm duyệt Shots đang bật, **When** bảng shot xong, **Then** việc dừng chờ người dùng duyệt trên trang việc như phim web.
+5. **Given** phim AE mới xong, **When** mở trang phim, **Then** có video, mốc shot và phần Shots của spec 029; ghi chú và "Fix with Claude" dùng được ngay.
+6. **Given** máy không có AE hoặc cầu nối không chạy, **When** chọn bộ máy After Effects lúc tạo phim, **Then** app báo trước và không tạo việc.
+
+---
+
 ### Edge Cases
 
 - Code shot bị sửa hỏng làm AE báo lỗi khi dựng: việc thử lại tối đa 1 lần sau khi Claude sửa lỗi; vẫn hỏng thì dừng, giữ video cũ, để ghi chú mở kèm lỗi.
@@ -116,11 +144,14 @@ Bộ cài app desktop build qua GitHub Actions có sẵn cầu nối AE. Cài v�
 - **FR-010**: Trang phim AE PHẢI có nút "Fix with Claude" tạo một việc sửa ghi chú (không tạo trùng khi một việc của phim đó đang chạy); nút tắt kèm lời giải thích khi phim không phải AE hoặc không có ghi chú mở.
 - **FR-011**: Việc sửa ghi chú PHẢI: lấy các ghi chú mở trong giới hạn mỗi lượt; ghi vào nhật ký việc danh sách ghi chú (shot, mốc giây, nội dung); sửa code shot; dựng lại các shot bị ảnh hưởng qua cầu nối; thay video giữ một bản trước (spec 029); trả lời mọi ghi chú của lượt (tick khi sửa được, kèm lý do khi không).
 - **FR-012**: Trong lúc việc sửa chạy, sổ ghi chú PHẢI ghi nhận ghi chú nào thuộc lượt đang chạy; ghi chú thêm hoặc sửa trong lúc đó PHẢI được lưu và để cho lượt sau; trang phim PHẢI hiện việc đang chạy.
-- **FR-013**: Việc sửa PHẢI ghi lại số token Claude đã dùng và thời gian dựng, hiện trên trang việc.
+- **FR-013**: Việc sửa ghi chú và việc làm phim AE PHẢI ghi lại số token Claude đã dùng và thời gian dựng, hiện trên trang việc; không có trần riêng cho mỗi việc, chỉ áp hạn mức chung hiện có của app.
 - **FR-014**: Việc lỗi PHẢI giữ nguyên video cũ và ghi chú mở, báo bước hỏng kèm nhật ký.
 - **FR-015**: Phim `ae-crayon-test` PHẢI được chuyển sang dạng mới và cho ra video trùng với bộ code cũ.
 - **FR-016**: Luồng build GitHub Actions của app desktop PHẢI có bài thử cầu nối AE với một AE giả, chạy trên Windows và macOS; bộ cài PHẢI có phần cài đặt đường dẫn AE (tự tìm ở chỗ cài mặc định, kiểm và lưu đường dẫn người dùng chọn).
 - **FR-017**: Xưởng KHÔNG ĐƯỢC cài, tải hay đóng gói After Effects (hiến pháp VII); thiếu AE thì chỉ báo.
+- **FR-018**: Form tạo phim của app PHẢI cho chọn bộ máy (trang web hoặc After Effects); chọn After Effects khi cầu nối không sẵn sàng thì báo trước và không tạo việc.
+- **FR-019**: Việc làm phim AE PHẢI đi qua các bước chung của xưởng: kịch bản được chấm (specs/010), giọng và kiểm tầng 0 (specs/020), điểm duyệt đang bật (specs/026), gói đăng (specs/011); phần hình gồm bảng shot, code từng shot bằng bộ dựng chung, luật dàn cảnh cho mỗi shot, dựng và render qua cầu nối, trộn tiếng, mốc shot (spec 029).
+- **FR-020**: Phim AE mới PHẢI chỉ chứa phần riêng của phim (shot, danh sách shot, cấu hình, tiếng, video); bộ dựng chung không được chép vào phim.
 
 ### Key Entities
 
@@ -141,12 +172,14 @@ Bộ cài app desktop build qua GitHub Actions có sẵn cầu nối AE. Cài v�
 - **SC-005**: Với 3 ghi chú mở ở 3 shot của `ae-crayon-test`, bấm "Fix with Claude" một lần: việc tự chạy tới cuối không cần thao tác thêm; mọi ghi chú có trả lời; chỉ các shot bị ảnh hưởng được dựng lại (đếm trong nhật ký); video mới hiện trên trang phim mà không tải lại.
 - **SC-006**: 100% yêu cầu tới cầu nối không đến từ phần lõi của máy bị từ chối trong test tự động.
 - **SC-007**: Luồng build thử trên GitHub Actions qua trên Windows và macOS, gồm bài thử cầu nối với AE giả.
+- **SC-008**: Phim AE mới khoảng 30 giây tạo từ một ý tưởng trên app chạy tới khi giao phim mà người dùng chỉ thao tác ở các điểm duyệt đang bật; mốc shot khớp video (lệch ≤ 1 khung); 0 tệp của bộ dựng chung bị chép vào phim.
+- **SC-009**: Trên một máy Windows và một máy macOS có After Effects thật, cài bộ cài mới rồi chạy "Fix with Claude" cho một ghi chú: cả hai máy dựng lại đúng shot, thay video và trả lời ghi chú (kiểm bằng tay theo quickstart).
 
 ## Assumptions
 
-- Chỉ phạm vi sửa và dựng lại phim AE đã có. Tạo phim AE mới từ đầu trên app (từ ý tưởng tới 40 shot) nằm ngoài spec này; phim AE mới vẫn do Claude làm trong chat theo luồng làm phim.
-- Video mới thay luôn sau khi dựng xong (giữ một bản trước như spec 029), không có bước duyệt trước khi thay; người dùng so bằng "Watch the previous version".
-- Bản đầu kiểm trên Windows (máy của người dùng). macOS dùng cùng cơ chế cầu nối và có bài thử với AE giả trong luồng build, nhưng chưa thử với AE thật.
-- Giới hạn mặc định 10 ghi chú mỗi lượt và 5 phút mỗi shot; đổi được trong cấu hình.
+- Tạo phim AE mới trên app nằm trong phạm vi (User Story 5). Tiếng của phim mới là giọng đọc và nhạc của xưởng (hiến pháp: câu chuyện, giọng, nhạc là của mình), không dùng tiếng của video tham chiếu như phim tập luyện.
+- Video mới thay luôn sau khi dựng xong (đã chốt ở Clarifications), giữ một bản trước như spec 029; không có bước duyệt trước khi thay.
+- Kiểm chứng với AE thật trên cả Windows và macOS (đã chốt ở Clarifications). Máy chạy GitHub Actions không có AE, nên luồng build chỉ thử với AE giả; bước thử AE thật trên macOS cần người dùng cho dùng một máy Mac có cài AE (ghi trong quickstart).
+- Giới hạn mặc định 10 ghi chú mỗi lượt và 5 phút mỗi shot; đổi được trong cấu hình. Không có trần token riêng cho mỗi việc (đã chốt ở Clarifications).
 - Bản quyền After Effects do người dùng tự lo (trial hiện hết hạn 2026-11-29). Hết bản quyền thì AE không chạy và cầu nối báo lỗi theo FR-008.
 - Chạy luồng phát hành (gắn tag, tạo bộ cài thật) tốn phút chạy GitHub: chỉ làm khi người dùng bảo; spec này chỉ bắt buộc luồng build thử.
