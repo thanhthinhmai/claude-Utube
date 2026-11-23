@@ -79,6 +79,30 @@ def env_seconds(name: str, default: float) -> float:
     return float(os.environ.get(name, default))
 
 
+# specs/030: compact earlier and keep long command output out of the conversation
+COMPACT_ENV = (("STUDIO_AUTO_COMPACT_WINDOW", "CLAUDE_CODE_AUTO_COMPACT_WINDOW", 300000, 100000),
+               ("STUDIO_BASH_MAX_OUTPUT", "BASH_MAX_OUTPUT_LENGTH", 20000, 1000))
+
+
+def compact_env(environ=None) -> dict:
+    """The agent's auto-compact window and Bash output limit; a bad value falls back to the default."""
+    environ = os.environ if environ is None else environ
+    out = {}
+    for ours, theirs, default, least in COMPACT_ENV:
+        raw = environ.get(ours)
+        value = default
+        if raw not in (None, ""):
+            try:
+                value = int(raw)
+                if value < least:
+                    raise ValueError
+            except ValueError:
+                log.warning("%s=%r is not a whole number ≥ %d: using %d", ours, raw, least, default)
+                value = default
+        out[theirs] = str(value)
+    return out
+
+
 # ---------- runners ----------
 class LocalRunner:
     """The agent as a child process in the job folder. No sandbox: only for tests and trusted machines."""
@@ -495,6 +519,7 @@ class Worker:
                "STUDIO_ROOT": self.runner.root(work),          # `learn …` and the film tools work in the job folder
                # Claude Code's helper calls (WebSearch, summaries) on the job's model too, not a small one
                "ANTHROPIC_DEFAULT_HAIKU_MODEL": s["model"], "ANTHROPIC_SMALL_FAST_MODEL": s["model"]}
+        env.update(compact_env())
         if j["kind"] == "film" and film:                         # specs/026: `job run` marks this film busy
             env["STUDIO_FILM_DIR"] = f"{self.runner.root(work)}/films/{film}"
         mounts, network = self.prepare(j, work)
