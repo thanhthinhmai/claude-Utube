@@ -171,6 +171,7 @@ class BridgeError extends Error {
  * @typedef {{
  *   base: () => string|null, key: string, platform: string, config: () => AeConfig|undefined,
  *   found: () => Found|null, version?: string, fetch?: typeof fetch, freeBytes?: (dir: string) => number,
+ *   aePath?: (p: string) => string,
  *   log?: (s: string) => void, sleep?: (ms: number) => Promise<void>, tick?: number
  * }} BridgeOptions
  */
@@ -191,6 +192,9 @@ class Bridge {
   }
 
   settings() { return settings(this.o.config(), this.o.found()); }
+
+  /** A path as After Effects sees it (the same, except a development run from WSL: C:\\…). @param {string} p */
+  aePath(p) { return this.o.aePath ? this.o.aePath(p) : p; }
 
   /** True when the configured After Effects and aerender exist. */
   hasAE() {
@@ -243,7 +247,7 @@ class Bridge {
     (async () => {
       while (!this.stopped) {
         const built = await this.once().catch((e) => { this.log(`ae bridge: ${e}`); return false; });
-        await sleep(built ? BUSY_POLL_MS : (this.o.tick || IDLE_POLL_MS));
+        await sleep(built ? 0 : (this.o.tick || IDLE_POLL_MS));     // after a build, ask for the next one at once
       }
     })();
   }
@@ -292,7 +296,7 @@ class Bridge {
       const proj = meta.proj || "build.aep";
       await progress({ state: "running", shot: shots[0], index: 0, total: shots.length });
       await this.killAE();
-      const script = this.run(scriptCommand(this.o.platform, s, path.join(dir, "entry.jsx")), { cwd: dir });
+      const script = this.run(scriptCommand(this.o.platform, s, this.aePath(path.join(dir, "entry.jsx"))), { cwd: dir });
       const text = await this.waitLog(path.join(dir, "log.txt"), shots, s, progress);
       await this.killAE();                         // AfterFX may stay open as the GUI: close it, then let the call end
       await Promise.race([script, new Promise((res) => setTimeout(res, 10_000))]);
@@ -302,7 +306,7 @@ class Bridge {
       const marksFile = path.join(dir, `shots_${proj.replace(/\.aep$/, "")}.json`);
       if (!fs.existsSync(aep) || !fs.existsSync(marksFile)) throw new BridgeError("build_error", "After Effects saved no project or shot marks", lg.tail);
       await progress({ state: "running", shot: "MASTER", index: shots.length, total: shots.length });
-      const r = await this.run(renderCommand(s, aep, out), { cwd: dir, timeoutMs: s.shotTimeoutSec * 1000 * Math.max(1, shots.length) });
+      const r = await this.run(renderCommand(s, this.aePath(aep), this.aePath(out)), { cwd: dir, timeoutMs: s.shotTimeoutSec * 1000 * Math.max(1, shots.length) });
       if (r.timedOut) { await this.killAE(); throw new BridgeError("shot_timeout", `aerender ran longer than ${s.shotTimeoutSec} s per shot`, String(r.out).slice(-2000)); }
       if (!fs.existsSync(out) || fs.statSync(out).size === 0) throw new BridgeError("render_error", "aerender wrote no video", String(r.out).slice(-2000));
       const up = await this.call(`${req.id}/result/MASTER`, { method: "PUT", headers: { "content-type": "video/mp4" }, body: fs.readFileSync(out) });
@@ -333,7 +337,7 @@ class Bridge {
         'var f = new File((new File($.fileName)).parent.fsName + "/log.txt"); f.open("w"); f.writeln("START"); f.writeln("DONE"); f.close();\n');
       await this.killAE();
       const t0 = Date.now();
-      const p = this.run(scriptCommand(this.o.platform, s, path.join(dir, "entry.jsx")), { cwd: dir });
+      const p = this.run(scriptCommand(this.o.platform, s, this.aePath(path.join(dir, "entry.jsx"))), { cwd: dir });
       await this.waitLog(path.join(dir, "log.txt"), [], s, () => {});
       await this.killAE();
       await Promise.race([p, new Promise((res) => setTimeout(res, 10_000))]);

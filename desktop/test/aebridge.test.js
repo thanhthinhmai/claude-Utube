@@ -134,7 +134,7 @@ test("one AE run at a time; the next request starts within 2 s (SC-003)", async 
     assert.equal(fs.existsSync(lock + ".overlap"), false, "two AE runs overlapped");
     for (let i = 1; i < core.reqs.length; i++) {
       assert.ok(core.reqs[i].claimedAt >= core.reqs[i - 1].finishedAt, "claimed before the previous one finished");
-      assert.ok(core.reqs[i].claimedAt - core.reqs[i - 1].finishedAt <= 2000, `request ${i} waited too long`);
+      assert.ok(core.reqs[i].claimedAt - core.reqs[i - 1].finishedAt <= 2000, `request ${i} waited too long: ${core.reqs.slice(1).map((/** @type {any} */ x, /** @type {number} */ k) => x.claimedAt - core.reqs[k].finishedAt).join(",")}`);
     }
     const x = core.reqs[0];
     assert.ok(x.results.MASTER > 0);
