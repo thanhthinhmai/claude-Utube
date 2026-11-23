@@ -1293,7 +1293,8 @@ function tiersHtml(t) {
 async function pageFilm(name) {
   const f = await get(`/films/${encodeURIComponent(name)}`);
   const base = `${API}/films/${encodeURIComponent(name)}`;
-  $app.innerHTML = `${back("#/films", "Films")}${head("Film", esc(f.name), "")}
+  $app.classList.toggle("wide-film", !!f.has_video);      // room for the Inspector column on the right
+  $app.innerHTML = `<div class="film-layout"><div class="film-main">${back("#/films", "Films")}${head("Film", esc(f.name), "")}
     ${f.has_video ? `<video id="film-video" controls preload="metadata" ${f.has_poster ? `poster="${base}/poster"` : ""}>
         <source src="${base}/video" type="video/mp4">
         ${f.has_subtitles ? `<track kind="subtitles" srclang="vi" label="Subtitles" src="${base}/subtitles.vtt" default>` : ""}
@@ -1303,7 +1304,8 @@ async function pageFilm(name) {
     ${f.has_video ? `<div id="shots-slot"><div class="panel"><p class="section-title">Shots</p><p class="muted">Loading…</p></div></div>` : ""}
     ${tiersHtml(f.tiers)}
     ${f.treatment_html ? `<h2>Script (TREATMENT)</h2><div class="panel md">${f.treatment_html}</div>` : ""}
-    ${f.credits ? `<h2>Third-party assets (CREDITS)</h2><pre class="log">${esc(f.credits)}</pre>` : ""}`;
+    ${f.credits ? `<h2>Third-party assets (CREDITS)</h2><pre class="log">${esc(f.credits)}</pre>` : ""}</div>
+    ${f.has_video ? `<aside class="shot-pane sh-inspector film-inspector" id="sh-pane" aria-label="Inspector"><p class="section-title">Inspector</p><p class="muted small">Loading…</p></aside>` : ""}</div>`;
   if (f.has_video) filmShots(name, f);
   const del = document.getElementById("del-film");
   if (del) del.onclick = async () => {
@@ -1328,6 +1330,8 @@ async function filmShots(name, f) {
   let r;
   try { r = await get(`${path}/shots`); }
   catch (e) { slot.innerHTML = `<div class="panel"><p class="section-title">Shots</p><p class="error">${esc(e.message)}</p></div>`; return; }
+  const noInspector = () => { const a = document.getElementById("sh-pane"); if (a) a.remove(); $app.classList.remove("wide-film"); };
+  if (r.missing || !r.valid) noInspector();
   if (r.missing) {
     slot.innerHTML = `<div class="panel" id="shots"><p class="section-title">Shots</p><p>This film has no shot marks yet.</p>
       <p class="muted">Make them from the film's page (no new render): <code>sh bin/studio shots export ${esc(name)}</code></p></div>`;
@@ -1346,10 +1350,7 @@ async function filmShots(name, f) {
     <div class="timeline" id="sh-timeline" role="group" aria-label="Shots on the timeline"></div>
     <div class="sh-legend small muted" id="sh-legend"></div>
     <div class="chips sh-filters" id="sh-filters" role="group" aria-label="Filter shots"></div>
-    <div class="sh-editor">
-      <div class="sh-canvas" id="sh-canvas"></div>
-      <aside class="shot-pane sh-inspector" id="sh-pane" aria-label="Inspector"></aside>
-    </div>
+    <div class="sh-editor"><div class="sh-canvas" id="sh-canvas"></div></div>
     <div class="sh-strip-wrap">
       <div class="row sh-strip-tools"><label class="small muted sh-zoom">Zoom <input type="range" id="sh-zoom" min="10" max="160" step="1" value="34" aria-label="Timeline zoom"></label>
         <span class="small muted" id="sh-zoom-val">34px/s</span><span class="small muted sh-strip-count">${r.shots.length} shots · ${mss1(r.duration || 0)}</span></div>
@@ -2774,6 +2775,7 @@ const PUBLIC = [
 let rendering = null;
 async function route() {
   const h = location.hash || "#/";
+  $app.classList.remove("wide-film");
   if (MODE === "online") {
     for (const [re, fn] of PUBLIC) {
       const m = h.match(/** @type {RegExp} */ (re));
