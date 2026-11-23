@@ -1339,7 +1339,7 @@ async function filmShots(name, f) {
     return;
   }
   SH = { name, path, api: API + path, f, shots: r.shots, stamp: r.video_stamp, duration: r.duration, sel: 0, filter: "all",
-    doc: { version: 1, shots: {} }, base: "", orphans: [], stopper: 0, selfSeek: false, prev: null, pending: [], draft: "", pv: /** @type {HTMLVideoElement | null} */ (null),
+    doc: { version: 1, shots: {} }, base: "", orphans: [], stopper: 0, selfSeek: false, prev: null, pending: [], draft: "", drafts: /** @type {Record<string, {text: string, pending: string[]}>} */ ({}), pv: /** @type {HTMLVideoElement | null} */ (null),
     pin: true, notesError: "" };
   slot.innerHTML = `<div class="panel shots" id="shots">
     <div class="shots-head"><p class="section-title">Shots</p><span class="muted small">${r.shots.length} shots · ${mss1(r.duration || 0)}</span></div>
@@ -1453,10 +1453,16 @@ function drawList() {
     li.addEventListener("keydown", (e) => { if (/** @type {KeyboardEvent} */ (e).key === "Enter" || /** @type {KeyboardEvent} */ (e).key === " ") { e.preventDefault(); go(); } });
   });
   wireThumbs(el);
+  if (document.getElementById("sh-msg")) unsavedHint();
 }
 /** @param {number} i @param {boolean} seek */
 function selectShot(i, seek) {
+  // each shot keeps its own unsaved note (text and pictures): it never follows you to another shot
+  const was = SH.shots[SH.sel];
+  if (was) { if ((SH.draft || "").trim() || SH.pending.length) SH.drafts[was.id] = { text: SH.draft || "", pending: SH.pending }; else delete SH.drafts[was.id]; }
   SH.sel = Math.max(0, Math.min(SH.shots.length - 1, i));
+  const d = SH.drafts[SH.shots[SH.sel].id];
+  SH.draft = d ? d.text : ""; SH.pending = d ? d.pending : [];
   stopShot();
   document.querySelectorAll("#sh-timeline .sh-cell").forEach((b) => b.classList.toggle("on", /** @type {HTMLElement} */ (b).dataset.i === String(SH.sel)));
   document.querySelectorAll("#sh-list .sh-row").forEach((b) => b.classList.toggle("on", /** @type {HTMLElement} */ (b).dataset.i === String(SH.sel)));
@@ -1556,9 +1562,10 @@ function drawNotes() {
       <p class="small" id="sh-msg" role="status"></p>
     </div>`;
   drawPending();
+  unsavedHint();
   zoomable(el);
   const ta = /** @type {HTMLTextAreaElement} */ (el.querySelector("#sh-note"));
-  ta.addEventListener("input", () => { SH.draft = ta.value; /** @type {HTMLElement} */ (el.querySelector("#sh-count")).textContent = `${ta.value.length}/2000`; });
+  ta.addEventListener("input", () => { SH.draft = ta.value; /** @type {HTMLElement} */ (el.querySelector("#sh-count")).textContent = `${ta.value.length}/2000`; unsavedHint(); });
   ta.addEventListener("paste", (e) => {
     const items = Array.from(/** @type {ClipboardEvent} */ (e).clipboardData?.items || []).filter((it) => it.kind === "file" && it.type.startsWith("image/"));
     if (!items.length) return;                     // text goes into the box as usual
@@ -1614,16 +1621,32 @@ function drawPending() {
   el.innerHTML = SH.pending.map((/** @type {string} */ f, /** @type {number} */ i) => `<span class="sh-pend"><img src="${SH.api}/notes/images/${esc(f)}" data-zoom alt="Picture to add">
     <button type="button" class="link" data-i="${i}" aria-label="Remove this picture">×</button></span>`).join("");
   zoomable(el);
-  el.querySelectorAll("button[data-i]").forEach((b) => b.addEventListener("click", () => { SH.pending.splice(+(/** @type {HTMLElement} */ (b).dataset.i || 0), 1); drawPending(); }));
+  el.querySelectorAll("button[data-i]").forEach((b) => b.addEventListener("click", () => { SH.pending.splice(+(/** @type {HTMLElement} */ (b).dataset.i || 0), 1); drawPending(); unsavedHint(); }));
+}
+/** "Not saved yet" while the box holds text or pictures, and a mark on every shot row with an unsaved note. */
+function unsavedHint() {
+  const m = document.getElementById("sh-msg"), dirty = !!((SH.draft || "").trim() || SH.pending.length);
+  if (m && (!m.textContent || m.dataset.unsaved)) {
+    m.dataset.unsaved = dirty ? "1" : ""; m.className = "small warn"; m.textContent = dirty ? "Not saved yet: press Add note." : "";
+  }
+  const cur = SH.shots[SH.sel] ? SH.shots[SH.sel].id : "";
+  document.querySelectorAll("#sh-list .sh-row").forEach((li) => {
+    const s = SH.shots[+(/** @type {HTMLElement} */ (li).dataset.i || 0)];
+    const has = s && (s.id === cur ? dirty : !!SH.drafts[s.id]);
+    let tag = li.querySelector(".sh-unsaved");
+    if (has && !tag) { tag = document.createElement("span"); tag.className = "sh-unsaved small"; tag.textContent = "unsaved note"; (li.querySelector(".sh-meta") || li).appendChild(tag); }
+    if (!has && tag) tag.remove();
+  });
 }
 /** @param {string} text @param {boolean} [bad] */
 function shotMsg(text, bad = false) {
   const m = document.getElementById("sh-msg");
-  if (m) { m.className = `small ${bad ? "fail" : "muted"}`; m.textContent = text; }
+  if (m) { m.dataset.unsaved = ""; m.className = `small ${bad ? "fail" : "muted"}`; m.textContent = text; }
 }
 /** Upload one picture (pasted or chosen) for the note being written. @param {File} file */
 async function addPicture(file) {
-  if (SH.pending.length >= 4) { shotMsg("A note can have up to 4 pictures.", true); return; }
+  const pend = SH.pending;                          // the picture belongs to the shot it was added on
+  if (pend.length >= 4) { shotMsg("A note can have up to 4 pictures.", true); return; }
   if (file.size > 10 * 1024 * 1024) { shotMsg("The picture is larger than 10 MB.", true); return; }
   shotMsg("Adding the picture…");
   const fd = new FormData();
@@ -1632,9 +1655,10 @@ async function addPicture(file) {
     const r = await fetch(`${SH.api}/notes/images`, { method: "POST", headers: { "X-Studio": "1" }, body: fd });
     const body = await r.json().catch(() => ({}));
     if (!r.ok) throw failed(r, body);
-    SH.pending.push(body.file);
+    pend.push(body.file);
     drawPending();
     shotMsg("");
+    unsavedHint();
   } catch (e) { shotMsg(e.message, true); }
 }
 function addNote() {
@@ -1648,7 +1672,11 @@ function addNote() {
   saveNotes((doc) => {
     const x = doc.shots[s.id] || (doc.shots[s.id] = { status: "none", status_by: "auto", notes: [] });
     x.notes.push({ at, text, images, done: false });
-  }, () => { SH.draft = ""; SH.pending = []; });
+  }, () => {
+    delete SH.drafts[s.id];
+    if (SH.shots[SH.sel] && SH.shots[SH.sel].id === s.id) { SH.draft = ""; SH.pending = []; }
+    unsavedHint();
+  });
 }
 /** Save the notes book with the fingerprint read (FR-009); on "changed" apply the same change to the new book once.
  * @param {(doc: any) => void} op @param {() => void} [ok] */

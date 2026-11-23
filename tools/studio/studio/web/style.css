@@ -576,6 +576,8 @@ fieldset.points legend { font-size: 13px; padding: 0 4px; }
 .sh-thumb:not(.ok) { color: transparent; }
 .sh-meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
 .sh-meta .badge { justify-self: start; align-self: flex-start; }
+.sh-unsaved { color: var(--warn); font-weight: 600; }
+#sh-msg.warn { color: var(--warn); font-weight: 600; }
 .sh-open { color: var(--warn); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .st-badge.st-fix { color: #9a3412; background: #ffedd5; } .st-badge.st-fixed { color: #fff; background: var(--st-fixed); }
 .st-badge.st-ok { color: #065f46; background: #d1fae5; } .st-badge.st-none { color: var(--muted); background: var(--hover); }

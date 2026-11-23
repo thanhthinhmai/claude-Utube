@@ -44,6 +44,14 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     out.nextTitle = (await page.locator("#sh-pane .sh-pane-head strong").innerText()).trim();
     out.nextDisabled = await page.locator("#sh-next").isDisabled();
     await page.click("#sh-prev");
+    // an unsaved note stays on its own shot: switching shots shows an empty box, coming back brings it back
+    await page.fill("#sh-note", "nháp shot 2");
+    await page.click("#sh-next");
+    out.otherShotBox = await page.inputValue("#sh-note");
+    out.unsavedTags = await page.locator("#sh-list .sh-unsaved").count();
+    await page.click("#sh-prev");
+    out.backBox = await page.inputValue("#sh-note");
+    out.unsavedMsg = (await page.locator("#sh-msg").innerText()).trim();
     // a note with a pasted picture
     await page.fill("#sh-note", "tay người ngồi bị bàn che");
     await page.evaluate((b64) => {
