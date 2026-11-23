@@ -119,7 +119,7 @@ description: "Tasks: ghi chú từng shot trên trang phim (029)"
 ## Phase 6: Polish & Cross-Cutting
 
 - [X] T037 [P] Chạy `tests/ui/test_typecheck.py` cho `app.js` (sửa kiểu `@ts-check` nếu lỗi) và `node --test desktop/test/*.test.js` không vỡ
-- [ ] T038 Chạy kiểm chứng theo `specs/029-shot-notes/quickstart.md` trên app thật, ghi kết quả đạt/không đạt vào cuối `quickstart.md`: thời gian và số thao tác ghi một ghi chú ở phim 40 shot (SC-001, ≤ 20 s, ≤ 4 thao tác); thời gian hiện phần Shots (SC-002); 10 lần dừng shot (SC-003); dán ảnh 10 lần (SC-008); khớp `shots.json` của `ae-crayon-test` với ffprobe ≤ 1 khung (SC-005, kiểm bằng tay vì dự án AE ngoài git); một lượt sửa thử với 3 ghi chú mở trên `ae-crayon-test`: Claude liệt kê đúng cả 3 trước khi sửa, sau khi xong mỗi ghi chú hoặc tick kèm trả lời hoặc còn mở kèm lý do (SC-006)
+- [X] T038 Chạy kiểm chứng theo `specs/029-shot-notes/quickstart.md` trên app thật, ghi kết quả đạt/không đạt vào cuối `quickstart.md`: thời gian và số thao tác ghi một ghi chú ở phim 40 shot (SC-001, ≤ 20 s, ≤ 4 thao tác); thời gian hiện phần Shots (SC-002); 10 lần dừng shot (SC-003); dán ảnh 10 lần (SC-008); khớp `shots.json` của `ae-crayon-test` với ffprobe ≤ 1 khung (SC-005, kiểm bằng tay vì dự án AE ngoài git); một lượt sửa thử với 3 ghi chú mở trên `ae-crayon-test`: Claude liệt kê đúng cả 3 trước khi sửa, sau khi xong mỗi ghi chú hoặc tick kèm trả lời hoặc còn mở kèm lý do (SC-006)
 - [X] T039 Chạy đủ 5 bộ test: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`
 
 ---

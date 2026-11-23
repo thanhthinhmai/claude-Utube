@@ -36,3 +36,17 @@ sh tests/ui/run.sh          # gồm test_shot_notes.py, test_typecheck.py
 sh tests/filmcheck/run.sh   # gồm test_shots_export.py
 sh tests/run.sh; sh tests/render/run.sh; sh tests/learn/run.sh
 ```
+
+## Kết quả kiểm chứng (T038, 2026-11-23)
+
+Phim `ae-crayon-test` (40 shot, 137,6 s). Đo bằng trình duyệt tự động trên bản sao của phim (video đổi sang VP9 vì Chromium thử không có H.264; mốc shot, ảnh và độ dài giữ nguyên), máy chủ chế độ local.
+
+| Tiêu chí | Đo được | Kết quả |
+|---|---|---|
+| SC-001 ghi một ghi chú | 3 thao tác (chọn shot, gõ, thêm), 0,13 s chờ máy | Đạt |
+| SC-002 hiện phần Shots | thanh thời gian 0,15 s; đủ 120 ảnh nhỏ lần đầu 1,6 s, lần sau 0,11 s | Đạt |
+| SC-003 dừng cuối shot | 10 shot (3, 6, 10, 15, 20, 26, 31, 34, 37, 39): lệch −0,014 đến −0,029 s | Đạt |
+| SC-005 mốc shot phim AE | `shots.json` 40 shot, tổng 137,6 s; ffprobe video 137,600 s | Đạt (kiểm bằng tay) |
+| SC-008 dán ảnh | 10/10 ảnh chụp màn hình dán được, sau tải lại còn 10 ghi chú, 10 ảnh | Đạt |
+| SC-004, SC-007 | test tự động (`tests/ui/test_shot_notes.py`) | Đạt |
+| SC-006 vòng sửa với Claude | `notes show` liệt kê đúng ghi chú; `notes reply` có test tự động. Chưa chạy một lượt sửa thật 3 ghi chú (cần ghi chú thật của người dùng và một lần dựng lại AE) | Đạt một phần |
