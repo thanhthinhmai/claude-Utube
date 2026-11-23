@@ -2169,6 +2169,10 @@ async function pageNew() {
           `<option value="${esc(c.slug)}" ${params.get("channel") === c.slug ? "selected" : ""}>${esc(c.name)} (${esc(c.language)})</option>`).join("")}</select></label>` : ""}
       <label>Style <span class="hint">Pick the look of the film. <a href="#/library">See the whole library</a>.</span></label>
       <div class="pick" role="radiogroup" aria-label="Style">${cards}</div>
+      <div class="row" role="radiogroup" aria-label="Picture engine">
+        <label class="check"><input type="radio" name="engine" value="page" checked> <span>Drawn by the studio (web page)</span></label>
+        <label class="check"><input type="radio" name="engine" value="ae" ${ME.ae && ME.ae.ready ? "" : "disabled"}> <span>After Effects (on this computer)</span></label>
+        ${ME.ae && !ME.ae.ready ? `<span class="hint">${esc(ME.ae.message || "After Effects is not ready.")}</span>` : ""}</div>
       <label>Your idea <span class="hint">What happens in the film, who is in it, the mood. Up to 2000 characters.</span>
         <textarea id="idea" minlength="3" maxlength="2000" required placeholder="A late-night bánh mì stall in Saigon, told by the old man who runs it.">${topic ? esc(topic.text) : ""}</textarea></label>
       ${topic ? `<p class="muted">From topic #${topic.n} (${esc(topic.verdict)} ${topic.total}/50).</p>` : ""}
@@ -2193,7 +2197,9 @@ async function pageNew() {
   onSubmit(async () => {
     const style = /** @type {HTMLInputElement | null} */ ($app.querySelector("input[name=style]:checked"));
     if (!style) throw new Error("Pick a style first.");
+    const eng = /** @type {HTMLInputElement | null} */ ($app.querySelector("input[name=engine]:checked"));
     const j = await post("/jobs", { kind: "film", style: style.value, idea: field("idea").value.trim(),
+      ...(eng && eng.value === "ae" ? { engine: "ae" } : {}),
       seconds: Number(field("seconds").value), review_treatment: field("treat").checked, reviews: pointsOf("f-reviews"),
       ...(chSel && chSel.value ? { channel: chSel.value } : {}),
       ...(topic && chSel && chSel.value === params.get("channel") ? { topic: topic.n } : {}) });

@@ -170,5 +170,59 @@ class FixJob(unittest.TestCase):
         self.assertNotIn("ae render ae-one", p.replace("do not run `ae render`", ""))
 
 
+class AeFilmJob(unittest.TestCase):
+    """US5 (T034): a new film drawn by After Effects."""
+
+    def setUp(self):
+        self.s = Studio()
+        f = Path(tempfile.mkdtemp()) / "bridge.json"
+        f.write_text(json.dumps({"key": KEY}))
+        self.old = os.environ.get("STUDIO_AE_BRIDGE")
+        os.environ["STUDIO_AE_BRIDGE"] = str(f)
+        self.c = self.s.signup_verified("aefilm@example.com")
+
+    def tearDown(self):
+        if self.old is None:
+            os.environ.pop("STUDIO_AE_BRIDGE", None)
+        else:
+            os.environ["STUDIO_AE_BRIDGE"] = self.old
+        self.s.close()
+
+    def test_needs_the_desktop_app_then_marks_the_job(self):          # FR-018
+        from helpers import film_job
+        r = film_job(self.c, engine="ae")
+        self.assertEqual((r.status_code, r.json()["error"]["code"]), (409, "ae_unavailable"))
+        self.assertFalse(self.c.get("/api/v1/me").json()["ae"]["ready"])
+        self.c.post("/api/v1/ae/bridge/hello", json={"found": True}, headers={"x-cu-bridge": KEY})
+        self.assertTrue(self.c.get("/api/v1/me").json()["ae"]["ready"])
+        r = film_job(self.c, engine="ae")
+        self.assertEqual(r.status_code, 201, r.text)
+        from studio import jobs
+        j = jobs.load(r.json()["id"])
+        self.assertEqual(j["input"]["engine"], "ae")
+        import sys
+        sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "runner"))
+        import agent
+        p = agent.prompt_for(j["input"])
+        self.assertIn(f"ae new {j['input']['film']}", p)
+        self.assertIn("ae render", p)
+        self.assertNotIn("ae new", agent.prompt_for({**j["input"], "engine": None}))
+        r = film_job(self.c)                                              # web page films are unchanged
+        self.assertEqual(r.status_code, 201, r.text)
+        self.assertNotIn("engine", jobs.load(r.json()["id"])["input"])
+
+    def test_new_ae_film_holds_no_kit_file(self):                       # SC-008
+        root = Path(tempfile.mkdtemp())
+        env = {**os.environ, "STUDIO_ROOT": str(root)}
+        env.pop("STUDIO_JOB", None)
+        repo = Path(__file__).resolve().parents[2]
+        p = subprocess.run(["sh", str(repo / "bin" / "studio"), "ae", "new", "fox-1"], env=env, capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        d = root / "films" / "fox-1"
+        self.assertEqual(json.loads((d / "film.json").read_text())["engine"], "ae")
+        kit = {f.name for f in (repo / "tools" / "ae" / "kit").glob("*.jsx")}
+        self.assertFalse(kit & {f.name for f in d.rglob("*.jsx")})
+
+
 if __name__ == "__main__":
     unittest.main()
