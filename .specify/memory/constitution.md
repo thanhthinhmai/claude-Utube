@@ -33,9 +33,13 @@ Các lệnh `/speckit-plan`, `/speckit-analyze` và `/speckit-converge` đều k
 - Thư viện phong cách bên ngoài (lemo-opuscar) **PHẢI** được giữ nguyên để cập nhật được từ bản gốc. Không sửa file bên trong nó.
 - Mọi phần mở rộng (phong cách riêng, công cụ, skill) nằm **bên ngoài** thư viện, trong thư mục của dự án.
 
-### VII. Một bộ máy dựng hình
-- Toàn dự án dùng **một** bộ máy dựng hình chính. Bộ máy nào được chốt trong `plan.md` của tính năng đầu tiên cần dựng hình, kèm so sánh trong `research.md`.
-- Thêm bộ máy thứ hai chỉ khi có lý do ghi trong "Complexity Tracking" và được người dùng duyệt.
+### VII. Hai bộ máy dựng hình, mỗi phim một bộ
+- Xưởng có **hai** bộ máy dựng hình chính thức:
+  - **Trang web dựng bằng code** (bộ máy đầu tiên, specs/019): giữ cho các phim và phong cách đang dùng nó.
+  - **Adobe After Effects** (từ 2026-11-23, theo quyết định của người dùng vì hình từ trang web chưa đạt): dự án AE do script ExtendScript của xưởng sinh ra, dựng bằng `aerender`. Đây là hướng chính cho phim hoạt hình nhân vật.
+- Mỗi phim dùng **đúng một** bộ máy, ghi trong thư mục phim; không trộn hai bộ máy trong một phim.
+- After Effects là phần mềm thương mại của người dùng, chạy trên máy Windows hoặc macOS của họ. Xưởng **KHÔNG ĐƯỢC** cài, phân phối, bẻ khoá hay mua thay; bản quyền do người dùng tự lo. Thiếu AE thì báo rõ, không âm thầm đổi sang bộ máy khác.
+- Thêm bộ máy thứ ba chỉ khi có lý do ghi trong "Complexity Tracking" và được người dùng duyệt.
 
 ### VIII. Học phong cách bằng đo, không bằng cảm nhận
 - Học phong cách từ kênh YouTube theo phương pháp của claude-animated-shorts: xem đủ mọi khung hình, đo bằng công cụ, rút ra luật kèm con số. Chỉ lấy **phương pháp** và **style bible**, không lấy code dựng hình của repo đó.
@@ -78,9 +82,10 @@ Các lệnh `/speckit-plan`, `/speckit-analyze` và `/speckit-converge` đều k
 - Hiến pháp này có hiệu lực cao hơn mọi hướng dẫn khác trong dự án.
 - Muốn sửa hiến pháp thì phải ghi lý do, được người dùng duyệt và tăng số phiên bản.
 
-**Version**: 2.2.0 | **Ratified**: 2026-11-05 | **Last Amended**: 2026-11-11
+**Version**: 3.0.0 | **Ratified**: 2026-11-05 | **Last Amended**: 2026-11-23
 
 ### Lịch sử sửa đổi
+- 3.0.0: Đổi nguyên tắc VII từ "Một bộ máy dựng hình" thành "Hai bộ máy dựng hình, mỗi phim một bộ": thêm Adobe After Effects làm bộ máy chính thức thứ hai (phần mềm thương mại của người dùng, xưởng không cài hay mua thay), mỗi phim dùng đúng một bộ máy.
 - 2.2.0: Thêm mục "Phần mềm hệ thống": xưởng không tự cài phần mềm hệ thống; ngoại lệ cho app desktop bật tính năng của hệ điều hành (WSL2) khi người dùng bấm và đồng ý quyền quản trị.
 - 2.1.0: Cho phép dịch vụ online tải video từ kênh YouTube khách nêu để học phong cách, kèm điều kiện (xác nhận quyền, giữ kín, xoá sau khi học).
 - 2.0.0: Hiến pháp riêng cho claude-Utube. Thêm nguyên tắc VI–IX và mục bản quyền, nội dung.
