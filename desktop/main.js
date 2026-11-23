@@ -5,6 +5,7 @@
 "use strict";
 
 const { app, BrowserWindow, Tray, Menu, dialog, shell, ipcMain, Notification, nativeImage, safeStorage, session } = require("electron");
+const aeb = require("./aebridge.js");
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -104,7 +105,7 @@ async function startCore() {
   if (!splash || splash.isDestroyed()) showSplash();
   await new Promise((r) => splash && splash.webContents.once("did-finish-load", r));
   step("Starting the studio…");
-  const r = await coreRun(["start", ...gateArgs()], core.READY_TIMEOUT_MS + 5_000).catch((e) => ({ code: 1, out: "", err: String(e) }));
+  const r = await coreRun(["start", ...gateArgs(), ...bridgeArgs()], core.READY_TIMEOUT_MS + 5_000).catch((e) => ({ code: 1, out: "", err: String(e) }));
   const url = core.parseUrl(r.out);
   if (r.code !== 0 || !url) {
     const why = (r.out + "\n" + r.err).trim().split("\n").slice(-20).join("\n");
@@ -115,6 +116,7 @@ async function startCore() {
   step("Opening…");
   appUrl = url;
   openMain(url);
+  startAeBridge();
   if (cfg && /** @type {any} */ (cfg).share && /** @type {any} */ (cfg).share.enabled) startSharing();   // specs/018
 }
 
@@ -217,6 +219,7 @@ function setTrayMenu() {
     ...(isClient() ? [] : [
       { label: "Open in the browser", click: () => appUrl && shell.openExternal(appUrl) },
       { label: "Share with my team…", click: showShare },
+      { label: "After Effects…", click: showAe },
       { type: /** @type {const} */ ("separator") },
       { label: "Data folder", click: () => openFolder("data") },
       { label: "Log folder", click: () => openFolder("logs") }]),
@@ -251,6 +254,7 @@ app.on("before-quit", async (e) => {
   const ok = isClient() ? true : await stopCore("Quit");
   if (!ok) { if (SMOKE) smoke("quit cancel ok"); return; }
   quitting = true;
+  if (aeBridge) aeBridge.stop();
   if (monitor) clearInterval(monitor);
   if (gateway) await gateway.stop().catch(() => {});
   const pending = PLATFORM === "win32" ? pendingUpdate() : null;
@@ -578,6 +582,85 @@ async function startSharing() {
   saveShare();
 }
 
+// ---------- After Effects bridge (specs/031) ----------
+// A new random key at each start, in bridge.json; the core gets the file with `app start --bridge` and only answers
+// /api/v1/ae/bridge/* with that key, from 127.0.0.1. The bridge pulls build requests and runs AE on this computer.
+const BRIDGE = path.join(CONFIG_DIR, "bridge.json");
+let aeBridge = /** @type {InstanceType<typeof aeb.Bridge>|null} */ (null);
+let aeKey = "";
+let aeWin = /** @type {BrowserWindow|null} */ (null);
+
+function bridgeArgs() {
+  if (isClient()) return [];
+  aeKey = require("node:crypto").randomBytes(32).toString("base64url");
+  fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  const tmp = BRIDGE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify({ key: aeKey }), { mode: 0o600 });
+  fs.renameSync(tmp, BRIDGE);
+  const p = cfg && cfg.platform === "win32" && !process.env.CU_CORE_CMD ? core.wslPath(BRIDGE) : BRIDGE;
+  return ["--bridge", p];
+}
+
+function aeConfig() { return /** @type {any} */ (core.loadConfig(CONFIG_DIR) || {}).ae || {}; }
+function aeFound() {
+  if (process.env.CU_FAKE_AE) return { afterfx: [process.execPath, process.env.CU_FAKE_AE, "afterfx"],
+    aerender: [process.execPath, process.env.CU_FAKE_AE, "aerender"], version: "fake" };
+  return aeb.findAE(PLATFORM, { readdir: (d) => fs.readdirSync(d), exists: (p) => fs.existsSync(p) });
+}
+function aeDefaultWork() { return path.join(app.getPath("documents"), "claude-Utube AE"); }
+
+function startAeBridge() {
+  if (isClient() || aeBridge || !aeKey) return;
+  aeBridge = new aeb.Bridge({ base: () => appUrl, key: aeKey, platform: PLATFORM, version: app.getVersion(),
+    config: () => ({ work: aeDefaultWork(), ...aeConfig() }), found: aeFound,
+    log: (m) => console.log(m) });
+  aeBridge.start();
+  smoke("ae bridge ok");
+}
+
+function showAe() {
+  if (aeWin && !aeWin.isDestroyed()) { aeWin.show(); return; }
+  aeWin = new BrowserWindow({ width: 640, height: 560, title: "After Effects", icon: path.join(ASSETS, "icon.png"),
+    autoHideMenuBar: true, show: !SMOKE, webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true } });
+  aeWin.loadFile(path.join(__dirname, "ae.html"));
+  aeWin.on("closed", () => { aeWin = null; });
+}
+
+function aeState() {
+  const found = aeFound();
+  const s = aeb.settings({ work: aeDefaultWork(), ...aeConfig() }, found);
+  const show = (/** @type {any} */ v) => (Array.isArray(v) ? "fake" : String(v || ""));
+  return { found: found ? { afterfx: show(found.afterfx), aerender: show(found.aerender), version: found.version } : null,
+    afterfx: show(s.afterfx), aerender: show(s.aerender), work: s.work, chosen: aeConfig(),
+    ready: aeBridge ? aeBridge.hasAE() : false, busy: aeBridge ? aeBridge.busy : null, platform: PLATFORM };
+}
+
+ipcMain.handle("ae:state", () => aeState());
+ipcMain.handle("ae:choose", async (_e, /** @type {string} */ what) => {
+  if (!["afterfx", "aerender", "work"].includes(what)) return aeState();
+  const r = await dialog.showOpenDialog(/** @type {any} */ (aeWin), what === "work"
+    ? { properties: ["openDirectory", "createDirectory"] }
+    : { properties: PLATFORM === "darwin" ? ["openFile", "treatPackageAsDirectory"] : ["openFile"] });
+  if (r.canceled || !r.filePaths[0]) return aeState();
+  const c = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || cfg || { platform: PLATFORM });
+  c.ae = { ...(c.ae || {}), [what]: r.filePaths[0] };
+  core.saveConfig(CONFIG_DIR, c);
+  if (aeBridge) aeBridge.hello();
+  return aeState();
+});
+ipcMain.handle("ae:reset", () => {
+  const c = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || cfg || { platform: PLATFORM });
+  delete c.ae;
+  core.saveConfig(CONFIG_DIR, c);
+  if (aeBridge) aeBridge.hello();
+  return aeState();
+});
+ipcMain.handle("ae:test", async () => {
+  if (!aeBridge) return { ok: false, message: "The studio is not running yet." };
+  if (aeBridge.running) return { ok: false, message: "After Effects is busy with a film; try again when it is done." };
+  return aeBridge.selfTest();
+});
+
 async function stopSharing() {
   pairing.close();
   if (gateway) { await gateway.stop().catch(() => {}); gateway = null; }
@@ -867,7 +950,7 @@ ipcMain.handle("setup:installCore", async (e, opts) => {
 
 ipcMain.handle("core:restart", async () => {
   if (win && !win.isDestroyed()) {
-    const r = await coreRun(["start", ...gateArgs()], core.READY_TIMEOUT_MS + 5_000);
+    const r = await coreRun(["start", ...gateArgs(), ...bridgeArgs()], core.READY_TIMEOUT_MS + 5_000);
     const url = core.parseUrl(r.out);
     if (!url) return { ok: false, error: (r.out + r.err).trim().split("\n").slice(-5).join("\n") };
     appUrl = url;

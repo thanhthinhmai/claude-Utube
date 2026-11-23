@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>After Effects</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<style>
+  :root { --bg: #f7f7fb; --panel: #fff; --fg: #20223a; --muted: #6b6f85; --line: #e3e4ee; --accent: #4b55d6; --ok: #1b7f3b; --bad: #b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #17182a; --panel: #212238; --fg: #ecedf5; --muted: #a3a6bd; --line: #33354f; --accent: #8c94ff; --ok: #6fd28f; --bad: #ff8a80; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  main { padding: 20px 18px 30px; } h1 { font-size: 20px; margin: 0 0 6px; } h2 { font-size: 15px; margin: 18px 0 6px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-top: 10px; }
+  .muted { color: var(--muted); } .bad { color: var(--bad); } .ok { color: var(--ok); }
+  .row { display: grid; grid-template-columns: 90px 1fr auto; gap: 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: 0; } .path { font: 12px/1.4 ui-monospace, monospace; word-break: break-all; }
+  button { padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg); font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border: 0; } button:disabled { opacity: .5; cursor: default; }
+  [hidden] { display: none !important; }
+</style></head>
+<body><main>
+  <h1>After Effects</h1>
+  <p class="muted">claude-Utube builds After Effects films with the After Effects installed on this computer. Your After Effects
+    licence is yours: claude-Utube does not install or buy it. Keep this app open while a film is being built.</p>
+  <div class="panel" id="status"></div>
+  <h2>Paths</h2>
+  <div class="panel">
+    <div class="row"><b>After Effects</b><span class="path" id="afterfx"></span><button data-choose="afterfx">Choose…</button></div>
+    <div class="row"><b>aerender</b><span class="path" id="aerender"></span><button data-choose="aerender">Choose…</button></div>
+    <div class="row"><b>Work folder</b><span class="path" id="work"></span><button data-choose="work">Choose…</button></div>
+    <p class="muted" id="auto"></p>
+    <button id="reset">Use the paths found automatically</button>
+  </div>
+  <h2>Test</h2>
+  <div class="panel">
+    <p class="muted">Runs a tiny script in After Effects. The first time, turn on <b>Preferences › Scripting &amp; Expressions ›
+      Allow Scripts to Write Files and Access Network</b> in After Effects.</p>
+    <button class="primary" id="test">Test</button> <span id="result"></span>
+  </div>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  function show(s) {
+    $("afterfx").textContent = s.afterfx || "not found";
+    $("aerender").textContent = s.aerender || "not found";
+    $("work").textContent = s.work;
+    $("auto").textContent = s.found ? `Found: ${s.found.version}` : "No After Effects found in the usual place. Choose it above.";
+    $("status").innerHTML = "";
+    const p = document.createElement("p");
+    p.className = s.ready ? "ok" : "bad";
+    p.textContent = s.busy ? `Building a film now (${s.busy}).` : s.ready ? "Ready: films can be built with After Effects."
+      : "Not ready: After Effects or aerender was not found.";
+    $("status").appendChild(p);
+  }
+  async function refresh() { show(await window.ae.state()); }
+  document.querySelectorAll("[data-choose]").forEach((b) => b.addEventListener("click", async () => show(await window.ae.choose(b.dataset.choose))));
+  $("reset").addEventListener("click", async () => show(await window.ae.reset()));
+  $("test").addEventListener("click", async () => {
+    $("test").disabled = true; $("result").textContent = "Running…"; $("result").className = "muted";
+    const r = await window.ae.test();
+    $("result").textContent = r.message; $("result").className = r.ok ? "ok" : "bad";
+    $("test").disabled = false; refresh();
+  });
+  refresh(); setInterval(refresh, 5000);
+</script>
+</body></html>

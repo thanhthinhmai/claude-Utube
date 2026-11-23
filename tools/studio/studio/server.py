@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import APP_ID, VERSION, actions, donesofar, filmsteps, gate, jobs, resources, reviews, store
+from . import APP_ID, VERSION, actions, aebridge, donesofar, filmsteps, gate, jobs, resources, reviews, store
 from .resources import shotnotes
 from urllib.parse import urlsplit
 from .store import StudioError
@@ -84,6 +84,13 @@ def create_app() -> FastAPI:
                 if request.url.path.startswith("/api/"):
                     return err("license_locked", f"claude-Utube is locked (license: {why})", 423)
                 return HTMLResponse(gate.LOCKED_HTML, status_code=423)
+        if request.url.path.startswith("/api/v1/ae/bridge/"):           # the desktop app's AE bridge (specs/031 R2)
+            client = request.client.host if request.client else ""
+            if not aebridge.allowed(client, request.headers.get("x-cu-bridge")):
+                return err("forbidden", "the AE bridge needs the desktop app's key", 403)
+            resp = await call_next(request)
+            resp.headers["X-Content-Type-Options"] = "nosniff"
+            return resp
         if online:
             return await online_guard(request, call_next)
         return await local_only(request, call_next)
@@ -313,6 +320,64 @@ def create_app() -> FastAPI:
         return reviews.decide(rid, body.value, body.note, "api" if via_token else "ui", body.base, owner(request) or "local")
 
     # ---------- films ----------
+    # ---------- After Effects bridge: the desktop app pulls build requests (specs/031 contracts/bridge-api.md) ----------
+    from ae import aequeue
+
+    def q(fn, *a):
+        try:
+            return fn(*a)
+        except aequeue.QueueError as e:
+            raise StudioError(e.code, e.message, e.status) from None
+
+    @app.get(api + "/ae/bridge/next")
+    def ae_next():
+        r = q(aequeue.next_request)
+        return r if r else Response(status_code=204)
+
+    @app.post(api + "/ae/bridge/hello")
+    async def ae_hello(request: Request):
+        try:
+            body = await request.json()
+        except ValueError:
+            body = {}
+        aequeue.hello(body if isinstance(body, dict) else {})
+        return {"ok": True}
+
+    @app.get(api + "/ae/bridge/{rid}/bundle")
+    def ae_bundle(rid: str):
+        return FileResponse(q(aequeue.bundle_path, rid), media_type="application/x-tar", filename="bundle.tar")
+
+    @app.post(api + "/ae/bridge/{rid}/progress")
+    async def ae_progress(rid: str, request: Request):
+        try:
+            body = await request.json()
+        except ValueError:
+            body = {}
+        return q(aequeue.progress, rid, body if isinstance(body, dict) else {})
+
+    @app.put(api + "/ae/bridge/{rid}/result/{name}", status_code=201)
+    async def ae_result(rid: str, name: str, request: Request):
+        part = q(aequeue.result_part, rid, name)
+        n = 0
+        with open(part, "wb") as f:
+            async for c in request.stream():
+                n += len(c)
+                if n > aequeue.MAX_RESULT:
+                    break
+                f.write(c)
+        if n > aequeue.MAX_RESULT:
+            part.unlink(missing_ok=True)
+            raise StudioError("too_big", "a result may be at most 500 MB", 413)
+        return {"bytes": q(aequeue.commit_result, rid, name)}
+
+    @app.post(api + "/ae/bridge/{rid}/finish")
+    async def ae_finish(rid: str, request: Request):
+        try:
+            body = await request.json()
+        except ValueError:
+            raise StudioError("invalid", "finish needs a JSON body", 422) from None
+        return q(aequeue.finish, rid, body if isinstance(body, dict) else {})
+
     @app.get(api + "/films")
     def list_films():
         return {"films": resources.films()}

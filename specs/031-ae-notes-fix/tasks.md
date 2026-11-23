@@ -46,15 +46,15 @@ description: "Tasks: sửa ghi chú phim After Effects tự động trên app (0
 
 ## Phase 4: User Story 2 - Cầu nối trong app desktop (P1)
 
-- [ ] T012 [US2] `tools/ae/queue.py`: hàng đợi trong `$STUDIO_DATA/ae/requests/<mã>/` (tạo, `next` một lượt mỗi lúc, tiến độ, kết quả, `finish`, nhịp; `claimed/running` không nhịp 60 s → `failed: bridge_lost`); trạng thái `hello` của app desktop (thời điểm, `found`, đường dẫn AE)
-- [ ] T013 [US2] `tools/studio/studio/server.py`: `/api/v1/ae/bridge/{next,hello}` và `/{id}/{bundle,progress,result/<shot>,finish}` theo contracts/bridge-api.md: chỉ nhận header `X-CU-Bridge` khớp `STUDIO_AE_BRIDGE` (so sánh hằng thời gian) và client 127.0.0.1, bỏ qua phiên/CSRF chỉ cho các đường này
-- [ ] T014 [US2] `tools/studio/studio/host.py` + `bin/studio app start --bridge <tệp>`: đọc khoá vào `STUDIO_AE_BRIDGE` cho web và proxy (như `--gate`)
-- [ ] T015 [US2] `tools/runner/proxy.py`: `/internal/ae/requests` (POST multipart gói, GET trạng thái, GET kết quả) cho việc; 409 `ae_unavailable` khi app desktop chưa `hello` trong 30 s (FR-009)
-- [ ] T016 [US2] `desktop/aebridge.js` (logic thuần, `@ts-check`): tìm AE theo hệ điều hành (chỗ cài mặc định, bản mới nhất), lệnh AfterFX/osascript/aerender, vòng hỏi việc (1 s khi bận, 5 s khi rảnh), khoá một lượt, thời hạn 120 s chờ `START` và 300 s mỗi shot, dừng tiến trình khi quá hạn, `hello` mỗi 10 s; kiểm thư mục làm việc còn ≥ 2 GB trống trước mỗi lượt dựng AE, thiếu thì trả `disk_low`
-- [ ] T017 [US2] `desktop/main.js` + `desktop/core.js`: tạo khoá 32 byte mỗi lần khởi động vào `CONFIG_DIR/bridge.json`, thêm `--bridge` (Windows: `wslPath`) vào `app start`; chạy cầu nối khi phần lõi sẵn sàng; dừng khi thoát
-- [ ] T018 [US2] `desktop/ae.html` + `preload.js` + mục khay "After Effects…": hiện đường dẫn tìm được, chọn đường dẫn, nút "Test" (chạy một entry thử ghi `DONE`), lưu vào `config.json` → `ae`
-- [ ] T019 [P] [US2] `desktop/test/aebridge.test.js` (dùng AE giả của T006a): 10 lần hai yêu cầu cùng lúc → 0 lần song song, yêu cầu 2 bắt đầu ≤ 2 s sau (SC-003); thiếu AE ≤ 10 s; treo → dừng khi hết hạn (SC-004); thư mục làm việc tên "thư mục thử" (tiếng Việt, khoảng trắng) chạy đúng; ổ thiếu chỗ → `disk_low`
-- [ ] T020 [P] [US2] Test phần lõi `tests/ui/test_ae_bridge.py`: khoá sai, thiếu, từ IP khác → 403 (SC-006); `next` chỉ giao một yêu cầu; hết nhịp → `bridge_lost`; proxy 409 khi không `hello`
+- [X] T012 [US2] `tools/ae/aequeue.py` (không đặt tên `queue.py`: trùng mô-đun chuẩn khi chạy `tools/ae/cli.py`): hàng đợi trong `$STUDIO_DATA/ae/requests/<mã>/` (tạo, `next` một lượt mỗi lúc, tiến độ, kết quả, `finish`, nhịp; `claimed/running` không nhịp 60 s → `failed: bridge_lost`); trạng thái `hello` của app desktop (thời điểm, `found`, đường dẫn AE)
+- [X] T013 [US2] `tools/studio/studio/server.py`: `/api/v1/ae/bridge/{next,hello}` và `/{id}/{bundle,progress,result/<shot>,finish}` theo contracts/bridge-api.md: chỉ nhận header `X-CU-Bridge` khớp `STUDIO_AE_BRIDGE` (so sánh hằng thời gian) và client 127.0.0.1, bỏ qua phiên/CSRF chỉ cho các đường này
+- [X] T014 [US2] `tools/studio/studio/host.py` + `bin/studio app start --bridge <tệp>`: đọc khoá vào `STUDIO_AE_BRIDGE` cho web và proxy (như `--gate`)
+- [X] T015 [US2] `tools/runner/proxy.py`: `/internal/ae/requests` (POST multipart gói, GET trạng thái, GET kết quả) cho việc; 409 `ae_unavailable` khi app desktop chưa `hello` trong 30 s (FR-009)
+- [X] T016 [US2] `desktop/aebridge.js` (logic thuần, `@ts-check`): tìm AE theo hệ điều hành (chỗ cài mặc định, bản mới nhất), lệnh AfterFX/osascript/aerender, vòng hỏi việc (1 s khi bận, 5 s khi rảnh), khoá một lượt, thời hạn 120 s chờ `START` và 300 s mỗi shot, dừng tiến trình khi quá hạn, `hello` mỗi 10 s; kiểm thư mục làm việc còn ≥ 2 GB trống trước mỗi lượt dựng AE, thiếu thì trả `disk_low`
+- [X] T017 [US2] `desktop/main.js` + `desktop/core.js`: tạo khoá 32 byte mỗi lần khởi động vào `CONFIG_DIR/bridge.json`, thêm `--bridge` (Windows: `wslPath`) vào `app start`; chạy cầu nối khi phần lõi sẵn sàng; dừng khi thoát
+- [X] T018 [US2] `desktop/ae.html` + `preload.js` + mục khay "After Effects…": hiện đường dẫn tìm được, chọn đường dẫn, nút "Test" (chạy một entry thử ghi `DONE`), lưu vào `config.json` → `ae`
+- [X] T019 [P] [US2] `desktop/test/aebridge.test.js` (dùng AE giả của T006a): 10 lần hai yêu cầu cùng lúc → 0 lần song song, yêu cầu 2 bắt đầu ≤ 2 s sau (SC-003); thiếu AE ≤ 10 s; treo → dừng khi hết hạn (SC-004); thư mục làm việc tên "thư mục thử" (tiếng Việt, khoảng trắng) chạy đúng; ổ thiếu chỗ → `disk_low`
+- [X] T020 [P] [US2] Test phần lõi `tests/online/test_ae_bridge.py` (cần proxy và mã việc của bộ test online): khoá sai, thiếu, từ IP khác → 403 (SC-006); `next` chỉ giao một yêu cầu; hết nhịp → `bridge_lost`; proxy 409 khi không `hello`
 
 **Checkpoint**: app desktop dựng AE theo yêu cầu của phần lõi.
 
@@ -77,7 +77,7 @@ description: "Tasks: sửa ghi chú phim After Effects tự động trên app (0
 ## Phase 6: User Story 4 - Bộ cài có cầu nối (P3)
 
 - [ ] T028 [US4] `.github/workflows/desktop.yml`: bước smoke `ae` (fake core có hàng đợi giả + AE giả) trên Windows và macOS; `desktop/test/fake-core.mjs` thêm `/api/v1/ae/bridge/*` giả
-- [ ] T029 [US4] `desktop/package.json` / danh sách tệp đóng gói: thêm `aebridge.js`, `ae.html`; `test/package-files.test.js` kiểm có mặt
+- [X] T029 [US4] `desktop/package.json` / danh sách tệp đóng gói: thêm `aebridge.js`, `ae.html`; `test/package-files.test.js` kiểm có mặt
 - [ ] T030 [US4] Hỏi người dùng rồi mới chạy `desktop.yml` trên nhánh (tốn phút chạy, macOS gấp 10); ghi kết quả (SC-007)
 - [ ] T031 [US4] Kiểm tay với AE thật: Windows (máy người dùng) và macOS (máy người dùng cung cấp) theo quickstart US4 (SC-009)
 

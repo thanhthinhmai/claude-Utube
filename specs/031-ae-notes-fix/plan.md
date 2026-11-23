@@ -72,7 +72,7 @@ tools/ae/
 ├── bundle.py            # gói jsx của một yêu cầu: bộ dựng chung + shot của phim + tệp vào (entry) cho danh sách shot
 ├── splice.py            # ghép shot vào video theo khung (từ fixshots.sh), cùng mốc shot spec 029
 ├── uses.py              # shot nào dùng hàm nào của bộ dựng chung (quét tên hàm CU.* trong shots_*.jsx)
-├── queue.py             # hàng đợi yêu cầu dựng AE trong $STUDIO_DATA/ae/ (tạo, nhận, tiến độ, kết quả, hết hạn)
+├── aequeue.py           # hàng đợi yêu cầu dựng AE trong $STUDIO_DATA/ae/ (tạo, nhận, tiến độ, kết quả, hết hạn)
 ├── local.py             # chạy AE trực tiếp từ WSL/macOS khi không có app (dòng lệnh trên máy phát triển)
 └── cli.py               # sh bin/studio ae build|render|fix|uses|status, config ae
 tools/studio/studio/

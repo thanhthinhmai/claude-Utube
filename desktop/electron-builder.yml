@@ -14,6 +14,7 @@ files:
   - license.js
   - updates.js
   - share.js
+  - aebridge.js
   - license-public-key.txt
   - "build-config.json"
   - "*.html"
