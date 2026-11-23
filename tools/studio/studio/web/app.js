@@ -1387,6 +1387,7 @@ async function filmShots(name, f) {
   pv.id = "sh-pane-video"; pv.className = "sh-pane-video"; pv.controls = true; pv.preload = "metadata"; pv.playsInline = true;
   pv.src = `${SH.api}/video?v=${encodeURIComponent(SH.stamp || "")}`;
   if (f.has_subtitles) { const tr = document.createElement("track"); tr.kind = "subtitles"; tr.srclang = "vi"; tr.label = "Subtitles"; tr.src = `${SH.api}/subtitles.vtt`; tr.default = true; pv.appendChild(tr); }
+  pv.addEventListener("loadedmetadata", () => { if (SH && SH.pv === pv && pv.currentTime < 0.01) { SH.selfSeek = true; pv.currentTime = SH.shots[SH.sel].t0 + 0.04; } }, { once: true });   // show the real first frame
   pv.addEventListener("seeking", () => { if (!SH || SH.selfSeek) return; stopShot(); });
   pv.addEventListener("seeked", () => { if (SH) SH.selfSeek = false; });
   ["play", "pause", "ended"].forEach((ev) => pv.addEventListener(ev, playButtonState));
@@ -1618,7 +1619,7 @@ function drawPane() {
     ${SH.f.has_prev ? `<div class="insp-sec sh-prev"><button type="button" class="insp-btn" id="sh-prev-version"><span aria-hidden="true">↺</span> Watch the previous version</button><div id="sh-prev-slot"></div></div>` : ""}
     <div id="sh-notes"></div>`;
   const media = cv.querySelector("#sh-media");
-  if (media && SH.pv) { SH.pv.poster = shotThumb(s, "b"); media.appendChild(SH.pv); }
+  if (media && SH.pv) media.appendChild(SH.pv);   // no poster: the small strip picture blown up looks blurred; the real frame shows
   drawNotes();
   wireThumbs(el);
   zoomable(el);
