@@ -28,6 +28,7 @@ sudo mkdir -p /srv/studio/data && sudo chown 1000:1000 /srv/studio/data
 - `DOMAIN`: tên miền ở bước 2.
 - `STUDIO_DATA_HOST`: thư mục dữ liệu, ví dụ `/srv/studio/data`. Tài khoản uid 1000 phải ghi được vào thư mục này.
 - `ANTHROPIC_API_KEY`: **tuỳ chọn**. Xưởng chạy bằng gói Claude; khoá này chỉ dùng khi không còn tài khoản Claude nào nhận được lệnh gọi (cả tài khoản đều chạm hạn mức hoặc cần đăng nhập lại). Để trống thì những lúc đó việc chờ tối đa 15 giây rồi lỗi, và thành viên được trả lượt. Khoá chỉ nằm ở `web` và `proxy`; worker chỉ biết là có khoá; container chạy việc không bao giờ thấy nó.
+- `STUDIO_AUTO_COMPACT_WINDOW`, `STUDIO_BASH_MAX_OUTPUT`: **tuỳ chọn**. Agent của việc gọn hội thoại khi đạt số token này (mặc định 300000) và ghi đầu ra lệnh dài hơn số ký tự này ra tệp (mặc định 20000), để mỗi lượt gọi Claude rẻ hơn. Proxy cũng giữ một tài khoản Claude cho mỗi việc tới khi tài khoản đó chạm hạn mức, để không mất bộ nhớ đệm (specs/030).
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`: máy chủ gửi thư (quên mật khẩu, báo phim xong, báo tài khoản Claude cần đăng nhập lại). Không bắt buộc để chạy.
 
 Không commit `deploy/.env`. Tệp này đã có trong `.gitignore`.

@@ -190,7 +190,8 @@ class PlanRun(unittest.TestCase):
         self.s.start()
         self.assertEqual(self.s.wait(jid)["status"], "done")
         vias = [x["via"] for x in self.calls()]
-        self.assertEqual(vias, ["plan:1", "plan:2", "plan:1", "plan:2"])               # equal use, equal turns
+        # specs/030: one job stays on the account it started on (the least used), so its prompt cache stays warm
+        self.assertEqual(vias, ["plan:1"] * 4)
 
     def test_401_refreshes_once_then_needs_sign_in(self):
         sign_in(self.a, 1, "owner@x.test")

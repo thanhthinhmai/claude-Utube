@@ -65,6 +65,8 @@ services:
       STUDIO_JOB_IMAGE: studio-job:latest
       STUDIO_JOB_CPUS: ${STUDIO_JOB_CPUS:-4}
       STUDIO_JOB_MEMORY: ${STUDIO_JOB_MEMORY:-8g}
+      STUDIO_AUTO_COMPACT_WINDOW: ${STUDIO_AUTO_COMPACT_WINDOW:-}   # specs/030; empty = 300000
+      STUDIO_BASH_MAX_OUTPUT: ${STUDIO_BASH_MAX_OUTPUT:-}           # specs/030; empty = 20000
       STUDIO_PROXY: http://proxy:8780
       STUDIO_EGRESS: http://egress:8888
       STUDIO_API_KEY_SET: ${ANTHROPIC_API_KEY:+1}  # jobs may start on the fallback key; the worker never holds the key
