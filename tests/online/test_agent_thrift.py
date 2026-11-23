@@ -88,7 +88,7 @@ class CompactSavings(unittest.TestCase):
         agent.save_compact_state(work, {"transcript_path": str(t), "trigger": "manual"})
         note = (work / ".compact-state.md").read_text()
         self.assertLessEqual(len(note.encode()), agent.STATE_MAX)
-        self.assertEqual(note.count("films/f/file-"), 20)
+        self.assertEqual(note.count("\n- films/f/"), 20)         # 20 newest files (checks.json may be one of them)
         agent.save_compact_state(work, {"transcript_path": "/nope", "trigger": "auto"})     # overwritten, not grown
         self.assertIn("Last step: unknown", (work / ".compact-state.md").read_text())
         os.chmod(work, 0o500)
