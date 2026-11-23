@@ -1138,7 +1138,10 @@ async function pageJob(id) {
   if (j.status === "done" && j.links.film && j.qa && j.qa.publish) fillPublish(j.links.film, j.qa.publish);
   if (j.kind === "film") doneOpen(j);
   if (j.links.film) get(`/films/${encodeURIComponent(j.links.film)}`).then((/** @type {any} */ f) => {
-    const slot = document.getElementById("tiers-slot"); if (slot) slot.innerHTML = tiersHtml(f.tiers);
+    const slot = document.getElementById("tiers-slot");
+    if (!slot) return;
+    slot.innerHTML = (f.has_video ? `<p class="shot-notes-link"><a class="button" href="#/films/${esc(j.links.film)}">Shot notes</a>
+      <span class="muted small">Watch the film shot by shot and write what to fix (specs/029).</span></p>` : "") + tiersHtml(f.tiers);
   }).catch(() => {});
   const sendAnswer = /** @type {HTMLButtonElement | null} */ (document.getElementById("send-answer"));
   if (sendAnswer) sendAnswer.onclick = async () => {
@@ -1344,7 +1347,12 @@ async function filmShots(name, f) {
     <div class="sh-legend small muted" id="sh-legend"></div>
     <div class="chips sh-filters" id="sh-filters" role="group" aria-label="Filter shots"></div>
     <div class="shots-body"><div><ol class="shot-list" id="sh-list"></ol><div id="sh-orphans"></div></div><div class="shot-pane" id="sh-pane"></div></div>
+    <div class="sh-claude"><p class="section-title">Fix with Claude</p>
+      <p class="muted small">Paste this into your Claude Code chat. Claude lists the open notes, fixes those shots, renders again, replaces the video and ticks each note with a short reply.</p>
+      <div class="row"><code id="sh-claude-text">${esc(`Sửa theo ghi chú phim ${name}`)}</code><button type="button" id="sh-claude-copy">Copy</button></div></div>
   </div>`;
+  const cp = /** @type {HTMLButtonElement} */ (document.getElementById("sh-claude-copy"));
+  cp.onclick = () => copyCommand(cp, `Sửa theo ghi chú phim ${name}`);
   const v = shotVideo();
   if (v) {
     v.addEventListener("seeking", () => { if (!SH || SH.selfSeek) return; stopShot(); });
@@ -1359,6 +1367,21 @@ async function loadNotes() {
     SH.doc = n.doc; SH.base = n.base; SH.orphans = n.orphans || [];
   } catch (e) { SH.notesError = e.message; }
   drawShots();
+}
+/** Copy, falling back to a selected text box when the clipboard API is refused; "Copied" for 1.5 s.
+ * @param {HTMLButtonElement} btn @param {string} text */
+async function copyCommand(btn, text) {
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch {
+    const t = document.createElement("textarea");
+    t.value = text; t.setAttribute("readonly", ""); t.style.position = "fixed"; t.style.opacity = "0";
+    document.body.appendChild(t); t.select();
+    try { ok = document.execCommand("copy"); } catch { ok = false; }
+    t.remove();
+  }
+  if (!ok) { prompt("Copy this:", text); return; }
+  btn.textContent = "Copied";
+  setTimeout(() => { btn.textContent = "Copy"; }, 1500);
 }
 /** @returns {HTMLVideoElement | null} */
 const shotVideo = () => /** @type {HTMLVideoElement | null} */ (document.getElementById("film-video"));
@@ -1463,6 +1486,7 @@ function drawPane() {
     <div class="row sh-nav"><button type="button" id="sh-prev"${SH.sel === 0 ? " disabled" : ""} aria-label="Previous shot">← Prev</button>
       <button type="button" class="primary" id="sh-play">▶ Play this shot</button>
       <button type="button" id="sh-next"${SH.sel === SH.shots.length - 1 ? " disabled" : ""} aria-label="Next shot">Next →</button></div>
+    ${SH.f.has_prev ? `<div class="sh-prev"><button type="button" id="sh-prev-version">Watch the previous version</button><div id="sh-prev-slot"></div></div>` : ""}
     <div id="sh-notes"></div>`;
   drawNotes();
   wireThumbs(el);
@@ -1470,6 +1494,25 @@ function drawPane() {
   /** @type {HTMLElement} */ (el.querySelector("#sh-prev")).onclick = () => selectShot(SH.sel - 1, true);
   /** @type {HTMLElement} */ (el.querySelector("#sh-next")).onclick = () => selectShot(SH.sel + 1, true);
   /** @type {HTMLElement} */ (el.querySelector("#sh-play")).onclick = () => { const v = shotVideo(); if (v) playRange(v, s.t0, s.t1); };
+  const pv = /** @type {HTMLElement | null} */ (el.querySelector("#sh-prev-version"));
+  if (pv) pv.onclick = () => playPrevious(s.id);
+}
+/** The same shot (by id) in the one previous video kept by `film replace` (FR-014a). @param {string} id */
+async function playPrevious(id) {
+  const slot = document.getElementById("sh-prev-slot");
+  if (!slot) return;
+  try {
+    if (!SH.prev) SH.prev = await get(`${SH.path}/shots?prev=1`);
+  } catch (e) { slot.innerHTML = `<p class="small fail">${esc(e.message)}</p>`; return; }
+  const ps = (SH.prev.shots || []).find((/** @type {any} */ x) => x.id === id);
+  if (!ps) { slot.innerHTML = `<p class="small muted">This shot is not in the previous version.</p>`; return; }
+  slot.innerHTML = `<p class="small muted">Previous version · shot ${ps.n} · ${mss1(ps.t0)}–${mss1(ps.t1)}</p>
+    <video id="sh-prev-video" class="sh-prev-video" controls muted preload="metadata" src="${SH.api}/video?prev=1"></video>`;
+  const v = /** @type {HTMLVideoElement} */ (slot.querySelector("video"));
+  const main = shotVideo();
+  if (main) { stopShot(); main.pause(); }
+  const go = () => playRange(v, ps.t0, ps.t1);
+  if (v.readyState >= 1) go(); else v.addEventListener("loadedmetadata", go, { once: true });
 }
 
 /** One note as a list item. @param {any} n @param {string} sid @param {boolean} canEdit */

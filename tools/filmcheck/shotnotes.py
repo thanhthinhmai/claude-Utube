@@ -552,3 +552,124 @@ def save_image(film_dir, data: bytes, now: float = None) -> str:
     t = clock() if now is None else now
     os.utime(path, (t, t))
     return name
+
+
+# ---------- Claude's side: answer a note (notes reply) ----------
+def reply(film_dir, note_id: str, text: str, done=None, base: str = "", by: str = "claude") -> dict:
+    """Write Claude's one-line answer on a note; done=True ticks it, False opens it again, None leaves it. The shot's
+    status follows (FR-007). ShotError not_found (no such note), changed (base is old), invalid."""
+    if not isinstance(text, str) or len(text) > MAX_TEXT:
+        raise ShotError("invalid", f"trả lời tối đa {MAX_TEXT} ký tự", 422, {"field": "reply"})
+    g = read_notes(film_dir)
+    if base != g["base"]:
+        raise ShotError("changed", "ghi chú đã đổi từ lần đọc trước: chạy lại notes show", 409,
+                        {"current": {"base": g["base"], "doc": g["doc"]}})
+    doc = g["doc"]
+    for sh in doc["shots"].values():
+        for n in sh.get("notes", []):
+            if n.get("id") == note_id:
+                n["reply"] = text.strip()
+                if done is not None:
+                    n["done"] = bool(done)
+                return save_notes(film_dir, base, doc, by)
+    raise ShotError("not_found", f"không có ghi chú {note_id}", 404)
+
+
+def show_lines(film_dir, everything: bool = False) -> tuple:
+    """(lines, number of open notes) of `notes show`: notes grouped by shot, in film order, then the gone shots."""
+    d = Path(film_dir).resolve()
+    g = read_notes(d)
+    marks = load_shots(d)
+    by_id = {s["id"]: s for s in marks["shots"]} if marks["valid"] else {}
+    order = [s["id"] for s in marks["shots"]] if marks["valid"] else []
+    order += sorted(k for k in g["doc"]["shots"] if k not in by_id)
+    names = {"none": "No notes", "ok": "No issue", "fix": "Needs fix", "fixed": "Fixed"}
+    fmt = lambda t: f"{int(t // 60)}:{t - 60 * int(t // 60):04.1f}"     # noqa: E731
+    lines, open_n = [], 0
+    if not marks["valid"]:
+        lines.append("! shots.json is missing or not valid: shot numbers and film times are not known")
+    for sid in order:
+        sh = g["doc"]["shots"].get(sid)
+        if not isinstance(sh, dict):
+            continue
+        notes = [n for n in sh.get("notes", []) if everything or not n.get("done")]
+        open_n += sum(1 for n in sh.get("notes", []) if not n.get("done"))
+        if not notes:
+            continue
+        s = by_id.get(sid)
+        head = (f"Shot {s['n']} · {sid} · {fmt(s['t0'])}–{fmt(s['t1'])} ({s['t1'] - s['t0']:.1f} s)" if s
+                else f"Gone shot {sid} (not in shots.json any more)")
+        lines.append(f"{head} · {names.get(sh.get('status', 'none'), sh.get('status'))}")
+        for n in notes:
+            if n.get("at") is None:
+                where = "whole shot"
+            elif s:
+                where = f"at {fmt(n['at'])} in the shot · {fmt(s['t0'] + n['at'])} in the film"
+            else:
+                where = f"at {fmt(n['at'])} in the shot"
+            lines.append(f"  [{'fixed' if n.get('done') else 'open'}] {n.get('id')} · {where} · by {n.get('by', '?')}")
+            for t in (n.get("text") or "(picture only)").splitlines() or [""]:
+                lines.append(f"      {t}")
+            for im in n.get("images", []):
+                lines.append(f"      picture: {d / 'shot-notes' / im}")
+            if n.get("reply"):
+                lines.append(f"      reply: {n['reply']}")
+    lines.append(f"{open_n} open note{'' if open_n == 1 else 's'}")
+    lines.append(f"base: {g['base']}")
+    return lines, open_n
+
+
+# ---------- film replace: a new video, keeping one previous (T031, research R7) ----------
+def replace_video(film_dir, new_video, new_shots=None) -> dict:
+    """Check the new video (and its shots.json), keep the current pair as <name>.prev.mp4 + shots.prev.json (dropping
+    an older previous pair), put a copy of the new video in place with os.replace (a new file: hard links of the old
+    one elsewhere are untouched), write the new shots.json, drop the small-picture cache. Nothing changes on refusal."""
+    d = Path(film_dir)
+    p = film_paths(d)
+    src = Path(new_video).expanduser().resolve()
+    if not src.is_file():
+        raise ShotError("bad_video", f"không có tệp video {src}", 400)
+    if src in (p["video"], p["video_prev"]):
+        raise ShotError("bad_video", "video mới phải là một tệp khác video của phim", 400)
+    info = probe(src)
+    if not info["has_video"]:
+        raise ShotError("bad_video", f"{src.name} không đọc được như một video có hình", 400)
+    marks, kept = None, False
+    if new_shots is not None:
+        try:
+            marks = json.loads(Path(new_shots).expanduser().read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            raise ShotError("invalid", f"không đọc được shots.json mới: {e}", 400) from None
+        shots, problems = check_shots(marks, info["duration"])
+        if problems:
+            raise ShotError("invalid", "; ".join(f"dòng {x['row']} {x['rule']}: {x['detail']}" for x in problems[:5]), 400)
+    elif p["shots"].is_file():
+        try:
+            cur = json.loads(p["shots"].read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            cur = None
+        if cur is not None and not check_shots(cur, info["duration"])[1]:
+            marks, kept = cur, True
+    old = probe(p["video"])["duration"] if p["video"].is_file() else None
+    if marks is not None:
+        marks = {**marks, "version": 1, "video": p["video"].name, "duration": info["duration"]}
+    tmp = p["video"].with_name(f".{p['video'].name}.{os.getpid()}.new.tmp")
+    shutil.copyfile(src, tmp)
+    try:
+        with locked(p["video"]):
+            if p["video"].is_file():
+                p["video_prev"].unlink(missing_ok=True)
+                p["shots_prev"].unlink(missing_ok=True)
+                os.replace(p["video"], p["video_prev"])
+                if p["shots"].is_file():
+                    os.replace(p["shots"], p["shots_prev"])
+            os.replace(tmp, p["video"])
+            if marks is not None:
+                write_atomic(p["shots"], (json.dumps(marks, ensure_ascii=False, indent=1) + "\n").encode())
+            else:
+                p["shots"].unlink(missing_ok=True)
+    finally:
+        tmp.unlink(missing_ok=True)
+    shutil.rmtree(p["thumbs"], ignore_errors=True)
+    return {"old": old, "new": info["duration"], "shots": len(marks["shots"]) if marks else None, "kept_marks": kept,
+            "prev": p["video_prev"].is_file()}

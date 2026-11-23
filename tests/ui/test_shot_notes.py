@@ -508,5 +508,173 @@ class NotesApi(unittest.TestCase):
             store.clock = real
 
 
+# ---------- US3: notes show|reply, film replace (T029, T030) ----------
+def studio(*args, root: Path):
+    env = {**os.environ, "STUDIO_ROOT": str(root)}
+    return subprocess.run(["sh", STUDIO, *args], capture_output=True, text=True, env=env, timeout=120)
+
+
+class NotesCli(unittest.TestCase):
+    def setUp(self):
+        self.p = Project()
+        self.d = make_film(self.p.dir, "demo-film", 3.0, 3)
+        img = shotnotes.save_image(self.d, PNG)
+        b = shotnotes.read_notes(self.d)["base"]
+        doc = {"version": 1, "shots": {
+            "S2": {"status": "none", "status_by": "auto", "notes": [note("tay bị bàn che", at=0.5, images=[img]),
+                                                                    note("logo sai", done=True)]},
+            "S3": {"status": "none", "status_by": "auto", "notes": [note("cả shot quá tối")]}}}
+        self.r = shotnotes.save_notes(self.d, b, doc, "local")
+        self.img = img
+
+    def tearDown(self):
+        self.p.close()
+
+    def run_(self, *args):
+        return studio(*args, "--dir", str(self.d), root=self.p.dir)
+
+    def test_show(self):
+        r = self.run_("notes", "show", "demo-film")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        lines = r.stdout.splitlines()
+        self.assertEqual(lines[0], f"film: {self.d.resolve()}")
+        self.assertEqual(lines[-1], f"base: {self.r['base']}")
+        out = r.stdout
+        self.assertIn("Shot 2 · S2 · 0:01.0–0:02.0", out)
+        self.assertIn("at 0:00.5 in the shot · 0:01.5 in the film", out)
+        self.assertIn("tay bị bàn che", out)
+        self.assertIn(str(self.d.resolve() / "shot-notes" / self.img), out)
+        self.assertIn("Shot 3 · S3", out)
+        self.assertNotIn("logo sai", out)                                  # fixed notes only with --all
+        self.assertIn("2 open notes", out)
+        self.assertIn("logo sai", self.run_("notes", "show", "demo-film", "--all").stdout)
+        j = self.run_("notes", "show", "demo-film", "--json")
+        self.assertEqual(j.returncode, 0, j.stderr)
+        data = json.loads(j.stdout)
+        self.assertEqual(data["base"], self.r["base"])
+        self.assertEqual(len(data["shots"]), 3)
+        self.assertIn("S2", data["doc"]["shots"])
+        self.assertEqual(studio("notes", "show", "no-such-film", root=self.p.dir).returncode, 2)
+
+    def test_reply(self):
+        nid = self.r["doc"]["shots"]["S2"]["notes"][0]["id"]
+        r = self.run_("notes", "reply", "demo-film", nid, "Đã đẩy bàn xuống", "--done", "--base", self.r["base"])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        g = shotnotes.read_notes(self.d)
+        self.assertIn(f"base: {g['base']}", r.stdout)
+        n = g["doc"]["shots"]["S2"]["notes"][0]
+        self.assertEqual((n["done"], n["reply"]), (True, "Đã đẩy bàn xuống"))
+        self.assertEqual(g["doc"]["shots"]["S2"]["status"], "fixed")
+        r = self.run_("notes", "reply", "demo-film", nid, "x", "--done", "--base", self.r["base"])     # old base
+        self.assertEqual(r.returncode, 4, r.stdout + r.stderr)
+        r = self.run_("notes", "reply", "demo-film", "n-00000000", "x", "--base", g["base"])
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        r = self.run_("notes", "reply", "demo-film", nid, "Chưa đúng, mở lại", "--open", "--base", g["base"])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        g = shotnotes.read_notes(self.d)
+        self.assertEqual(g["doc"]["shots"]["S2"]["status"], "fix")
+        sid3 = g["doc"]["shots"]["S3"]["notes"][0]["id"]
+        r = self.run_("notes", "reply", "demo-film", sid3, "Không sửa được: thiếu ánh sáng gốc", "--base", g["base"])
+        self.assertEqual(r.returncode, 0)
+        n3 = shotnotes.read_notes(self.d)["doc"]["shots"]["S3"]["notes"][0]
+        self.assertEqual((n3["done"], n3["reply"]), (False, "Không sửa được: thiếu ánh sáng gốc"))
+        self.assertEqual(self.run_("notes", "reply", "demo-film", nid, "x").returncode, 2)          # --base missing
+
+
+class FilmReplace(unittest.TestCase):
+    def setUp(self):
+        self.p = Project()
+        self.c = client()
+        self.d = make_film(self.p.dir, "demo-film", 3.0, 3)
+        self.new = make_video(self.p.dir / "new" / "v2.mp4", 4.0, 30, color="red")
+        self.new_shots = self.p.dir / "new" / "shots.json"
+        self.new_shots.write_text(json.dumps(shots_doc(even_rows(2, 4.0, "N"), 4.0, source="ae")))
+
+    def tearDown(self):
+        self.p.close()
+
+    def replace(self, *args):
+        return studio("film", "replace", "demo-film", *args, "--dir", str(self.d), root=self.p.dir)
+
+    def test_replace_keeps_one_previous(self):
+        video = self.d / "demo-film.mp4"
+        elsewhere = self.p.dir / "project-copy.mp4"
+        os.link(video, elsewhere)                                        # like the app's hard-linked copy
+        old_bytes, old_ino = video.read_bytes(), video.stat().st_ino
+        shotnotes.thumbs_state(self.d, shotnotes.load_shots(self.d)["shots"])
+        r = self.replace(str(self.new), "--shots", str(self.new_shots))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("2 shots", r.stdout)
+        self.assertEqual(elsewhere.read_bytes(), old_bytes)               # the other copy is untouched
+        self.assertNotEqual(video.stat().st_ino, old_ino)                 # a new file, not written into the old one
+        self.assertEqual((self.d / "demo-film.prev.mp4").read_bytes(), old_bytes)
+        self.assertEqual(video.read_bytes(), self.new.read_bytes())
+        self.assertTrue(self.new.is_file())                               # the source is left where it was
+        self.assertEqual([s["id"] for s in shotnotes.load_shots(self.d)["shots"]], ["N1", "N2"])
+        self.assertEqual([s["id"] for s in shotnotes.load_shots(self.d, prev=True)["shots"]], ["S1", "S2", "S3"])
+        self.assertFalse(any((self.d / ".shots" / "thumbs").glob("*/.done")))      # old small pictures gone
+        f = self.c.get(f"{API}/demo-film").json()
+        self.assertTrue(f["has_prev"])
+        self.assertEqual([s["id"] for s in self.c.get(f"{API}/demo-film/shots?prev=1").json()["shots"]], ["S1", "S2", "S3"])
+        pv = self.c.get(f"{API}/demo-film/video?prev=1")
+        self.assertEqual((pv.status_code, pv.content), (200, old_bytes))
+        third = make_video(self.p.dir / "new" / "v3.mp4", 4.0, 30, color="blue")
+        r = self.replace(str(third))                                      # no --shots: the marks still fit 4 s
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual((self.d / "demo-film.prev.mp4").read_bytes(), self.new.read_bytes())    # only one previous
+        self.assertEqual([s["id"] for s in shotnotes.load_shots(self.d, prev=True)["shots"]], ["N1", "N2"])
+        self.assertEqual([s["id"] for s in shotnotes.load_shots(self.d)["shots"]], ["N1", "N2"])
+        self.assertEqual(sorted(p.name for p in self.d.glob("*.mp4")), ["demo-film.mp4", "demo-film.prev.mp4"])
+
+    def test_refused_changes_nothing(self):
+        before = tree(self.d)
+        broken = self.p.dir / "new" / "broken.mp4"
+        broken.write_bytes(b"not a video at all")
+        self.assertEqual(self.replace(str(broken)).returncode, 1)
+        wrong = self.p.dir / "new" / "wrong.json"
+        wrong.write_text(json.dumps(shots_doc(even_rows(2, 3.0), 3.0)))  # 3 s of marks for a 4 s video
+        r = self.replace(str(self.new), "--shots", str(wrong))
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertEqual(self.replace(str(self.p.dir / "new" / "none.mp4")).returncode, 1)
+        self.assertEqual(tree(self.d), before)
+        self.assertEqual(studio("film", "replace", "demo-film", root=self.p.dir).returncode, 2)
+
+
+@unittest.skipUnless(__import__("shutil").which("node") and (REPO / "lib" / "lemo-opuscar" / "node_modules" / "playwright-core").is_dir(),
+                     "no node / playwright-core")
+class BrowserShots(unittest.TestCase):
+    def test_shots_section_in_a_browser(self):
+        p = Project(ports="18830-18839")
+        try:
+            d = make_film(p.dir, "demo-film", 3.0, 3)
+            make_video(d / "demo-film.prev.mp4", 3.0, 30, color="blue")
+            (d / "shots.prev.json").write_text((d / "shots.json").read_text())
+            self.assertEqual(p.cli("ui").returncode, 0)
+            port = json.loads((p.dir / ".studio" / "server.json").read_text())["port"]
+            r = subprocess.run(["node", str(REPO / "tests" / "ui" / "browser_shots.cjs"), f"http://127.0.0.1:{port}", "demo-film"],
+                               capture_output=True, text=True, timeout=180,
+                               env={**os.environ, "NODE_PATH": str(REPO / "lib" / "lemo-opuscar" / "node_modules")})
+            if r.returncode == 77:
+                self.skipTest("no browser")
+            out = json.loads(r.stdout.strip().splitlines()[-1])
+            self.assertNotIn("failed", out, out)
+            self.assertEqual(out["errors"], [])
+            self.assertEqual((out["cells"], out["rows"]), (3, 3))
+            self.assertEqual((out["paneTitle"], out["nextTitle"], out["nextDisabled"]), ("Shot 2", "Shot 3", True))
+            if out["playable"]:
+                self.assertLessEqual(abs(out["stoppedAt"] - 2.0), 0.2, out)       # SC-003
+            self.assertEqual(out["noteTextKept"], "tay người ngồi bị bàn che")
+            self.assertIn("st-fix", out["cell2"])
+            self.assertEqual((out["fixRows"], out["afterReload"], out["afterReloadImg"]), (1, 1, 1))
+            self.assertEqual(out["fixedBadge"], "Fixed")
+            self.assertEqual(out["copyLabel"], "Copied")
+            if out["clipboard"] is not None:
+                self.assertEqual(out["clipboard"], "Sửa theo ghi chú phim demo-film")
+            self.assertEqual(out["prevButton"], 1)
+            self.assertIn("Previous version · shot 2", out["prevNote"])
+        finally:
+            p.close()
+
+
 if __name__ == "__main__":
     unittest.main()

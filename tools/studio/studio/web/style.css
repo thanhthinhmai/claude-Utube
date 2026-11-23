@@ -618,3 +618,8 @@ label.button:focus-within { outline: 2px solid var(--accent-line); }
 .sh-gone { margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--line); }
 .sh-gone-shot { margin-bottom: 10px; }
 .sh-at { font-variant-numeric: tabular-nums; }
+.sh-claude { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.sh-claude code { padding: 6px 10px; border-radius: 8px; background: var(--hover); overflow-wrap: anywhere; }
+.sh-prev { display: grid; gap: 6px; }
+.sh-prev-video { max-height: 240px; }
+.shot-notes-link { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
