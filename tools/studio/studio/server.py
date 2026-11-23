@@ -478,14 +478,37 @@ def create_app() -> FastAPI:
                             headers={"Cache-Control": "max-age=86400"})
 
     # ---------- live events ----------
+    def film_stamps(owner: str = None) -> dict:
+        """specs/029: one stamp per film (video, shot marks, notes book) so an open film page follows changes made
+        elsewhere (Claude replacing the video or answering notes from the command line)."""
+        base = (store.account_dir(owner) if owner else store.root()) / "films"
+        out = {}
+        try:
+            dirs = [d for d in base.iterdir() if d.is_dir() and resources.NAME.match(d.name)]
+        except OSError:
+            return out
+        for d in dirs:
+            parts = []
+            for f in (d / f"{d.name}.mp4", d / "shots.json", d / "shot-notes.json"):
+                try:
+                    st = f.stat()
+                    parts.append(f"{st.st_size}-{st.st_mtime_ns}")
+                except OSError:
+                    parts.append("-")
+            out["film:" + d.name] = "|".join(parts)
+        return out
+
     def snapshot(owner: str = None) -> dict:
-        return store.doc_versions(owner)
+        return {**store.doc_versions(owner), **film_stamps(owner)}
 
     def changes(old: dict, new: dict):
         for name, t in new.items():
             if old.get(name) == t:
                 continue
-            if name.startswith("j-"):
+            if name.startswith("film:"):
+                if name in old:
+                    yield "film.updated", name[5:]
+            elif name.startswith("j-"):
                 yield "job.updated", name[:-5]
             elif name.endswith(".decision.json"):
                 yield "review.decided", name[: -len(".decision.json")]

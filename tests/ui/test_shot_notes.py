@@ -663,7 +663,7 @@ class BrowserShots(unittest.TestCase):
             (d / "shots.prev.json").write_text((d / "shots.json").read_text())
             self.assertEqual(p.cli("ui").returncode, 0)
             port = json.loads((p.dir / ".studio" / "server.json").read_text())["port"]
-            r = subprocess.run(["node", str(REPO / "tests" / "ui" / "browser_shots.cjs"), f"http://127.0.0.1:{port}", "demo-film"],
+            r = subprocess.run(["node", str(REPO / "tests" / "ui" / "browser_shots.cjs"), f"http://127.0.0.1:{port}", "demo-film", "", str(d)],
                                capture_output=True, text=True, timeout=180,
                                env={**os.environ, "NODE_PATH": str(REPO / "lib" / "lemo-opuscar" / "node_modules")})
             if r.returncode == 77:
@@ -680,6 +680,7 @@ class BrowserShots(unittest.TestCase):
             self.assertEqual((out["otherShotBox"], out["backBox"], out["unsavedMsg"]), ("", "nháp shot 2", "Saved"))   # box per shot, saved
             self.assertEqual(len(out["typedSaved"]), 1, out)                                                          # typing alone saves:
             self.assertTrue(out["typedSaved"][0].endswith("gõ là lưu"), out)                                          # one note, last text
+            self.assertEqual((out["liveNote"], out["liveVideo"]), (True, True), out)   # outside changes show without a reload
             self.assertEqual(out["noteTextKept"], "tay người ngồi bị bàn che")
             self.assertIn("st-fix", out["cell2"])
             self.assertEqual((out["fixRows"], out["afterReload"], out["afterReloadImg"]), (1, 1, 1))

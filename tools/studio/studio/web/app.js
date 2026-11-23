@@ -1356,13 +1356,76 @@ async function filmShots(name, f) {
   // the selected shot plays in the shot pane itself: one video element kept across redraws (moved, not rebuilt)
   const pv = document.createElement("video");
   pv.id = "sh-pane-video"; pv.className = "sh-pane-video"; pv.controls = true; pv.preload = "metadata"; pv.playsInline = true;
-  pv.src = `${SH.api}/video`;
+  pv.src = `${SH.api}/video?v=${encodeURIComponent(SH.stamp || "")}`;
   pv.addEventListener("seeking", () => { if (!SH || SH.selfSeek) return; stopShot(); });
   pv.addEventListener("seeked", () => { if (SH) SH.selfSeek = false; });
   ["play", "pause", "ended"].forEach((ev) => pv.addEventListener(ev, playButtonState));
   SH.pv = pv;
   drawShots();
   loadNotes();
+}
+/** A film changed on the server (video replaced, notes answered). Only the open page of that film reacts.
+ * @param {Event} e */
+function onFilmUpdated(e) {
+  let id = "";
+  try { id = JSON.parse(/** @type {MessageEvent} */ (e).data).id; } catch { return; }
+  if (!SH || SH.name !== id || !location.hash.startsWith("#/films/")) return;
+  if (SH.liveRefresh) clearTimeout(SH.liveRefresh);
+  SH.liveRefresh = setTimeout(() => { SH.liveRefresh = 0; refreshFilmLive(); }, 300);
+}
+/** True while the person is typing a note or editing one: their box is never rebuilt under them. */
+const typingNote = () => !!(document.activeElement && (document.activeElement.id === "sh-note" || document.activeElement.classList.contains("sh-edit-box"))) || !!document.querySelector(".sh-edit-box");
+async function refreshFilmLive() {
+  if (!SH) return;
+  try {
+    const n = await get(`${SH.path}/notes`);
+    if (n.base !== SH.base && !SH.liveTimer) {
+      SH.doc = n.doc; SH.base = n.base; SH.orphans = n.orphans || [];
+      drawTimeline(); drawFilters(); drawList(); drawOrphans();
+      if (typingNote()) refreshPaneStatus(); else drawNotes();
+    }
+  } catch { /* next event tries again */ }
+  try {
+    const r = await get(`${SH.path}/shots`);
+    if (r.video_stamp && r.video_stamp !== SH.stamp) {
+      SH.pendingVideo = r;
+      const main = /** @type {HTMLVideoElement | null} */ (document.getElementById("film-video"));
+      if ((SH.pv && !SH.pv.paused) || (main && !main.paused)) newVersionBar(true); else applyNewVideo();
+    }
+  } catch { /* next event tries again */ }
+}
+/** "A new version of the film is ready" while a video is playing; the person loads it when they want. @param {boolean} on */
+function newVersionBar(on) {
+  let bar = document.getElementById("sh-newver");
+  if (!on) { if (bar) bar.remove(); return; }
+  if (bar) return;
+  const slot = document.getElementById("shots-slot");
+  if (!slot) return;
+  bar = document.createElement("div");
+  bar.id = "sh-newver"; bar.className = "notice sh-newver"; bar.setAttribute("role", "status");
+  bar.innerHTML = `<span>A new version of the film is ready.</span> <button type="button" class="primary" id="sh-newver-load">Load it</button>`;
+  slot.prepend(bar);
+  /** @type {HTMLElement} */ (bar.querySelector("#sh-newver-load")).onclick = () => applyNewVideo();
+}
+/** Swap in the replaced video (both players), its shot marks and small pictures; the selected shot stays. */
+function applyNewVideo() {
+  const r = SH.pendingVideo;
+  if (!r) return;
+  SH.pendingVideo = null;
+  SH.stamp = r.video_stamp;
+  if (r.valid) { SH.shots = r.shots; SH.duration = r.duration; SH.sel = Math.min(SH.sel, SH.shots.length - 1); }
+  SH.prev = null; SH.f.has_prev = true;
+  const src = `${SH.api}/video?v=${encodeURIComponent(SH.stamp)}`;
+  const main = /** @type {HTMLVideoElement | null} */ (document.getElementById("film-video"));
+  if (main) { main.pause(); main.src = src; main.load(); }
+  if (SH.pv) {
+    stopShot(); SH.pv.pause();
+    const t0 = SH.shots[SH.sel] ? SH.shots[SH.sel].t0 : 0, pv = SH.pv;
+    pv.addEventListener("loadedmetadata", () => { SH.selfSeek = true; pv.currentTime = t0; }, { once: true });
+    pv.src = src; pv.load();
+  }
+  newVersionBar(false);
+  if (typingNote()) { drawTimeline(); drawFilters(); drawList(); } else drawShots();
 }
 async function loadNotes() {
   try {
@@ -2753,6 +2816,7 @@ function connect() {
   es.onopen = () => { live().classList.add("on"); live().textContent = "● Live updates on"; };
   es.onerror = () => { live().classList.remove("on"); live().textContent = "Disconnected, reconnecting…"; };      // EventSource reconnects by itself
   ["job.updated", "review.created", "review.decided"].forEach((t) => es.addEventListener(t, onChange));
+  es.addEventListener("film.updated", onFilmUpdated);       // specs/029: the open film page follows outside changes
 }
 
 window.addEventListener("hashchange", route);

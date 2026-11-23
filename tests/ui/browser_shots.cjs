@@ -3,7 +3,7 @@
 // by hand: node browser_shots.cjs <base> <film> [screenshot dir]. Prints JSON. Exit 77 = no browser.
 let pw;
 try { pw = require("playwright-core"); } catch { process.exit(77); }
-const [base, film, shots] = process.argv.slice(2);
+const [base, film, shots, filmDir] = process.argv.slice(2);
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
 (async () => {
   let browser;
@@ -106,6 +106,22 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
       await page.click("#sh-prev-version");
       await page.waitForSelector("#sh-prev-video", { timeout: 5000 });
       out.prevNote = (await page.locator("#sh-prev-slot p").innerText()).trim();
+    }
+    // live: changes made outside the page show up without a reload (specs/029)
+    await page.goto(`${base}/#/films/${film}`); await page.waitForSelector("#sh-list .sh-row");
+    await page.waitForTimeout(1500);                     // the event stream is connected
+    const api = `${base}/api/v1/films/${film}`;
+    const nb = await (await fetch(`${api}/notes`)).json();
+    const sid = (await (await fetch(`${api}/shots`)).json()).shots[0].id;
+    nb.doc.shots[sid] = { status: "none", status_by: "auto", notes: [{ at: null, text: "từ bên ngoài", images: [], done: false }] };
+    await fetch(`${api}/notes`, { method: "PUT", headers: { "Content-Type": "application/json", "X-Studio": "1" }, body: JSON.stringify({ base: nb.base, doc: nb.doc }) });
+    out.liveNote = await page.waitForSelector("#sh-timeline .sh-cell[data-i='0'].st-fix", { timeout: 8000 }).then(() => true).catch(() => false);
+    if (filmDir) {
+      const fs = require("fs"), path = require("path");
+      const before = await page.getAttribute("#sh-pane-video", "src");
+      const vid = path.join(filmDir, `${film}.mp4`), tmp = vid + ".new";
+      fs.copyFileSync(path.join(filmDir, `${film}.prev.mp4`), tmp); fs.renameSync(tmp, vid);
+      out.liveVideo = await page.waitForFunction((b) => document.getElementById("sh-pane-video").getAttribute("src") !== b, before, { timeout: 8000 }).then(() => true).catch(() => false);
     }
     await snap("2-done");
   } catch (e) {
