@@ -1295,10 +1295,10 @@ async function pageFilm(name) {
   const base = `${API}/films/${encodeURIComponent(name)}`;
   $app.classList.toggle("wide-film", !!f.has_video);      // room for the Inspector column on the right
   $app.innerHTML = `<div class="film-layout"><div class="film-main">${back("#/films", "Films")}${head("Film", esc(f.name), "")}
-    ${f.has_video ? `<video id="film-video" controls preload="metadata" ${f.has_poster ? `poster="${base}/poster"` : ""}>
+    ${f.has_video ? `<div id="film-player"><video id="film-video" controls preload="metadata" ${f.has_poster ? `poster="${base}/poster"` : ""}>
         <source src="${base}/video" type="video/mp4">
         ${f.has_subtitles ? `<track kind="subtitles" srclang="vi" label="Subtitles" src="${base}/subtitles.vtt" default>` : ""}
-      </video><p class="muted">Turn subtitles on or off with the player’s CC button.</p>
+      </video></div><p class="muted">Turn subtitles on or off with the player’s CC button.</p>
       ${MODE === "online" ? `<p><a class="button primary" href="${base}/download">Download</a> <button class="danger" id="del-film">Delete this film</button></p>` : ""}`
     : `<p class="notice">${f.rendering ? "The film is still rendering: see progress on the Jobs page." : "No film file yet."}</p>`}
     ${f.has_video ? `<div id="shots-slot"><div class="panel"><p class="section-title">Shots</p><p class="muted">Loading…</p></div></div>` : ""}
@@ -1350,7 +1350,7 @@ async function filmShots(name, f) {
     <div class="timeline" id="sh-timeline" role="group" aria-label="Shots on the timeline"></div>
     <div class="sh-legend small muted" id="sh-legend"></div>
     <div class="chips sh-filters" id="sh-filters" role="group" aria-label="Filter shots"></div>
-    <div class="sh-editor"><div class="sh-canvas" id="sh-canvas"></div></div>
+
     <div class="sh-strip-wrap">
       <div class="row sh-strip-tools"><label class="small muted sh-zoom">Zoom <input type="range" id="sh-zoom" min="10" max="160" step="1" value="34" aria-label="Timeline zoom"></label>
         <span class="small muted" id="sh-zoom-val">34px/s</span><span class="small muted sh-strip-count">${r.shots.length} shots · ${mss1(r.duration || 0)}</span></div>
@@ -1361,6 +1361,9 @@ async function filmShots(name, f) {
       <p class="muted small">Paste this into your Claude Code chat. Claude lists the open notes, fixes those shots, renders again, replaces the video and ticks each note with a short reply.</p>
       <div class="row"><code id="sh-claude-text">${esc(`Sửa theo ghi chú phim ${name}`)}</code><button type="button" id="sh-claude-copy">Copy</button></div></div>
   </div>`;
+  // the shot player takes the film player's place at the top of the page
+  const fp = document.getElementById("film-player");
+  if (fp) fp.innerHTML = `<div class="sh-canvas" id="sh-canvas"></div>`;
   const zm = /** @type {HTMLInputElement} */ (document.getElementById("sh-zoom"));
   zm.oninput = () => { SH.pps = +zm.value; /** @type {HTMLElement} */ (document.getElementById("sh-zoom-val")).textContent = `${SH.pps}px/s`; drawList(); };
   const cp = /** @type {HTMLButtonElement} */ (document.getElementById("sh-claude-copy"));
@@ -1369,6 +1372,7 @@ async function filmShots(name, f) {
   const pv = document.createElement("video");
   pv.id = "sh-pane-video"; pv.className = "sh-pane-video"; pv.controls = true; pv.preload = "metadata"; pv.playsInline = true;
   pv.src = `${SH.api}/video?v=${encodeURIComponent(SH.stamp || "")}`;
+  if (f.has_subtitles) { const tr = document.createElement("track"); tr.kind = "subtitles"; tr.srclang = "vi"; tr.label = "Subtitles"; tr.src = `${SH.api}/subtitles.vtt`; tr.default = true; pv.appendChild(tr); }
   pv.addEventListener("seeking", () => { if (!SH || SH.selfSeek) return; stopShot(); });
   pv.addEventListener("seeked", () => { if (SH) SH.selfSeek = false; });
   ["play", "pause", "ended"].forEach((ev) => pv.addEventListener(ev, playButtonState));
