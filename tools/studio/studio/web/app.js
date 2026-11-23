@@ -1495,7 +1495,7 @@ function drawPane() {
     <div class="sh-media" id="sh-media"></div>
     <p class="small muted">${mss1(s.t0)}–${mss1(s.t1)} · ${(s.t1 - s.t0).toFixed(1)} s</p>
     <div class="row sh-nav"><button type="button" id="sh-prev"${SH.sel === 0 ? " disabled" : ""} aria-label="Previous shot">← Prev</button>
-      <button type="button" class="primary" id="sh-play">▶ Play this shot</button>
+      <button type="button" class="primary sh-roundbtn" id="sh-play" aria-label="Play this shot" title="Play this shot"></button>
       <button type="button" id="sh-next"${SH.sel === SH.shots.length - 1 ? " disabled" : ""} aria-label="Next shot">Next →</button></div>
     ${SH.f.has_prev ? `<div class="sh-prev"><button type="button" id="sh-prev-version">Watch the previous version</button><div id="sh-prev-slot"></div></div>` : ""}
     <div id="sh-notes"></div>`;
@@ -1521,10 +1521,10 @@ function playButtonState() {
   const b = document.getElementById("sh-play"), v = shotVideo();
   if (!b || !v) return;
   const playing = !v.paused && !v.ended;
-  b.classList.toggle("sh-pausebtn", playing);
   b.setAttribute("aria-label", playing ? "Pause" : "Play this shot");
-  b.title = playing ? "Pause" : "";
-  b.innerHTML = playing ? '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>' : "▶ Play this shot";
+  b.title = playing ? "Pause" : "Play this shot";
+  b.innerHTML = playing ? '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>';
 }
 /** The same shot (by id) in the one previous video kept by `film replace` (FR-014a). @param {string} id */
 async function playPrevious(id) {
