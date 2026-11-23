@@ -1294,7 +1294,7 @@ async function pageFilm(name) {
   const f = await get(`/films/${encodeURIComponent(name)}`);
   const base = `${API}/films/${encodeURIComponent(name)}`;
   $app.classList.toggle("wide-film", !!f.has_video);      // room for the Inspector column on the right
-  $app.innerHTML = `<div class="film-layout"><div class="film-main">${back("#/films", "Films")}${head("Film", esc(f.name), "")}
+  $app.innerHTML = `<div class="film-layout"><div class="film-main"><div class="film-head">${back("#/films", "Films")}${head("Film", esc(f.name), "")}</div>
     ${f.has_video ? `<div id="film-player"><video id="film-video" controls preload="metadata" ${f.has_poster ? `poster="${base}/poster"` : ""}>
         <source src="${base}/video" type="video/mp4">
         ${f.has_subtitles ? `<track kind="subtitles" srclang="vi" label="Subtitles" src="${base}/subtitles.vtt" default>` : ""}
@@ -1372,6 +1372,9 @@ async function filmShots(name, f) {
   const fp = document.getElementById("film-player");
   if (fp) {
     fp.innerHTML = `<div class="sh-canvas" id="sh-canvas"></div>`;
+    // the shot strip (and its filters) sits right under the player: click a shot and watch it without scrolling
+    const strip = document.querySelector("#shots .sh-strip-wrap"), filters = document.getElementById("sh-filters");
+    if (strip) { fp.appendChild(strip); const tools = strip.querySelector(".sh-strip-tools"); if (filters && tools) tools.prepend(filters); }
     if (window.ResizeObserver) new ResizeObserver(() => alignInspector()).observe(fp);
     window.addEventListener("resize", alignInspector);
   }
