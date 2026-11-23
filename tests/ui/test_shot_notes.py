@@ -124,6 +124,16 @@ class PathSafety(unittest.TestCase):
         self.assertEqual((r.status_code, r.json()["error"]["code"]), (400, "bad_name"))
         self.assertEqual(tree(self.p.dir), before)                     # nothing made anywhere
 
+    def test_every_route_answers(self):            # the literal paths, for test_api's contract check
+        for url in ("/api/v1/films/demo-film/shots", "/api/v1/films/demo-film/notes"):
+            self.assertEqual(self.c.get(url).status_code, 200, url)
+        self.assertIn(self.c.get("/api/v1/films/demo-film/shots/thumbs/1/a.jpg").status_code, (200, 202))
+        up = self.c.post("/api/v1/films/demo-film/notes/images", files={"file": ("a.png", PNG, "image/png")}, headers=W)
+        self.assertEqual(up.status_code, 201)
+        self.assertEqual(self.c.get(f"/api/v1/films/demo-film/notes/images/{up.json()['file']}").status_code, 200)
+        r = self.c.put("/api/v1/films/demo-film/notes", json={"base": shotnotes.EMPTY_SHA, "doc": {"version": 1, "shots": {}}}, headers=W)
+        self.assertEqual(r.status_code, 200)
+
     def test_no_film_is_not_found(self):
         for method, url, body in self.routes("no-such-film"):
             r = self.call(method, url, body)
@@ -480,6 +490,8 @@ class NotesApi(unittest.TestCase):
         big = self.image(PNG + b"\0" * (10 * 1024 * 1024 + 1 - len(PNG)))
         self.assertEqual((big.status_code, big.json()["error"]["code"]), (413, "too_large"))
         self.assertEqual(self.image(PNG + b"\0" * (10 * 1024 * 1024 - len(PNG))).status_code, 201)     # exactly 10 MB
+        huge = self.image(PNG + b"\0" * (11 * 1024 * 1024))                    # refused from its Content-Length
+        self.assertEqual((huge.status_code, huge.json()["error"]["code"]), (413, "too_large"))
         for bad in (PDF, b"GIF89a" + b"\0" * 20, b"not a png at all"):
             r = self.image(bad, "fake.png")
             self.assertEqual((r.status_code, r.json()["error"]["code"]), (415, "bad_image"))

@@ -386,6 +386,12 @@ def create_app() -> FastAPI:
     async def film_note_image(name: str, request: Request):
         resources.film_path(name, "images")
         _note_writer(request)
+        try:                                       # refuse a body far over the limit before reading it
+            too_big = int(request.headers.get("content-length") or 0) > shotnotes.MAX_IMAGE_BYTES + 64 * 1024
+        except ValueError:
+            too_big = False
+        if too_big:
+            raise StudioError("too_large", f"ảnh tối đa {shotnotes.MAX_IMAGE_BYTES // (1024 * 1024)} MB", 413)
         form = await request.form(max_files=1, max_fields=4)
         f = form.get("file")
         if f is None or isinstance(f, str):
