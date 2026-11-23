@@ -603,8 +603,8 @@ function bridgeArgs() {
 
 function aeConfig() { return /** @type {any} */ (core.loadConfig(CONFIG_DIR) || {}).ae || {}; }
 function aeFound() {
-  if (process.env.CU_FAKE_AE) return { afterfx: [process.execPath, process.env.CU_FAKE_AE, "afterfx"],
-    aerender: [process.execPath, process.env.CU_FAKE_AE, "aerender"], version: "fake" };
+  if (process.env.CU_FAKE_AE) return { afterfx: ["node", process.env.CU_FAKE_AE, "afterfx"],    // smoke runs: a fake AE (node on PATH)
+    aerender: ["node", process.env.CU_FAKE_AE, "aerender"], version: "fake" };
   return aeb.findAE(PLATFORM, { readdir: (d) => fs.readdirSync(d), exists: (p) => fs.existsSync(p) });
 }
 function aeDefaultWork() { return path.join(app.getPath("documents"), "claude-Utube AE"); }
@@ -1034,6 +1034,16 @@ async function smokeMain(port) {
     if (shareState().clients.length !== 1) return smokeFail("the paired computer was not saved");
     await stopSharing();
     smoke("share pair ok");
+  }
+  if (process.env.CU_SMOKE_AE === "1") {                // specs/031: the fake core queues one AE build; the fake AE builds it
+    let st = null;
+    for (let i = 0; i < 120 && !(st && (st.state === "done" || st.state === "failed")); i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      st = await fetch(`${appUrl}/__fake/ae`).then((r) => r.json()).catch(() => null);
+    }
+    if (!st || st.state !== "done") return smokeFail(`the AE build did not finish: ${JSON.stringify(st)}`);
+    if (!st.hello || !st.hello.found || !st.result || !st.finish.marks || st.finish.marks.length !== 2) return smokeFail(`AE build result: ${JSON.stringify(st)}`);
+    smoke("ae build ok");
   }
   await win.webContents.executeJavaScript("document.getElementById('out').click()");
   await new Promise((r) => setTimeout(r, 500));

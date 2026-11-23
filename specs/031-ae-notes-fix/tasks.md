@@ -76,7 +76,7 @@ description: "Tasks: sửa ghi chú phim After Effects tự động trên app (0
 
 ## Phase 6: User Story 4 - Bộ cài có cầu nối (P3)
 
-- [ ] T028 [US4] `.github/workflows/desktop.yml`: bước smoke `ae` (fake core có hàng đợi giả + AE giả) trên Windows và macOS; `desktop/test/fake-core.mjs` thêm `/api/v1/ae/bridge/*` giả
+- [X] T028 [US4] `.github/workflows/desktop.yml`: bước smoke `ae` (fake core có hàng đợi giả + AE giả) trên Windows và macOS; `desktop/test/fake-core.mjs` thêm `/api/v1/ae/bridge/*` giả
 - [X] T029 [US4] `desktop/package.json` / danh sách tệp đóng gói: thêm `aebridge.js`, `ae.html`; `test/package-files.test.js` kiểm có mặt
 - [ ] T030 [US4] Hỏi người dùng rồi mới chạy `desktop.yml` trên nhánh (tốn phút chạy, macOS gấp 10); ghi kết quả (SC-007)
 - [ ] T031 [US4] Kiểm tay với AE thật: Windows (máy người dùng) và macOS (máy người dùng cung cấp) theo quickstart US4 (SC-009)

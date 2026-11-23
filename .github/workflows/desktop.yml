@@ -30,10 +30,12 @@ jobs:
         env:
           CU_CORE_CMD: '["node","test/fake-core.mjs"]'
           CU_SMOKE_SHARE: "1"
+          CU_SMOKE_AE: "1"
+          FAKE_CORE_AE: "1"
         run: |
-          export CU_CONFIG_DIR="$RUNNER_TEMP/cu-config"
+          export CU_CONFIG_DIR="$RUNNER_TEMP/cu-config" CU_FAKE_AE="$PWD/test/fake-ae.mjs"
           npx electron . --smoke 2>&1 | tee smoke.log
-          for line in "setup ok" "window ok" "share pair ok" "external ok" "second instance ok" "hide ok" "stopped ok" "quit cancel ok" "quit ok"; do
+          for line in "setup ok" "window ok" "share pair ok" "ae bridge ok" "ae build ok" "external ok" "second instance ok" "hide ok" "stopped ok" "quit cancel ok" "quit ok"; do
             grep -q "smoke: $line" smoke.log || { echo "missing: smoke: $line"; exit 1; }
           done
           ! grep -q "smoke: fail" smoke.log
