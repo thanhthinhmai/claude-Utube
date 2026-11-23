@@ -675,8 +675,9 @@ class BrowserShots(unittest.TestCase):
             self.assertEqual((out["paneTitle"], out["nextTitle"], out["nextDisabled"]), ("Shot 2", "Shot 3", True))
             if out["playable"]:
                 self.assertLessEqual(abs(out["stoppedAt"] - 2.0), 0.2, out)       # SC-003
-            self.assertEqual((out["otherShotBox"], out["unsavedTags"], out["backBox"]), ("", 1, "nháp shot 2"))   # drafts per shot
-            self.assertIn("Not saved yet", out["unsavedMsg"])
+            self.assertEqual((out["otherShotBox"], out["backBox"], out["unsavedMsg"]), ("", "nháp shot 2", "Saved"))   # box per shot, saved
+            self.assertEqual(len(out["typedSaved"]), 1, out)                                                          # typing alone saves:
+            self.assertTrue(out["typedSaved"][0].endswith("gõ là lưu"), out)                                          # one note, last text
             self.assertEqual(out["noteTextKept"], "tay người ngồi bị bàn che")
             self.assertIn("st-fix", out["cell2"])
             self.assertEqual((out["fixRows"], out["afterReload"], out["afterReloadImg"]), (1, 1, 1))

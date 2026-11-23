@@ -1339,7 +1339,7 @@ async function filmShots(name, f) {
     return;
   }
   SH = { name, path, api: API + path, f, shots: r.shots, stamp: r.video_stamp, duration: r.duration, sel: 0, filter: "all",
-    doc: { version: 1, shots: {} }, base: "", orphans: [], stopper: 0, selfSeek: false, prev: null, pending: [], draft: "", drafts: /** @type {Record<string, {text: string, pending: string[]}>} */ ({}), pv: /** @type {HTMLVideoElement | null} */ (null),
+    doc: { version: 1, shots: {} }, base: "", orphans: [], stopper: 0, selfSeek: false, prev: null, pending: [], draft: "", drafts: /** @type {Record<string, {text: string, pending: string[]}>} */ ({}), live: /** @type {Record<string, {id: string, at: number | null}>} */ ({}), liveTimer: 0, pv: /** @type {HTMLVideoElement | null} */ (null),
     pin: true, notesError: "" };
   slot.innerHTML = `<div class="panel shots" id="shots">
     <div class="shots-head"><p class="section-title">Shots</p><span class="muted small">${r.shots.length} shots · ${mss1(r.duration || 0)}</span></div>
@@ -1459,6 +1459,7 @@ function drawList() {
 function selectShot(i, seek) {
   // each shot keeps its own unsaved note (text and pictures): it never follows you to another shot
   const was = SH.shots[SH.sel];
+  if (was) flushLive();
   if (was) { if ((SH.draft || "").trim() || SH.pending.length) SH.drafts[was.id] = { text: SH.draft || "", pending: SH.pending }; else delete SH.drafts[was.id]; }
   SH.sel = Math.max(0, Math.min(SH.shots.length - 1, i));
   const d = SH.drafts[SH.shots[SH.sel].id];
@@ -1549,15 +1550,15 @@ function drawNotes() {
   const s = SH.shots[SH.sel], sh = SH.doc.shots[s.id] || { status: "none", notes: [] }, st = sh.status || "none";
   el.innerHTML = `${SH.notesError ? `<p class="error">${esc(SH.notesError)}</p>` : ""}
     <div class="seg sh-status" role="group" aria-label="Shot status">${["ok", "fix", "fixed"].map((k) => `<button type="button" data-st="${k}" class="${st === k ? "on" : ""}" aria-pressed="${st === k}">${SHOT_STATUS[k]}</button>`).join("")}</div>
-    <ul class="sh-notes">${(sh.notes || []).map((/** @type {any} */ n) => noteHtml(n, s.id, true)).join("") || `<li class="muted small">No notes on this shot yet.</li>`}</ul>
+    <ul class="sh-notes">${(sh.notes || []).filter((/** @type {any} */ n) => !SH.live[s.id] || n.id !== SH.live[s.id].id).map((/** @type {any} */ n) => noteHtml(n, s.id, true)).join("") || (SH.live[s.id] ? "" : `<li class="muted small">No notes on this shot yet.</li>`)}</ul>
     <div class="sh-add">
-      <textarea id="sh-note" maxlength="2000" rows="3" placeholder="What is wrong in this shot? Paste a screenshot here with Ctrl+V.">${esc(SH.draft || "")}</textarea>
+      <textarea id="sh-note" maxlength="2000" rows="3" placeholder="What is wrong in this shot? Type it (saved as you type) or paste a screenshot with Ctrl+V.">${esc(SH.draft || "")}</textarea>
       <div class="sh-pending" id="sh-pending"></div>
       <div class="row sh-add-row">
         <label class="check"><input type="checkbox" id="sh-pin"${SH.pin ? " checked" : ""}> <span>Pin to current time</span></label>
         <label class="button sh-file">Add picture<input type="file" id="sh-file" accept="image/png,image/jpeg,image/webp" hidden></label>
         <span class="muted small" id="sh-count">${(SH.draft || "").length}/2000</span>
-        <button type="button" class="primary" id="sh-add">Add note</button>
+        <button type="button" id="sh-add" title="Keep this note and start another one for this shot">New note</button>
       </div>
       <p class="small" id="sh-msg" role="status"></p>
     </div>`;
@@ -1565,7 +1566,8 @@ function drawNotes() {
   unsavedHint();
   zoomable(el);
   const ta = /** @type {HTMLTextAreaElement} */ (el.querySelector("#sh-note"));
-  ta.addEventListener("input", () => { SH.draft = ta.value; /** @type {HTMLElement} */ (el.querySelector("#sh-count")).textContent = `${ta.value.length}/2000`; unsavedHint(); });
+  ta.addEventListener("input", () => { SH.draft = ta.value; /** @type {HTMLElement} */ (el.querySelector("#sh-count")).textContent = `${ta.value.length}/2000`; unsavedHint(); scheduleLive(); });
+  ta.addEventListener("blur", () => flushLive());
   ta.addEventListener("paste", (e) => {
     const items = Array.from(/** @type {ClipboardEvent} */ (e).clipboardData?.items || []).filter((it) => it.kind === "file" && it.type.startsWith("image/"));
     if (!items.length) return;                     // text goes into the box as usual
@@ -1615,28 +1617,60 @@ function wireNoteItems(root, sid) {
     if (at) at.onclick = () => { const v = shotVideo(); if (v) { stopShot(); v.currentTime = +(at.dataset.at || 0); } };
   });
 }
+/** After a save made while typing: the shot's badge and status buttons, without rebuilding the note box. */
+function refreshPaneStatus() {
+  const s = SH.shots[SH.sel];
+  if (!s) return;
+  const st = shotStatus(s.id), b = document.querySelector("#sh-pane .sh-pane-head .badge");
+  if (b) { b.className = `badge st-badge st-${st}`; b.textContent = SHOT_STATUS[st]; }
+  const cur = (SH.doc.shots[s.id] || {}).status || "none";
+  document.querySelectorAll("#sh-notes .sh-status button").forEach((x) => { const on = /** @type {HTMLElement} */ (x).dataset.st === cur; x.classList.toggle("on", on); x.setAttribute("aria-pressed", String(on)); });
+}
 function drawPending() {
   const el = document.getElementById("sh-pending");
   if (!el) return;
   el.innerHTML = SH.pending.map((/** @type {string} */ f, /** @type {number} */ i) => `<span class="sh-pend"><img src="${SH.api}/notes/images/${esc(f)}" data-zoom alt="Picture to add">
     <button type="button" class="link" data-i="${i}" aria-label="Remove this picture">×</button></span>`).join("");
   zoomable(el);
-  el.querySelectorAll("button[data-i]").forEach((b) => b.addEventListener("click", () => { SH.pending.splice(+(/** @type {HTMLElement} */ (b).dataset.i || 0), 1); drawPending(); unsavedHint(); }));
+  el.querySelectorAll("button[data-i]").forEach((b) => b.addEventListener("click", () => { SH.pending.splice(+(/** @type {HTMLElement} */ (b).dataset.i || 0), 1); drawPending(); flushLive(); }));
 }
-/** "Not saved yet" while the box holds text or pictures, and a mark on every shot row with an unsaved note. */
+/** Save state of the note being typed: "Saving…" while a save waits, then "Saved". */
 function unsavedHint() {
-  const m = document.getElementById("sh-msg"), dirty = !!((SH.draft || "").trim() || SH.pending.length);
-  if (m && (!m.textContent || m.dataset.unsaved)) {
-    m.dataset.unsaved = dirty ? "1" : ""; m.className = "small warn"; m.textContent = dirty ? "Not saved yet: press Add note." : "";
+  const m = document.getElementById("sh-msg");
+  if (!m || (m.textContent && !m.dataset.unsaved)) return;
+  const dirty = !!((SH.draft || "").trim() || SH.pending.length), cur = SH.shots[SH.sel];
+  m.dataset.unsaved = "1"; m.className = "small muted";
+  m.textContent = SH.liveTimer ? "Saving…" : (dirty && cur && SH.live[cur.id] ? "Saved" : "");
+}
+function scheduleLive() {
+  if (SH.liveTimer) clearTimeout(SH.liveTimer);
+  SH.liveTimer = setTimeout(() => { SH.liveTimer = 0; flushLive(); }, 1000);
+  unsavedHint();
+}
+/** Typing is the note (no Add button): create the shot's note on the first save, then keep updating that same note;
+ * an emptied box removes it. Called after 1 s without typing, on a picture, on leaving the box and on switching shots. */
+function flushLive() {
+  if (SH.liveTimer) { clearTimeout(SH.liveTimer); SH.liveTimer = 0; }
+  const s = SH.shots[SH.sel];
+  if (!s) return;
+  const text = (SH.draft || "").trim().slice(0, 2000), images = SH.pending.slice();
+  let live = SH.live[s.id];
+  if (!live) {
+    if (!text && !images.length) { unsavedHint(); return; }
+    const v = shotVideo();
+    let at = null;
+    if (SH.pin && v && v.currentTime >= s.t0 && v.currentTime <= s.t1) at = Math.round((v.currentTime - s.t0) * 10) / 10;
+    live = SH.live[s.id] = { id: "n-" + Array.from(crypto.getRandomValues(new Uint8Array(4)), (b) => b.toString(16).padStart(2, "0")).join(""), at };
   }
-  const cur = SH.shots[SH.sel] ? SH.shots[SH.sel].id : "";
-  document.querySelectorAll("#sh-list .sh-row").forEach((li) => {
-    const s = SH.shots[+(/** @type {HTMLElement} */ (li).dataset.i || 0)];
-    const has = s && (s.id === cur ? dirty : !!SH.drafts[s.id]);
-    let tag = li.querySelector(".sh-unsaved");
-    if (has && !tag) { tag = document.createElement("span"); tag.className = "sh-unsaved small"; tag.textContent = "unsaved note"; (li.querySelector(".sh-meta") || li).appendChild(tag); }
-    if (!has && tag) tag.remove();
-  });
+  const id = live.id, at = live.at, sid = s.id;
+  if (!text && !images.length) delete SH.live[sid];
+  saveNotes((doc) => {
+    const x = doc.shots[sid] || (doc.shots[sid] = { status: "none", status_by: "auto", notes: [] });
+    const i = x.notes.findIndex((/** @type {any} */ n) => n.id === id);
+    if (!text && !images.length) { if (i >= 0) x.notes.splice(i, 1); return; }
+    if (i < 0) x.notes.push({ id, at, text, images, done: false });
+    else { x.notes[i].text = text; x.notes[i].images = images; }
+  }, () => unsavedHint(), true);
 }
 /** @param {string} text @param {boolean} [bad] */
 function shotMsg(text, bad = false) {
@@ -1658,29 +1692,21 @@ async function addPicture(file) {
     pend.push(body.file);
     drawPending();
     shotMsg("");
-    unsavedHint();
+    if (pend === SH.pending) flushLive();
   } catch (e) { shotMsg(e.message, true); }
 }
 function addNote() {
-  const s = SH.shots[SH.sel], text = (SH.draft || "").trim();
-  if (!text && !SH.pending.length) { shotMsg("Write the note or add a picture first.", true); return; }
-  if (text.length > 2000) { shotMsg("A note can have up to 2,000 characters.", true); return; }
-  const v = shotVideo();
-  let at = null;
-  if (SH.pin && v && v.currentTime >= s.t0 && v.currentTime <= s.t1) at = Math.round((v.currentTime - s.t0) * 10) / 10;
-  const images = SH.pending.slice();
-  saveNotes((doc) => {
-    const x = doc.shots[s.id] || (doc.shots[s.id] = { status: "none", status_by: "auto", notes: [] });
-    x.notes.push({ at, text, images, done: false });
-  }, () => {
-    delete SH.drafts[s.id];
-    if (SH.shots[SH.sel] && SH.shots[SH.sel].id === s.id) { SH.draft = ""; SH.pending = []; }
-    unsavedHint();
-  });
+  const s = SH.shots[SH.sel];
+  if (!(SH.draft || "").trim() && !SH.pending.length) { shotMsg("Type the note or paste a picture first.", true); return; }
+  if ((SH.draft || "").length > 2000) { shotMsg("A note can have up to 2,000 characters.", true); return; }
+  flushLive();
+  delete SH.live[s.id]; delete SH.drafts[s.id];
+  SH.draft = ""; SH.pending = [];
+  drawPane();
 }
 /** Save the notes book with the fingerprint read (FR-009); on "changed" apply the same change to the new book once.
- * @param {(doc: any) => void} op @param {() => void} [ok] */
-async function saveNotes(op, ok) {
+ * @param {(doc: any) => void} op @param {() => void} [ok] @param {boolean} [quiet] keep the pane (and the box being typed in) */
+async function saveNotes(op, ok, quiet = false) {
   /** @param {string} base @param {any} doc */
   const put = async (base, doc) => {
     const r = await fetch(`${SH.api}/notes`, { method: "PUT", headers: { "Content-Type": "application/json", "X-Studio": "1" },
@@ -1704,7 +1730,7 @@ async function saveNotes(op, ok) {
     if (!r.ok) throw failed(r, body);
     SH.doc = body.doc; SH.base = body.base;
     if (ok) ok();
-    drawShots();
+    if (quiet) { drawTimeline(); drawFilters(); drawList(); refreshPaneStatus(); } else drawShots();
   } catch (e) { shotMsg(e.message, true); }
 }
 function drawOrphans() {

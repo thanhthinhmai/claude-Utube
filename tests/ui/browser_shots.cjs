@@ -12,6 +12,7 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 1000 } });
   await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: base });
   const page = await ctx.newPage();
+  page.on("dialog", (d) => d.accept());
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   const snap = async (name) => { if (shots) await page.screenshot({ path: `${shots}/${name}.png`, fullPage: true }); };
@@ -48,10 +49,18 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     await page.fill("#sh-note", "nháp shot 2");
     await page.click("#sh-next");
     out.otherShotBox = await page.inputValue("#sh-note");
-    out.unsavedTags = await page.locator("#sh-list .sh-unsaved").count();
     await page.click("#sh-prev");
     out.backBox = await page.inputValue("#sh-note");
+    await page.waitForFunction(() => document.getElementById("sh-msg").textContent.trim() === "Saved", null, { timeout: 5000 }).catch(() => {});
     out.unsavedMsg = (await page.locator("#sh-msg").innerText()).trim();
+    // typing alone saves: wait past the 1 s pause, reload, the note is there without pressing anything
+    await page.fill("#sh-note", "gõ là lưu");
+    await page.waitForTimeout(1800);
+    await page.reload();
+    await page.waitForSelector("#sh-list .sh-row");
+    await page.click("#sh-list .sh-row[data-i='1']");
+    out.typedSaved = (await page.locator("#sh-notes .sh-note .sh-note-text").allInnerTexts()).map((t) => t.trim());
+    await page.click("#sh-notes .sh-del").catch(() => {});
     // a note with a pasted picture
     await page.fill("#sh-note", "tay người ngồi bị bàn che");
     await page.evaluate((b64) => {
