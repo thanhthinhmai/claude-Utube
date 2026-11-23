@@ -689,3 +689,6 @@ main.wide-film .film-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 38
 .film-side .film-actions { display: flex; gap: 8px; margin: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
 .film-side .film-actions > * { flex: 1 1 0; text-align: center; justify-content: center; }
 @media (max-width: 1100px) { .film-side { position: static; } .film-inspector { max-height: none; } }
+
+/* the Inspector column spans the shot player (height set by alignInspector) */
+main.wide-film .film-inspector { max-height: none; overflow-y: auto; }

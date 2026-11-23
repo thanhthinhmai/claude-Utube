@@ -1370,7 +1370,11 @@ async function filmShots(name, f) {
   </div>`;
   // the shot player takes the film player's place at the top of the page
   const fp = document.getElementById("film-player");
-  if (fp) fp.innerHTML = `<div class="sh-canvas" id="sh-canvas"></div>`;
+  if (fp) {
+    fp.innerHTML = `<div class="sh-canvas" id="sh-canvas"></div>`;
+    if (window.ResizeObserver) new ResizeObserver(() => alignInspector()).observe(fp);
+    window.addEventListener("resize", alignInspector);
+  }
   const zm = /** @type {HTMLInputElement} */ (document.getElementById("sh-zoom"));
   zm.oninput = () => { SH.pps = +zm.value; /** @type {HTMLElement} */ (document.getElementById("sh-zoom-val")).textContent = `${SH.pps}px/s`; drawList(); };
   const cp = /** @type {HTMLButtonElement} */ (document.getElementById("sh-claude-copy"));
@@ -1395,6 +1399,18 @@ function onFilmUpdated(e) {
   if (!SH || SH.name !== id || !location.hash.startsWith("#/films/")) return;
   if (SH.liveRefresh) clearTimeout(SH.liveRefresh);
   SH.liveRefresh = setTimeout(() => { SH.liveRefresh = 0; refreshFilmLive(); }, 300);
+}
+/** The right column (Inspector, then Download / Delete) spans exactly the shot player: from the top of the video to the
+ * Prev / Play / Next row. Long notes scroll inside the Inspector. Off on narrow screens (one column). */
+function alignInspector() {
+  const side = document.getElementById("film-side"), pl = document.getElementById("film-player"), lay = document.querySelector(".film-layout");
+  const insp = document.getElementById("sh-pane"), acts = document.getElementById("film-actions");
+  if (!side || !insp) return;
+  if (!pl || !lay || !$app.classList.contains("wide-film") || window.innerWidth <= 1100) { side.style.marginTop = ""; insp.style.height = ""; return; }
+  const pr = pl.getBoundingClientRect();
+  side.style.marginTop = `${Math.max(0, Math.round(pr.top - lay.getBoundingClientRect().top))}px`;
+  const gap = acts && acts.parentNode === side ? acts.getBoundingClientRect().height + 12 : 0;
+  insp.style.height = `${Math.max(260, Math.round(pr.height - gap))}px`;
 }
 /** True while the person is typing a note or editing one: their box is never rebuilt under them. */
 const typingNote = () => !!(document.activeElement && (document.activeElement.id === "sh-note" || document.activeElement.classList.contains("sh-edit-box"))) || !!document.querySelector(".sh-edit-box");
