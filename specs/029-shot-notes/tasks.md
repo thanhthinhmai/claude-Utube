@@ -22,17 +22,17 @@ description: "Tasks: ghi chú từng shot trên trang phim (029)"
 
 ## Phase 1: Setup
 
-- [ ] T001 Tạo khung `tools/filmcheck/shotnotes.py` (docstring, hằng số: `MAX_SHOTS = 300`, `MAX_TEXT = 2000`, `MAX_IMAGES = 4`, `MAX_IMAGE_BYTES = 10 * 1024 * 1024`, `IMAGE_NAME = r"img-[0-9a-f]{12}\.(png|jpg|webp)"`, `ORPHAN_IMAGE_AGE = 3600`) và tệp test rỗng `tests/ui/test_shot_notes.py` (dùng `tests/ui/helpers.py` như các test API khác)
-- [ ] T002 [P] Thêm `shot-notes/`, `.shots/`, `*.prev.mp4`, `shots.prev.json` vào danh sách loại trừ của trang "Done so far" trong `tools/studio/studio/donesofar.py` (contracts/files.md)
+- [X] T001 Tạo khung `tools/filmcheck/shotnotes.py` (docstring, hằng số: `MAX_SHOTS = 300`, `MAX_TEXT = 2000`, `MAX_IMAGES = 4`, `MAX_IMAGE_BYTES = 10 * 1024 * 1024`, `IMAGE_NAME = r"img-[0-9a-f]{12}\.(png|jpg|webp)"`, `ORPHAN_IMAGE_AGE = 3600`) và tệp test rỗng `tests/ui/test_shot_notes.py` (dùng `tests/ui/helpers.py` như các test API khác)
+- [X] T002 [P] Thêm `shot-notes/`, `.shots/`, `*.prev.mp4`, `shots.prev.json` vào danh sách loại trừ của trang "Done so far" trong `tools/studio/studio/donesofar.py` (contracts/files.md)
 
 ---
 
 ## Phase 2: Foundational (chặn mọi story)
 
-- [ ] T003 Viết hàm chọn tệp an toàn trong `tools/filmcheck/shotnotes.py`: `film_paths(film_dir)` trả đường dẫn `shots.json`, `shots.prev.json`, `shot-notes.json`, `shot-notes/`, `.shots/thumbs/`, `<tên>.mp4`, `<tên>.prev.mp4`; mọi đường dẫn `resolve()` và phải nằm trong `film_dir` (khác → `StudioError("bad_name")`-tương đương `ValueError`)
-- [ ] T004 Viết `write_atomic(path, bytes)` và `locked(path)` (khoá `fcntl` trên `<tệp>.lock`) trong `tools/filmcheck/shotnotes.py`, cùng cách `tools/studio/studio/store.py`
-- [ ] T005 Thêm vào `tools/studio/studio/resources.py`: `film_summary` trả thêm `has_shots` (có `shots.json`) và `has_prev` (có `<tên>.prev.mp4`); hàm `film_path(name, kind)` gọi `shotnotes.film_paths(film_dir(name))` để server dùng
-- [ ] T006 [P] Test bảo mật đường dẫn trong `tests/ui/test_shot_notes.py`: tên phim `../x`, `a/b`, `%2e%2e`, tên ảnh `../../etc/passwd`, `img-zz.png`, ký tự lạ → 400 `bad_name` ở mọi đường của contracts/api.md; không tệp nào ngoài thư mục phim bị đọc hay tạo (SC-007); chế độ online: người B không đọc, ghi được ghi chú phim của người A (404), mã API vai chỉ đọc PUT/POST → 403 (FR-016)
+- [X] T003 Viết hàm chọn tệp an toàn trong `tools/filmcheck/shotnotes.py`: `film_paths(film_dir)` trả đường dẫn `shots.json`, `shots.prev.json`, `shot-notes.json`, `shot-notes/`, `.shots/thumbs/`, `<tên>.mp4`, `<tên>.prev.mp4`; mọi đường dẫn `resolve()` và phải nằm trong `film_dir` (khác → `StudioError("bad_name")`-tương đương `ValueError`)
+- [X] T004 Viết `write_atomic(path, bytes)` và `locked(path)` (khoá `fcntl` trên `<tệp>.lock`) trong `tools/filmcheck/shotnotes.py`, cùng cách `tools/studio/studio/store.py`
+- [X] T005 Thêm vào `tools/studio/studio/resources.py`: `film_summary` trả thêm `has_shots` (có `shots.json`) và `has_prev` (có `<tên>.prev.mp4`); hàm `film_path(name, kind)` gọi `shotnotes.film_paths(film_dir(name))` để server dùng
+- [X] T006 [P] Test bảo mật đường dẫn trong `tests/ui/test_shot_notes.py`: tên phim `../x`, `a/b`, `%2e%2e`, tên ảnh `../../etc/passwd`, `img-zz.png`, ký tự lạ → 400 `bad_name` ở mọi đường của contracts/api.md; không tệp nào ngoài thư mục phim bị đọc hay tạo (SC-007); chế độ online: người B không đọc, ghi được ghi chú phim của người A (404), mã API vai chỉ đọc PUT/POST → 403 (FR-016)
 
 **Checkpoint**: nền đường dẫn an toàn và ghi nguyên tử sẵn sàng.
 
