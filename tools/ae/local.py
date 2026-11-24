@@ -16,7 +16,7 @@ from ae import bundle
 
 CONFIG = Path(os.environ.get("STUDIO_AE_CONFIG") or Path.home() / ".config" / "claude-utube" / "ae.json")
 FAKE = Path(__file__).resolve().parents[2] / "desktop" / "test" / "fake-ae.mjs"
-START_TIMEOUT = 120
+START_TIMEOUT = 240           # a cold After Effects start took ~90 s (2026-11-24)
 SHOT_TIMEOUT = 300
 MIN_FREE = 2 * 1024 ** 3
 OM_TEMPLATE = "H.264 - Match Render Settings - 40 Mbps"
@@ -205,7 +205,8 @@ def build(film_dir, shots=None, progress=None, s: dict = None) -> dict:
 def run_folder(s: dict, folder: Path, shots: list, proj: str, progress=None) -> dict:
     """Run an unpacked bundle in folder (shared by the CLI and tests)."""
     log = folder / "log.txt"
-    _kill(s)
+    # no kill here: AfterFX -r hands the script to an open After Effects; killing it first is what leaves AE stuck on a
+    # start-up dialog next time. AE is closed only before aerender (which cannot open a project the GUI holds).
     proc = run_script(s, folder / "entry.jsx")
     text = wait_log(s, log, shots, proc, progress)
     errs = [x for x in text.splitlines() if x.startswith("ERR")]

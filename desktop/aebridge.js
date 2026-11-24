@@ -12,7 +12,7 @@ const IDLE_POLL_MS = 5_000;
 const BUSY_POLL_MS = 1_000;
 const HELLO_MS = 10_000;
 const BEAT_MS = 10_000;
-const START_TIMEOUT_S = 120;
+const START_TIMEOUT_S = 240;          // a cold After Effects start took ~90 s (2026-11-24)
 const SHOT_TIMEOUT_S = 300;
 const MIN_FREE = 2 * 1024 ** 3;
 const OM_TEMPLATE = "H.264 - Match Render Settings - 40 Mbps";
@@ -295,7 +295,7 @@ class Bridge {
       const shots = meta.shots || req.shots;
       const proj = meta.proj || "build.aep";
       await progress({ state: "running", shot: shots[0], index: 0, total: shots.length });
-      await this.killAE();
+      // no kill before the script: AfterFX -r hands it to an open After Effects (a forced kill leaves AE on a dialog)
       const script = this.run(scriptCommand(this.o.platform, s, this.aePath(path.join(dir, "entry.jsx"))), { cwd: dir });
       const text = await this.waitLog(path.join(dir, "log.txt"), shots, s, progress);
       await this.killAE();                         // AfterFX may stay open as the GUI: close it, then let the call end
@@ -335,7 +335,6 @@ class Bridge {
       fs.writeFileSync(path.join(dir, "bundle.json"), JSON.stringify({ shots: [], proj: "test.aep" }));
       fs.writeFileSync(path.join(dir, "entry.jsx"), '// claude-Utube: After Effects test (specs/031)\n' +
         'var f = new File((new File($.fileName)).parent.fsName + "/log.txt"); f.open("w"); f.writeln("START"); f.writeln("DONE"); f.close();\n');
-      await this.killAE();
       const t0 = Date.now();
       const p = this.run(scriptCommand(this.o.platform, s, this.aePath(path.join(dir, "entry.jsx"))), { cwd: dir });
       await this.waitLog(path.join(dir, "log.txt"), [], s, () => {});

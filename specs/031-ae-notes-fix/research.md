@@ -16,7 +16,7 @@
 - **Rationale**: Đúng cách đã chạy ổn trên phim tập luyện (`run.sh`, `fixshots.sh`); một project chỉ chứa các shot cần dựng nên nhanh (~10 s/shot).
 
 ## R4. Phát hiện AE và lỗi
-- **Decision**: Tìm AE ở chỗ cài mặc định (`C:\Program Files\Adobe\Adobe After Effects 20XX\Support Files\AfterFX.exe`, `/Applications/Adobe After Effects 20XX/`), chọn bản mới nhất; người dùng có thể chọn đường dẫn trong cửa sổ "After Effects…". "Không tiến triển": entry phải ghi dòng `START` vào log trong 120 s, mỗi shot trong 5 phút; quá hạn thì dừng tiến trình AE của lượt (taskkill / kill), báo lỗi kèm log. Cần bật "Allow Scripts to Write Files and Access Network": nếu log không được ghi, báo đúng tên tuỳ chọn đó.
+- **Decision**: Tìm AE ở chỗ cài mặc định (`C:\Program Files\Adobe\Adobe After Effects 20XX\Support Files\AfterFX.exe`, `/Applications/Adobe After Effects 20XX/`), chọn bản mới nhất; người dùng có thể chọn đường dẫn trong cửa sổ "After Effects…". "Không tiến triển": entry phải ghi dòng `START` vào log trong 240 s (AE khởi động nguội mất khoảng 90 s); không tắt AE trước khi gửi script (tắt cưỡng bức làm AE dừng ở hộp thoại lần sau), chỉ tắt trước `aerender`, mỗi shot trong 5 phút; quá hạn thì dừng tiến trình AE của lượt (taskkill / kill), báo lỗi kèm log. Cần bật "Allow Scripts to Write Files and Access Network": nếu log không được ghi, báo đúng tên tuỳ chọn đó.
 
 ## R5. Ghép shot theo khung
 - **Decision**: `tools/ae/splice.py` lấy từ `fixshots.sh`: cắt theo số khung (`trim=start_frame/end_frame`, `setpts=N/FPS/TB`), ép `fps` đầu ra, giữ tiếng gốc, mã hoá lại một lần cho nhiều shot (một lệnh ffmpeg cho mọi đoạn thay vì mỗi shot một lần).
