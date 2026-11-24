@@ -221,9 +221,9 @@ persp.jsx, build_core.jsx) is loaded first and is read-only. Read only what you 
    Open every picture a note names (they show what is wrong).
 2. Fix each note in the code of its shot in ae/. When the cause is in the shared kit, do not try to change the kit:
    override that kit function for this film in ae/kit_fixes.jsx (add it to the end of film.json "ae_files"), then
-   `sh {st}/bin/studio ae uses {film} <function…>` lists every shot that uses it: they all need rebuilding.
+   `sh {st}/bin/studio ae uses {film} <function…> --dir {WORK}/films/{film}` lists every shot that uses it: they all need rebuilding.
 3. Rebuild only the shots you changed or that use what you changed:
-   `sh {st}/bin/studio job run {job} --step Render -- sh {st}/bin/studio ae fix {film} S<n> [S<m> …]`
+   `sh {st}/bin/studio job run {job} --step Render -- sh {st}/bin/studio ae fix {film} S<n> [S<m> …] --dir {WORK}/films/{film}`
    It builds them through After Effects on the customer's computer (one run at a time; it may wait) and splices them
    into the film frame by frame (out/fix.mp4). If it fails, read the error, fix the code and try once more. Lines
    starting with CHECK are staging problems (floating people, bubbles off their speaker): fix them too.

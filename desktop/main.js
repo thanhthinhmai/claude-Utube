@@ -607,7 +607,8 @@ function aeFound() {
     aerender: ["node", process.env.CU_FAKE_AE, "aerender"], version: "fake" };
   return aeb.findAE(PLATFORM, { readdir: (d) => fs.readdirSync(d), exists: (p) => fs.existsSync(p) });
 }
-function aeDefaultWork() { return path.join(app.getPath("documents"), "claude-Utube AE"); }
+// no space in the name: After Effects on Windows ignores scripts in a folder whose path has one (T031)
+function aeDefaultWork() { return path.join(app.getPath("documents"), "claude-Utube-AE"); }
 
 function startAeBridge() {
   if (isClient() || aeBridge || !aeKey) return;
@@ -631,7 +632,7 @@ function aeState() {
   const s = aeb.settings({ work: aeDefaultWork(), ...aeConfig() }, found);
   const show = (/** @type {any} */ v) => (Array.isArray(v) ? "fake" : String(v || ""));
   return { found: found ? { afterfx: show(found.afterfx), aerender: show(found.aerender), version: found.version } : null,
-    afterfx: show(s.afterfx), aerender: show(s.aerender), work: s.work, chosen: aeConfig(),
+    afterfx: show(s.afterfx), aerender: show(s.aerender), work: s.work, workProblem: aeb.workProblem(PLATFORM, s), chosen: aeConfig(),
     ready: aeBridge ? aeBridge.hasAE() : false, busy: aeBridge ? aeBridge.busy : null, platform: PLATFORM };
 }
 

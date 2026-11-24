@@ -2,6 +2,7 @@
 import html
 import re
 import sys
+import time
 from pathlib import Path
 
 import markdown as md
@@ -73,13 +74,25 @@ def films() -> list:
     return out
 
 
+RENDER_STALE_S = 2 * 3600   # out/ untouched this long = a render that died, not one still running
+
+
+def _rendering(out: Path) -> bool:
+    """A render is running when out/ exists and it (or a file in it) changed recently; a left-over out/ is not."""
+    try:
+        newest = max([out.stat().st_mtime] + [c.stat().st_mtime for c in out.iterdir()])
+    except OSError:
+        return False
+    return time.time() - newest < RENDER_STALE_S
+
+
 def film_summary(name: str) -> dict:
     d = film_dir(name)
     if not d.is_dir():
         raise StudioError("not_found", f"không có phim \"{name}\"", 404)
     has_video = (d / f"{name}.mp4").is_file()
     return {"name": name, "has_video": has_video, "has_poster": (d / "poster.jpg").is_file(),
-            "has_subtitles": (d / f"{name}.srt").is_file(), "rendering": not has_video and (d / "out").exists(),
+            "has_subtitles": (d / f"{name}.srt").is_file(), "rendering": not has_video and _rendering(d / "out"),
             "has_shots": (d / "shots.json").is_file(), "has_prev": (d / f"{name}.prev.mp4").is_file(),
             "engine": aefilm.engine(d)}
 

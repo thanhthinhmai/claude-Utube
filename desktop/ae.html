@@ -38,7 +38,7 @@
   const $ = (id) => document.getElementById(id);
   function show(s) {
     $("afterfx").textContent = s.afterfx || "not found";
-    $("work").textContent = s.work;
+    $("work").textContent = s.work + (s.workProblem ? "  ⚠ has a space: After Effects ignores scripts here, choose another folder" : "");
     $("auto").textContent = s.found ? `Found: ${s.found.version}` : "No After Effects found in the usual place. Choose it above.";
     $("status").innerHTML = "";
     const p = document.createElement("p");

@@ -269,7 +269,7 @@ async function pageChannels() {
         <td>${esc(c.style)}</td><td>${c.lessons_active}${c.lessons_draft ? ` · ${c.lessons_draft} to approve` : ""}</td></tr>`).join("")}</table></div>` : `<p class="muted">No channels yet.</p>`}
     <form class="form panel"><p class="section-title">New channel</p>
       <label>Name<input id="c-name" maxlength="80" required></label>
-      <label>Short id <span class="hint">Lowercase letters, digits and dashes, e.g. science-for-kids</span><input id="c-slug" maxlength="40" pattern="[a-z0-9-]+" required></label>
+      <label>Short id <span class="hint">Lowercase letters, digits and dashes, e.g. science-for-kids</span><input id="c-slug" maxlength="40" pattern="[a-z0-9\\-]+" required></label>
       <label>Language <span class="hint">A code such as en or vi</span><input id="c-language" maxlength="3" value="en" required></label>
       <label>Length in seconds<input id="c-seconds" type="number" min="5" max="900" value="45" required></label>
       <label>Style<select id="c-style">${styles.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select></label>
@@ -1300,7 +1300,8 @@ async function pageFilm(name) {
         ${f.has_subtitles ? `<track kind="subtitles" srclang="vi" label="Subtitles" src="${base}/subtitles.vtt" default>` : ""}
       </video></div><p class="muted">Turn subtitles on or off with the player’s CC button.</p>
       ${MODE === "online" ? `<p class="film-actions" id="film-actions"><a class="button primary" href="${base}/download">Download</a> <button class="danger" id="del-film">Delete this film</button></p>` : ""}`
-    : `<p class="notice">${f.rendering ? "The film is still rendering: see progress on the Jobs page." : "No film file yet."}</p>`}
+    : `<p class="notice">${f.rendering ? "The film is still rendering: see progress on the Jobs page." : "No film file yet."}</p>
+      ${MODE === "online" && !f.rendering ? `<p class="film-actions"><button class="danger" id="del-film">Delete this film</button></p>` : ""}`}
     ${f.has_video ? `<div id="shots-slot"><div class="panel"><p class="section-title">Shots</p><p class="muted">Loading…</p></div></div>` : ""}
     ${tiersHtml(f.tiers)}
     ${f.treatment_html ? `<h2>Script (TREATMENT)</h2><div class="panel md">${f.treatment_html}</div>` : ""}
@@ -2109,7 +2110,8 @@ async function pageSetup() {
       <input id="password" type="password" autocomplete="new-password" minlength="10" required></label>
     <label>Password again <input id="password2" type="password" autocomplete="new-password" required></label>
     <button class="primary wide" type="submit" data-busy="Creating…">Create the owner account</button></form>`,
-  `<a href="/terms" target="_blank" rel="noopener">Terms of use and content policy</a>`);
+  `<a href="#/login">Already set up? Sign in</a>
+    <br><a href="/terms" target="_blank" rel="noopener">Terms of use and content policy</a>`);
   onSubmit(async () => {
     if (field("password").value !== field("password2").value) throw new Error("The two passwords differ.");
     await post("/auth/setup", { email: field("email").value, password: field("password").value });

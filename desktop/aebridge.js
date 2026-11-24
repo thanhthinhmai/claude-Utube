@@ -77,6 +77,14 @@ function settings(cfg, found) {
 
 /** @param {string|string[]} v */
 const argv = (v) => (Array.isArray(v) ? [...v] : [v]);
+/** Windows only: a running After Effects silently ignores `-r` on a script whose path has a space (found in T031).
+ * @param {string} platform @param {ReturnType<typeof settings>} s @returns {string} the reason, or "" when fine */
+function workProblem(platform, s) {
+  if (platform !== "win32" || isFake(s.afterfx) || !/\s/.test(String(s.work || ""))) return "";
+  return `the work folder "${s.work}" has a space in its path, and After Effects ignores scripts there; ` +
+    "choose a folder without spaces in the tray menu → After Effects… (for example E:\\claude-utube-ae)";
+}
+
 /** @param {string|string[]} v */
 const isFake = (v) => Array.isArray(v);
 
@@ -285,6 +293,7 @@ class Bridge {
       beat = setInterval(() => progress({}), BEAT_MS);
       if (!this.hasAE()) throw new BridgeError("ae_missing", "After Effects was not found on this computer; open the tray menu → After Effects… to choose it");
       if (!s.work) throw new BridgeError("bad_work", "no work folder for After Effects; choose one in the tray menu → After Effects…");
+      if (workProblem(this.o.platform, s)) throw new BridgeError("bad_work", workProblem(this.o.platform, s));
       fs.mkdirSync(s.work, { recursive: true });
       if (this.freeBytes(s.work) < MIN_FREE) throw new BridgeError("disk_low", `the work folder ${s.work} has less than 2 GB free`);
       const dir = path.join(s.work, req.id);
@@ -325,6 +334,7 @@ class Bridge {
     if (!this.hasAE()) return { ok: false, code: "ae_missing", message: "After Effects was not found. Choose AfterFX (Windows) or the After Effects app (macOS)." };
     const s = this.settings();
     if (this.running) return { ok: false, code: "busy", message: "After Effects is busy with a film." };
+    if (workProblem(this.o.platform, s)) return { ok: false, code: "bad_work", message: workProblem(this.o.platform, s) };
     this.running = true;
     const dir = path.join(s.work, `test-${Date.now()}`);
     try {
@@ -367,10 +377,11 @@ class Bridge {
       const allow = s.shotTimeoutSec * (rendering ? Math.max(1, shots.length) : 1);
       const now = Date.now();
       if (!n && now - t0 > s.startTimeoutSec * 1000) {
-        await this.killAE();
-        for (const c of this.children) { try { c.kill(); } catch { /* gone */ } }
+        // never force After Effects closed here: it is usually waiting on a dialog, and a forced close brings back
+        // the crash / Safe Mode dialog at the next start (T031). On Windows the child may be After Effects itself.
+        if (this.o.platform !== "win32" || isFake(s.afterfx)) for (const c of this.children) { try { c.kill(); } catch { /* gone */ } }
         throw new BridgeError("ae_scripting_off", `After Effects did not start the script in ${s.startTimeoutSec} s. Open After Effects once ` +
-          `(a dialog may be waiting) and turn on Preferences > Scripting & Expressions > "Allow Scripts to Write Files and Access Network".`);
+          `(a dialog may be waiting: answer it, and do not choose Safe Mode) and turn on Preferences > Scripting & Expressions > "Allow Scripts to Write Files and Access Network".`);
       }
       if (n && now - last > allow * 1000) {
         await this.killAE();
@@ -382,5 +393,5 @@ class Bridge {
   }
 }
 
-module.exports = { Bridge, BridgeError, findAE, settings, scriptCommand, renderCommand, killCommands, untar, extract, parseLog, aeYear,
+module.exports = { Bridge, BridgeError, findAE, settings, workProblem, scriptCommand, renderCommand, killCommands, untar, extract, parseLog, aeYear,
   IDLE_POLL_MS, BUSY_POLL_MS, MIN_FREE };

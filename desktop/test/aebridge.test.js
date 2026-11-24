@@ -209,3 +209,11 @@ test("the Test button runs a script in After Effects", async () => {
   assert.equal((await b2.selfTest()).code, "ae_missing");
   await core.close();
 });
+
+test("a work folder with a space is refused on Windows before After Effects is called (T031)", async () => {
+  const s = (work, afterfx = "C:\\AE\\AfterFX.exe") => ae.settings({ work, afterfx, aerender: "C:\\AE\\aerender.exe" }, null);
+  assert.match(ae.workProblem("win32", s("C:\\Users\\a\\Documents\\claude-Utube AE")), /space/);
+  assert.equal(ae.workProblem("win32", s("E:\\claude-utube-ae")), "");
+  assert.equal(ae.workProblem("darwin", s("/Users/a/claude Utube AE")), "");
+  assert.equal(ae.workProblem("win32", s("C:\\a b", ["node", "fake"])), "");
+});
