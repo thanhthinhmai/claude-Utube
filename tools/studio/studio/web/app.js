@@ -2407,17 +2407,111 @@ async function settingsUsers(top) {
 
 /** Settings → Usage: films, learns, tokens and storage per member; calls and tokens per Claude account, member and
  *  day, all from the studio's own record of each call (specs/008 US4). USD only for the API-key part. */
+/** The date range of Settings → Usage from the address (specs/033): range=7|30|90, or from/to; default 30 days. */
+function usageRange(params) {
+  const day = (d) => d.toISOString().slice(0, 10);
+  const today = new Date(Date.now() + 7 * 3600_000);                    // Vietnam days, like the studio's tables
+  const f = params.get("from") || "", t = params.get("to") || "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(f) && /^\d{4}-\d{2}-\d{2}$/.test(t)) return { from: f, to: t, range: 0 };
+  const n = [7, 30, 90].includes(Number(params.get("range"))) ? Number(params.get("range")) : 30;
+  return { from: day(new Date(today.getTime() - (n - 1) * 86400_000)), to: day(today), range: n };
+}
+
+/** 1234 → "1.2k", 3400000 → "3.4M" for axes (tables and tips show full numbers). */
+const short = (v) => (v >= 1e9 ? `${+(v / 1e9).toFixed(1)}B` : v >= 1e6 ? `${+(v / 1e6).toFixed(1)}M` : v >= 1e3 ? `${+(v / 1e3).toFixed(1)}k` : String(v));
+const viaColor = (v) => (v === "api" ? "var(--via-api)" : /^plan:[1-5]$/.test(v) ? `var(--via-${v.slice(5)})` : "var(--via-other)");
+
+/** @type {Record<string, any>} what usageChart drew, for usageChartEvents */
+const USAGE_CHARTS = {};
+
+/** A stacked bar chart per day, one segment per via (Claude slot or API key), with a legend, tips and a table view.
+ * @param {string} id @param {any} use the /admin/usage answer @param {"calls"|"tokens"} metric (switched in place)
+ * @param {(v: string) => string} label HTML name of a via */
+function usageChart(id, use, metric, label) {
+  const rows = use.days_by_via, vias = use.vias;
+  const title = metric === "tokens" ? "Tokens per day" : "Requests per day";
+  const val = (d, v) => (d.via[v] ? d.via[v][metric] : 0);
+  const tot = (d) => vias.reduce((a, v) => a + val(d, v), 0);
+  const sums = vias.map((v) => rows.reduce((a, d) => a + val(d, v), 0));
+  const kind = `<span class="seg" role="group" aria-label="Show">${[["calls", "Requests"], ["tokens", "Tokens"]].map(([k, n]) =>
+    `<button type="button" data-metric="${k}" aria-pressed="${metric === k}">${n}</button>`).join("")}</span>`;
+  const head = `<div class="chart-head"><p class="section-title">${title}</p><span class="range" style="margin:0">${kind}
+    ${vias.length ? `<button type="button" class="link" data-table="${id}">Show as table</button>` : ""}</span></div>`;
+  if (!vias.length) return `<div class="chart" id="${id}">${head}<p class="muted">No Claude calls in this range.</p></div>`;
+  const W = 720, H = 220, L = 44, B = 22, T = 8, n = rows.length, cw = (W - L) / n;
+  const max = Math.max(1, ...rows.map(tot));
+  const step = Math.pow(10, Math.floor(Math.log10(max / 4))) || 1;
+  const nice = [1, 2, 2.5, 5, 10].map((m) => m * step).find((x) => x * 4 >= max) || step * 10;
+  const top = nice * 4, y = (v) => T + (H - T - B) * (1 - v / top);
+  const grid = [0, 1, 2, 3, 4].map((i) => `<line x1="${L}" x2="${W}" y1="${y(nice * i)}" y2="${y(nice * i)}"/>`).join("");
+  const yl = [0, 1, 2, 3, 4].map((i) => `<text x="${L - 6}" y="${y(nice * i) + 4}" text-anchor="end">${short(nice * i)}</text>`).join("");
+  const every = Math.ceil(n / Math.max(1, Math.floor((W - L) / 56)));
+  const bw = Math.max(1, Math.min(28, cw - (n > 60 ? 1 : 3)));
+  const cols = rows.map((d, i) => {
+    const x = L + i * cw, total = tot(d);
+    let acc = 0;
+    const segs = vias.map((v) => {
+      const h = val(d, v);
+      if (!h) return "";
+      const y1 = y(acc + h), y0 = y(acc);
+      acc += h;
+      const gap = acc < total ? 2 : 0;                                      // 2px surface gap above a segment with one on top
+      const hh = Math.max(0.5, y0 - y1 - gap);
+      return `<rect x="${x + (cw - bw) / 2}" y="${y1 + gap}" width="${bw}" height="${hh}" rx="${acc === total && bw > 6 ? 2 : 0}" fill="${viaColor(v)}"/>`;
+    }).join("");
+    const lbl = i % every === 0 ? `<text x="${x + cw / 2}" y="${H - 6}" text-anchor="middle">${d.day.slice(5)}</text>` : "";
+    return `<g class="col" tabindex="0" data-i="${i}"><title>${d.day}: ${total.toLocaleString("en-US")}</title><rect class="hit" x="${x}" y="${T}" width="${cw}" height="${H - T - B}"/>${segs}</g><g class="axis">${lbl}</g>`;
+  }).join("");
+  const legend = vias.map((v, k) => `<li><span class="sw" style="background:${viaColor(v)}"></span>${label(v)} <span class="n">${sums[k].toLocaleString("en-US")}</span></li>`).join("");
+  const table = `<div class="table-wrap" hidden><table><tr><th>Day</th>${vias.map((v) => `<th>${label(v)}</th>`).join("")}<th>Total</th></tr>
+    ${rows.slice().reverse().map((d) => `<tr><td>${d.day}</td>${vias.map((v) => `<td class="num">${val(d, v).toLocaleString("en-US")}</td>`).join("")}<td class="num">${tot(d).toLocaleString("en-US")}</td></tr>`).join("")}</table></div>`;
+  USAGE_CHARTS[id] = { rows, vias, metric, names: Object.fromEntries(vias.map((v) => [v, label(v)])) };
+  return `<div class="chart" id="${id}">${head}<svg class="plot" viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}, ${n} days">
+    <g class="grid">${grid}</g><g class="axis">${yl}</g>${cols}</svg><ul class="legend">${legend}</ul>${table}</div>`;
+}
+
+/** Tips on hover, touch and focus, and the table toggle, for every chart usageChart drew. */
+function usageChartEvents() {
+  Object.entries(USAGE_CHARTS).forEach(([id, c]) => {
+    const box = document.getElementById(id);
+    if (!box) return;
+    const tip = document.createElement("div");
+    tip.className = "chart-tip"; tip.hidden = true; box.appendChild(tip);
+    const show = (/** @type {Element} */ g) => {
+      const d = c.rows[Number(/** @type {HTMLElement} */ (g).dataset.i)];
+      const lines = c.vias.filter((v) => d.via[v]).map((v) => `<div><span class="sw" style="background:${viaColor(v)};width:9px;height:9px;border-radius:2px"></span><span>${c.names[v]}</span><span>${d.via[v][c.metric].toLocaleString("en-US")}</span></div>`);
+      const total = c.vias.reduce((a, v) => a + (d.via[v] ? d.via[v][c.metric] : 0), 0);
+      tip.innerHTML = `<p>${d.day}</p>${lines.join("")}<div><span>Total</span><span>${total.toLocaleString("en-US")}</span></div>`;
+      tip.hidden = false;
+      const r = g.getBoundingClientRect(), b = box.getBoundingClientRect();
+      const left = Math.min(Math.max(0, r.left - b.left + r.width / 2 - tip.offsetWidth / 2), b.width - tip.offsetWidth);
+      tip.style.left = `${left}px`; tip.style.top = `${Math.max(0, r.top - b.top - tip.offsetHeight + 24)}px`;
+    };
+    box.querySelectorAll(".col").forEach((g) => {
+      g.addEventListener("mouseenter", () => show(g)); g.addEventListener("focus", () => show(g));
+      g.addEventListener("touchstart", () => show(g), { passive: true });
+      g.addEventListener("mouseleave", () => { tip.hidden = true; }); g.addEventListener("blur", () => { tip.hidden = true; });
+    });
+    const btn = box.querySelector("[data-table]"), tw = /** @type {HTMLElement|null} */ (box.querySelector(".table-wrap"));
+    if (btn && tw) btn.addEventListener("click", () => { tw.hidden = !tw.hidden; btn.textContent = tw.hidden ? "Show as table" : "Hide table"; });
+  });
+  Object.keys(USAGE_CHARTS).forEach((k) => delete USAGE_CHARTS[k]);
+}
+
 async function settingsUsage(top) {
   const params = new URLSearchParams(location.hash.split("?")[1] || "");
   const q = params.get("q") || "";
-  const [acc, use] = await Promise.all([get("/admin/accounts?q=" + encodeURIComponent(q)), get("/admin/usage")]);
-  const [claude] = await Promise.all([get("/admin/claude")]);
+  const rg = usageRange(params);
+  let metric = /** @type {"calls"|"tokens"} */ (params.get("metric") === "tokens" ? "tokens" : "calls");
+  const [acc, use, claude] = await Promise.all([get("/admin/accounts?q=" + encodeURIComponent(q)),
+    get(`/admin/usage?from=${rg.from}&to=${rg.to}`), get("/admin/claude")]);
   const money = use.cost_usd_total > 0;                     // USD only when calls went through the API key (FR-117)
   const cost = (v) => (money ? `<td class="num">${usd(v)}</td>` : "");
   const via = (v) => {
     if (v === "api") return "API key";
     const a = claude.accounts.find((x) => `plan:${x.slot}` === v);
-    return `${claudeLabel(Number(v.split(":")[1]))}${a && a.email ? ` · ${esc(a.email)}` : ""}`;
+    if (!v.startsWith("plan:")) return esc(v);
+    return `${claudeLabel(Number(v.split(":")[1]))}${a && a.email ? ` · ${esc(a.email)}` : a ? "" : " (removed)"}`;
   };
   const rows = acc.accounts.map((a) => `<tr data-id="${esc(a.id)}"><td>${esc(a.email)}${a.role === "admin" ? " (owner)" : ""}</td>
       <td>${a.quota.films.used} / <input type="number" min="0" data-f="quota_films" value="${a.quota_films ?? ""}" placeholder="${a.quota.films.limit}" aria-label="Films limit"></td>
@@ -2426,7 +2520,17 @@ async function settingsUsage(top) {
   const table = (head1, list, first) => `<div class="table-wrap"><table><tr><th>${head1}</th><th>Jobs</th><th>Calls</th><th>Tokens</th>${money ? "<th>Cost</th>" : ""}</tr>
       ${list.map((d) => `<tr><td>${first(d)}</td><td class="num">${d.jobs}</td><td class="num">${num(d.calls, 0)}</td><td class="num">${num(d.tokens, 0)}</td>${cost(d.cost_usd)}</tr>`).join("")
         || `<tr><td colspan="${money ? 5 : 4}" class="muted">No calls yet.</td></tr>`}</table></div>`;
-  $app.innerHTML = `${top}<p class="lead">Last 30 days: ${num(use.calls_total, 0)} Claude calls · ${num(use.tokens_total, 0)} tokens${money ? ` · ${usd(use.cost_usd_total)} through the API key` : ""} · storage ${num(use.storage_mb_total, 1)} MB</p>
+  const tl = use.tiles, tile = (k, x) => `<div class="tile"><p class="k">${k}</p><p class="v">${num(x.calls, 0)} <span class="s">requests</span></p>
+      <p class="s">${num(x.tokens, 0)} tokens</p></div>`;
+  const span = rg.range ? `Last ${rg.range} days` : `${esc(use.from)} to ${esc(use.to)}`;
+  $app.innerHTML = `${top}<div class="tiles">${tile("Today", tl.today)}${tile("Last 7 days", tl.d7)}${tile("Last 30 days", tl.d30)}</div>
+    <div class="range" role="group" aria-label="Date range"><span class="seg">${[7, 30, 90].map((n) =>
+      `<button type="button" data-range="${n}" aria-pressed="${rg.range === n}">${n} days</button>`).join("")}</span>
+      <label>From <input type="date" id="use-from" value="${esc(use.from)}"></label>
+      <label>To <input type="date" id="use-to" value="${esc(use.to)}"></label>
+      <button type="button" id="use-apply">Apply</button> <span id="use-msg" class="muted" role="status"></span></div>
+    <div id="ch-wrap">${usageChart("ch-usage", use, metric, via)}</div>
+    <p class="lead">${span}: ${num(use.calls_total, 0)} Claude calls · ${num(use.tokens_total, 0)} tokens${money ? ` · ${usd(use.cost_usd_total)} through the API key` : ""} · storage ${num(use.storage_mb_total, 1)} MB</p>
     <h2>Members</h2>
     <div class="row filters"><label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input id="acc-q" type="search" placeholder="Search by email" value="${esc(q)}" aria-label="Search by email"></label></div>
@@ -2436,6 +2540,34 @@ async function settingsUsage(top) {
     <h2>Per Claude account</h2>${table("Account", use.by_claude, (d) => via(d.via))}
     <h2>Per member</h2>${table("Member", use.by_account, (d) => esc(d.email || "(deleted)"))}
     <h2>Per day</h2>${table("Day", use.days.slice().reverse(), (d) => esc(d.day))}`;
+  const bindChart = () => {
+    usageChartEvents();
+    document.querySelectorAll("#ch-wrap [data-metric]").forEach((b) => b.addEventListener("click", () => {
+      metric = /** @type {"calls"|"tokens"} */ (/** @type {HTMLElement} */ (b).dataset.metric === "tokens" ? "tokens" : "calls");
+      document.getElementById("ch-wrap").innerHTML = usageChart("ch-usage", use, metric, via);
+      const p = new URLSearchParams(location.hash.split("?")[1] || "");
+      if (metric === "tokens") p.set("metric", "tokens"); else p.delete("metric");
+      history.replaceState(null, "", "#/settings/usage?" + p.toString());
+      bindChart();
+      /** @type {HTMLElement} */ (document.querySelector(`#ch-wrap [data-metric="${metric}"]`)).focus();
+    }));
+  };
+  bindChart();
+  const go = (/** @type {Record<string, string>} */ o) => {
+    const p = new URLSearchParams();
+    if (q) p.set("q", q);
+    if (metric === "tokens") p.set("metric", "tokens");
+    Object.entries(o).forEach(([k, v]) => p.set(k, v));
+    location.hash = "#/settings/usage?" + p.toString();
+  };
+  $app.querySelectorAll("[data-range]").forEach((b) => b.addEventListener("click", () => go({ range: /** @type {HTMLElement} */ (b).dataset.range || "30" })));
+  document.getElementById("use-apply").onclick = () => {
+    const f = field("use-from").value, to = field("use-to").value, um = document.getElementById("use-msg");
+    const days = f && to ? (Date.parse(to) - Date.parse(f)) / 86400000 + 1 : 0;
+    if (!f || !to || !(days >= 1)) { um.className = "fail"; um.textContent = "Choose a start date on or before the end date."; return; }
+    if (days > 366) { um.className = "fail"; um.textContent = "Choose at most 366 days."; return; }
+    go({ from: f, to });
+  };
   const msg = document.getElementById("acc-msg");
   (/** @type {NodeListOf<HTMLInputElement>} */ ($app.querySelectorAll("tr[data-id] input[data-f]"))).forEach((el) => el.addEventListener("change", async () => {
     const id = /** @type {HTMLElement} */ (el.closest("tr")).dataset.id, f = el.dataset.f;
@@ -2448,7 +2580,9 @@ async function settingsUsage(top) {
   qi.addEventListener("input", () => {
     clearTimeout(t);
     t = setTimeout(() => {
-      history.replaceState(null, "", "#/settings/usage?q=" + encodeURIComponent(qi.value));
+      const p = new URLSearchParams(location.hash.split("?")[1] || "");      // keep the range and the chart's kind
+      if (qi.value) p.set("q", qi.value); else p.delete("q");
+      history.replaceState(null, "", "#/settings/usage?" + p.toString());
       route().then(() => { const n = field("acc-q"); n.focus(); n.setSelectionRange(n.value.length, n.value.length); });
     }, 400);
   });

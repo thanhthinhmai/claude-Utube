@@ -1011,6 +1011,14 @@ def put_account(account_id: str, body: AccountIn, request: Request):
 
 
 DAY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+USAGE_MAX_DAYS = 366                              # specs/033: the longest range of Settings → Usage
+
+
+def via_key(v: str):
+    """plan:1 … plan:5 by number, then api, then anything else by name (specs/033)."""
+    if v.startswith("plan:") and v[5:].isdigit():
+        return (0, int(v[5:]), v)
+    return (1, 0, v) if v == "api" else (2, 0, v)
 
 
 @router.get("/admin/usage")
@@ -1023,11 +1031,12 @@ def usage(request: Request, start: Optional[str] = Query(None, alias="from"), en
     end = end or today.isoformat()
     start = start or (today - dt.timedelta(days=29)).isoformat()
     try:
-        ok = bool(DAY.match(start) and DAY.match(end)) and dt.date.fromisoformat(start) <= dt.date.fromisoformat(end)
+        d0, d1 = dt.date.fromisoformat(start), dt.date.fromisoformat(end)
+        ok = bool(DAY.match(start) and DAY.match(end)) and d0 <= d1 and (d1 - d0).days < USAGE_MAX_DAYS
     except ValueError:
         ok = False
     if not ok:
-        raise StudioError("invalid", "ngày phải có dạng YYYY-MM-DD và from ≤ to", 422)
+        raise StudioError("invalid", f"ngày phải có dạng YYYY-MM-DD, from ≤ to, tối đa {USAGE_MAX_DAYS} ngày", 422)
     cols = f"count(*), {TOKENS_SQL}, coalesce(sum(cost_usd), 0), count(DISTINCT job_id)"
     where = f"{VN_DAY_SQL} BETWEEN ? AND ?"
     row = lambda r: {"calls": r[0], "tokens": r[1], "cost_usd": round(r[2], 4), "jobs": r[3]}      # noqa: E731
@@ -1040,7 +1049,24 @@ def usage(request: Request, start: Optional[str] = Query(None, alias="from"), en
         claude = [{"via": r[4], **row(r)} for r in con.execute(
             f"SELECT {cols}, via FROM call WHERE {where} GROUP BY via ORDER BY via", (start, end))]
         ids = [r[0] for r in con.execute("SELECT id FROM accounts WHERE deleted_at IS NULL")]
+        # specs/033: tiles always end today; the chart has one row per day of the range, split by via
+        t7, t30 = (today - dt.timedelta(days=6)).isoformat(), (today - dt.timedelta(days=29)).isoformat()
+        tok = "tokens_in + tokens_out + cache_write + cache_read"
+        t = con.execute(f"SELECT sum({VN_DAY_SQL} = ?), coalesce(sum(CASE WHEN {VN_DAY_SQL} = ? THEN {tok} END), 0), "
+                        f"sum({VN_DAY_SQL} >= ?), coalesce(sum(CASE WHEN {VN_DAY_SQL} >= ? THEN {tok} END), 0), "
+                        f"count(*), {TOKENS_SQL} FROM call WHERE {VN_DAY_SQL} BETWEEN ? AND ?",
+                        (today.isoformat(), today.isoformat(), t7, t7, t30, today.isoformat())).fetchone()
+        tiles = {"today": {"calls": t[0] or 0, "tokens": t[1]}, "d7": {"calls": t[2] or 0, "tokens": t[3]},
+                 "d30": {"calls": t[4], "tokens": t[5]}}
+        per = {}
+        for r in con.execute(f"SELECT {VN_DAY_SQL} AS d, via, count(*), {TOKENS_SQL} FROM call WHERE {where} "
+                             "GROUP BY d, via", (start, end)):
+            per.setdefault(r[0], {})[r[1]] = {"calls": r[2], "tokens": r[3]}
+    days_by_via = [{"day": (d0 + dt.timedelta(days=i)).isoformat(), "via": per.get((d0 + dt.timedelta(days=i)).isoformat(), {})}
+                   for i in range((d1 - d0).days + 1)]
+    vias = sorted({v for d in per.values() for v in d}, key=via_key)
     return {"from": start, "to": end, "days": days, "by_account": by, "by_claude": claude,
+            "tiles": tiles, "vias": vias, "days_by_via": days_by_via,
             "calls_total": sum(d["calls"] for d in days), "tokens_total": sum(d["tokens"] for d in days),
             "cost_usd_total": round(sum(d["cost_usd"] for d in days), 4),
             "storage_mb_total": round(sum(storage_mb(i) for i in ids), 1)}
