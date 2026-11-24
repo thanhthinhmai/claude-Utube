@@ -88,7 +88,7 @@ description: "Tasks: sửa ghi chú phim After Effects tự động trên app (0
 - [X] T032 [US5] `JobIn.engine: "page" | "ae"` cho việc `film`; `make_job` từ chối `"ae"` khi app desktop không có AE (FR-018); `web/app.js` `pageNew`: chọn bộ máy (After Effects tắt kèm lý do khi không có cầu nối)
 - [X] T033 [US5] `tools/runner/agent.py` `film_prompt` nhánh `engine == "ae"` theo R8: bước chung giữ nguyên; bước hình: `ae new`, bảng shot, `ae/shots_*.jsx` dùng `tools/ae/kit`, `ae build` (CHECK phải sạch), `ae render`, trộn tiếng giọng + nhạc, `shots.json`; worker `finished` chép phim AE như phim web (không chép `kit/`)
 - [X] T034 [P] [US5] Test: việc `film` `engine: "ae"` khi không có cầu nối → 409; `film.json` của phim mới có `engine: "ae"`; `finished` không chép tệp `tools/ae/kit` vào phim (SC-008)
-- [ ] T035 [US5] Chạy thật: phim AE mới khoảng 30 giây từ một ý tưởng (SC-008), ghi kết quả vào quickstart
+- [X] T035 [US5] Chạy thật: phim AE mới khoảng 30 giây từ một ý tưởng (SC-008), ghi kết quả vào quickstart
 
 ---
 

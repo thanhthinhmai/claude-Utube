@@ -27,6 +27,8 @@
 
 ## US5 – phim AE mới
 1. New film → bộ máy "After Effects", ý tưởng 30 giây → duyệt kịch bản, bảng shot → video; `shots.json` khớp video ≤ 1 khung; `films/<tên>/ae/` không có tệp của `tools/ae/kit/`.
+   - **Kết quả 2026-11-24** (T035, việc `j-20261124-045726-1988`, phong cách `crayon-book`, tắt điểm duyệt): phim 25,8 s, 7 shot, `film.json` engine "ae", `ae/` chỉ có `crayon.jsx` + `shots.jsx` (0 tệp của bộ dựng chung), mốc shot khớp video. QC của xưởng đạt (−14,0 LUFS, đỉnh −1,5 dB, kịch bản 8,5/10, giọng khớp kịch bản). Ba lượt dựng AE (9 → 8 → 7 shot, ~3 phút mỗi lượt) theo lỗi Self-check. 12,6 triệu token (phần lớn là cache).
+   - Còn thiếu: gói đăng không vẽ được thumbnail cho phim AE (`thumb_not_rendered`: thumbnail đang vẽ từ trang web của phim); một lần dựng lỗi `fetch failed` khi app desktop gửi kết quả (lần sau đạt); shot 6 có tờ giấy cảm ơn trắng trơn.
 
 ## Test tự động
 `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh` (gồm `node --test desktop/test/*.test.js`), `sh tests/filmcheck/run.sh`, `sh tests/ae/run.sh` (mới).
