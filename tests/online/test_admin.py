@@ -116,6 +116,88 @@ class US3(unittest.TestCase):
         self.assertEqual(rows["cust@example.com"]["tokens_month"], 220_000)
 
 
+def seed_calls(account_id):
+    """specs/033: calls on Vietnam days today, yesterday, 8 and 40 days ago, on plan:1, plan:2 and the API key.
+    Returns {day offset: [(via, tokens)]}. Each call is at noon Vietnam time (05:00 UTC)."""
+    import datetime as dt
+    from studio import db, quotas
+    today = dt.date.fromisoformat(quotas.today_vn())
+    plan = {0: [("plan:1", 1000), ("plan:1", 2000), ("api", 500)], 1: [("plan:2", 4000)],
+            8: [("plan:1", 8000), ("plan:2", 100)], 40: [("api", 70000)]}
+    with db.tx() as con:
+        for off, calls in plan.items():
+            at = f"{(today - dt.timedelta(days=off)).isoformat()}T05:00:00+00:00"
+            for via, tok in calls:
+                con.execute("INSERT INTO call (job_id, account_id, via, model, tokens_in, tokens_out, cache_write, "
+                            "cache_read, at) VALUES (?, ?, ?, 'm', ?, 0, 0, 0, ?)", (f"j-{off}", account_id, via, tok, at))
+    return today, plan
+
+
+class UsageCharts(unittest.TestCase):
+    """specs/033: tiles and per-day, per-via rows of Settings → Usage."""
+    setUp, tearDown = US3.setUp, US3.tearDown
+
+    def test_tiles_and_days(self):
+        import datetime as dt
+        today, _ = seed_calls(self.cid)
+        u = self.admin.get("/api/v1/admin/usage").json()
+        self.assertEqual(u["tiles"], {"today": {"calls": 3, "tokens": 3500}, "d7": {"calls": 4, "tokens": 7500},
+                                      "d30": {"calls": 6, "tokens": 15600}})
+        self.assertEqual(len(u["days_by_via"]), 30)
+        self.assertEqual([d["day"] for d in u["days_by_via"]][-1], today.isoformat())
+        self.assertEqual(u["days_by_via"][-1]["via"], {"plan:1": {"calls": 2, "tokens": 3000}, "api": {"calls": 1, "tokens": 500}})
+        self.assertEqual(u["days_by_via"][-2]["via"], {"plan:2": {"calls": 1, "tokens": 4000}})
+        self.assertEqual(u["days_by_via"][-3]["via"], {})                        # a day with no calls is still there
+        self.assertEqual(u["vias"], ["plan:1", "plan:2", "api"])
+        self.assertEqual((u["calls_total"], u["tokens_total"]), (6, 15600))
+        # a range: tiles do not move, rows and totals follow it
+        f = (today - dt.timedelta(days=6)).isoformat()
+        u7 = self.admin.get(f"/api/v1/admin/usage?from={f}&to={today.isoformat()}").json()
+        self.assertEqual(u7["tiles"], u["tiles"])
+        self.assertEqual((len(u7["days_by_via"]), u7["calls_total"], u7["vias"]), (7, 4, ["plan:1", "plan:2", "api"]))
+        old = (today - dt.timedelta(days=40)).isoformat()
+        u1 = self.admin.get(f"/api/v1/admin/usage?from={old}&to={old}").json()
+        self.assertEqual((u1["vias"], u1["days_by_via"][0]["via"]["api"]["tokens"]), (["api"], 70000))
+        # at most 366 days; customers are kept out
+        ok = (today - dt.timedelta(days=365)).isoformat()
+        bad = (today - dt.timedelta(days=366)).isoformat()
+        self.assertEqual(self.admin.get(f"/api/v1/admin/usage?from={ok}&to={today.isoformat()}").status_code, 200)
+        r = self.admin.get(f"/api/v1/admin/usage?from={bad}&to={today.isoformat()}")
+        self.assertEqual((r.status_code, r.json()["error"]["code"]), (422, "invalid"))
+        self.assertEqual(self.c.get("/api/v1/admin/usage").status_code, 403)
+
+    @unittest.skipUnless(__import__("shutil").which("node") and
+                         (__import__("helpers").REPO / "lib" / "lemo-opuscar" / "node_modules" / "playwright-core").is_dir(),
+                         "needs node and playwright-core")
+    def test_page(self):
+        import json
+        import os
+        import subprocess
+        from pathlib import Path
+        from helpers import REPO, Server
+        from studio.server import create_app
+        seed_calls(self.cid)
+        want = {"tiles": ["3 requests 3,500 tokens", "4 requests 7,500 tokens", "6 requests 15,600 tokens"],
+                "legend": ["Claude 11,000", "Claude #2 (removed) 4,100", "API key 500"]}   # slot 2 is not signed in here
+        web = Server(create_app())
+        try:
+            r = subprocess.run(["node", str(Path(__file__).with_name("browser_usage.cjs")), web.url, "boss@example.com", PASSWORD,
+                                json.dumps(want)], capture_output=True, text=True, timeout=90,
+                               env={**os.environ, "NODE_PATH": str(REPO / "lib" / "lemo-opuscar" / "node_modules")})
+            if r.returncode == 77:
+                self.skipTest("cannot start a browser")
+            self.assertEqual(r.returncode, 0, r.stderr)
+            res = json.loads(r.stdout.strip().splitlines()[-1])
+            self.assertEqual(res["errors"], [], res["info"])
+        finally:
+            web.close()
+
+    def test_empty_studio(self):
+        u = self.admin.get("/api/v1/admin/usage").json()
+        self.assertEqual(u["tiles"]["today"], {"calls": 0, "tokens": 0})
+        self.assertEqual((u["vias"], len(u["days_by_via"])), ([], 30))
+
+
 if __name__ == "__main__":
     unittest.main()
 
