@@ -32,7 +32,8 @@ def film_dirs(name: str, folder=None) -> tuple:
         if not re.fullmatch(r"[a-z0-9-]{1,60}", name or ""):
             print(f"✗ bad film name: {name!r}", file=sys.stderr)
             raise SystemExit(2)
-        proj = (ROOT / "films" / name).resolve()
+        here = Path.cwd() / "films" / name             # a job works in its own folder (like filmcheck's film_dir)
+        proj = (here if (here / "film.json").is_file() or in_job() else ROOT / "films" / name).resolve()
         video = None
         if not in_job():
             from filmcheck.cli import app_film
