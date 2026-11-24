@@ -160,6 +160,15 @@ class FixJob(unittest.TestCase):
         doc = self.c.get("/api/v1/films/ae-one/notes").json()["doc"]
         self.assertNotIn("lot", doc)
 
+    def test_a_chat_job_left_running_does_not_hold_the_queue(self):
+        self.hello()
+        self.notes([("S1", "x")])
+        from studio import jobs
+        jobs.create("film", "chat film", {"film": "ae-one"}, owner=account_id(self.c))     # `job start` of the chat flow
+        jid = self.fix().json()["job"]
+        got = self.s.worker.claim()
+        self.assertEqual(got and got["id"], jid)
+
     def test_agent_prompt(self):
         import sys
         sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "runner"))

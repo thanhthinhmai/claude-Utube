@@ -448,7 +448,10 @@ class Worker:
             return None
         n = quotas.settings()["concurrency"]
         with db.tx() as con:
-            busy = [r[0] for r in con.execute("SELECT owner FROM docs WHERE kind = 'job' AND status = 'running'")]
+            # only the worker's own jobs (they have "charged"); a job of the chat flow (`job start` on this machine) left
+            # "running" must not hold the customer's queue (seen in the first Fix with Claude run, specs/031)
+            busy = [r[0] for r in con.execute("SELECT owner FROM docs WHERE kind = 'job' AND status = 'running' "
+                                              "AND json_extract(data, '$.charged') IS NOT NULL")]
             if len(busy) >= n:
                 return None
             rows = con.execute("SELECT id, owner, data FROM docs WHERE kind = 'job' AND status = 'queued' "
