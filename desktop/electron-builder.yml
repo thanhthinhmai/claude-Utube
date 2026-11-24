@@ -34,7 +34,7 @@ win:
 nsis:
   oneClick: false
   perMachine: false
-  allowToChangeInstallationDirectory: false
+  allowToChangeInstallationDirectory: true      # specs/032: the app may go on another drive (e.g. E:)
   createStartMenuShortcut: true
   shortcutName: claude-Utube
   artifactName: claude-Utube-Setup-${version}.${ext}
