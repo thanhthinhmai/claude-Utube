@@ -5,10 +5,97 @@ import os
 import subprocess
 import sys
 import unittest
+from pathlib import Path
 
 from helpers import REPO, Studio, film_job
 
 sys.path.insert(0, str(REPO / "tools" / "runner"))
+
+
+class CompactSavings(unittest.TestCase):
+    """specs/030 US2, US3: the agent compacts earlier, keeps the right things, and leaves a note before it does."""
+
+    def test_compact_env_defaults_and_overrides(self):
+        import worker
+        self.assertEqual(worker.compact_env({}), {"CLAUDE_CODE_AUTO_COMPACT_WINDOW": "300000",
+                                                  "BASH_MAX_OUTPUT_LENGTH": "20000"})
+        self.assertEqual(worker.compact_env({"STUDIO_AUTO_COMPACT_WINDOW": "500000", "STUDIO_BASH_MAX_OUTPUT": "8000"}),
+                         {"CLAUDE_CODE_AUTO_COMPACT_WINDOW": "500000", "BASH_MAX_OUTPUT_LENGTH": "8000"})
+        with self.assertLogs("studio.worker", "WARNING"):
+            bad = worker.compact_env({"STUDIO_AUTO_COMPACT_WINDOW": "50000", "STUDIO_BASH_MAX_OUTPUT": "abc"})
+        self.assertEqual(bad, {"CLAUDE_CODE_AUTO_COMPACT_WINDOW": "300000", "BASH_MAX_OUTPUT_LENGTH": "20000"})
+
+    def test_film_job_gets_the_compact_env(self):           # SC-004: what the runner actually starts with
+        s = Studio()
+        try:
+            seen = []
+            start = s.worker.runner.start
+            s.worker.runner.start = lambda jid, work, env, *a, **k: (seen.append(env), start(jid, work, env, *a, **k))[1]
+            c = s.signup_verified("m@x.test")
+            jid = film_job(c, idea="A fox").json()["id"]
+            s.start()
+            self.assertEqual(s.wait(jid)["status"], "done")
+            self.assertEqual(seen[0]["CLAUDE_CODE_AUTO_COMPACT_WINDOW"], "300000")
+            self.assertEqual(seen[0]["BASH_MAX_OUTPUT_LENGTH"], "20000")
+        finally:
+            s.close()
+
+    def test_rules_say_what_to_keep(self):
+        import agent
+        r = agent.rules()
+        for words in ("When the conversation is compacted", "film name", "review request", "next step",
+                      "Drop the contents", ".compact-state.md"):
+            self.assertIn(words, r)
+
+    def make_work(self, files=3):
+        import tempfile
+        work = Path(tempfile.mkdtemp())
+        f = work / "films" / "f"
+        (f / ".check").mkdir(parents=True)
+        (f / ".check" / "hidden.json").write_text("{}")
+        for i in range(files):
+            (f / f"file-{i:03}.txt").write_text("x")
+        (f / "checks.json").write_text(json.dumps({
+            "script": {"verdict": "pass"}, "film": {"pass": False},
+            "tiers": {"plan": {"pass": True, "issues": []},
+                      "shots": {"pass": False, "issues": [{"severity": "block"}, {"severity": "warn"}]}}}))
+        t = work / "t.jsonl"
+        t.write_text(json.dumps({"input": {"command": 'sh /studio/bin/studio job step J1 "Script"'}}) + "\n" +
+                     json.dumps({"input": {"command": 'sh /studio/bin/studio job step J1 "Picture"'}}) + "\n")
+        return work, t
+
+    def test_state_note(self):                              # SC-005
+        import time
+        import agent
+        work, t = self.make_work()
+        t0 = time.time()
+        agent.save_compact_state(work, {"transcript_path": str(t), "trigger": "auto"})
+        self.assertLess(time.time() - t0, 1.0)
+        note = (work / ".compact-state.md").read_text()
+        self.assertIn("auto", note)
+        self.assertIn("Last step: Picture", note)
+        for i in range(3):
+            self.assertIn(f"films/f/file-{i:03}.txt", note)
+        self.assertNotIn("hidden.json", note)
+        self.assertIn("- script: pass", note)
+        self.assertIn("- tier plan: pass (0 errors)", note)
+        self.assertIn("- tier shots: fail (1 errors)", note)
+        self.assertIn("- film: fail", note)
+
+    def test_state_note_is_small_and_never_fails(self):
+        import agent
+        work, t = self.make_work(files=500)
+        agent.save_compact_state(work, {"transcript_path": str(t), "trigger": "manual"})
+        note = (work / ".compact-state.md").read_text()
+        self.assertLessEqual(len(note.encode()), agent.STATE_MAX)
+        self.assertEqual(note.count("\n- films/f/"), 20)         # 20 newest files (checks.json may be one of them)
+        agent.save_compact_state(work, {"transcript_path": "/nope", "trigger": "auto"})     # overwritten, not grown
+        self.assertIn("Last step: unknown", (work / ".compact-state.md").read_text())
+        os.chmod(work, 0o500)
+        try:
+            agent.save_compact_state(work, {})                                 # read-only folder: no exception
+        finally:
+            os.chmod(work, 0o700)
 
 
 class Thrift(unittest.TestCase):

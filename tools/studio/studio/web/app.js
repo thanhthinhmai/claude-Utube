@@ -1232,7 +1232,7 @@ const decidedHtml = (d, kind = "") => (kind === "question"
   : `<p class="done-box">Decided: <strong>${esc(DECISION[d.value])}</strong> (via ${esc(SOURCE[d.source])}, ${when(d.at)})
   ${d.note ? `<br>Note: ${esc(d.note)}` : ""}</p>`);
 
-// The stages a film job reports (CLAUDE.md: job step); Storyboard only when the job asked for one
+// The stages a film job reports (skill film-make: job step); Storyboard only when the job asked for one
 const STAGES = ["Treatment", "Script", "Look", "Storyboard", "Voice", "Music", "Picture", "Mix", "Render", "Self-check", "Publish"];
 const OPEN_STATUS = ["queued", "running", "waiting_review", "waiting_resume"];
 const ago = (iso) => {

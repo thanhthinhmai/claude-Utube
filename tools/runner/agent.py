@@ -8,7 +8,9 @@ Code runs in plan mode; the proxy swaps the token for a Claude account's (specs/
 import asyncio
 import json
 import os
+import re
 import sys
+import time
 from pathlib import Path
 
 WORK = Path(os.environ.get("STUDIO_WORK", "/work"))
@@ -56,7 +58,82 @@ building the studio, and everything you read is paid again on every later turn. 
 - If the job cannot be done, run `sh {STUDIO}/bin/studio job fail {job} "<reason>" --by studio|customer`:
   `customer` only when the customer's request itself cannot be made (for example the idea breaks the rules);
   `studio` for anything else (a tool broke, you ran out of ideas, a check keeps failing).
+
+When the conversation is compacted, keep in the summary: the film name, the step you are on, any review request
+that is pending, the next step, the files you wrote, and the latest check results. Drop the contents of files you
+read, logs and long command output: they are on disk. After a compaction, {WORK}/.compact-state.md has the last
+step, the recently changed files and the checks.
 """
+
+
+# ---------- before the conversation is compacted (specs/030 US3) ----------
+STATE_FILE = ".compact-state.md"
+STATE_MAX = 8 * 1024
+_STEP = re.compile(r'job step \S+ \\?"([^"\\]+)')
+
+
+def _last_step(transcript: str) -> str:
+    try:
+        with open(transcript, "rb") as f:
+            f.seek(0, 2)
+            f.seek(max(0, f.tell() - 2 * 1024 * 1024))
+            found = _STEP.findall(f.read().decode("utf-8", "ignore"))
+        return found[-1] if found else "unknown"
+    except (OSError, TypeError):
+        return "unknown"
+
+
+def _checks_summary(path: Path) -> list:
+    try:
+        d = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ["- none"]
+    out = []
+    if isinstance(d.get("script"), dict):
+        out.append(f"- script: {d['script'].get('verdict') or 'not run'}")
+    for name, t in sorted((d.get("tiers") or {}).items()):
+        if isinstance(t, dict):
+            n = sum(1 for i in t.get("issues") or [] if i.get("severity") == "block")
+            out.append(f"- tier {name}: {'pass' if t.get('pass') else 'fail'} ({n} errors)")
+    for name in ("film", "publish"):
+        if isinstance(d.get(name), dict):
+            out.append(f"- {name}: {'pass' if d[name].get('pass') else 'fail'}")
+    return out or ["- none"]
+
+
+def save_compact_state(work: Path, data: dict) -> None:
+    """A small note in the job folder, written just before Claude Code compacts the conversation. No Claude call;
+    any error is printed and ignored, the job goes on."""
+    try:
+        films = work / "films"
+        changed = []
+        for root, dirs, files in os.walk(films):
+            dirs[:] = [d for d in dirs if not d.startswith(".") and d != "node_modules"]
+            for name in files:
+                if not name.startswith("."):
+                    p = Path(root) / name
+                    changed.append((p.stat().st_mtime, p.relative_to(work)))
+        changed.sort(reverse=True)
+        changed = changed[:20]
+        checks = sorted(films.glob("*/checks.json"), key=lambda p: p.stat().st_mtime) if films.is_dir() else []
+        lines = [f"# Before compaction ({time.strftime('%Y-%m-%dT%H:%M:%S')}, {data.get('trigger') or '?'})",
+                 f"- Last step: {_last_step(data.get('transcript_path'))}",
+                 "", "## Recently changed files (newest first, max 20)"]
+        lines += [f"- {rel}  {time.strftime('%H:%M:%S', time.localtime(t))}" for t, rel in changed] or ["- none"]
+        lines += ["", f"## Checks ({checks[-1].relative_to(work) if checks else 'none'})"]
+        lines += _checks_summary(checks[-1]) if checks else ["- none"]
+        text = "\n".join(lines) + "\n"
+        while len(text.encode()) > STATE_MAX and len(lines) > 4:      # very long names: drop from the end
+            lines.pop()
+            text = "\n".join(lines) + "\n"
+        (work / STATE_FILE).write_text(text, encoding="utf-8")
+    except Exception as e:     # noqa: BLE001 - a note must never stop the job
+        print(f"compact state not saved: {e}", file=sys.stderr)
+
+
+async def before_compact(input_data, tool_use_id, context):
+    save_compact_state(WORK, input_data or {})
+    return {}
 
 
 def revise_prompt(inp: dict) -> str:
@@ -254,7 +331,8 @@ async def run() -> int:
         allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Skill", "WebSearch"],
         disallowed_tools=["WebFetch"],          # pages open through the proxy: `studio web fetch` (specs/010 R4)
         permission_mode="acceptEdits",
-        hooks={"PreToolUse": [HookMatcher(matcher="|".join(WRITE_TOOLS), hooks=[guard_writes])]},
+        hooks={"PreToolUse": [HookMatcher(matcher="|".join(WRITE_TOOLS), hooks=[guard_writes])],
+               "PreCompact": [HookMatcher(hooks=[before_compact])]},           # specs/030 US3
         model=os.environ.get("STUDIO_MODEL") or inp["model"],     # specs/024: the studio's one model, always given
         max_turns=MAX_TURNS,
         max_buffer_size=MAX_BUFFER,

@@ -76,6 +76,40 @@ def issue(job_id: str) -> str:
     return token
 
 
+# ---------- one Claude account per job (specs/030) ----------
+# The prompt cache belongs to one account: a job that changes account pays its whole context again.
+HELD: dict = {}                 # job id -> the plan slot it last used successfully
+PRUNE_EVERY_S = 60
+_pruned_at = [0.0]
+
+
+def order_slots(job_id: str, slots: list) -> list:
+    """The order to try `slots` (already usable, least used first) for this job: its held slot first; a job
+    without one prefers slots fewer jobs hold (auto order only), so jobs starting together spread out."""
+    held = HELD.get(job_id)
+    if held in slots:
+        return [held] + [s for s in slots if s != held]
+    if claude_plan.order() != "auto":
+        return list(slots)
+    count = {s: 0 for s in slots}
+    for s in HELD.values():
+        if s in count:
+            count[s] += 1
+    return sorted(slots, key=lambda s: count[s])       # stable: equal counts keep the least-used order
+
+
+def prune_held(force: bool = False) -> None:
+    """Drop jobs that ended (the worker, another process, cannot tell us)."""
+    now = time.time()
+    if not HELD or (not force and now - _pruned_at[0] < PRUNE_EVERY_S):
+        return
+    _pruned_at[0] = now
+    for job_id in list(HELD):
+        j = store.doc_get("job", job_id)
+        if not j or j["status"] in jobs.FINAL:
+            HELD.pop(job_id, None)
+
+
 def revoke(job_id: str) -> None:
     with db.tx() as con:
         con.execute("UPDATE job_tokens SET revoked_at = ? WHERE job_id = ? AND revoked_at IS NULL",
@@ -224,6 +258,8 @@ class ReviewIn(BaseModel):
 
 def create_app() -> FastAPI:
     import contextlib
+    HELD.clear()                    # a new proxy starts with no job holding an account (specs/030)
+    _pruned_at[0] = 0.0
     upstream = os.environ.get("ANTHROPIC_UPSTREAM", "https://api.anthropic.com").rstrip("/")
     client = httpx.AsyncClient(timeout=httpx.Timeout(connect=10, read=600, write=60, pool=10))
 
@@ -312,13 +348,16 @@ def create_app() -> FastAPI:
             return _anthropic_error(429, "rate_limit_error", "job token limit reached")
         body = await request.body()
         waited = False
+        await asyncio.to_thread(prune_held)
         while True:
-            for slot in await asyncio.to_thread(claude_plan.usable):            # least used first (R4)
+            slots = order_slots(job["id"], await asyncio.to_thread(claude_plan.usable))   # least used first (R4)
+            for slot in slots:                                                  # the job's own account first (030)
                 token = await asyncio.to_thread(claude_plan.access_token, slot)
                 if not token:
                     await asyncio.to_thread(claude_plan.mark_needs_signin, slot)
                     log.info("job %s plan:%s cannot refresh its sign-in", job["id"], slot)
                     continue
+                HELD[job["id"]] = slot                  # held from the first try, so jobs starting together spread
                 r = await send(request, path, body, {"authorization": f"Bearer {token}"}, api=False)
                 if r.status_code == 401:                                      # refresh once, then give up on it
                     await r.aclose()

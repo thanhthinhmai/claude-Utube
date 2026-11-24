@@ -260,7 +260,7 @@ sh bin/studio learn clean <set> --keep   # chỉ khi người dùng nói giữ
 ## 11. Phim mẫu (specs/021)
 
 Sau khi lưu, làm một phim mẫu 15–30 s theo phong cách vừa học, như phong cách của thư viện (`lib/lemo-opuscar/MY-STYLES.md` §5). Phim mẫu nên làm trong một phiên mới:
-- đi đủ luồng làm phim của `CLAUDE.md` (kịch bản được chấm, giọng của kênh nếu có, các tầng kiểm của specs/020), câu chuyện riêng, không làm gói đăng;
+- đi đủ luồng làm phim của skill `film-make` (`.claude/skills/film-make/SKILL.md`) (kịch bản được chấm, giọng của kênh nếu có, các tầng kiểm của specs/020), câu chuyện riêng, không làm gói đăng;
 - bảng cảnh lập theo `shots.json` của phong cách; `qc shots` phải không có `blurred` và không có cảnh báo cách quay nào ngoài khoảng;
 - lưu vào `my-styles/<slug>/`: `DEMO.md` (theo `lib/lemo-opuscar/styles/_template/DEMO.md`), `demo/` (mã nguồn, `CREDITS`, `build.sh` có `LIB=` ở đầu, ghi ra `${OUT:-…}` ngoài `demo/`), `test.jpg`, `test.mp4` (không vào git), `demo-checks.json`;
 - mục 10 (Engine) của `STYLE.md` chỉ tới `demo/` trước phong cách gốc.

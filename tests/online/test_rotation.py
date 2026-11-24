@@ -8,9 +8,13 @@ from helpers import PASSWORD, W, Studio, film_job, sign_in
 A = "/api/v1/admin/claude"
 
 
-class Rotation(unittest.TestCase):
+class Accounts(unittest.TestCase):
+    """Two signed-in Claude accounts (no tests of its own)."""
+
     def setUp(self):
         self.s = Studio(plan=True)
+        import proxy
+        proxy.HELD.clear()
         from studio import accounts
         accounts.signup("boss@x.test", PASSWORD, True, role="admin", verified=True)
         self.a = self.s.client()
@@ -30,6 +34,9 @@ class Rotation(unittest.TestCase):
         from studio import db
         with db.read() as con:
             return [dict(r) for r in con.execute("SELECT * FROM call ORDER BY id")]
+
+
+class Rotation(Accounts):
 
     def test_sc104_limit_in_the_middle_of_a_job(self):
         self.s.upstream_app.state.plan[self.token(1)] = "limit-after:1:900"       # one good answer, then the limit
@@ -71,6 +78,60 @@ class Rotation(unittest.TestCase):
         self.assertEqual(set(per), {"plan:1", "plan:2"})
         lo, hi = sorted(per.values())
         self.assertLessEqual((hi - lo) / hi, 0.20, per)                           # SC-105: within 20%
+
+
+class OneAccountPerJob(Accounts):
+    """specs/030 US1: a job stays on the account it started on, so the prompt cache stays warm."""
+
+    def vias_of(self, jid):
+        return [x["via"] for x in self.calls() if x["job_id"] == jid]
+
+    def test_sc001_a_job_keeps_its_account(self):
+        c = self.s.signup_verified("m@x.test")
+        jid = film_job(c, idea="A fox [spend 6]").json()["id"]
+        self.s.start()
+        self.assertEqual(self.s.wait(jid)["status"], "done")
+        # plan:1 gets busier after the first call (least-used would now pick plan:2), yet the job stays
+        self.assertEqual(self.vias_of(jid), ["plan:1"] * 6)
+
+    def test_sc002_limit_moves_the_job_and_it_stays(self):
+        self.s.upstream_app.state.plan[self.token(1)] = "limit-after:2:900"
+        c = self.s.signup_verified("m@x.test")
+        jid = film_job(c, idea="A fox [spend 6]").json()["id"]
+        self.s.start()
+        self.assertEqual(self.s.wait(jid)["status"], "done")            # the agent never saw the limit
+        self.assertEqual(self.vias_of(jid), ["plan:1", "plan:1"] + ["plan:2"] * 4)
+
+    def test_sc003_jobs_starting_together_get_different_accounts(self):
+        c1, c2 = self.s.signup_verified("m1@x.test"), self.s.signup_verified("m2@x.test")
+        a = film_job(c1, idea="Fox A [spend 3]").json()["id"]
+        b = film_job(c2, idea="Fox B [spend 3]").json()["id"]
+        self.s.start()
+        for jid in (a, b):
+            self.assertEqual(self.s.wait(jid)["status"], "done")
+        va, vb = self.vias_of(a), self.vias_of(b)
+        self.assertEqual(len(set(va)), 1, va)
+        self.assertEqual(len(set(vb)), 1, vb)
+        self.assertNotEqual(va[0], vb[0])
+
+    def test_fr004_ended_jobs_are_forgotten(self):
+        import proxy
+        c = self.s.signup_verified("m@x.test")
+        jid = film_job(c, idea="A fox [spend 2]").json()["id"]
+        self.s.start()
+        self.assertEqual(self.s.wait(jid)["status"], "done")
+        self.assertIn(jid, proxy.HELD)
+        proxy.prune_held(force=True)
+        self.assertNotIn(jid, proxy.HELD)
+
+    def test_order_slots(self):
+        import proxy
+        proxy.HELD.clear()
+        proxy.HELD.update({"j1": 2, "j2": 1, "j3": 1})
+        self.assertEqual(proxy.order_slots("j1", [1, 2, 3]), [2, 1, 3])      # held first
+        self.assertEqual(proxy.order_slots("j1", [1, 3]), [3, 1])            # held slot gone: chosen like a new job
+        self.assertEqual(proxy.order_slots("new", [1, 2, 3]), [3, 2, 1])     # fewest jobs first
+        proxy.HELD.clear()
 
 
 if __name__ == "__main__":
