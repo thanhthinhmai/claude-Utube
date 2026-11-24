@@ -12,6 +12,7 @@ if (location.protocol === "file:") {
     pair: (d) => ipcRenderer.invoke("setup:pair", d),
     hostname: () => ipcRenderer.invoke("setup:hostname"),
     installCore: (opts) => ipcRenderer.invoke("setup:installCore", opts),
+    chooseCoreDir: () => ipcRenderer.invoke("setup:chooseCoreDir"),
     onProgress: (fn) => ipcRenderer.on("setup:progress", (_e, msg) => fn(msg)),
   });
   contextBridge.exposeInMainWorld("license", {
@@ -25,6 +26,12 @@ if (location.protocol === "file:") {
     add: () => ipcRenderer.invoke("share:add"),
     remove: (id) => ipcRenderer.invoke("share:remove", id),
     onChange: (fn) => ipcRenderer.on("share:changed", () => fn()),
+  });
+  contextBridge.exposeInMainWorld("ae", {
+    state: () => ipcRenderer.invoke("ae:state"),
+    choose: (what) => ipcRenderer.invoke("ae:choose", what),
+    reset: () => ipcRenderer.invoke("ae:reset"),
+    test: () => ipcRenderer.invoke("ae:test"),
   });
   contextBridge.exposeInMainWorld("client", { retry: () => ipcRenderer.invoke("client:retry"), setup: () => ipcRenderer.invoke("client:setup") });
   contextBridge.exposeInMainWorld("core", {

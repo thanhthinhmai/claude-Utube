@@ -498,6 +498,8 @@ def save_notes(film_dir, base: str, doc, by: str = "local", now: float = None) -
         old_notes = {n.get("id"): n for sh in cur.get("shots", {}).values() if isinstance(sh, dict)
                      for n in sh.get("notes", []) if isinstance(n, dict) and n.get("id")}
         new = {"version": 1, "shots": {}}
+        if isinstance(cur.get("lot"), dict):          # a fix run in progress (specs/032): only start_lot/end_lot change it
+            new["lot"] = cur["lot"]
         for sid, sh in doc["shots"].items():
             new["shots"][sid] = {"status": sh.get("status", "none"), "status_by": sh.get("status_by", "auto"),
                                  "notes": [_clean_note(n, old_notes.get(n.get("id")), by, stamp) for n in sh.get("notes", [])]}
@@ -617,6 +619,101 @@ def show_lines(film_dir, everything: bool = False) -> tuple:
     lines.append(f"{open_n} open note{'' if open_n == 1 else 's'}")
     lines.append(f"base: {g['base']}")
     return lines, open_n
+
+
+# ---------- fix runs: the notes one "Fix with Claude" job works on (specs/032 R7, FR-011, FR-012) ----------
+LOT_LIMIT = 10
+
+
+def open_notes_in_order(film_dir) -> list:
+    """[(note id, film second)] of open notes, in film order (shot start + the note's second); gone shots last."""
+    g = read_notes(film_dir)
+    marks = load_shots(film_dir)
+    by_id = {x["id"]: x for x in marks["shots"]} if marks["valid"] else {}
+    out = []
+    for sid, sh in g["doc"]["shots"].items():
+        if not isinstance(sh, dict):
+            continue
+        t0 = by_id[sid]["t0"] if sid in by_id else float("inf")
+        for n in sh.get("notes", []):
+            if not n.get("done") and n.get("id"):
+                out.append((n["id"], t0 + (n.get("at") or 0)))
+    return sorted(out, key=lambda x: x[1])
+
+
+def active_lot(film_dir, live=None):
+    """The lot of a running fix job, or None. live(job id) -> bool says whether that job still runs; a lot left by a
+    job that ended (stopped, crashed) counts as free."""
+    lot = read_notes(film_dir)["doc"].get("lot")
+    if not isinstance(lot, dict):
+        return None
+    if live is not None and not live(lot.get("job")):
+        return None
+    return lot
+
+
+def start_lot(film_dir, job: str, limit: int = LOT_LIMIT, live=None, now: float = None) -> dict:
+    """Mark the first `limit` open notes (film order) as this job's lot. Returns {lot, left}.
+    ShotError in_progress (409) when a live job holds a lot; no_open_notes (422)."""
+    p = film_paths(film_dir)
+    with locked(p["notes"]):
+        raw, cur = _read_raw(film_dir)
+        lot = cur.get("lot")
+        if isinstance(lot, dict) and (live is None or live(lot.get("job"))):
+            raise ShotError("in_progress", f"Claude is already fixing this film's notes (job {lot.get('job')})", 409,
+                            {"job": lot.get("job")})
+        ordered = open_notes_in_order(film_dir)
+        if not ordered:
+            raise ShotError("no_open_notes", "this film has no open notes to fix", 422)
+        take = [nid for nid, _ in ordered[:limit]]
+        cur["lot"] = {"job": job, "notes": take, "since": now_iso(clock() if now is None else now)}
+        write_atomic(p["notes"], _dump(cur))
+    return {"lot": cur["lot"], "left": len(ordered) - len(take)}
+
+
+def end_lot(film_dir, job: str = None) -> bool:
+    """Drop the lot (only this job's when `job` is given). True when one was dropped."""
+    p = film_paths(film_dir)
+    with locked(p["notes"]):
+        raw, cur = _read_raw(film_dir)
+        lot = cur.get("lot")
+        if not isinstance(lot, dict) or (job and lot.get("job") != job):
+            return False
+        del cur["lot"]
+        write_atomic(p["notes"], _dump(cur))
+    return True
+
+
+def merge_lot_replies(lib_dir, work_dir, job: str = None, failed_why: str = None) -> dict:
+    """Copy Claude's answers on the lot's notes from the job's copy of the book into the library's, one note at a
+    time on the newest base, so notes added or edited meanwhile stay as they are. A lot note without an answer gets
+    one saying it was not fixed (no note is left without a word). Returns {replied, unanswered}."""
+    lot = read_notes(lib_dir)["doc"].get("lot")
+    if not isinstance(lot, dict) or (job and lot.get("job") != job):
+        return {"replied": 0, "unanswered": 0}
+    work = {}
+    if work_dir is not None and film_paths(work_dir)["notes"].is_file():
+        work = {n.get("id"): n for sh in read_notes(work_dir)["doc"]["shots"].values() if isinstance(sh, dict)
+                for n in sh.get("notes", []) if isinstance(n, dict)}
+    replied = unanswered = 0
+    for nid in lot.get("notes", []):
+        w = work.get(nid) or {}
+        text, done = w.get("reply"), bool(w.get("done"))
+        if failed_why or not text:
+            text, done = (failed_why or "Not fixed in this run: Claude gave no answer for this note."), False
+            unanswered += 1
+        else:
+            replied += 1
+        for _ in range(3):                           # the user may save between our read and write
+            try:
+                reply(lib_dir, nid, text[:MAX_TEXT], done=done, base=read_notes(lib_dir)["base"])
+                break
+            except ShotError as e:
+                if e.code == "not_found":            # the user deleted the note meanwhile
+                    break
+                if e.code != "changed":
+                    raise
+    return {"replied": replied, "unanswered": unanswered}
 
 
 # ---------- film replace: a new video, keeping one previous (T031, research R7) ----------

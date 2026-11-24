@@ -16,6 +16,9 @@ Mỗi yêu cầu đi đúng **một** luồng:
 - `app status` · `app stop` (còn việc đang chạy thì từ chối, `--force` để dừng) · `app models` (tải mô hình Whisper) · `app import` (chép `films/`, `my-styles/`, `channels/` của dự án vào app).
 - Khi app đang chạy, việc của luồng làm phim bằng chat (`job …`, `review …`) ghi vào sổ việc của app: xem và duyệt trên app; phim xong được chép (hard link) vào kho của chủ xưởng.
 
+### Phim After Effects (specs/032, hiến pháp 3.0.0 nguyên tắc VII)
+- Mỗi phim một bộ máy: `films/<tên>/film.json` → `engine` `"page"` (vắng tệp) hoặc `"ae"`. Bộ dựng AE chung ở `tools/ae/` (`sh bin/studio ae build|fix|render|uses|status|new`); cầu nối AE trong app desktop; nút "Fix with Claude" của trang phim AE tạo việc `fix`. Chi tiết: mục "Phim After Effects" của skill `film-make`, `tools/CLAUDE.md`, `desktop/CLAUDE.md`.
+
 ### App desktop, bộ cài, license, Client (specs/015–018)
 - 015: vỏ Electron trong `desktop/`, chỉ gọi `sh bin/studio app …` (macOS chạy thẳng, Windows qua WSL2). 016: bộ cài chứa sẵn phần lõi. 017: máy chủ license `tools/license/`, lease Ed25519, tự cập nhật. 018: chế độ Host/Client, ghép đôi bằng mã một lần.
 - Chi tiết (lệnh chạy khi phát triển, test, phát hành, khoá) ở `desktop/CLAUDE.md`. Khoá riêng ký license **không bao giờ** vào repo hay vào chat.
@@ -65,7 +68,7 @@ Mẹo chung để tiết kiệm token:
 Lệnh phụ: `/speckit-checklist <lĩnh vực>` tạo checklist kiểm tra chất lượng spec (UX, bảo mật…). `/speckit-constitution` dùng để sửa hiến pháp.
 
 ## Cấu trúc
-- `bin/studio`: mọi lệnh của xưởng, xem `sh bin/studio --help`; lệnh làm phim ở skill `film-make`. Test: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/online/run.sh`, `sh tests/license/run.sh` (bài chạy thật, tốn tiền: `sh tests/online/live.sh`)
+- `bin/studio`: mọi lệnh của xưởng, xem `sh bin/studio --help`; lệnh làm phim ở skill `film-make`. Test: `sh tests/run.sh`, `sh tests/render/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/online/run.sh`, `sh tests/license/run.sh`, `sh tests/ae/run.sh` (bài chạy thật, tốn tiền: `sh tests/online/live.sh`)
 - `tools/`: công cụ tự viết (`studio/` giao diện và API, `runner/` worker, proxy, agent của chế độ online, `filmcheck/` kiểm phim và gói đăng, `render/` dựng hình, `style-learn/` học phong cách, `license/`); chi tiết ở `tools/CLAUDE.md`
 - `library.lock`: phiên bản thư viện đã ghim; `lib/lemo-opuscar/`: thư viện (không vào git, không sửa)
 - `channels/`: hồ sơ kênh của chính xưởng và bài học (vào git, specs/012) · `people/`: thư viện người thật (hình vẽ và duyệt vào git, ảnh tham chiếu trong `.sheet/` không vào git; `tools/filmcheck/people.py`, specs/028) · `my-styles/`: phong cách riêng (vào git) · `films/`: phim (không vào git) · `references/`: video tham chiếu (không vào git) · `tools/`: công cụ tự viết

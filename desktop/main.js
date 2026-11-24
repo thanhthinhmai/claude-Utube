@@ -5,6 +5,7 @@
 "use strict";
 
 const { app, BrowserWindow, Tray, Menu, dialog, shell, ipcMain, Notification, nativeImage, safeStorage, session } = require("electron");
+const aeb = require("./aebridge.js");
 const { execFile, spawn } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -104,7 +105,7 @@ async function startCore() {
   if (!splash || splash.isDestroyed()) showSplash();
   await new Promise((r) => splash && splash.webContents.once("did-finish-load", r));
   step("Starting the studio…");
-  const r = await coreRun(["start", ...gateArgs()], core.READY_TIMEOUT_MS + 5_000).catch((e) => ({ code: 1, out: "", err: String(e) }));
+  const r = await coreRun(["start", ...gateArgs(), ...bridgeArgs()], core.READY_TIMEOUT_MS + 5_000).catch((e) => ({ code: 1, out: "", err: String(e) }));
   const url = core.parseUrl(r.out);
   if (r.code !== 0 || !url) {
     const why = (r.out + "\n" + r.err).trim().split("\n").slice(-20).join("\n");
@@ -115,6 +116,7 @@ async function startCore() {
   step("Opening…");
   appUrl = url;
   openMain(url);
+  startAeBridge();
   if (cfg && /** @type {any} */ (cfg).share && /** @type {any} */ (cfg).share.enabled) startSharing();   // specs/018
 }
 
@@ -217,6 +219,7 @@ function setTrayMenu() {
     ...(isClient() ? [] : [
       { label: "Open in the browser", click: () => appUrl && shell.openExternal(appUrl) },
       { label: "Share with my team…", click: showShare },
+      { label: "After Effects…", click: showAe },
       { type: /** @type {const} */ ("separator") },
       { label: "Data folder", click: () => openFolder("data") },
       { label: "Log folder", click: () => openFolder("logs") }]),
@@ -251,6 +254,7 @@ app.on("before-quit", async (e) => {
   const ok = isClient() ? true : await stopCore("Quit");
   if (!ok) { if (SMOKE) smoke("quit cancel ok"); return; }
   quitting = true;
+  if (aeBridge) aeBridge.stop();
   if (monitor) clearInterval(monitor);
   if (gateway) await gateway.stop().catch(() => {});
   const pending = PLATFORM === "win32" ? pendingUpdate() : null;
@@ -578,6 +582,86 @@ async function startSharing() {
   saveShare();
 }
 
+// ---------- After Effects bridge (specs/032) ----------
+// A new random key at each start, in bridge.json; the core gets the file with `app start --bridge` and only answers
+// /api/v1/ae/bridge/* with that key, from 127.0.0.1. The bridge pulls build requests and runs AE on this computer.
+const BRIDGE = path.join(CONFIG_DIR, "bridge.json");
+let aeBridge = /** @type {InstanceType<typeof aeb.Bridge>|null} */ (null);
+let aeKey = "";
+let aeWin = /** @type {BrowserWindow|null} */ (null);
+
+function bridgeArgs() {
+  if (isClient()) return [];
+  aeKey = require("node:crypto").randomBytes(32).toString("base64url");
+  fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  const tmp = BRIDGE + ".tmp";
+  fs.writeFileSync(tmp, JSON.stringify({ key: aeKey }), { mode: 0o600 });
+  fs.renameSync(tmp, BRIDGE);
+  const p = cfg && cfg.platform === "win32" && !process.env.CU_CORE_CMD ? core.wslPath(BRIDGE) : BRIDGE;
+  return ["--bridge", p];
+}
+
+function aeConfig() { return /** @type {any} */ (core.loadConfig(CONFIG_DIR) || {}).ae || {}; }
+function aeFound() {
+  if (process.env.CU_FAKE_AE) return { afterfx: ["node", process.env.CU_FAKE_AE, "afterfx"],    // smoke runs: a fake AE (node on PATH)
+    aerender: ["node", process.env.CU_FAKE_AE, "aerender"], version: "fake" };
+  return aeb.findAE(PLATFORM, { readdir: (d) => fs.readdirSync(d), exists: (p) => fs.existsSync(p) });
+}
+// no space in the name: After Effects on Windows ignores scripts in a folder whose path has one (T031)
+function aeDefaultWork() { return path.join(app.getPath("documents"), "claude-Utube-AE"); }
+
+function startAeBridge() {
+  if (isClient() || aeBridge || !aeKey) return;
+  aeBridge = new aeb.Bridge({ base: () => appUrl, key: aeKey, platform: PLATFORM, version: app.getVersion(),
+    config: () => ({ work: aeDefaultWork(), ...aeConfig() }), found: aeFound,
+    log: (m) => console.log(m) });
+  aeBridge.start();
+  smoke("ae bridge ok");
+}
+
+function showAe() {
+  if (aeWin && !aeWin.isDestroyed()) { aeWin.show(); return; }
+  aeWin = new BrowserWindow({ width: 640, height: 560, title: "After Effects", icon: path.join(ASSETS, "icon.png"),
+    autoHideMenuBar: true, show: !SMOKE, webPreferences: { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true } });
+  aeWin.loadFile(path.join(__dirname, "ae.html"));
+  aeWin.on("closed", () => { aeWin = null; });
+}
+
+function aeState() {
+  const found = aeFound();
+  const s = aeb.settings({ work: aeDefaultWork(), ...aeConfig() }, found);
+  const show = (/** @type {any} */ v) => (Array.isArray(v) ? "fake" : String(v || ""));
+  return { found: found ? { afterfx: show(found.afterfx), aerender: show(found.aerender), version: found.version } : null,
+    afterfx: show(s.afterfx), aerender: show(s.aerender), work: s.work, workProblem: aeb.workProblem(PLATFORM, s), chosen: aeConfig(),
+    ready: aeBridge ? aeBridge.hasAE() : false, busy: aeBridge ? aeBridge.busy : null, platform: PLATFORM };
+}
+
+ipcMain.handle("ae:state", () => aeState());
+ipcMain.handle("ae:choose", async (_e, /** @type {string} */ what) => {
+  if (!["afterfx", "aerender", "work"].includes(what)) return aeState();
+  const r = await dialog.showOpenDialog(/** @type {any} */ (aeWin), what === "work"
+    ? { properties: ["openDirectory", "createDirectory"] }
+    : { properties: PLATFORM === "darwin" ? ["openFile", "treatPackageAsDirectory"] : ["openFile"] });
+  if (r.canceled || !r.filePaths[0]) return aeState();
+  const c = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || cfg || { platform: PLATFORM });
+  c.ae = { ...(c.ae || {}), [what]: r.filePaths[0] };
+  core.saveConfig(CONFIG_DIR, c);
+  if (aeBridge) aeBridge.hello();
+  return aeState();
+});
+ipcMain.handle("ae:reset", () => {
+  const c = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || cfg || { platform: PLATFORM });
+  delete c.ae;
+  core.saveConfig(CONFIG_DIR, c);
+  if (aeBridge) aeBridge.hello();
+  return aeState();
+});
+ipcMain.handle("ae:test", async () => {
+  if (!aeBridge) return { ok: false, message: "The studio is not running yet." };
+  if (aeBridge.running) return { ok: false, message: "After Effects is busy with a film; try again when it is done." };
+  return aeBridge.selfTest();
+});
+
 async function stopSharing() {
   pairing.close();
   if (gateway) { await gateway.stop().catch(() => {}); gateway = null; }
@@ -761,7 +845,7 @@ async function finishSetup(draft) {
     setupAt: new Date().toISOString(), trayNoticeShown: !!(cfg && cfg.trayNoticeShown),
     coreKind: draft.coreKind || "existing", coreVersion: draft.coreVersion || null, modelsReady: !!draft.modelsReady };
   const old = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || {});       // keep the license and update state (017)
-  for (const k of ["installId", "lease", "licenseClock", "licenseRefused", "licenseLabel", "licenseExpires", "pendingUpdate"]) {
+  for (const k of ["installId", "lease", "licenseClock", "licenseRefused", "licenseLabel", "licenseExpires", "pendingUpdate", "coreDir", "ae"]) {
     if (old[k] !== undefined) /** @type {any} */ (c)[k] = old[k];
   }
   if (!(await studioThere(c))) return { ok: false, error: `No studio at ${c.studio}` };
@@ -777,6 +861,19 @@ async function finishSetup(draft) {
 const FAKE_INSTALL = process.env.CU_FAKE_INSTALL === "1";      // smoke runs: real checks and unpacking, no commands
 const PACKAGED_DIR = process.env.CU_PACKAGED_DIR || (app.isPackaged ? path.join(process.resourcesPath, "core") : null);
 const LOCAL = PLATFORM === "win32" ? path.join(process.env.LOCALAPPDATA || os.homedir(), "ClaudeUtube") : null;
+
+/** Where the studio's Linux goes on Windows: the folder chosen on the setup screen (specs/032), else %LOCALAPPDATA%. */
+function coreBase() {
+  const c = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || {});
+  return core.validCoreDir(c.coreDir) ? c.coreDir : LOCAL;
+}
+
+/** Free bytes on the drive of a folder that may not exist yet (its nearest existing parent). @param {string} dir */
+function freeAt(dir) {
+  let d = dir;
+  while (d && !fs.existsSync(d) && path.dirname(d) !== d) d = path.dirname(d);
+  try { const sf = fs.statfsSync(d); return Number(sf.bavail) * Number(sf.bsize); } catch { return null; }
+}
 
 async function packagedInfo() {
   const manifest = core.readManifest(PACKAGED_DIR);
@@ -794,11 +891,21 @@ async function packagedInfo() {
     installed = fs.existsSync(f) ? fs.readFileSync(f, "utf8").trim() : null;
   }
   const steps = core.installSteps(PLATFORM, { manifest, coreFile: "", tmpDir: os.tmpdir(), home: os.homedir() }).map((s) => s.id);
+  const base = PLATFORM === "win32" ? coreBase() : null;
   return { available: true, platform: PLATFORM, manifest, installed, distroThere, steps,
-    reinstall: core.needsReinstall(installed, manifest), smoke: SMOKE };
+    reinstall: core.needsReinstall(installed, manifest), smoke: SMOKE,
+    coreDir: base, coreFree: base ? freeAt(base) : null, need: core.spaceNeeded(manifest, PLATFORM) };
 }
 
 ipcMain.handle("setup:packaged", async () => packagedInfo());
+ipcMain.handle("setup:chooseCoreDir", async () => {                // specs/032: put the studio's Linux on another drive
+  const r = await dialog.showOpenDialog(/** @type {any} */ (setupWin), { title: "Where to put the studio",
+    properties: ["openDirectory", "createDirectory"] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const dir = core.coreDirFor(r.filePaths[0]);
+  if (!core.validCoreDir(dir)) return { error: "Choose a folder on a drive of this computer (for example E:\\)." };
+  return { dir, free: freeAt(dir) };
+});
 
 /** Gunzip the core file into a .tar for `wsl --import` (Windows). @param {string} from @param {string} to */
 function gunzipTo(from, to) {
@@ -813,8 +920,17 @@ ipcMain.handle("setup:installCore", async (e, opts) => {
   if (!info.available || !info.manifest) return { ok: false, step: "verify", error: "This copy of the app has no studio package." };
   const m = info.manifest;
   const coreFile = path.join(String(PACKAGED_DIR), m.file);
-  const tmpDir = FAKE_INSTALL ? path.join(CONFIG_DIR, "tmp") : (LOCAL ? path.join(LOCAL, "tmp") : os.tmpdir());
-  const steps = core.installSteps(PLATFORM, { manifest: m, coreFile, tmpDir, wslDir: LOCAL ? path.join(LOCAL, "wsl") : undefined,
+  if (PLATFORM === "win32" && opts && opts.coreDir !== undefined) {   // the folder chosen on the setup screen (specs/032)
+    if (!core.validCoreDir(opts.coreDir)) return { ok: false, step: "space", error: "That folder cannot hold the studio: choose a folder on a drive of this computer." };
+    const c = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || { platform: PLATFORM });
+    c.coreDir = opts.coreDir;
+    core.saveConfig(CONFIG_DIR, c);
+  }
+  const base = PLATFORM === "win32" ? coreBase() : null;
+  const dirs = base ? core.coreDirs(base) : null;
+  const tmpDir = FAKE_INSTALL ? path.join(CONFIG_DIR, "tmp") : (dirs ? dirs.tmpDir : os.tmpdir());
+  if (FAKE_INSTALL && base) smoke(`install core dir ${base}`);
+  const steps = core.installSteps(PLATFORM, { manifest: m, coreFile, tmpDir, wslDir: dirs ? dirs.wslDir : undefined,
     reinstall: info.reinstall, distroThere: info.distroThere, home: os.homedir() });
   const skipInstall = PLATFORM === "darwin" && info.installed === m.version;       // unpacked before: go on with the models
   let i = opts && opts.from ? Math.max(0, steps.findIndex((s) => s.id === opts.from)) : 0;
@@ -867,7 +983,7 @@ ipcMain.handle("setup:installCore", async (e, opts) => {
 
 ipcMain.handle("core:restart", async () => {
   if (win && !win.isDestroyed()) {
-    const r = await coreRun(["start", ...gateArgs()], core.READY_TIMEOUT_MS + 5_000);
+    const r = await coreRun(["start", ...gateArgs(), ...bridgeArgs()], core.READY_TIMEOUT_MS + 5_000);
     const url = core.parseUrl(r.out);
     if (!url) return { ok: false, error: (r.out + r.err).trim().split("\n").slice(-5).join("\n") };
     appUrl = url;
@@ -951,6 +1067,16 @@ async function smokeMain(port) {
     if (shareState().clients.length !== 1) return smokeFail("the paired computer was not saved");
     await stopSharing();
     smoke("share pair ok");
+  }
+  if (process.env.CU_SMOKE_AE === "1") {                // specs/032: the fake core queues one AE build; the fake AE builds it
+    let st = null;
+    for (let i = 0; i < 120 && !(st && (st.state === "done" || st.state === "failed")); i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      st = await fetch(`${appUrl}/__fake/ae`).then((r) => r.json()).catch(() => null);
+    }
+    if (!st || st.state !== "done") return smokeFail(`the AE build did not finish: ${JSON.stringify(st)}`);
+    if (!st.hello || !st.hello.found || !st.result || !st.finish.marks || st.finish.marks.length !== 2) return smokeFail(`AE build result: ${JSON.stringify(st)}`);
+    smoke("ae build ok");
   }
   await win.webContents.executeJavaScript("document.getElementById('out').click()");
   await new Promise((r) => setTimeout(r, 500));

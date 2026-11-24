@@ -36,3 +36,7 @@ Chi tiết của specs/015–018. Luật chung ở `CLAUDE.md` gốc.
 - **Ghép đôi**: hai bên chứng minh cùng biết mã bằng HMAC gắn với dấu vân tay chứng chỉ, nên mã không đi qua mạng. Client lưu dấu vân tay, ghim nó (`setCertificateVerifyProc`) và gửi `X-CU-Client` trong mọi yêu cầu.
 - **Cập nhật của Client** đi qua Host (`/__cu/update`, bằng lease của Host); Client kiểm chữ ký như 017.
 - **Test**: `desktop/test/share.test.js`, Host giả `desktop/test/fake-host.mjs`, chứng chỉ thử ở `desktop/test/vectors/share-cert.json`.
+
+## Cầu nối After Effects (specs/032)
+- `desktop/aebridge.js` (logic thuần, `@ts-check`): tìm AE ở chỗ cài mặc định, hỏi hàng đợi `/api/v1/ae/bridge/*` của phần lõi bằng khoá tạo mỗi lần khởi động (`app start --bridge <CONFIG_DIR/bridge.json>`, header `X-CU-Bridge`, chỉ 127.0.0.1), chạy `AfterFX -r entry.jsx` (macOS: `osascript … DoScriptFile`); AE tự render trong hàng đợi render và vẫn mở (không `aerender`, chỉ tắt AE khi treo quá hạn); mỗi lúc một lượt dựng AE. `ae.html` + khay "After Effects…": đường dẫn, nút Test. Cổng chia sẻ (018) chặn `/api/v1/ae/bridge/*`.
+- Test: `desktop/test/aebridge.test.js` với AE giả `desktop/test/fake-ae.mjs`; smoke `CU_SMOKE_AE=1 FAKE_CORE_AE=1 CU_FAKE_AE=$PWD/test/fake-ae.mjs` (in `ae build ok`). Chạy cầu nối từ WSL với AE thật khi phát triển: `node desktop/test/wsl-bridge.mjs --core http://127.0.0.1:8790 --bridge <tệp khoá> --work /mnt/e/…`.

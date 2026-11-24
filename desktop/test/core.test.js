@@ -111,3 +111,21 @@ test("quitting asks first when jobs run (SC-004)", () => {
   assert.equal(down.stop, false);
   assert.equal(down.ask, false);
 });
+
+test("the studio's Linux can go on another drive (specs/032)", () => {
+  assert.equal(core.validCoreDir("E:\\ClaudeUtube"), true);
+  assert.equal(core.validCoreDir("\\\\server\\share\\x"), false);          // no network share
+  assert.equal(core.validCoreDir("E:\\a\\..\\b"), false);
+  assert.equal(core.validCoreDir("relative\\x"), false);
+  assert.equal(core.validCoreDir(42), false);
+  assert.equal(core.coreDirFor("E:\\"), "E:\\ClaudeUtube");
+  assert.equal(core.coreDirFor("E:"), "E:\\ClaudeUtube");
+  assert.equal(core.coreDirFor("D:\\Apps"), "D:\\Apps\\ClaudeUtube");
+  assert.equal(core.coreDirFor("D:\\Apps\\ClaudeUtube\\"), "D:\\Apps\\ClaudeUtube");
+  const d = core.coreDirs("E:\\ClaudeUtube");
+  assert.deepEqual(d, { wslDir: "E:\\ClaudeUtube\\wsl", tmpDir: "E:\\ClaudeUtube\\tmp" });
+  const m = { version: "1.0.0", os: "linux-x64", file: "c.tar.gz", sha256: "a".repeat(64), bytes: 1, unpacked_bytes: 2 };
+  const steps = core.installSteps("win32", { manifest: m, coreFile: "x", tmpDir: d.tmpDir, wslDir: d.wslDir, home: "C:\\Users\\an" });
+  const imp = steps.find((s) => s.id === "install").run.find((c) => c.args[0] === "--import");
+  assert.deepEqual(imp.args.slice(0, 4), ["--import", core.DISTRO, "E:\\ClaudeUtube\\wsl", "E:\\ClaudeUtube\\tmp\\core.tar"]);
+});

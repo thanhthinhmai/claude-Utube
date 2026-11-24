@@ -499,6 +499,63 @@ def create_app() -> FastAPI:
         log.info("job %s youtube %s: %s units%s", job["id"], body.endpoint, units, " (cache)" if not units else "")
         return {**out, "_cached": units == 0, "_units": units}
 
+    # ---------- After Effects builds through the desktop app's bridge (specs/032 contracts/bridge-api.md) ----------
+    from ae import aequeue
+    from fastapi.responses import FileResponse
+
+    def aeq(fn, *a):
+        try:
+            return fn(*a)
+        except aequeue.QueueError as e:
+            return JSONResponse({"error": {"code": e.code, "message": e.message}}, status_code=e.status)
+
+    @app.get("/internal/ae/status")
+    def ae_status(request: Request):
+        job_of(request)
+        return aequeue.bridge_status()
+
+    @app.post("/internal/ae/requests", status_code=201)
+    async def ae_submit(request: Request):
+        job, _ = job_of(request)
+        st = aequeue.bridge_status()
+        if not st["ready"]:
+            return JSONResponse({"error": {"code": st["code"], "message": st["message"]}}, status_code=409)
+        form = await request.form(max_files=1, max_fields=4)
+        f, meta = form.get("bundle"), form.get("meta")
+        if f is None or isinstance(f, str) or not isinstance(meta, str):
+            raise Denied(422, "invalid_request_error", "needs multipart fields meta (JSON) and bundle (file)")
+        try:
+            m = json.loads(meta)
+        except ValueError:
+            raise Denied(422, "invalid_request_error", "meta is not JSON") from None
+        data = await f.read(200 * 1024 * 1024 + 1)
+        await f.close()
+        if len(data) > 200 * 1024 * 1024:
+            raise Denied(413, "invalid_request_error", "a bundle may be at most 200 MB")
+        r = aeq(aequeue.create, job["owner"], job["id"], m.get("film"), m.get("shots"), data)
+        if isinstance(r, JSONResponse):
+            return r
+        log.info("job %s AE request %s: %s shots", job["id"], r["id"], len(r["shots"]))
+        return {"id": r["id"]}
+
+    def _own(request: Request, rid: str):
+        job, _ = job_of(request)
+        r = aeq(aequeue.get, rid)
+        if isinstance(r, JSONResponse) or r["job"] != job["id"]:
+            raise Denied(404, "not_found_error", "no such AE request")
+        return r
+
+    @app.get("/internal/ae/requests/{rid}")
+    def ae_request(rid: str, request: Request):
+        r = _own(request, rid)
+        return {**r, "ahead": aequeue.position(rid) if r["state"] == "queued" else 0}
+
+    @app.get("/internal/ae/requests/{rid}/result/{name}")
+    def ae_result(rid: str, name: str, request: Request):
+        _own(request, rid)
+        p = aeq(aequeue.result_path, rid, name)
+        return p if isinstance(p, JSONResponse) else FileResponse(p, media_type="video/mp4")
+
     @app.get("/internal/reviews/{rid}")
     def review_status(rid: str, request: Request):
         job, _ = job_of(request)
