@@ -12,6 +12,7 @@ if (location.protocol === "file:") {
     pair: (d) => ipcRenderer.invoke("setup:pair", d),
     hostname: () => ipcRenderer.invoke("setup:hostname"),
     installCore: (opts) => ipcRenderer.invoke("setup:installCore", opts),
+    chooseCoreDir: () => ipcRenderer.invoke("setup:chooseCoreDir"),
     onProgress: (fn) => ipcRenderer.on("setup:progress", (_e, msg) => fn(msg)),
   });
   contextBridge.exposeInMainWorld("license", {

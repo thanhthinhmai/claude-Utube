@@ -239,6 +239,24 @@ function wslPath(p) {
   return m ? `/mnt/${m[1].toLowerCase()}/${m[2].replace(/\\/g, "/")}` : p.replace(/\\/g, "/");
 }
 
+/** A folder the user chose for the studio's Linux on Windows (specs/032): a local absolute path such as
+ *  E:\\ClaudeUtube, no network share, no "..". @param {unknown} p */
+function validCoreDir(p) {
+  return typeof p === "string" && p.length < 200 && /^[A-Za-z]:\\/.test(p) && !p.split(/[\\/]/).includes("..");
+}
+
+/** The Linux disk and the unpack folder under a core folder (Windows). @param {string} base */
+function coreDirs(base) {
+  return { wslDir: path.win32.join(base, "wsl"), tmpDir: path.win32.join(base, "tmp") };
+}
+
+/** The folder offered after the user picks a drive or folder: <picked>\ClaudeUtube unless it already ends so.
+ *  @param {string} picked */
+function coreDirFor(picked) {
+  const p = picked.replace(/[\\/]+$/, "");
+  return /[\\/]ClaudeUtube$/i.test(p) ? p : path.win32.join(/^[A-Za-z]:$/.test(p) ? p + "\\" : p, "ClaudeUtube");
+}
+
 /** A different core version is installed: reinstall it, keeping the data (FR-012). @param {string|null} installed @param {Manifest} m */
 function needsReinstall(installed, m) {
   return !!installed && installed.trim() !== m.version;
@@ -289,7 +307,7 @@ function espeakPathOk(studio) {
   return Buffer.byteLength(path.posix.join(studio, "python/lib/python3.12/site-packages/espeakng_loader/espeak-ng-data")) < 160;
 }
 
-module.exports = { DISTRO, readManifest, sha256File, spaceNeeded, macCoreDir, packagedConfig, hasOwnDistro, wslPath,
+module.exports = { DISTRO, validCoreDir, coreDirs, coreDirFor, readManifest, sha256File, spaceNeeded, macCoreDir, packagedConfig, hasOwnDistro, wslPath,
   needsReinstall, installSteps, espeakPathOk, MIN_FREE_GB, STATUS_EVERY_MS, READY_TIMEOUT_MS, loadConfig, saveConfig, configUsable, expandHome,
   coreCommand, shellCommand, parseUrl, parseStatus, parseWslList, wsl2Distros, wslStatusChecks, enableWslCommand,
   machineChecks, parseDf, isAppUrl, quitPlan, portOf };

@@ -844,7 +844,7 @@ async function finishSetup(draft) {
     setupAt: new Date().toISOString(), trayNoticeShown: !!(cfg && cfg.trayNoticeShown),
     coreKind: draft.coreKind || "existing", coreVersion: draft.coreVersion || null, modelsReady: !!draft.modelsReady };
   const old = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || {});       // keep the license and update state (017)
-  for (const k of ["installId", "lease", "licenseClock", "licenseRefused", "licenseLabel", "licenseExpires", "pendingUpdate"]) {
+  for (const k of ["installId", "lease", "licenseClock", "licenseRefused", "licenseLabel", "licenseExpires", "pendingUpdate", "coreDir", "ae"]) {
     if (old[k] !== undefined) /** @type {any} */ (c)[k] = old[k];
   }
   if (!(await studioThere(c))) return { ok: false, error: `No studio at ${c.studio}` };
@@ -860,6 +860,19 @@ async function finishSetup(draft) {
 const FAKE_INSTALL = process.env.CU_FAKE_INSTALL === "1";      // smoke runs: real checks and unpacking, no commands
 const PACKAGED_DIR = process.env.CU_PACKAGED_DIR || (app.isPackaged ? path.join(process.resourcesPath, "core") : null);
 const LOCAL = PLATFORM === "win32" ? path.join(process.env.LOCALAPPDATA || os.homedir(), "ClaudeUtube") : null;
+
+/** Where the studio's Linux goes on Windows: the folder chosen on the setup screen (specs/032), else %LOCALAPPDATA%. */
+function coreBase() {
+  const c = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || {});
+  return core.validCoreDir(c.coreDir) ? c.coreDir : LOCAL;
+}
+
+/** Free bytes on the drive of a folder that may not exist yet (its nearest existing parent). @param {string} dir */
+function freeAt(dir) {
+  let d = dir;
+  while (d && !fs.existsSync(d) && path.dirname(d) !== d) d = path.dirname(d);
+  try { const sf = fs.statfsSync(d); return Number(sf.bavail) * Number(sf.bsize); } catch { return null; }
+}
 
 async function packagedInfo() {
   const manifest = core.readManifest(PACKAGED_DIR);
@@ -877,11 +890,21 @@ async function packagedInfo() {
     installed = fs.existsSync(f) ? fs.readFileSync(f, "utf8").trim() : null;
   }
   const steps = core.installSteps(PLATFORM, { manifest, coreFile: "", tmpDir: os.tmpdir(), home: os.homedir() }).map((s) => s.id);
+  const base = PLATFORM === "win32" ? coreBase() : null;
   return { available: true, platform: PLATFORM, manifest, installed, distroThere, steps,
-    reinstall: core.needsReinstall(installed, manifest), smoke: SMOKE };
+    reinstall: core.needsReinstall(installed, manifest), smoke: SMOKE,
+    coreDir: base, coreFree: base ? freeAt(base) : null, need: core.spaceNeeded(manifest, PLATFORM) };
 }
 
 ipcMain.handle("setup:packaged", async () => packagedInfo());
+ipcMain.handle("setup:chooseCoreDir", async () => {                // specs/032: put the studio's Linux on another drive
+  const r = await dialog.showOpenDialog(/** @type {any} */ (setupWin), { title: "Where to put the studio",
+    properties: ["openDirectory", "createDirectory"] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const dir = core.coreDirFor(r.filePaths[0]);
+  if (!core.validCoreDir(dir)) return { error: "Choose a folder on a drive of this computer (for example E:\\)." };
+  return { dir, free: freeAt(dir) };
+});
 
 /** Gunzip the core file into a .tar for `wsl --import` (Windows). @param {string} from @param {string} to */
 function gunzipTo(from, to) {
@@ -896,8 +919,17 @@ ipcMain.handle("setup:installCore", async (e, opts) => {
   if (!info.available || !info.manifest) return { ok: false, step: "verify", error: "This copy of the app has no studio package." };
   const m = info.manifest;
   const coreFile = path.join(String(PACKAGED_DIR), m.file);
-  const tmpDir = FAKE_INSTALL ? path.join(CONFIG_DIR, "tmp") : (LOCAL ? path.join(LOCAL, "tmp") : os.tmpdir());
-  const steps = core.installSteps(PLATFORM, { manifest: m, coreFile, tmpDir, wslDir: LOCAL ? path.join(LOCAL, "wsl") : undefined,
+  if (PLATFORM === "win32" && opts && opts.coreDir !== undefined) {   // the folder chosen on the setup screen (specs/032)
+    if (!core.validCoreDir(opts.coreDir)) return { ok: false, step: "space", error: "That folder cannot hold the studio: choose a folder on a drive of this computer." };
+    const c = /** @type {any} */ (core.loadConfig(CONFIG_DIR) || { platform: PLATFORM });
+    c.coreDir = opts.coreDir;
+    core.saveConfig(CONFIG_DIR, c);
+  }
+  const base = PLATFORM === "win32" ? coreBase() : null;
+  const dirs = base ? core.coreDirs(base) : null;
+  const tmpDir = FAKE_INSTALL ? path.join(CONFIG_DIR, "tmp") : (dirs ? dirs.tmpDir : os.tmpdir());
+  if (FAKE_INSTALL && base) smoke(`install core dir ${base}`);
+  const steps = core.installSteps(PLATFORM, { manifest: m, coreFile, tmpDir, wslDir: dirs ? dirs.wslDir : undefined,
     reinstall: info.reinstall, distroThere: info.distroThere, home: os.homedir() });
   const skipInstall = PLATFORM === "darwin" && info.installed === m.version;       // unpacked before: go on with the models
   let i = opts && opts.from ? Math.max(0, steps.findIndex((s) => s.id === opts.from)) : 0;
