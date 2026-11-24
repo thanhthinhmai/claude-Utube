@@ -22,6 +22,7 @@
 
 ## US4 – bộ cài
 1. Đẩy nhánh `032-desktop-ae` (hoặc chạy tay `desktop.yml`) → smoke `ae` qua trên Windows và macOS. **Tốn phút chạy: hỏi người dùng trước.**
+   - **Kết quả 2026-11-24** (T030, run 45329859196, chạy tay trên nhánh 032-ae-notes-fix): smoke có `ae bridge ok` và `ae build ok` đạt trên Windows và macOS. Lần đầu bước cài im lặng của 017 trên Windows hết 3 phút chờ (chập chờn, không liên quan 032); chạy lại job Windows: đạt.
 2. Cài bộ cài trên máy Windows có AE và trên máy Mac có AE (người dùng cung cấp) → chạy lại US3 bước 1–3 (SC-009).
 
 ## US5 – phim AE mới
