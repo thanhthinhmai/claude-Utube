@@ -1,4 +1,4 @@
-"""film.json of a film folder (specs/031 data-model.md): which engine draws the film and, for AE films, its shots."""
+"""film.json of a film folder (specs/032 data-model.md): which engine draws the film and, for AE films, its shots."""
 import json
 import re
 from pathlib import Path
@@ -14,7 +14,7 @@ class FilmError(Exception):
 
 
 def load(film_dir) -> dict:
-    """film.json with defaults; a folder without it is a page film (films made before 031)."""
+    """film.json with defaults; a folder without it is a page film (films made before 032)."""
     d = Path(film_dir)
     p = d / "film.json"
     if not p.is_file():

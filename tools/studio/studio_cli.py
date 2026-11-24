@@ -504,7 +504,7 @@ def main(argv=None) -> int:
     s.add_argument("--proxy-port", type=int)
     s.add_argument("--foreground", action="store_true")
     s.add_argument("--gate", help="the desktop app's license file (specs/017)")
-    s.add_argument("--bridge", help="the desktop app's After Effects bridge key file (specs/031)")
+    s.add_argument("--bridge", help="the desktop app's After Effects bridge key file (specs/032)")
     s = aps.add_parser("status")
     s.add_argument("--data")
     s.add_argument("--json", action="store_true")

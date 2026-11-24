@@ -1,4 +1,4 @@
-// Shared After Effects kit of the studio (specs/031). Moved from films/ae-crayon-test/ae/persp.jsx on 2026-11-23.
+// Shared After Effects kit of the studio (specs/032). Moved from films/ae-crayon-test/ae/persp.jsx on 2026-11-23.
 // Paths come from CU.WORK (the folder the entry script runs in); film data lives in CU.WORK/data/.
 // persp.jsx: depth kit. Flat artwork pinned into perspective (Corner Pin), 3/4 boxes, monitors and keyboards,
 // wall light, vignette, contact shadows and parallax. Used to stop props from facing the camera flat.

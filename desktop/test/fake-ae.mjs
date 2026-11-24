@@ -1,4 +1,4 @@
-// A fake After Effects for tests and the GitHub Actions smoke run (specs/031 T006a): the runners have no AE.
+// A fake After Effects for tests and the GitHub Actions smoke run (specs/032 T006a): the runners have no AE.
 //   node fake-ae.mjs afterfx -r <entry.jsx>                       like AfterFX.exe -r: runs a bundle's entry
 //   node fake-ae.mjs aerender -project <p.aep> -comp MASTER -output <out.mp4>
 // afterfx reads bundle.json next to the entry and writes log.txt (START, shot … ok, DONE), shots_<proj>.json

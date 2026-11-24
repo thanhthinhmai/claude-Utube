@@ -1,4 +1,4 @@
-"""Splice rebuilt shots into a film's video, frame-exact, in one encode (specs/031 R5; from fixshots.sh).
+"""Splice rebuilt shots into a film's video, frame-exact, in one encode (specs/032 R5; from fixshots.sh).
 
 marks: the film's shots.json rows [t0, t1, set, id]. pieces: {shot id: (clip, start second in the clip)}; a build
 of several shots renders them back to back in one MASTER, so each piece is an offset into that clip. Every frame

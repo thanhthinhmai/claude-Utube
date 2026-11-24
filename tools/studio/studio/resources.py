@@ -11,7 +11,7 @@ from .store import StudioError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))     # tools/: filmcheck (shot notes, specs/029)
 from filmcheck import shotnotes  # noqa: E402
-from ae import film as aefilm  # noqa: E402  (specs/031: which engine draws the film)
+from ae import film as aefilm  # noqa: E402  (specs/032: which engine draws the film)
 
 NAME = re.compile(r"^[a-z0-9-]{1,60}$")
 SHEET = re.compile(r"^v\d{2}_\d{4}\.jpg$")
@@ -111,7 +111,7 @@ def film(name: str) -> dict:
     f["credits"] = credits.read_text(encoding="utf-8", errors="replace") if credits.is_file() else None
     f["treatment_html"] = to_html(treat.read_text(encoding="utf-8", errors="replace")) if treat.is_file() else None
     f["tiers"] = tiers_view(d)
-    if f["engine"] == "ae":                     # specs/031: the fix run in progress and whether AE can build now
+    if f["engine"] == "ae":                     # specs/032: the fix run in progress and whether AE can build now
         from . import jobs
         from ae import aequeue
         lot = None

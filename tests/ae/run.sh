@@ -1,5 +1,5 @@
 #!/bin/sh
-# Test of the After Effects engine (specs/031): film.json, bundles, frame-exact splice, ae uses, CLI with a fake AE.
+# Test of the After Effects engine (specs/032): film.json, bundles, frame-exact splice, ae uses, CLI with a fake AE.
 #   sh tests/ae/run.sh            (needs: python3, ffmpeg, node)
 set -eu
 HERE=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd -P)

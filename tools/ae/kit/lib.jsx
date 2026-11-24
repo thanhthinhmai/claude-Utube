@@ -1,4 +1,4 @@
-// Shared After Effects kit of the studio (specs/031). Moved from films/ae-crayon-test/ae/lib.jsx on 2026-11-23.
+// Shared After Effects kit of the studio (specs/032). Moved from films/ae-crayon-test/ae/lib.jsx on 2026-11-23.
 // Paths come from CU.WORK (the folder the entry script runs in); film data lives in CU.WORK/data/.
 // lib.jsx: drawing and animation helpers for After Effects (ExtendScript, ES3).
 // Shapes use comp coordinates (layer anchor and position at 0,0 unless a pivot is set).

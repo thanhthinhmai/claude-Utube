@@ -31,18 +31,18 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 | `PUT /films/{name}/notes` body `{base, doc}` | `{base, doc}`: ghi cả sổ nếu `base` còn đúng (029) | `409 changed` (kèm `current`) · `422 invalid` (kèm `field`) · `403 forbidden` (mã chỉ đọc) · `404` |
 | `POST /films/{name}/notes/images` multipart `file` | `201 {file}`: ảnh PNG/JPEG/WebP ≤ 10 MB cho ghi chú (029; cũng nhận `multipart/form-data` có `X-Studio: 1`) | `413 too_large` · `415 bad_image` · `403 forbidden` · `404` |
 | `GET /films/{name}/notes/images/{file}` | ảnh đính kèm, `file` dạng `img-<12 hex>.(png\|jpg\|webp)` (029) | `400 bad_name` · `404` |
-| `POST /films/{name}/fix` body `{}` | `201 {job, notes, left}`: việc `fix` "Fix with Claude" trên ≤ 10 ghi chú mở theo thứ tự trong phim (specs/031, chỉ trong app); `GET /films/{name}` của phim AE có thêm `engine`, `lot`, `ae_ready`, `ae_message` | `422 not_ae` · `422 no_open_notes` · `409 in_progress` · `409 ae_unavailable` · `409 ae_missing` · `409 app_only` (chế độ local) |
+| `POST /films/{name}/fix` body `{}` | `201 {job, notes, left}`: việc `fix` "Fix with Claude" trên ≤ 10 ghi chú mở theo thứ tự trong phim (specs/032, chỉ trong app); `GET /films/{name}` của phim AE có thêm `engine`, `lot`, `ae_ready`, `ae_message` | `422 not_ae` · `422 no_open_notes` · `409 in_progress` · `409 ae_unavailable` · `409 ae_missing` · `409 app_only` (chế độ local) |
 | `GET /films/{name}/poster` | `image/jpeg` | `404` |
 | `GET /films/{name}/subtitles.vtt` | WebVTT (chuyển từ `.srt`) | `404` |
 | `GET /films/{name}/publish` | gói đăng: `{titles, description, subtitles, files, check}` (specs/011) | `404` |
 | `GET /films/{name}/publish/{file}` | một tệp của gói: `thumbnail-[123].(png\|jpg)`, `subtitles.srt`, `titles.md`, `description.md`, `PUBLISH.md` (011) | `404` |
 | `GET /films/{name}/publish.zip` | `application/zip`, cả gói (011) | `404` |
-| `GET /ae/bridge/next` | `200 {id, shots, film, …}` (nhận một yêu cầu dựng AE) hoặc `204`. Mọi đường `/ae/bridge/*`: chỉ app desktop của chính máy, header `X-CU-Bridge` + từ 127.0.0.1, không cần phiên hay `X-Studio` (specs/031) | `403 forbidden` |
-| `POST /ae/bridge/hello` body `{version, os, afterfx, aerender, found}` | `{ok}` (031) | `403` |
-| `GET /ae/bridge/{id}/bundle` | `application/x-tar`: gói jsx của yêu cầu (031) | `404` · `409 not_active` |
-| `POST /ae/bridge/{id}/progress` body `{state, shot, index, total}` hoặc `{}` (nhịp) | yêu cầu (031) | `409 not_active` |
-| `PUT /ae/bridge/{id}/result/{name}` thân mp4 ≤ 500 MB, `name` = `MASTER` hoặc mã shot | `201 {bytes}` (031) | `413` · `422` · `409` |
-| `POST /ae/bridge/{id}/finish` body `{ok, checks, marks, duration}` hoặc `{ok: false, error}` | yêu cầu (031) | `409` · `422` |
+| `GET /ae/bridge/next` | `200 {id, shots, film, …}` (nhận một yêu cầu dựng AE) hoặc `204`. Mọi đường `/ae/bridge/*`: chỉ app desktop của chính máy, header `X-CU-Bridge` + từ 127.0.0.1, không cần phiên hay `X-Studio` (specs/032) | `403 forbidden` |
+| `POST /ae/bridge/hello` body `{version, os, afterfx, aerender, found}` | `{ok}` (032) | `403` |
+| `GET /ae/bridge/{id}/bundle` | `application/x-tar`: gói jsx của yêu cầu (032) | `404` · `409 not_active` |
+| `POST /ae/bridge/{id}/progress` body `{state, shot, index, total}` hoặc `{}` (nhịp) | yêu cầu (032) | `409 not_active` |
+| `PUT /ae/bridge/{id}/result/{name}` thân mp4 ≤ 500 MB, `name` = `MASTER` hoặc mã shot | `201 {bytes}` (032) | `413` · `422` · `409` |
+| `POST /ae/bridge/{id}/finish` body `{ok, checks, marks, duration}` hoặc `{ok: false, error}` | yêu cầu (032) | `409` · `422` |
 | `GET /sets` | `{sets: [{set, videos, measured, media_removed}]}` | |
 | `GET /sets/{set}` | `summary`, `videos[]` (không có `origin`, `title`, `channel`) | `404` |
 | `GET /sets/{set}/sheets` | `{sheets: [file]}` hoặc `{removed: true}` | |

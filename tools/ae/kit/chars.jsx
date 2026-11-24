@@ -1,4 +1,4 @@
-// Shared After Effects kit of the studio (specs/031). Moved from films/ae-crayon-test/ae/chars.jsx on 2026-11-23.
+// Shared After Effects kit of the studio (specs/032). Moved from films/ae-crayon-test/ae/chars.jsx on 2026-11-23.
 // Paths come from CU.WORK (the folder the entry script runs in); film data lives in CU.WORK/data/.
 // chars.jsx: rigged cartoon people built from shape layers inside a precomp.
 // A person comp is 800 x 1100; feet at (400, 1060). Faces turn toward dir (+1 right, -1 left).

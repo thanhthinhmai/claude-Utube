@@ -303,7 +303,7 @@ class ShotsApi(unittest.TestCase):
     def test_shots_and_thumbs(self):
         f = self.c.get(f"{API}/demo-film").json()
         self.assertEqual((f["has_shots"], f["has_prev"]), (True, False))
-        self.assertEqual(f["engine"], "page")                  # specs/031: no film.json → web page engine
+        self.assertEqual(f["engine"], "page")                  # specs/032: no film.json → web page engine
         r = self.c.get(f"{API}/demo-film/shots").json()
         self.assertTrue(r["valid"], r)
         self.assertEqual([s["id"] for s in r["shots"]], ["S1", "S2", "S3"])

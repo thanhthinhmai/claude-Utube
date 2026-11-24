@@ -498,7 +498,7 @@ def save_notes(film_dir, base: str, doc, by: str = "local", now: float = None) -
         old_notes = {n.get("id"): n for sh in cur.get("shots", {}).values() if isinstance(sh, dict)
                      for n in sh.get("notes", []) if isinstance(n, dict) and n.get("id")}
         new = {"version": 1, "shots": {}}
-        if isinstance(cur.get("lot"), dict):          # a fix run in progress (specs/031): only start_lot/end_lot change it
+        if isinstance(cur.get("lot"), dict):          # a fix run in progress (specs/032): only start_lot/end_lot change it
             new["lot"] = cur["lot"]
         for sid, sh in doc["shots"].items():
             new["shots"][sid] = {"status": sh.get("status", "none"), "status_by": sh.get("status_by", "auto"),
@@ -621,7 +621,7 @@ def show_lines(film_dir, everything: bool = False) -> tuple:
     return lines, open_n
 
 
-# ---------- fix runs: the notes one "Fix with Claude" job works on (specs/031 R7, FR-011, FR-012) ----------
+# ---------- fix runs: the notes one "Fix with Claude" job works on (specs/032 R7, FR-011, FR-012) ----------
 LOT_LIMIT = 10
 
 

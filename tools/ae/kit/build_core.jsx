@@ -1,4 +1,4 @@
-// Shared After Effects kit of the studio (specs/031). Moved from films/ae-crayon-test/ae/build_core.jsx on 2026-11-23.
+// Shared After Effects kit of the studio (specs/032). Moved from films/ae-crayon-test/ae/build_core.jsx on 2026-11-23.
 // Paths come from CU.WORK (the folder the entry script runs in); film data lives in CU.WORK/data/.
 // build_core.jsx: builds the listed shots into a MASTER comp, writes shot marks and saves CU.PROJ in CU.WORK.
 // Log lines: START, shot … ok, CHECK …, ERR …, master …, DONE.
@@ -48,7 +48,7 @@ CU.build = function (list) {
   CU.say("DONE"); CU.log.close();
 };
 
-// Render MASTER inside After Effects with its render queue (specs/031): no aerender, so After Effects never has to be
+// Render MASTER inside After Effects with its render queue (specs/032): no aerender, so After Effects never has to be
 // closed between builds (a forced close leaves it on a start-up dialog, and a cold start takes 1.5-4 minutes).
 CU.OM_TEMPLATE = "H.264 - Match Render Settings - 40 Mbps";
 CU.renderMaster = function (M, name) {

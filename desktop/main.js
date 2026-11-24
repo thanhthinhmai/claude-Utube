@@ -582,7 +582,7 @@ async function startSharing() {
   saveShare();
 }
 
-// ---------- After Effects bridge (specs/031) ----------
+// ---------- After Effects bridge (specs/032) ----------
 // A new random key at each start, in bridge.json; the core gets the file with `app start --bridge` and only answers
 // /api/v1/ae/bridge/* with that key, from 127.0.0.1. The bridge pulls build requests and runs AE on this computer.
 const BRIDGE = path.join(CONFIG_DIR, "bridge.json");
@@ -1035,7 +1035,7 @@ async function smokeMain(port) {
     await stopSharing();
     smoke("share pair ok");
   }
-  if (process.env.CU_SMOKE_AE === "1") {                // specs/031: the fake core queues one AE build; the fake AE builds it
+  if (process.env.CU_SMOKE_AE === "1") {                // specs/032: the fake core queues one AE build; the fake AE builds it
     let st = null;
     for (let i = 0; i < 120 && !(st && (st.state === "done" || st.state === "failed")); i++) {
       await new Promise((r) => setTimeout(r, 500));

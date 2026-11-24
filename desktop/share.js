@@ -187,7 +187,7 @@ function startGateway(o) {
       }
       const headers = { ...req.headers };
       delete headers["x-cu-client"];
-      delete headers["x-cu-bridge"];                     // the AE bridge is for this computer's own app only (specs/031)
+      delete headers["x-cu-bridge"];                     // the AE bridge is for this computer's own app only (specs/032)
       if (url.startsWith("/api/v1/ae/bridge/")) return json(res, 403, { code: "forbidden" });
       if (url === "/__cu/update" || url.startsWith("/__cu/update/")) {         // R5: through the Host's own license
         const src = o.update ? o.update() : null;

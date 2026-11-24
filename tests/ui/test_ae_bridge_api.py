@@ -1,4 +1,4 @@
-"""The AE bridge paths of API v1 in local mode (specs/031 T020; the full flow with jobs is tests/online/test_ae_bridge.py)."""
+"""The AE bridge paths of API v1 in local mode (specs/032 T020; the full flow with jobs is tests/online/test_ae_bridge.py)."""
 import json
 import os
 import tempfile

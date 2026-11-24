@@ -1,4 +1,4 @@
-"""Which shots use which functions of the shared kit (specs/031 R6, FR-005).
+"""Which shots use which functions of the shared kit (specs/032 R6, FR-005).
 
 ES3 has no modules: a shot uses CU.<name> when its function body (CU.shot<id> = function …) calls it, directly or
 through other CU functions (the film's own helpers and the kit's call graph). When in doubt a shot is listed: an

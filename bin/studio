@@ -22,7 +22,7 @@
 #   sh bin/studio render <phim> [--fps N] [--workers N] [--until S] [--skip-checks R] [--no-stop] [--fresh]  ghi video sau khi kiểm (019, 020)
 #   sh bin/studio page still|events|readcheck <phim> …  chạy công cụ trang của thư viện · deps gpu · config render auto|software
 #   sh bin/studio shots export <phim> · notes show|reply <phim> … · film replace <phim> <video> [--shots F]  ghi chú từng shot (specs/029)
-#   sh bin/studio ae build|render|fix|uses|status|new <phim> … · config ae [--afterfx P] [--aerender P] [--work D]  phim After Effects (specs/031)
+#   sh bin/studio ae build|render|fix|uses|status|new <phim> … · config ae [--afterfx P] [--aerender P] [--work D]  phim After Effects (specs/032)
 #   sh bin/studio help
 # Mã thoát: 0 = sẵn sàng / xong · 1 = chưa sẵn sàng / thất bại · 2 = sai cách dùng hoặc library.lock sai.
 set -eu

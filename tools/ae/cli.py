@@ -1,4 +1,4 @@
-"""sh bin/studio ae build|render|fix|uses|status|new and config ae (specs/031 contracts/cli.md).
+"""sh bin/studio ae build|render|fix|uses|status|new and config ae (specs/032 contracts/cli.md).
 
 Inside a job (STUDIO_JOB and STUDIO_PROXY set) builds go through the desktop app's bridge (remote.py); elsewhere AE
 runs on this machine (local.py). Exit codes: 0 done · 1 build error or CHECK lines · 2 bad input · 3 no AE / bridge."""
@@ -197,7 +197,7 @@ def cmd_status(a) -> int:
     return 0
 
 
-SHOTS_TEMPLATE = """// shots.jsx: this film's own shots (specs/031). One function per shot id of film.json, returning its comp.
+SHOTS_TEMPLATE = """// shots.jsx: this film's own shots (specs/032). One function per shot id of film.json, returning its comp.
 // The shared kit (tools/ae/kit: lib, chars, scene, persp, build_core) is loaded first: use CU.comp, CU.person, …
 CU.shot1 = function () {
   var c = CU.comp("S01 title", 3);
@@ -237,7 +237,7 @@ def cmd_config(a) -> int:
 
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="studio ae", description="After Effects films (specs/031)")
+    p = argparse.ArgumentParser(prog="studio ae", description="After Effects films (specs/032)")
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("build"); s.add_argument("film"); s.add_argument("--shots"); s.add_argument("--dir"); s.set_defaults(fn=cmd_build)
     s = sub.add_parser("render"); s.add_argument("film"); s.add_argument("--dir"); s.set_defaults(fn=cmd_render)

@@ -1,4 +1,4 @@
-// Shared After Effects kit of the studio (specs/031). Moved from films/ae-crayon-test/ae/scene.jsx on 2026-11-23.
+// Shared After Effects kit of the studio (specs/032). Moved from films/ae-crayon-test/ae/scene.jsx on 2026-11-23.
 // Paths come from CU.WORK (the folder the entry script runs in); film data lives in CU.WORK/data/.
 // scene.jsx: staging declarations and automatic logic checks (prototype).
 // A shot declares its floor, props with boxes and anchor points, how each person is supported, who speaks each

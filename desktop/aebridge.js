@@ -1,5 +1,5 @@
 // @ts-check
-// The After Effects bridge of the desktop app (specs/031 T016, research R1–R4). The core (in WSL or on this Mac)
+// The After Effects bridge of the desktop app (specs/032 T016, research R1–R4). The core (in WSL or on this Mac)
 // keeps a queue of build requests; this app pulls one at a time, runs After Effects and aerender on this machine,
 // and sends progress, the rendered clip and the result back. No Electron here, so `node --test` covers it.
 "use strict";
@@ -330,7 +330,7 @@ class Bridge {
     try {
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, "bundle.json"), JSON.stringify({ shots: [], proj: "test.aep" }));
-      fs.writeFileSync(path.join(dir, "entry.jsx"), '// claude-Utube: After Effects test (specs/031)\n' +
+      fs.writeFileSync(path.join(dir, "entry.jsx"), '// claude-Utube: After Effects test (specs/032)\n' +
         'var f = new File((new File($.fileName)).parent.fsName + "/log.txt"); f.open("w"); f.writeln("START"); f.writeln("DONE"); f.close();\n');
       const t0 = Date.now();
       const p = this.run(scriptCommand(this.o.platform, s, this.aePath(path.join(dir, "entry.jsx"))), { cwd: dir });

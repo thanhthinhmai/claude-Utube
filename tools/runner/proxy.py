@@ -499,7 +499,7 @@ def create_app() -> FastAPI:
         log.info("job %s youtube %s: %s units%s", job["id"], body.endpoint, units, " (cache)" if not units else "")
         return {**out, "_cached": units == 0, "_units": units}
 
-    # ---------- After Effects builds through the desktop app's bridge (specs/031 contracts/bridge-api.md) ----------
+    # ---------- After Effects builds through the desktop app's bridge (specs/032 contracts/bridge-api.md) ----------
     from ae import aequeue
     from fastapi.responses import FileResponse
 

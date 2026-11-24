@@ -161,7 +161,7 @@ def revise_prompt(inp: dict) -> str:
 
 
 AE_PICTURE = """
-This film is drawn by After Effects on the customer's computer (specs/031), not by a web page. Follow JOB.md for
+This film is drawn by After Effects on the customer's computer (specs/032), not by a web page. Follow JOB.md for
 everything except the picture: treatment, script and its review, voice and its check, review points, mix, publish pack
 and `job done` stay the same. Skip every web-page step (no kit, no index.html, no scenes.json, no `render`, no `qc plan`,
 no `qc shots`). For the picture:
@@ -206,7 +206,7 @@ def film_prompt(inp: dict) -> str:
 
 
 def fix_prompt(inp: dict) -> str:
-    """"Fix with Claude" on an After Effects film's shot notes (specs/031 T024; the steps of CLAUDE.md 3c)."""
+    """"Fix with Claude" on an After Effects film's shot notes (specs/032 T024; the steps of CLAUDE.md 3c)."""
     st, job, film = STUDIO, os.environ.get("STUDIO_JOB", ""), inp["film"]
     ids = ", ".join(inp.get("notes") or [])
     return f"""Fix the customer's notes on the After Effects film `{film}` ({WORK}/films/{film}/). This job works on these

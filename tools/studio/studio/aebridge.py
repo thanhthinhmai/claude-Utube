@@ -1,4 +1,4 @@
-"""The desktop app's key for /api/v1/ae/bridge/* (specs/031 research R2).
+"""The desktop app's key for /api/v1/ae/bridge/* (specs/032 research R2).
 
 The desktop app makes a random 32-byte key at each start, writes it to bridge.json and starts the core with
 `app start --bridge <file>`; the file's path is in STUDIO_AE_BRIDGE for the web and the proxy. A bridge call must come

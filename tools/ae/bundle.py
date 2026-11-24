@@ -1,4 +1,4 @@
-"""The jsx bundle of one AE build request (specs/031 contracts/film-ae.md).
+"""The jsx bundle of one AE build request (specs/032 contracts/film-ae.md).
 
 bundle.tar holds kit/*.jsx (the studio's shared kit), ae/<ae_files> (the film's own shots), data/ (the film's data:
 measured camera moves, snaps), bundle.json and entry.jsx. entry.jsx sets CU.WORK to the folder it runs in, so the

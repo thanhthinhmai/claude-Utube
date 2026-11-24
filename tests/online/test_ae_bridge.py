@@ -1,4 +1,4 @@
-"""The After Effects bridge (specs/031 T020): the desktop app's key, one request at a time, heartbeats, the proxy."""
+"""The After Effects bridge (specs/032 T020): the desktop app's key, one request at a time, heartbeats, the proxy."""
 import io
 import json
 import os

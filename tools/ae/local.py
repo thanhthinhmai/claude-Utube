@@ -1,4 +1,4 @@
-"""Run After Effects on this machine from the command line (specs/031 T007, research R3/R4).
+"""Run After Effects on this machine from the command line (specs/032 T007, research R3/R4).
 
 Used outside a job (development machine: WSL with AE on Windows, or macOS). Inside the app a job goes through the
 desktop app's bridge instead (tools/ae/remote.py). Steps: bundle → work/<id>/ → AfterFX -r entry.jsx (macOS:

@@ -1,4 +1,4 @@
-"""The core's queue of After Effects build requests (specs/031 T012, data-model.md, contracts/bridge-api.md).
+"""The core's queue of After Effects build requests (specs/032 T012, data-model.md, contracts/bridge-api.md).
 
 $STUDIO_DATA/ae/requests/<id>/ holds request.json, bundle.tar, out/<name>.mp4. A job puts a request in (through the
 proxy); the desktop app pulls one at a time (GET next), sends progress (a heartbeat), uploads results and finishes.

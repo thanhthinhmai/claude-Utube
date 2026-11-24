@@ -436,7 +436,7 @@ class Worker:
         if job_id not in self.runs:      # media go first, as for done jobs
             self.purge(jobs.load(job_id))
         j = quotas.fail(job_id, error, by)
-        if j.get("kind") == "fix":       # specs/031: the notes are free again; the video and the notes stay as they were
+        if j.get("kind") == "fix":       # specs/032: the notes are free again; the video and the notes stay as they were
             try:
                 from filmcheck import shotnotes
                 shotnotes.end_lot(store.account_dir(j["owner"]) / "films" / (j.get("input") or {}).get("film", ""), job_id)
@@ -473,7 +473,7 @@ class Worker:
         n = quotas.settings()["concurrency"]
         with db.tx() as con:
             # only the worker's own jobs (they have "charged"); a job of the chat flow (`job start` on this machine) left
-            # "running" must not hold the customer's queue (seen in the first Fix with Claude run, specs/031)
+            # "running" must not hold the customer's queue (seen in the first Fix with Claude run, specs/032)
             busy = [r[0] for r in con.execute("SELECT owner FROM docs WHERE kind = 'job' AND status = 'running' "
                                               "AND json_extract(data, '$.charged') IS NOT NULL")]
             if len(busy) >= n:
@@ -556,7 +556,7 @@ class Worker:
         if (acct / "my-styles").is_dir() and not mine.exists():
             shutil.copytree(acct / "my-styles", mine)
         inp = j.get("input") or {}
-        if j["kind"] == "fix":                        # specs/031: the AE film with its notes; videos as hard links
+        if j["kind"] == "fix":                        # specs/032: the AE film with its notes; videos as hard links
             src, dst = acct / "films" / inp["film"], work / "films" / inp["film"]
             if src.is_dir() and not dst.exists():
                 def link_or_copy(a, b):
@@ -662,7 +662,7 @@ class Worker:
             self.finish_topics(j, work, result)
             return
         rep = j.get("reported") or {}
-        if j["kind"] == "fix":                     # specs/031: put the fixed video and the answers in the library
+        if j["kind"] == "fix":                     # specs/032: put the fixed video and the answers in the library
             self.finish_fix(j, work, rep, result, rc)
             return
         cut = j.get("publish_cut") if j["kind"] == "film" else None
@@ -729,7 +729,7 @@ class Worker:
         log.info("job %s done", job_id)
 
     def finish_fix(self, j: dict, work: Path, rep: dict, result: dict, rc: int) -> None:
-        """A fix run ended (specs/031 R7, FR-011, FR-014). Done: the film's AE files and, when shots were rebuilt, the
+        """A fix run ended (specs/032 R7, FR-011, FR-014). Done: the film's AE files and, when shots were rebuilt, the
         new video (previous kept) go to the library, then Claude's answers on the lot's notes. Failed: nothing changes
         but the lot is dropped (in failed())."""
         from filmcheck import shotnotes

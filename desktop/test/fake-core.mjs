@@ -2,7 +2,7 @@
 // `sh bin/studio app …` (specs/014), with a tiny web server instead of the studio. GitHub Actions has no WSL2.
 //   node fake-core.mjs app start|status|stop|check [--json] [--force] --data <dir>
 // FAKE_CORE_JOB=1: `app status` reports one running job, so quitting has to ask.
-// FAKE_CORE_AE=1 (specs/031): `app start --bridge <file>` makes the server queue one After Effects build request behind
+// FAKE_CORE_AE=1 (specs/032): `app start --bridge <file>` makes the server queue one After Effects build request behind
 // /api/v1/ae/bridge/* (key from the file); GET /__fake/ae shows how it went.
 import fs from "node:fs";
 import http from "node:http";

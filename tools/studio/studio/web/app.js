@@ -1396,7 +1396,7 @@ async function filmShots(name, f) {
   drawShots();
   loadNotes();
 }
-/** The "Fix with Claude" button of an After Effects film in the app (specs/031 FR-010): a fix job on the open notes,
+/** The "Fix with Claude" button of an After Effects film in the app (specs/032 FR-010): a fix job on the open notes,
  * or why it cannot start (not AE, no open notes, the desktop app has no AE), or the run in progress. */
 function drawFix() {
   const box = document.getElementById("sh-fix");

@@ -1,4 +1,4 @@
-"""Fix with Claude on an After Effects film (specs/031 T026): the lot, the fix job, and what the worker puts back."""
+"""Fix with Claude on an After Effects film (specs/032 T026): the lot, the fix job, and what the worker puts back."""
 import json
 import os
 import shutil

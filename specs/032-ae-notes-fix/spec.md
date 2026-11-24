@@ -1,6 +1,6 @@
 # Feature Specification: Sửa ghi chú phim After Effects tự động trên app
 
-**Feature Branch**: `031-ae-notes-fix`
+**Feature Branch**: `032-ae-notes-fix`
 
 **Created**: 2026-11-23
 

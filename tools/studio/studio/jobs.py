@@ -8,7 +8,7 @@ import time
 from . import store
 from .store import StudioError
 
-KINDS = {"learn", "film", "topics", "fix"}     # fix: "Fix with Claude" on an AE film's notes (specs/031)
+KINDS = {"learn", "film", "topics", "fix"}     # fix: "Fix with Claude" on an AE film's notes (specs/032)
 STORED = {"queued", "running", "waiting_review", "waiting_resume", "done", "failed", "stopped"}
 FINAL = {"done", "failed", "stopped"}
 INACTIVE_AFTER = 600          # s without any update while running → shown as inactive
@@ -29,7 +29,7 @@ def check_id(job_id: str) -> str:
 
 
 def is_live(job_id) -> bool:
-    """True while this job exists and has not ended (a fix run's lot is held only by a live job, specs/031)."""
+    """True while this job exists and has not ended (a fix run's lot is held only by a live job, specs/032)."""
     try:
         return bool(job_id) and load(job_id)["status"] not in FINAL
     except (StudioError, ValueError, TypeError):

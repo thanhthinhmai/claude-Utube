@@ -1,4 +1,4 @@
-// Development only (specs/031 T027): run the desktop app's AE bridge from WSL against a core started with
+// Development only (specs/032 T027): run the desktop app's AE bridge from WSL against a core started with
 // `sh bin/studio app start --bridge <file>`, driving the real After Effects on Windows through WSL interop.
 //   node desktop/test/wsl-bridge.mjs --core http://127.0.0.1:8790 --bridge <file> --work /mnt/e/claude-utube-ae/work
 import { createRequire } from "node:module";

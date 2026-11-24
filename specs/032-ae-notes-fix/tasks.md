@@ -1,11 +1,11 @@
 ---
 
-description: "Tasks: sửa ghi chú phim After Effects tự động trên app (031)"
+description: "Tasks: sửa ghi chú phim After Effects tự động trên app (032)"
 ---
 
 # Tasks: Sửa ghi chú phim After Effects tự động trên app
 
-**Input**: `specs/031-ae-notes-fix/` (plan.md, spec.md, research.md, data-model.md, contracts/, quickstart.md)
+**Input**: `specs/032-ae-notes-fix/` (plan.md, spec.md, research.md, data-model.md, contracts/, quickstart.md)
 
 **Tests**: Có (hiến pháp IV; SC-003, SC-004, SC-006, SC-007 đo bằng test tự động).
 

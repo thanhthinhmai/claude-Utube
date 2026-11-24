@@ -1,4 +1,4 @@
-"""Build through the desktop app's bridge from inside a job (specs/031 T009/T015): the job sends the bundle to the
+"""Build through the desktop app's bridge from inside a job (specs/032 T009/T015): the job sends the bundle to the
 proxy (/internal/ae/requests), waits for the desktop app to build it, then downloads the MASTER clip."""
 import json
 import os

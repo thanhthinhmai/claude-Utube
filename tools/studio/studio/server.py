@@ -84,7 +84,7 @@ def create_app() -> FastAPI:
                 if request.url.path.startswith("/api/"):
                     return err("license_locked", f"claude-Utube is locked (license: {why})", 423)
                 return HTMLResponse(gate.LOCKED_HTML, status_code=423)
-        if request.url.path.startswith("/api/v1/ae/bridge/"):           # the desktop app's AE bridge (specs/031 R2)
+        if request.url.path.startswith("/api/v1/ae/bridge/"):           # the desktop app's AE bridge (specs/032 R2)
             client = request.client.host if request.client else ""
             if not aebridge.allowed(client, request.headers.get("x-cu-bridge")):
                 return err("forbidden", "the AE bridge needs the desktop app's key", 403)
@@ -320,7 +320,7 @@ def create_app() -> FastAPI:
         return reviews.decide(rid, body.value, body.note, "api" if via_token else "ui", body.base, owner(request) or "local")
 
     # ---------- films ----------
-    # ---------- After Effects bridge: the desktop app pulls build requests (specs/031 contracts/bridge-api.md) ----------
+    # ---------- After Effects bridge: the desktop app pulls build requests (specs/032 contracts/bridge-api.md) ----------
     from ae import aequeue
 
     def q(fn, *a):
@@ -438,7 +438,7 @@ def create_app() -> FastAPI:
 
     @app.post(api + "/films/{name}/fix", status_code=201)
     def film_fix(name: str, request: Request):
-        """"Fix with Claude" (specs/031 FR-010, FR-011): a fix job on the film's open notes (≤ 10, film order)."""
+        """"Fix with Claude" (specs/032 FR-010, FR-011): a fix job on the film's open notes (≤ 10, film order)."""
         _note_writer(request)
         d = resources.film_dir(name)
         if not d.is_dir():

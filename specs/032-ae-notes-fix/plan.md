@@ -1,8 +1,8 @@
 # Implementation Plan: Sửa ghi chú phim After Effects tự động trên app
 
-**Branch**: `031-ae-notes-fix` | **Date**: 2026-11-23 | **Spec**: [spec.md](spec.md)
+**Branch**: `032-ae-notes-fix` | **Date**: 2026-11-23 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `specs/031-ae-notes-fix/spec.md`
+**Input**: Feature specification from `specs/032-ae-notes-fix/spec.md`
 
 ## Summary
 
@@ -55,7 +55,7 @@ Kết quả: **qua cổng**.
 ### Documentation (this feature)
 
 ```text
-specs/031-ae-notes-fix/
+specs/032-ae-notes-fix/
 ├── plan.md · research.md · data-model.md · quickstart.md
 ├── contracts/
 │   ├── bridge-api.md     # phần lõi ↔ app desktop (kéo việc, tiến độ, kết quả) và proxy ↔ việc

@@ -1,5 +1,5 @@
 // @ts-check
-// The desktop app's After Effects bridge (specs/031 T019) with the fake AE (fake-ae.mjs) and a fake core queue.
+// The desktop app's After Effects bridge (specs/032 T019) with the fake AE (fake-ae.mjs) and a fake core queue.
 "use strict";
 
 const test = require("node:test");
