@@ -23,7 +23,6 @@
   <h2>Paths</h2>
   <div class="panel">
     <div class="row"><b>After Effects</b><span class="path" id="afterfx"></span><button data-choose="afterfx">Choose…</button></div>
-    <div class="row"><b>aerender</b><span class="path" id="aerender"></span><button data-choose="aerender">Choose…</button></div>
     <div class="row"><b>Work folder</b><span class="path" id="work"></span><button data-choose="work">Choose…</button></div>
     <p class="muted" id="auto"></p>
     <button id="reset">Use the paths found automatically</button>
@@ -39,14 +38,13 @@
   const $ = (id) => document.getElementById(id);
   function show(s) {
     $("afterfx").textContent = s.afterfx || "not found";
-    $("aerender").textContent = s.aerender || "not found";
     $("work").textContent = s.work;
     $("auto").textContent = s.found ? `Found: ${s.found.version}` : "No After Effects found in the usual place. Choose it above.";
     $("status").innerHTML = "";
     const p = document.createElement("p");
     p.className = s.ready ? "ok" : "bad";
     p.textContent = s.busy ? `Building a film now (${s.busy}).` : s.ready ? "Ready: films can be built with After Effects."
-      : "Not ready: After Effects or aerender was not found.";
+      : "Not ready: After Effects was not found.";
     $("status").appendChild(p);
   }
   async function refresh() { show(await window.ae.state()); }

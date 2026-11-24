@@ -40,6 +40,28 @@ CU.build = function (list) {
     }
     app.project.save(new File(CU.WORK + "/" + (CU.PROJ || "build.aep")));
     CU.say("master " + total.toFixed(3) + " s");
+    if (CU.RENDER) { CU.renderMaster(M, CU.RENDER); }
   } catch (e) { CU.say("ERR " + e.toString() + " line " + e.line); }
+  try { app.project.close(CloseOptions.DO_NOT_SAVE_CHANGES); } catch (e4) { }   // After Effects stays open for the next build
+  try { app.purge(PurgeTarget.ALL_CACHES); } catch (e5) { }                       // and gives its memory back
+  app.endSuppressDialogs(false);
   CU.say("DONE"); CU.log.close();
+};
+
+// Render MASTER inside After Effects with its render queue (specs/031): no aerender, so After Effects never has to be
+// closed between builds (a forced close leaves it on a start-up dialog, and a cold start takes 1.5-4 minutes).
+CU.OM_TEMPLATE = "H.264 - Match Render Settings - 40 Mbps";
+CU.renderMaster = function (M, name) {
+  var rq = app.project.renderQueue, i;
+  for (i = rq.numItems; i >= 1; i--) { rq.item(i).remove(); }
+  var it = rq.items.add(M);
+  try { it.applyTemplate("Best Settings"); } catch (e1) { }
+  var om = it.outputModule(1);
+  om.applyTemplate(CU.OM_TEMPLATE);
+  om.file = new File(CU.WORK + "/" + name);
+  CU.say("render " + name);
+  var t0 = new Date().getTime();
+  rq.render();
+  if (!om.file.exists) { CU.say("ERR render: After Effects wrote no " + name); return; }
+  CU.say("rendered " + (new Date().getTime() - t0) + " ms");
 };

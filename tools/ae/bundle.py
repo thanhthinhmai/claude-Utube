@@ -26,7 +26,8 @@ def entry_text(doc: dict, shots: list, film_name: str, proj: str = PROJ) -> str:
              f"CU.FPS = {doc['fps']}; CU.W = {w}; CU.H = {h};"]
     lines += [f'#include "kit/{f}"' for f in KIT_FILES[1:]]
     lines += [f'#include "ae/{f}"' for f in doc["ae_files"]]
-    lines += [f"CU.PROJ = {json.dumps(proj)};", f"CU.build([{ids}]);", ""]
+    lines += [f"CU.PROJ = {json.dumps(proj)};", 'CU.RENDER = "master.mp4";   // rendered inside After Effects (no aerender)',
+              f"CU.build([{ids}]);", ""]
     return "\n".join(lines)
 
 

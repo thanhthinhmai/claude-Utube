@@ -10,9 +10,9 @@
 - **Rationale**: Không cần tài khoản hay phiên; tiến trình khác trên máy không có khoá thì không gọi được AE (SC-006).
 
 ## R3. Gói dựng (bundle) và cách AE chạy
-- **Decision**: Phần lõi (lệnh `ae` trong việc) tạo `bundle.tar`: `kit/*.jsx` + `films/<tên>/ae/*.jsx` + `entry.jsx` (danh sách shot, tên tệp ra, thư mục làm việc được thay lúc chạy bằng biến `CU.WORK`). App desktop giải nén vào thư mục làm việc của máy (`<work>/<mã yêu cầu>/`), chạy entry, rồi `aerender -project … -comp "S<n>" -output <work>/out/S<n>.mp4` cho từng shot.
-- **Windows**: `AfterFX.exe -r <entry.jsx>` gửi script vào AE đang chạy hoặc mở AE; chờ `log.txt` có `DONE`; tắt AfterFX trước khi `aerender` (kinh nghiệm: aerender báo "connection forcibly closed" hoặc treo khi AE GUI giữ project).
-- **macOS**: `osascript -e 'tell application id "com.adobe.AfterEffects" to DoScriptFile "<entry>"'`; `aerender` ở thư mục ứng dụng AE.
+- **Decision**: Phần lõi (lệnh `ae` trong việc) tạo `bundle.tar`: `kit/*.jsx` + `films/<tên>/ae/*.jsx` + `entry.jsx` (danh sách shot, tên tệp ra, thư mục làm việc được thay lúc chạy bằng biến `CU.WORK`). App desktop giải nén vào thư mục làm việc của máy (`<work>/<mã yêu cầu>/`) và chạy entry. After Effects dựng các shot thành `MASTER` rồi tự render bằng hàng đợi render của nó (`CU.renderMaster`, mẫu "H.264 - Match Render Settings - 40 Mbps") ra `master.mp4`, đóng project, `app.purge`, và **vẫn mở** cho lượt sau. Không dùng `aerender` (đổi ngày 2026-11-24 sau T027: tắt AE trước `aerender` khiến mỗi lượt phải khởi động nguội 1,5–4 phút và đôi khi AE dừng ở hộp thoại; render trong AE: 11–20 s mỗi lượt, bộ nhớ AE về ~1 GB sau purge).
+- **Windows**: `AfterFX.exe -r <entry.jsx>` gửi script vào AE đang chạy hoặc mở AE; chờ `log.txt` có `DONE`. Chỉ tắt AE khi quá hạn (treo).
+- **macOS**: `osascript -e 'tell application "<app>" to DoScriptFile "<entry>"'`.
 - **Rationale**: Đúng cách đã chạy ổn trên phim tập luyện (`run.sh`, `fixshots.sh`); một project chỉ chứa các shot cần dựng nên nhanh (~10 s/shot).
 
 ## R4. Phát hiện AE và lỗi

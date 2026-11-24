@@ -200,7 +200,7 @@ class Bridge {
   hasAE() {
     const s = this.settings();
     if (isFake(s.afterfx)) return true;
-    return !!s.afterfx && !!s.aerender && fs.existsSync(String(s.afterfx)) && fs.existsSync(String(s.aerender));
+    return !!s.afterfx && fs.existsSync(String(s.afterfx));     // aerender is not needed: AE renders in its render queue
   }
 
   /** @param {string} p @param {RequestInit} [init] */
@@ -295,20 +295,17 @@ class Bridge {
       const shots = meta.shots || req.shots;
       const proj = meta.proj || "build.aep";
       await progress({ state: "running", shot: shots[0], index: 0, total: shots.length });
-      // no kill before the script: AfterFX -r hands it to an open After Effects (a forced kill leaves AE on a dialog)
+      // After Effects builds and renders MASTER itself (render queue) and stays open: no kill, no aerender (a forced
+      // close leaves it on a start-up dialog; a cold start takes minutes)
       const script = this.run(scriptCommand(this.o.platform, s, this.aePath(path.join(dir, "entry.jsx"))), { cwd: dir });
       const text = await this.waitLog(path.join(dir, "log.txt"), shots, s, progress);
-      await this.killAE();                         // AfterFX may stay open as the GUI: close it, then let the call end
       await Promise.race([script, new Promise((res) => setTimeout(res, 10_000))]);
       const lg = parseLog(text);
-      if (lg.errors.length) throw new BridgeError("build_error", lg.errors[0], lg.tail);
-      const aep = path.join(dir, proj), out = path.join(dir, "master.mp4");
+      if (lg.errors.length) throw new BridgeError(lg.errors[0].startsWith("ERR render") ? "render_error" : "build_error", lg.errors[0], lg.tail);
+      const out = path.join(dir, "master.mp4");
       const marksFile = path.join(dir, `shots_${proj.replace(/\.aep$/, "")}.json`);
-      if (!fs.existsSync(aep) || !fs.existsSync(marksFile)) throw new BridgeError("build_error", "After Effects saved no project or shot marks", lg.tail);
-      await progress({ state: "running", shot: "MASTER", index: shots.length, total: shots.length });
-      const r = await this.run(renderCommand(s, this.aePath(aep), this.aePath(out)), { cwd: dir, timeoutMs: s.shotTimeoutSec * 1000 * Math.max(1, shots.length) });
-      if (r.timedOut) { await this.killAE(); throw new BridgeError("shot_timeout", `aerender ran longer than ${s.shotTimeoutSec} s per shot`, String(r.out).slice(-2000)); }
-      if (!fs.existsSync(out) || fs.statSync(out).size === 0) throw new BridgeError("render_error", "aerender wrote no video", String(r.out).slice(-2000));
+      if (!fs.existsSync(marksFile)) throw new BridgeError("build_error", "After Effects wrote no shot marks", lg.tail);
+      if (!fs.existsSync(out) || fs.statSync(out).size === 0) throw new BridgeError("render_error", "After Effects rendered no video", lg.tail);
       const up = await this.call(`${req.id}/result/MASTER`, { method: "PUT", headers: { "content-type": "video/mp4" }, body: fs.readFileSync(out) });
       if (up.status !== 201) throw new BridgeError("upload", `the studio did not take the clip (${up.status})`);
       const marks = JSON.parse(fs.readFileSync(marksFile, "utf8"));
@@ -338,7 +335,6 @@ class Bridge {
       const t0 = Date.now();
       const p = this.run(scriptCommand(this.o.platform, s, this.aePath(path.join(dir, "entry.jsx"))), { cwd: dir });
       await this.waitLog(path.join(dir, "log.txt"), [], s, () => {});
-      await this.killAE();
       await Promise.race([p, new Promise((res) => setTimeout(res, 10_000))]);
       return { ok: true, message: `After Effects ran the test script in ${((Date.now() - t0) / 1000).toFixed(1)} s.` };
     } catch (e) {
@@ -363,8 +359,12 @@ class Bridge {
       const n = text.split(/\r?\n/).filter((x) => x.trim()).length;
       if (n > seen) {
         seen = n; last = Date.now();
-        if (lg.shotsOk.length) progress({ state: "running", shot: lg.shotsOk[lg.shotsOk.length - 1], index: lg.shotsOk.length, total: shots.length });
+        const lastLine = text.split(/\r?\n/).filter((x) => x.trim()).pop() || "";
+        if (lastLine.startsWith("render ")) progress({ state: "running", shot: "MASTER", index: shots.length, total: shots.length });
+        else if (lg.shotsOk.length) progress({ state: "running", shot: lg.shotsOk[lg.shotsOk.length - 1], index: lg.shotsOk.length, total: shots.length });
       }
+      const rendering = (text.split(/\r?\n/).filter((x) => x.trim()).pop() || "").startsWith("render ");
+      const allow = s.shotTimeoutSec * (rendering ? Math.max(1, shots.length) : 1);
       const now = Date.now();
       if (!n && now - t0 > s.startTimeoutSec * 1000) {
         await this.killAE();
@@ -372,10 +372,10 @@ class Bridge {
         throw new BridgeError("ae_scripting_off", `After Effects did not start the script in ${s.startTimeoutSec} s. Open After Effects once ` +
           `(a dialog may be waiting) and turn on Preferences > Scripting & Expressions > "Allow Scripts to Write Files and Access Network".`);
       }
-      if (n && now - last > s.shotTimeoutSec * 1000) {
+      if (n && now - last > allow * 1000) {
         await this.killAE();
         for (const c of this.children) { try { c.kill(); } catch { /* gone */ } }
-        throw new BridgeError("ae_stalled", `After Effects made no progress for ${s.shotTimeoutSec} s`, parseLog(text).tail);
+        throw new BridgeError("ae_stalled", `After Effects made no progress for ${allow} s`, parseLog(text).tail);
       }
       await new Promise((res) => setTimeout(res, 250));
     }

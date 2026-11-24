@@ -234,6 +234,18 @@ class Cli(unittest.TestCase):
         self.assertEqual(r.returncode, 1)
         self.assertIn("CHECK floor S1", r.stdout)
 
+    def test_no_video_rendered(self):
+        self.film()
+        r = self.ae("build", "f1", extra={"FAKE_AE_MODE": "norender"})
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("render_error", r.stderr)
+
+    def test_entry_renders_in_after_effects(self):
+        d = self.film()
+        from ae import bundle as b
+        self.assertIn('CU.RENDER = "master.mp4";', b.entry_text(film.load(d), ["S1"], "f1"))
+        self.assertIn("rq.render()", (b.KIT / "build_core.jsx").read_text())
+
     def test_script_never_starts(self):
         self.film()
         t = time.time()

@@ -104,9 +104,6 @@ def check(s: dict) -> None:
         raise AeError("ae_missing", "After Effects was not found on this machine"
                       + (f" ({s['afterfx']})" if s["afterfx"] else "")
                       + "; set its path with: sh bin/studio config ae --afterfx <AfterFX.exe or .app> --aerender <aerender>")
-    if not s["aerender"] or not Path(s["aerender"]).exists():
-        raise AeError("ae_missing", f"aerender was not found ({s['aerender'] or 'no path'}); set it with: "
-                                    "sh bin/studio config ae --aerender <path>")
     if s["kind"] == "unknown":
         raise AeError("ae_missing", f"{s['afterfx']} is neither AfterFX.exe nor an After Effects .app")
 
@@ -159,7 +156,9 @@ def wait_log(s: dict, log: Path, shots: list, proc, progress=None, sleep=0.25) -
         if len(lines) > seen:
             seen, last = len(lines), time.time()
             done = [x for x in lines if re.match(r"shot \S+ ok", x)]
-            if progress and done:
+            if progress and lines[-1].startswith("render "):
+                progress({"state": "running", "shot": "MASTER", "index": len(shots), "total": len(shots)})
+            elif progress and done:
                 progress({"state": "running", "shot": "S" + done[-1].split()[1], "index": len(done), "total": len(shots)})
         now = time.time()
         if not lines and now - t0 > s["startTimeoutSec"]:
@@ -167,13 +166,14 @@ def wait_log(s: dict, log: Path, shots: list, proc, progress=None, sleep=0.25) -
             raise AeError("ae_scripting_off", "After Effects did not start the script in "
                           f"{s['startTimeoutSec']} s. Open After Effects once (a dialog may be waiting) and turn on "
                           "Edit > Preferences > Scripting & Expressions > \"Allow Scripts to Write Files and Access Network\".")
-        if lines and now - last > s["shotTimeoutSec"]:
+        allow = s["shotTimeoutSec"] * (max(1, len(shots)) if lines and lines[-1].startswith("render ") else 1)   # render phase
+        if lines and now - last > allow:
             _kill(s, [proc])
-            raise AeError("ae_stalled", f"After Effects made no progress for {s['shotTimeoutSec']} s", _tail(text))
+            raise AeError("ae_stalled", f"After Effects made no progress for {int(allow)} s", _tail(text))
         time.sleep(sleep)
 
 
-def render(s: dict, aep: Path, out: Path, timeout: float) -> str:
+def render(s: dict, aep: Path, out: Path, timeout: float) -> str:     # aerender: kept for a manual render only
     cmd = _argv(s, "aerender") + ["-project", _path(s, aep), "-comp", "MASTER", "-OMtemplate", OM_TEMPLATE,
                                   "-output", _path(s, out)]
     try:
@@ -205,8 +205,8 @@ def build(film_dir, shots=None, progress=None, s: dict = None) -> dict:
 def run_folder(s: dict, folder: Path, shots: list, proj: str, progress=None) -> dict:
     """Run an unpacked bundle in folder (shared by the CLI and tests)."""
     log = folder / "log.txt"
-    # no kill here: AfterFX -r hands the script to an open After Effects; killing it first is what leaves AE stuck on a
-    # start-up dialog next time. AE is closed only before aerender (which cannot open a project the GUI holds).
+    # AfterFX -r hands the script to the open After Effects, which builds and renders MASTER itself (render queue) and
+    # stays open: no kill, no aerender (a forced close leaves AE on a start-up dialog; a cold start takes minutes).
     proc = run_script(s, folder / "entry.jsx")
     text = wait_log(s, log, shots, proc, progress)
     errs = [x for x in text.splitlines() if x.startswith("ERR")]
@@ -214,17 +214,13 @@ def run_folder(s: dict, folder: Path, shots: list, proj: str, progress=None) -> 
     if proc.poll() is None and s["kind"] == "fake":
         proc.wait(timeout=10)
     if errs:
-        raise AeError("build_error", errs[0], _tail(text))
-    _kill(s, [proc])
-    aep, out = folder / proj, folder / "master.mp4"
+        raise AeError("render_error" if errs[0].startswith("ERR render") else "build_error", errs[0], _tail(text))
+    out = folder / "master.mp4"
     marks_file = folder / f"shots_{proj[:-4]}.json"
-    if not aep.exists() or not marks_file.exists():
-        raise AeError("build_error", "After Effects finished but saved no project or shot marks", _tail(text))
-    if progress:
-        progress({"state": "running", "shot": "MASTER", "index": len(shots), "total": len(shots)})
-    rlog = render(s, aep, out, s["shotTimeoutSec"] * max(1, len(shots)))
+    if not marks_file.exists():
+        raise AeError("build_error", "After Effects finished but wrote no shot marks", _tail(text))
     if not out.exists() or out.stat().st_size == 0:
-        raise AeError("render_error", "aerender wrote no video", _tail(rlog))
+        raise AeError("render_error", "After Effects rendered no video", _tail(text))
     marks = json.loads(marks_file.read_text(encoding="utf-8"))
     return {"master": str(out), "marks": marks["shots"], "duration": marks["duration"], "checks": checks,
             "log": text, "dir": str(folder)}

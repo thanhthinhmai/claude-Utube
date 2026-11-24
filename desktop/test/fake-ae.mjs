@@ -4,7 +4,8 @@
 // afterfx reads bundle.json next to the entry and writes log.txt (START, shot … ok, DONE), shots_<proj>.json
 // (2 s per shot) and the project file. aerender writes a clip as long as the project's shots (ffmpeg testsrc when
 // ffmpeg is on PATH, else the 2 s clip in vectors/).
-// FAKE_AE_MODE: hang (no log, sleeps), noscript (exits without a log), err (ERR line), slowrender (aerender sleeps)
+// afterfx also renders master.mp4 like CU.renderMaster (After Effects' render queue; aerender is not used any more).
+// FAKE_AE_MODE: hang (no log, sleeps), noscript (exits without a log), err (ERR line), norender (no master.mp4), slowrender
 // FAKE_AE_LOCK=<file>: counts runs that overlap (a second afterfx/aerender while one is running) into <file>.overlap
 import fs from "node:fs";
 import path from "node:path";
@@ -24,6 +25,13 @@ function enter() {
   fs.writeFileSync(lock, String(process.pid));
 }
 function leave() { if (lock) { try { fs.unlinkSync(lock); } catch { /* gone */ } } }
+
+/** A clip of `dur` seconds: ffmpeg testsrc when ffmpeg is on PATH, else the 2 s clip in vectors/. */
+function clip(out, dur) {
+  const r = spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", `testsrc=size=320x180:rate=30:duration=${dur}`,
+    "-c:v", "libx264", "-pix_fmt", "yuv420p", out]);
+  if (r.status !== 0) fs.copyFileSync(path.join(HERE, "vectors", "fake-shot.mp4"), out);
+}
 
 if (tool === "afterfx") {
   const entry = opt("-r");
@@ -46,7 +54,15 @@ if (tool === "afterfx") {
       JSON.stringify({ version: 1, video: "", duration: t, fps: meta.fps || 30, source: "ae", shots: rows }));
     fs.writeFileSync(path.join(dir, proj), "fake aep");
     sleep(Number(process.env.FAKE_AE_BUILD_MS || 50));
-    log.push(`master ${t.toFixed(3)} s`, "DONE");
+    log.push(`master ${t.toFixed(3)} s`);
+    if (rows.length && mode !== "norender") {          // like CU.renderMaster: AE renders MASTER in its render queue
+      log.push("render master.mp4");
+      fs.writeFileSync(path.join(dir, "log.txt"), log.join("\n") + "\n");   // AE writes its log as it goes
+      sleep(400);
+      clip(path.join(dir, "master.mp4"), t);
+      log.push("rendered 5 ms");
+    }
+    log.push("DONE");
     fs.writeFileSync(path.join(dir, "log.txt"), log.join("\n") + "\n");
   } finally { leave(); }
 } else if (tool === "aerender") {
@@ -59,9 +75,7 @@ if (tool === "afterfx") {
     const marks = path.join(path.dirname(proj), `shots_${path.basename(proj).replace(/\.aep$/, "")}.json`);
     let dur = 2;
     try { dur = JSON.parse(fs.readFileSync(marks, "utf8")).duration || 2; } catch { /* default */ }
-    const r = spawnSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", `testsrc=size=320x180:rate=30:duration=${dur}`,
-      "-c:v", "libx264", "-pix_fmt", "yuv420p", out]);
-    if (r.status !== 0) fs.copyFileSync(path.join(HERE, "vectors", "fake-shot.mp4"), out);
+    clip(out, dur);
     sleep(Number(process.env.FAKE_AE_RENDER_MS || 50));
     console.log("PROGRESS: Total Time Elapsed: 1 Seconds");
   } finally { leave(); }
