@@ -2,6 +2,7 @@
 import html
 import re
 import sys
+import time
 from pathlib import Path
 
 import markdown as md
@@ -11,6 +12,7 @@ from .store import StudioError
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))     # tools/: filmcheck (shot notes, specs/029)
 from filmcheck import shotnotes  # noqa: E402
+from ae import film as aefilm  # noqa: E402  (specs/032: which engine draws the film)
 
 NAME = re.compile(r"^[a-z0-9-]{1,60}$")
 SHEET = re.compile(r"^v\d{2}_\d{4}\.jpg$")
@@ -72,14 +74,27 @@ def films() -> list:
     return out
 
 
+RENDER_STALE_S = 2 * 3600   # out/ untouched this long = a render that died, not one still running
+
+
+def _rendering(out: Path) -> bool:
+    """A render is running when out/ exists and it (or a file in it) changed recently; a left-over out/ is not."""
+    try:
+        newest = max([out.stat().st_mtime] + [c.stat().st_mtime for c in out.iterdir()])
+    except OSError:
+        return False
+    return time.time() - newest < RENDER_STALE_S
+
+
 def film_summary(name: str) -> dict:
     d = film_dir(name)
     if not d.is_dir():
         raise StudioError("not_found", f"không có phim \"{name}\"", 404)
     has_video = (d / f"{name}.mp4").is_file()
     return {"name": name, "has_video": has_video, "has_poster": (d / "poster.jpg").is_file(),
-            "has_subtitles": (d / f"{name}.srt").is_file(), "rendering": not has_video and (d / "out").exists(),
-            "has_shots": (d / "shots.json").is_file(), "has_prev": (d / f"{name}.prev.mp4").is_file()}
+            "has_subtitles": (d / f"{name}.srt").is_file(), "rendering": not has_video and _rendering(d / "out"),
+            "has_shots": (d / "shots.json").is_file(), "has_prev": (d / f"{name}.prev.mp4").is_file(),
+            "engine": aefilm.engine(d)}
 
 
 def shot_call(fn, *args, **kw):
@@ -109,6 +124,18 @@ def film(name: str) -> dict:
     f["credits"] = credits.read_text(encoding="utf-8", errors="replace") if credits.is_file() else None
     f["treatment_html"] = to_html(treat.read_text(encoding="utf-8", errors="replace")) if treat.is_file() else None
     f["tiers"] = tiers_view(d)
+    if f["engine"] == "ae":                     # specs/032: the fix run in progress and whether AE can build now
+        from . import jobs
+        from ae import aequeue
+        lot = None
+        try:
+            lot = shotnotes.active_lot(d, live=jobs.is_live)
+        except Exception:                       # noqa: BLE001 - a broken book never hides the film page
+            lot = None
+        f["lot"] = lot
+        st = aequeue.bridge_status()
+        f["ae_ready"] = st["ready"]
+        f["ae_message"] = None if st["ready"] else st["message"]
     return f
 
 

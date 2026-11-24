@@ -269,7 +269,7 @@ async function pageChannels() {
         <td>${esc(c.style)}</td><td>${c.lessons_active}${c.lessons_draft ? ` · ${c.lessons_draft} to approve` : ""}</td></tr>`).join("")}</table></div>` : `<p class="muted">No channels yet.</p>`}
     <form class="form panel"><p class="section-title">New channel</p>
       <label>Name<input id="c-name" maxlength="80" required></label>
-      <label>Short id <span class="hint">Lowercase letters, digits and dashes, e.g. science-for-kids</span><input id="c-slug" maxlength="40" pattern="[a-z0-9-]+" required></label>
+      <label>Short id <span class="hint">Lowercase letters, digits and dashes, e.g. science-for-kids</span><input id="c-slug" maxlength="40" pattern="[a-z0-9\\-]+" required></label>
       <label>Language <span class="hint">A code such as en or vi</span><input id="c-language" maxlength="3" value="en" required></label>
       <label>Length in seconds<input id="c-seconds" type="number" min="5" max="900" value="45" required></label>
       <label>Style<select id="c-style">${styles.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("")}</select></label>
@@ -1300,7 +1300,8 @@ async function pageFilm(name) {
         ${f.has_subtitles ? `<track kind="subtitles" srclang="vi" label="Subtitles" src="${base}/subtitles.vtt" default>` : ""}
       </video></div><p class="muted">Turn subtitles on or off with the player’s CC button.</p>
       ${MODE === "online" ? `<p class="film-actions" id="film-actions"><a class="button primary" href="${base}/download">Download</a> <button class="danger" id="del-film">Delete this film</button></p>` : ""}`
-    : `<p class="notice">${f.rendering ? "The film is still rendering: see progress on the Jobs page." : "No film file yet."}</p>`}
+    : `<p class="notice">${f.rendering ? "The film is still rendering: see progress on the Jobs page." : "No film file yet."}</p>
+      ${MODE === "online" && !f.rendering ? `<p class="film-actions"><button class="danger" id="del-film">Delete this film</button></p>` : ""}`}
     ${f.has_video ? `<div id="shots-slot"><div class="panel"><p class="section-title">Shots</p><p class="muted">Loading…</p></div></div>` : ""}
     ${tiersHtml(f.tiers)}
     ${f.treatment_html ? `<h2>Script (TREATMENT)</h2><div class="panel md">${f.treatment_html}</div>` : ""}
@@ -1365,7 +1366,8 @@ async function filmShots(name, f) {
     </div>
     <div id="sh-orphans"></div>
     <div class="sh-claude"><p class="section-title">Fix with Claude</p>
-      <p class="muted small">Paste this into your Claude Code chat. Claude lists the open notes, fixes those shots, renders again, replaces the video and ticks each note with a short reply.</p>
+      <div id="sh-fix"></div>
+      <p class="muted small">${f.engine === "ae" && MODE === "online" ? "Or paste" : "Paste"} this into your Claude Code chat. Claude lists the open notes, fixes those shots, renders again, replaces the video and ticks each note with a short reply.</p>
       <div class="row"><code id="sh-claude-text">${esc(`Sửa theo ghi chú phim ${name}`)}</code><button type="button" id="sh-claude-copy">Copy</button></div></div>
   </div>`;
   // the shot player takes the film player's place at the top of the page
@@ -1395,6 +1397,36 @@ async function filmShots(name, f) {
   drawShots();
   loadNotes();
 }
+/** The "Fix with Claude" button of an After Effects film in the app (specs/032 FR-010): a fix job on the open notes,
+ * or why it cannot start (not AE, no open notes, the desktop app has no AE), or the run in progress. */
+function drawFix() {
+  const box = document.getElementById("sh-fix");
+  if (!box || !SH) return;
+  const f = SH.f;
+  if (f.engine !== "ae" || MODE !== "online") { box.innerHTML = ""; return; }
+  const open = Object.values(SH.doc.shots || {}).reduce((k, /** @type {any} */ sh) => k + (sh.notes || []).filter((/** @type {any} */ n) => !n.done).length, 0);
+  if (f.lot) {
+    box.innerHTML = `<p><button type="button" class="primary" disabled>Fixing…</button> <span class="small">Claude is fixing ${f.lot.notes.length} note${f.lot.notes.length === 1 ? "" : "s"}
+      (marked <span class="sh-lot-badge">in this fix</span>). New notes wait for the next run. <a href="#/jobs/${esc(f.lot.job)}">Follow the job</a></span></p>`;
+    return;
+  }
+  const why = !f.ae_ready ? (f.ae_message || "After Effects is not ready on this computer.") : open ? "" : "No open notes: write what is wrong in a shot first.";
+  box.innerHTML = `<p><button type="button" class="primary" id="sh-fix-go"${why ? " disabled" : ""}>Fix with Claude</button>
+    <span class="small ${why ? "muted" : ""}">${why ? esc(why) : `Claude fixes ${Math.min(open, 10)} open note${open === 1 ? "" : "s"}${open > 10 ? ` (the first 10 in film order; ${open - 10} wait for the next run)` : ""}, rebuilds only those shots in After Effects and replaces the video (the previous one is kept).`}</span></p>
+    <p class="error small" id="sh-fix-err" hidden></p>`;
+  const go = /** @type {HTMLButtonElement | null} */ (document.getElementById("sh-fix-go"));
+  if (go) go.onclick = async () => {
+    go.disabled = true;
+    try {
+      const r = await send("POST", `${SH.path}/fix`, {});
+      SH.f.lot = { job: r.job, notes: r.notes };
+      drawFix(); drawNotes();
+    } catch (e) {
+      const err = /** @type {HTMLElement} */ (document.getElementById("sh-fix-err"));
+      err.textContent = /** @type {Error} */ (e).message; err.hidden = false; go.disabled = false;
+    }
+  };
+}
 /** A film changed on the server (video replaced, notes answered). Only the open page of that film reacts.
  * @param {Event} e */
 function onFilmUpdated(e) {
@@ -1420,6 +1452,9 @@ function alignInspector() {
 const typingNote = () => !!(document.activeElement && (document.activeElement.id === "sh-note" || document.activeElement.classList.contains("sh-edit-box"))) || !!document.querySelector(".sh-edit-box");
 async function refreshFilmLive() {
   if (!SH) return;
+  if (SH.f && SH.f.engine === "ae") {
+    try { const f = await get(SH.path); SH.f.lot = f.lot; SH.f.ae_ready = f.ae_ready; SH.f.ae_message = f.ae_message; drawFix(); } catch { /* next event */ }
+  }
   try {
     const n = await get(`${SH.path}/notes`);
     if (n.base !== SH.base && !SH.liveTimer) {
@@ -1531,6 +1566,7 @@ function shotCounts() {
   return c;
 }
 function drawFilters() {
+  drawFix();                       // the open-note count of "Fix with Claude" follows every change of the notes
   const el = document.getElementById("sh-filters");
   if (!el) return;
   const c = shotCounts();
@@ -1675,6 +1711,7 @@ function noteHtml(n, sid, canEdit) {
       <div class="sh-note-text">${at} ${esc(n.text)}</div>
       ${n.images && n.images.length ? `<div class="sh-note-imgs">${n.images.map((/** @type {string} */ f) => `<img src="${SH.api}/notes/images/${esc(f)}" data-zoom alt="Picture of this note">`).join("")}</div>` : ""}
       ${n.reply ? `<div class="sh-reply small"><strong>Claude:</strong> ${esc(n.reply)}</div>` : ""}
+      ${SH.f && SH.f.lot && (SH.f.lot.notes || []).includes(n.id) ? `<span class="sh-lot-badge small">in this fix</span>` : ""}
       <div class="muted small">${esc(n.by || "")} · ${when(n.updated || n.created)}</div>
     </div>
     ${canEdit ? `<div class="sh-note-tools"><button type="button" class="link sh-edit">Edit</button><button type="button" class="link danger sh-del">Delete</button></div>` : ""}
@@ -2073,7 +2110,8 @@ async function pageSetup() {
       <input id="password" type="password" autocomplete="new-password" minlength="10" required></label>
     <label>Password again <input id="password2" type="password" autocomplete="new-password" required></label>
     <button class="primary wide" type="submit" data-busy="Creating…">Create the owner account</button></form>`,
-  `<a href="/terms" target="_blank" rel="noopener">Terms of use and content policy</a>`);
+  `<a href="#/login">Already set up? Sign in</a>
+    <br><a href="/terms" target="_blank" rel="noopener">Terms of use and content policy</a>`);
   onSubmit(async () => {
     if (field("password").value !== field("password2").value) throw new Error("The two passwords differ.");
     await post("/auth/setup", { email: field("email").value, password: field("password").value });
@@ -2133,6 +2171,10 @@ async function pageNew() {
           `<option value="${esc(c.slug)}" ${params.get("channel") === c.slug ? "selected" : ""}>${esc(c.name)} (${esc(c.language)})</option>`).join("")}</select></label>` : ""}
       <label>Style <span class="hint">Pick the look of the film. <a href="#/library">See the whole library</a>.</span></label>
       <div class="pick" role="radiogroup" aria-label="Style">${cards}</div>
+      <div class="row" role="radiogroup" aria-label="Picture engine">
+        <label class="check"><input type="radio" name="engine" value="page" checked> <span>Drawn by the studio (web page)</span></label>
+        <label class="check"><input type="radio" name="engine" value="ae" ${ME.ae && ME.ae.ready ? "" : "disabled"}> <span>After Effects (on this computer)</span></label>
+        ${ME.ae && !ME.ae.ready ? `<span class="hint">${esc(ME.ae.message || "After Effects is not ready.")}</span>` : ""}</div>
       <label>Your idea <span class="hint">What happens in the film, who is in it, the mood. Up to 2000 characters.</span>
         <textarea id="idea" minlength="3" maxlength="2000" required placeholder="A late-night bánh mì stall in Saigon, told by the old man who runs it.">${topic ? esc(topic.text) : ""}</textarea></label>
       ${topic ? `<p class="muted">From topic #${topic.n} (${esc(topic.verdict)} ${topic.total}/50).</p>` : ""}
@@ -2157,7 +2199,9 @@ async function pageNew() {
   onSubmit(async () => {
     const style = /** @type {HTMLInputElement | null} */ ($app.querySelector("input[name=style]:checked"));
     if (!style) throw new Error("Pick a style first.");
+    const eng = /** @type {HTMLInputElement | null} */ ($app.querySelector("input[name=engine]:checked"));
     const j = await post("/jobs", { kind: "film", style: style.value, idea: field("idea").value.trim(),
+      ...(eng && eng.value === "ae" ? { engine: "ae" } : {}),
       seconds: Number(field("seconds").value), review_treatment: field("treat").checked, reviews: pointsOf("f-reviews"),
       ...(chSel && chSel.value ? { channel: chSel.value } : {}),
       ...(topic && chSel && chSel.value === params.get("channel") ? { topic: topic.n } : {}) });

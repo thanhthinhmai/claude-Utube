@@ -59,6 +59,9 @@
     <div class="panel">
       <label class="choice"><input type="radio" name="kind" value="packaged" checked> Install the studio <span class="hint">(recommended) · <span id="pkg-size"></span></span></label>
       <label class="choice"><input type="radio" name="kind" value="existing"> Use a studio I already have <span class="hint">(for developers)</span></label>
+      <div id="where" class="row" hidden><span>Studio folder: <b id="core-dir"></b> <span class="hint" id="core-free"></span></span>
+        <button id="core-change">Change…</button></div>
+      <p id="where-hint" class="hint" hidden>The studio's Linux and its models go here (several GB). Pick a drive with room, for example E:.</p>
       <p id="reinstall" class="hint" hidden>A different version of the studio is installed. Installing replaces it and keeps your films, channels and accounts.</p>
       <ol class="steps" id="steps"></ol>
       <div class="row"><button class="primary" id="install">Install</button><button id="retry" hidden>Try again</button></div>
@@ -135,7 +138,15 @@
   };
 
   // ---------- the packaged core (specs/016 T015) ----------
-  let pkg = null, failedAt = null;
+  let pkg = null, failedAt = null, coreDir = null;
+  const gb = (b) => (b / 1024 ** 3).toFixed(1);
+  function showWhere(dir, free) {
+    coreDir = dir;
+    $("core-dir").textContent = dir;
+    const low = free !== null && pkg && free < pkg.need;
+    $("core-free").textContent = free === null ? "" : `· ${gb(free)} GB free` + (low ? `, ${gb(pkg.need)} GB needed` : "");
+    $("core-free").className = low ? "hint bad" : "hint";
+  }
   const STEP_NAMES = { verify: "Check the package", space: "Check free space", unpack: "Unpack", install: "Install the studio",
     voice: "Download the voice model", models: "Download the speech check models", check: "Check the studio" };
   setup.onProgress((m) => {
@@ -147,7 +158,7 @@
   });
   async function install(from) {
     $("install").disabled = true; $("retry").hidden = true;
-    const r = await setup.installCore(from ? { from } : {});
+    const r = await setup.installCore({ ...(from ? { from } : {}), ...(coreDir ? { coreDir } : {}) });
     if (!r.ok) { $("retry").hidden = false; $("install").disabled = false; failedAt = r.step; }
   }
   $("install").onclick = () => install(null);
@@ -166,6 +177,16 @@
     $("existing").classList.add("packaged-mode");
     $("pkg-size").textContent = `${(pkg.manifest.unpacked_bytes / 1024 ** 3).toFixed(1)} GB on the disk, plus about 0.5 GB of models`;
     $("reinstall").hidden = !pkg.reinstall;
+    if (pkg.coreDir) {                         // Windows: the studio's Linux may go on another drive (specs/032)
+      $("where").hidden = $("where-hint").hidden = false;
+      showWhere(pkg.coreDir, pkg.coreFree);
+      $("core-change").onclick = async () => {
+        const r = await setup.chooseCoreDir();
+        if (!r) return;
+        if (r.error) { $("pmsg").textContent = r.error; return; }
+        showWhere(r.dir, r.free);
+      };
+    }
     $("steps").innerHTML = pkg.steps.map((id) => `<li data-id="${id}">${esc(STEP_NAMES[id])}</li>`).join("");
     showKind();
     if (pkg.smoke) install(null);

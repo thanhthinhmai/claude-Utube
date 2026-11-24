@@ -137,8 +137,10 @@ def reset(body: ResetIn):
 @router.get("/me")
 def get_me(request: Request):
     a = me(request)
+    from ae import aequeue                     # specs/032: can this studio build After Effects films right now?
+    st = aequeue.bridge_status()
     return {**accounts.public(a), "quota": quotas.summary(a),
-            "limits": limits()}
+            "limits": limits(), "ae": {"ready": st["ready"], "message": None if st["ready"] else st["message"]}}
 
 
 def limits() -> dict:
@@ -172,6 +174,7 @@ class JobIn(BaseModel):
     seconds: Optional[int] = Field(default=None, ge=1, le=3600)
     review_treatment: bool = False
     reviews: Optional[List[Literal["script", "voice", "shots", "mix", "publish"]]] = Field(default=None, max_length=5)   # 026
+    engine: Optional[Literal["page", "ae"]] = None     # specs/032: who draws the picture (After Effects needs the desktop app)
     revise_of: Optional[str] = Field(default=None, max_length=60)
     note: Optional[str] = Field(default=None, max_length=2000)
     # learn
@@ -267,6 +270,11 @@ def make_job(body: JobIn, a) -> dict:
         raise StudioError("style_not_found", f"không có phong cách \"{body.style}\"", 404)
     if body.seconds > s["film_max_seconds"]:
         raise StudioError("too_long", f"phim dài tối đa {s['film_max_seconds']} giây", 422)
+    if body.engine == "ae":                              # specs/032 FR-018: only with the desktop app's AE ready
+        from ae import aequeue
+        st = aequeue.bridge_status()
+        if not st["ready"]:
+            raise StudioError(st["code"], st["message"], 409)
     ratelimit.hit("job_account", a["id"])
     ok, reason = moderation.check(body.idea)
     if not ok:
@@ -276,6 +284,8 @@ def make_job(body: JobIn, a) -> dict:
     name = film_name(body.idea)
     inp = {"kind": "film", "style": body.style, "idea": body.idea, "seconds": body.seconds,
            "review_treatment": body.review_treatment, "film": name, "reviews": body.reviews}
+    if body.engine == "ae":
+        inp["engine"] = "ae"
     if slug:
         inp["channel"] = slug
     if body.topic is not None:                         # a topic of the channel's queue (specs/013 FR-009)
