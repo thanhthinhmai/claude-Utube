@@ -17,6 +17,8 @@
 1. Ghi 3 ghi chú ở 3 shot của `ae-crayon-test`; bấm "Fix with Claude".
 2. Trang việc: danh sách 3 ghi chú, các shot dựng lại (chỉ shot bị ảnh hưởng), token đã dùng.
 3. Xong: trang phim tự nạp video mới; 3 ghi chú có trả lời; "Watch the previous version" phát bản cũ.
+   - **Kết quả 2026-11-24** (T027, app từ nhánh 031 + cầu nối chạy từ WSL `desktop/test/wsl-bridge.mjs` + AE 2027 thật): việc `j-20261124-030227-9444` với 3 ghi chú S6 (chữ CLAUDE bị đầu che), S23 (chân co lơ lửng), S27 (chữ đè nét não). Xong trong 3 phút: một lượt dựng AE cho đúng 3 shot (S6, S23, S27), ghép 4128 khung, video thay (giữ bản trước), 3 ghi chú tick kèm trả lời, `ae/` chép về kho; 19 lượt gọi, 742 665 token (phần lớn là cache). Nhìn khung trước/sau: cả 3 lỗi đã sửa.
+   - Lỗi tìm ra khi chạy thật (đã sửa): worker tính việc làm phim bằng chat còn "running" là việc của người đó nên không nhận việc mới; `ae` trong việc tìm nhầm phim của dự án; tắt AE trước khi gửi script làm AE dừng ở hộp thoại khởi động lần sau (giờ chỉ tắt trước `aerender`); AE khởi động nguội ~90 s nên chờ script 240 s.
 
 ## US4 – bộ cài
 1. Đẩy nhánh `031-desktop-ae` (hoặc chạy tay `desktop.yml`) → smoke `ae` qua trên Windows và macOS. **Tốn phút chạy: hỏi người dùng trước.**

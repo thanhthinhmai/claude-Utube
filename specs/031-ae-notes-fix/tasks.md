@@ -68,7 +68,7 @@ description: "Tasks: sửa ghi chú phim After Effects tự động trên app (0
 - [X] T024 [US3] `tools/runner/agent.py` `fix_prompt`: đúng các bước 3c (liệt kê ghi chú vào nhật ký, mở ảnh, sửa shot hoặc `kit/` rồi `ae uses`, `ae fix` các shot bị ảnh hưởng, `notes reply` từng ghi chú, thử lại tối đa 1 lần khi dựng lỗi)
 - [X] T025 [US3] `web/app.js`: nút "Fix with Claude" (gọi `POST /films/{name}/fix`, đường dẫn tới việc), trạng thái "Fixing…" khi có `lot`, ghi chú trong lượt có dấu; nút tắt kèm lý do (không phải AE, không có ghi chú mở, app desktop không có AE); ô "Copy" giữ lại cho dòng lệnh
 - [X] T026 [P] [US3] Test `tests/online/test_fix_job.py`: tạo việc, lượt ≤ 10, không tạo trùng; ghi chú thêm trong lúc chạy không vào lượt; `finished` với kết quả giả (video + trả lời) cập nhật kho đúng ghi chú của lượt; việc lỗi giữ video cũ; token ghi trên việc (FR-013)
-- [ ] T027 [US3] Chạy thật trên máy (app + app desktop + AE): 3 ghi chú ở 3 shot của `ae-crayon-test` (SC-005), ghi kết quả vào quickstart
+- [X] T027 [US3] Chạy thật trên máy (app + app desktop + AE): 3 ghi chú ở 3 shot của `ae-crayon-test` (SC-005), ghi kết quả vào quickstart
 
 **Checkpoint**: bấm "Fix with Claude" là xong một lượt sửa.
 
