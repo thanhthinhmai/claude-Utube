@@ -2,6 +2,8 @@
 reopens the same job at the Cast step (no new credit) and the worker resumes Claude's session."""
 import sys
 import unittest
+from datetime import datetime, timedelta, timezone
+from unittest import mock
 from pathlib import Path
 
 from helpers import W, Studio, account_id
@@ -36,17 +38,19 @@ class CastResend(unittest.TestCase):
         self.assertEqual(self.c.post(url, headers=W, json={}).status_code, 409)          # still running
         castnotes.add(self.film, "hero", text="bigger hair")
         castnotes.start_lot(self.film, self.jid)
-        jobs.finish(self.jid, "failed", "AE crashed")
+        jobs.finish(self.jid, "failed", "AE crashed", refund=True)              # a studio failure: credit given back
         self.assertEqual(castnotes.load(self.film)["failed_lot"]["job"], self.jid)
-        # the work folder outlives the usual hour while the notes can be sent again
-        jobs.update(self.jid, lambda x: x.__setitem__("updated_at", "2020-01-01T00:00:00+00:00"))
+        # the work folder outlives the usual hour while the notes can be sent again (jobs.update sets updated_at)
+        old = (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat(timespec="seconds")
+        with mock.patch.object(store, "now_iso", lambda: old):
+            jobs.update(self.jid, lambda x: None)
+        self.assertGreater(store.age_seconds(jobs.load(self.jid)["updated_at"]), 3600)
         self.s.worker.clean()
         self.assertTrue(self.film.is_dir())
-        jobs.update(self.jid, lambda x: x.__setitem__("updated_at", store.now_iso()))
-        r = self.c.post(url, headers=W, json={})
+        r =self.c.post(url, headers=W, json={})
         self.assertEqual(r.status_code, 200, r.text)
         j = jobs.load(self.jid)
-        self.assertEqual((j["status"], j["error"], j["charged"]), ("waiting_review", None, True))
+        self.assertEqual((j["status"], j["error"], j["charged"]), ("waiting_review", None, True))   # charged again
         doc = castnotes.load(self.film)
         self.assertNotIn("failed_lot", doc)
         self.assertEqual(len(doc["lot"]["notes"]), 1)

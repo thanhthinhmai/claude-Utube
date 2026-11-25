@@ -192,3 +192,8 @@ description: "Task list: Duyệt nhân vật cho phim After Effects (034-cast-re
 - [X] T063 Cho gửi lại ghi chú nhân vật khi việc phim đã thất bại hoặc bị dừng giữa lượt vẽ lại (việc đã kết thúc, không còn bước Cast chờ duyệt) per Edge "vẽ lại thất bại" (partial)
 - [X] T064 Skill `film-make`: kho nhân vật của kênh (`cast library`, `cast use`), `cast approve --save/--no-save`, trả lời từng ghi chú (`cast notes show|reply`) cho luồng chat per FR-011, FR-016 (partial)
 - [X] T065 Test qua app: "Approve cast" của review lưu vào kho; việc thất bại kết thúc lượt vẽ lại per T055, T059 (partial)
+
+## Phase 10: Convergence
+
+- [X] T066 "Send notes again" trên việc đã được hoàn credit (lỗi do xưởng) trừ lại một credit (hết lượt thì 402 `quota_exceeded`), để phim giao ra luôn tính đúng một credit per T063, specs/008 FR-006a (unrequested)
+- [X] T067 Test giữ thư mục việc thật sự chạy nhánh `cast_resendable` của `clean()` (đặt `updated_at` cũ qua `store.now_iso`) per T063 (partial)

@@ -166,10 +166,21 @@ def resend_cast(job_id: str, by: str = None) -> dict:
     if n >= quotas.MAX_OPEN:
         raise StudioError("too_many_queued", f"at most {quotas.MAX_OPEN} unfinished jobs per account", 409)
 
+    if not j.get("charged"):                      # a studio failure gave the credit back: the film takes it again
+        from . import accounts
+        acc = accounts.get(j["owner"])
+        if acc is None or quotas.used(j["owner"], "film") >= quotas.limit(acc, "film"):
+            e = StudioError("quota_exceeded", "no film credit left this month to finish this film", 402)
+            e.extra = {"resets_at": quotas.next_reset_vn().isoformat(timespec="seconds")}
+            raise e
+
     def f(x):
         if x["status"] not in ("failed", "stopped"):
             raise StudioError("changed", "the job changed: reload the page", 409)
         x["status"], x["error"] = "waiting_review", None          # create() below adds the cast review to it
+        if not x.get("charged"):
+            x["charged"] = True
+            x["log"].append(jobs._line("Credit used again (it was given back when the redraw failed)"))
         x["log"].append(jobs._line("Reopened to send the cast notes again"))
     jobs.update(job_id, f)
     r = create(job_id, "cast", None, "Cast notes sent again after the redraw did not finish.")
