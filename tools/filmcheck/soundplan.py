@@ -54,8 +54,18 @@ def _write(f: Path, data) -> None:
 
 def style_sfx(d: Path) -> dict:
     """The style's measured sound rules (kit/template.json → sound.sfx, written by `learn sfx`), or {}."""
-    t = _read(Path(d) / "kit" / "template.json", {}) or {}
-    return ((t.get("sound") or {}).get("sfx")) or {}
+    d = Path(d)
+    srcs = [d / "kit" / "template.json"]
+    style = (_read(d / "film.json", {}) or {}).get("style")
+    if isinstance(style, str) and re.fullmatch(r"[a-z0-9][a-z0-9-]*", style):
+        from filmcheck import soundlib
+        sd = soundlib.repo() / "my-styles" / style
+        srcs += [sd / "template.json", sd / "kit" / "template.json"]
+    for f in srcs:
+        sfx = ((_read(f, {}) or {}).get("sound") or {}).get("sfx")
+        if sfx:
+            return sfx
+    return {}
 
 
 def load(d: Path) -> dict:

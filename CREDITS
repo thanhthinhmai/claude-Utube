@@ -48,6 +48,13 @@ Python packages in each `*.dist-info/`, npm packages in `node_modules/*/`, Debia
   (specs/037); only sounds under Creative Commons 0 (CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/) are
   fetched, as HQ previews. Each film names the Freesound sounds it used (id, author, page) in its own CREDITS.
 
+- Sound learning models (specs/037, `sh bin/studio deps sound`, run on the owner's machine, not bundled): htdemucs
+  (Demucs, https://github.com/adefossez/demucs, MIT, © Meta Platforms); MIT/ast-finetuned-audioset-10-10-0.4593
+  (Audio Spectrogram Transformer, BSD-3-Clause); laion/larger_clap_general (CLAP, Apache-2.0). Labels and the
+  level-2 tree in tools/style-learn/sl/audioset.py come from the AudioSet ontology (https://github.com/audioset/ontology),
+  © Google, CC BY 4.0. Python packages of that tier: PyTorch and torchaudio (BSD-3-Clause), demucs (MIT), Transformers
+  (Apache-2.0), soundfile (BSD-3-Clause).
+
 ## Python packages
 
 - aiohappyeyeballs (PSF-2.0)
