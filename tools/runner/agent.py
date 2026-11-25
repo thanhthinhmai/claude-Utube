@@ -166,6 +166,16 @@ everything except the picture: treatment, script and its review, voice and its c
 and `job done` stay the same. Skip every web-page step (no kit, no index.html, no scenes.json, no `render`, no `qc plan`,
 no `qc shots`). For the picture:
 1. `sh {st}/bin/studio ae new {film}` once the film folder exists: it writes film.json (engine "ae") and ae/shots.jsx.
+   Cast (specs/034), right after the script point and before the voice: write cast/cast.json (format in
+   {st}/tools/ae/CAST.md): every character the script shows, its role, the locked rig
+   (`sh {st}/bin/studio ae rigs`), its spec, and in "needs" only the expressions and poses this script asks for (each
+   with the paragraph id) plus walk when a character walks. Characters already in the channel's cast: `cast use`. Run
+   `sh {st}/bin/studio cast check {film}`, then `sh {st}/bin/studio job run {job} --step Cast -- sh {st}/bin/studio ae
+   sheet {film}` (exit 3: After Effects is not ready; say so in the log and wait, do not draw it another way), look at
+   the pictures in cast/sheets/, and send `review request --kind cast --film {film}` when the cast point is on, ending
+   your turn. `voice make` refuses to run until every character is approved. When the script changes later, update
+   cast.json to match (new characters, needs) and draw only those characters again with `ae sheet {film} --only id,id`.
+   In the shots, draw every character with `CU.char("<id>", {{dur, view, keys, …}})`, never with a rig function.
 2. Write SHOTS.md: one row per shot (S1, S2, …) with its seconds, place, people, action and camera. Cut only where a
    sentence of the narration ends; shots of 1.1 to 6 s; every shot has movement (a person acts or the camera moves).
 3. Write the shots in ae/*.jsx: one function CU.shot<n> per shot, returning a comp of exactly its seconds, built with the
