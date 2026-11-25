@@ -53,6 +53,19 @@ class Library(unittest.TestCase):
         with mock.patch.dict(os.environ, {"STUDIO_ROOT": str(self.tmp)}):   # not the app that may run for this repo
             self.assertIsNone(castlib.root(out))                    # outside the app, and no app runs for STUDIO_ROOT
 
+    def test_app_approval_saves(self):                                # T055: FR-015, US3/AC1
+        from filmcheck import edit
+        sheet(self.d, "hero", ("front", "back", "34"))
+        r = edit.cast_approve(self.d, {"character": "hero", "by": "owner"})
+        self.assertTrue(r["ok"], r)
+        self.assertIn("default/hero: v1 (new)", r["saved"][0])
+        self.assertTrue((self.acc / "channels" / "default" / "cast" / "hero" / "v1").is_dir())
+        doc = cast.load(self.d); doc["save_to_library"] = False; cast.save(self.d, doc)
+        sheet(self.d, "friend", ("front", "back", "34"))
+        r = edit.cast_approve(self.d, {"character": "friend"})
+        self.assertNotIn("saved", r)
+        self.assertFalse((self.acc / "channels" / "default" / "cast" / "friend").exists())
+
     def test_save_versions(self):
         r = self.approve_all(self.d)
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -122,6 +135,8 @@ class Library(unittest.TestCase):
         self.assertEqual(cast.find(cast.load(d2), "friend")["approved"]["source"], "library")
         self.assertEqual((cast.sheet_dir(d2, "friend") / "front.jpg").read_bytes(),
                          (self.acc / "channels/default/cast/friend/v1/sheet/front.jpg").read_bytes())
+        friend = next(c for c in castlib.listing(self.acc)[0]["characters"] if c["id"] == "friend")
+        self.assertEqual(friend["films"], ["f1", "f2"])                 # T061: the version lists the films that used it
         # hero needs an expression the library lacks: only that picture is to draw, the rest is kept
         r = self.studio("cast", "use", str(d2), "default/hero@1")
         self.assertEqual(r.returncode, 0, r.stderr)

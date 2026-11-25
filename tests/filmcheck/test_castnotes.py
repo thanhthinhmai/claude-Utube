@@ -98,6 +98,19 @@ class Notes(unittest.TestCase):
         self.assertIn(a["id"], lot["notes"])
         castnotes.end_lot(self.d)
         self.assertNotIn("lot", castnotes.load(self.d))
+        self.assertEqual(castnotes.load(self.d)["last_lot"]["notes"], lot["notes"])   # T057: shown with the answers
+        # T059: a failed job ends only its own round, keeps the notes open and records why
+        castnotes.start_lot(self.d, "j-2")
+        castnotes.end_lot(self.d, "j-other", "boom")
+        self.assertIn("lot", castnotes.load(self.d))
+        castnotes.end_lot(self.d, "j-2", "The job failed: AE crashed")
+        doc = castnotes.load(self.d)
+        self.assertNotIn("lot", doc)
+        self.assertEqual(doc["failed_lot"]["error"], "The job failed: AE crashed")
+        self.assertNotIn("last_lot", doc)
+        self.assertEqual(castnotes.open_counts(self.d), {"hero": 2, "friend": 1})
+        castnotes.start_lot(self.d, "j-3")
+        self.assertNotIn("failed_lot", castnotes.load(self.d))
 
     def test_edit_ops(self):
         b = castnotes.base(self.d)
@@ -131,6 +144,16 @@ class Notes(unittest.TestCase):
         self.assertIn("(no open notes)", run("show", "f1").stdout)
         js = json.loads(run("show", "f1", "--all", "--json").stdout)
         self.assertEqual(js["notes"][0]["reply"], "Curlier now")
+        # T058 (FR-013): during a round, show lists only that round's notes; later ones wait
+        a = castnotes.add(self.d, "hero", text="Round one")
+        castnotes.start_lot(self.d, "j-1")
+        castnotes.add(self.d, "friend", text="Written during the redraw")
+        r = run("show", "f1")
+        self.assertIn("Round one", r.stdout)
+        self.assertNotIn("Written during the redraw", r.stdout)
+        self.assertIn("1 written since wait for the next round", r.stdout)
+        js = json.loads(run("show", "f1", "--json").stdout)
+        self.assertEqual(([n["id"] for n in js["notes"]], js["waiting"]), ([a["id"]], 1))
 
 
 if __name__ == "__main__":

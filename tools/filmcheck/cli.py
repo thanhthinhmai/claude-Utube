@@ -1404,9 +1404,13 @@ def cmd_cast_notes(a) -> int:
             return 0
         doc = castnotes.load(d)
         b = castnotes.base(d)
-        rows = []
+        rows, waiting = [], 0
+        lot = set((doc.get("lot") or {}).get("notes") or []) if doc.get("lot") else None
         for cid, n in castnotes.all_notes(doc):
             if n.get("done") and not a.all:
+                continue
+            if lot is not None and not a.all and n["id"] not in lot:   # FR-013: written during the redraw: next round
+                waiting += 1
                 continue
             pic = None
             if n.get("frame"):
@@ -1418,8 +1422,10 @@ def cmd_cast_notes(a) -> int:
         print(f"✗ {e.code}: {e.message}", file=sys.stderr)
         return e.exit_code()
     if a.json:
-        print(json.dumps({"notes": rows, "base": b, "lot": doc.get("lot")}, ensure_ascii=False))
+        print(json.dumps({"notes": rows, "base": b, "lot": doc.get("lot"), "waiting": waiting}, ensure_ascii=False))
         return 0
+    if waiting:
+        print(f"(this round: {len(rows)} note(s); {waiting} written since wait for the next round)")
     last = None
     for i, r in enumerate(rows, 1):
         if r["character"] != last:

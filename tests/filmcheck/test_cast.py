@@ -104,6 +104,16 @@ class Point(unittest.TestCase):
         self.assertIn("cast", points.POINTS)
         self.assertEqual(points.POINTS.index("cast"), points.POINTS.index("script") + 1)
 
+    def test_chosen_list_keeps_cast_off_before_ae(self):            # T060: FR-002, the form's list comes before `ae new`
+        import shutil
+        for chosen, on in ((True, False), (False, True)):
+            d = Path(tempfile.mkdtemp(dir=TMP)) / "f2"
+            shutil.copytree(self.d, d)
+            (d / "film.json").rename(d / "film.later")
+            points.set_on(d, ["script", "shots"], origin="this film", chosen=chosen)
+            (d / "film.later").rename(d / "film.json")                     # the film becomes an AE film
+            self.assertEqual(points.status(d)["cast"]["on"], on, chosen)
+
     def test_skipped_without_characters_or_for_page_films(self):
         doc = cast.load(self.d); doc["characters"] = []; cast.save(self.d, doc)
         self.assertEqual(points.cast_skip_reason(self.d), "no characters")
@@ -127,6 +137,16 @@ class Point(unittest.TestCase):
         self.assertTrue(all(c["approved"]["source"] == "chat" for c in cast.load(self.d)["characters"]))
         self.assertEqual(points.state(self.d, "cast"), "approved")
         self.assertEqual(points.gate(self.d, "cast"), [])
+
+    def test_note_after_approval_stops_the_voice(self):              # T056: FR-003, SC-002
+        for c in ("hero", "friend", "classmates"):
+            fake_sheet(self.d, c)
+        self.assertEqual(points.approve(self.d, "cast", source="chat"), (0, []))
+        from filmcheck import castnotes
+        castnotes.add(self.d, "friend", text="bigger smile", b=castnotes.base(self.d))
+        self.assertEqual(points.state(self.d, "cast"), "stale")
+        why = points.gate(self.d, "cast")
+        self.assertTrue(why and "friend" in why[0], why)
 
     def test_cast_change_makes_picture_stale_not_voice(self):
         hit = steps.impact("cast", self.d)

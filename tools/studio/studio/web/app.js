@@ -302,7 +302,7 @@ async function pageChannel(slug) {
       ${a("title_rules", "Title rules", "In your own words")}${t("title_max", "Longest title", "20–100 characters, or empty")}
       ${a("thumbnail_rules", "Thumbnail rules", "In your own words")}
       ${a("hashtags", "Hashtags always used", "One per line, like #science; at most 5")}${a("banned", "Words never used", "One per line")}
-      ${pointBoxes("p-reviews", c.reviews || ["script", "shots"])}
+      ${pointBoxes("p-reviews", c.reviews || ["script", "cast", "shots"])}
       <div><button class="primary" type="submit">Save the profile</button></div></form><p id="msg" class="muted" role="status"></p>
     <div class="panel"><p class="section-title">Decisions</p>
       ${(c.decisions || []).length ? `<ul>${c.decisions.map((/** @type {any} */ d) => `<li>${esc(d.date)}: ${esc(d.text)}</li>`).join("")}</ul>` : `<p class="muted">None yet.</p>`}
@@ -888,6 +888,10 @@ function doneCast(body, s) {
   const noteList = notes.length ? `<ul class="cast-notes">${notes.map((/** @type {any} */ n, /** @type {number} */ i) => `<li><b>${i + 1} · ${esc(label(n))}${n.kind === "view" ? " (draw it)" : ""}</b>
       <span class="row spread"><span>${esc(n.text)}${n.reply ? `<br><small class="muted">Claude: ${esc(n.reply)}</small>` : ""}</span>
       ${can ? `<button class="btn small" data-del="${esc(n.id)}" aria-label="Delete note ${i + 1}">✕ Delete</button>` : ""}</span></li>`).join("")}</ul>` : "";
+  const lastIds = (cb.notes && cb.notes.last_lot && cb.notes.last_lot.notes) || [];      // the round just redrawn (FR-011)
+  const last = (((cb.notes && cb.notes.characters && cb.notes.characters[c.id]) || {}).notes || []).filter((/** @type {any} */ n) => n.done && lastIds.includes(n.id));
+  const lastList = last.length ? `<details class="cast-last" open><summary class="small">Last round: ${last.length} note${last.length === 1 ? "" : "s"} answered</summary><ul class="cast-notes">${last.map((/** @type {any} */ n) => `<li class="done"><b>✓ ${esc(label(n))}</b>
+      <span>${esc(n.text)}<br><small class="muted">Claude: ${esc(n.reply || "no answer")}</small></span></li>`).join("")}</ul></details>` : "";
   body.innerHTML = facts([`${b(chars.length)} character${chars.length === 1 ? "" : "s"}`, `${b(done)} approved`,
       chars.some((/** @type {any} */ x) => x.source !== "film") ? `${b(chars.filter((/** @type {any} */ x) => x.source !== "film").length)} from the channel's cast` : ""])
     + `<div class="cast-split"><div class="cast">
@@ -898,10 +902,10 @@ function doneCast(body, s) {
         ${errs.length ? `<ul class="fail small">${errs.map((/** @type {any} */ e) => `<li>${esc(e.code)}: ${esc(e.message)}</li>`).join("")}</ul>` : ""}
         ${c.sheet ? (can ? `<p class="hint small muted"><i class="pin">1</i> Click the exact spot on any picture (the hair, a hand, the hat) to pin a note there.</p>` : "") + groups
           : `<div class="fr missing wide"><b>No cast sheet yet</b><span>Claude draws it in After Effects. If it does not come, After Effects or its bridge is not ready: open After Effects (desktop app tray → After Effects… → Test), then ask Claude to run <code>ae sheet</code> again.</span></div>`}
-        ${look ? `<h3>Look</h3><dl class="spec">${look}${paras.length ? `<dt>Used in</dt><dd>${paras.map((p) => esc(p)).join(", ")}</dd>` : ""}</dl>` : ""}
+        ${look ? `<h3>Look</h3><dl class="spec">${look}${paras.length ? `<dt>Used in</dt><dd>${paras.map((p) => cb.passages?.[p] ? `<details class="passage"><summary>${esc(p)}</summary><p class="small">${esc(cb.passages[p])}</p></details>` : esc(p)).join(" ")}</dd>` : ""}</dl>` : ""}
         ${c.has_prev ? `<p class="muted small">The sheet before the last redraw is kept: <a href="${castFile(c, "sheet.json", true)}" target="_blank" rel="noopener">previous sheet</a>.</p>` : ""}
         ${can || notes.length ? `<div class="notebox"><p><b>Notes for ${esc(c.name || c.id)}</b> <span class="muted small">· pinned notes appear here; write below for a note about the whole character</span></p>
-          ${noteList}
+          ${noteList}${lastList}
           ${can ? `<textarea id="cast-note" maxlength="2000" placeholder="e.g. Make him a bit taller than the hero" aria-label="Note for the whole character"></textarea>
           <div class="row spread"><span class="muted small">"Send notes to Claude" sends every note at once. Claude redraws only the characters with notes.</span>
             <button class="btn small" id="cast-note-add">Add note</button></div><p class="small fail" id="cast-note-msg" role="status"></p>` : ""}</div>` : ""}
@@ -1017,6 +1021,12 @@ function castBar(body) {
   if (lot && !r) {
     const p = document.createElement("p"); p.className = "notice small";
     p.textContent = `Claude is redrawing the characters with notes (${lot.notes.length} note${lot.notes.length === 1 ? "" : "s"}). Notes you add now wait for the next round.`;
+    body.prepend(p);
+  }
+  const failedLot = !lot && cb.notes && cb.notes.failed_lot;     // specs/034: the redraw failed; the notes stay open
+  if (failedLot) {
+    const p = document.createElement("p"); p.className = "notice warn small";
+    p.textContent = `The last redraw did not finish (${failedLot.error}). Your notes are still open: send them again with the next cast review.`;
     body.prepend(p);
   }
   const save = document.createElement("label");
@@ -2536,7 +2546,7 @@ async function pageNew() {
       <label>Length in seconds <span class="hint">Up to ${max} seconds.</span>
         <input id="seconds" type="number" min="5" max="${max}" value="${Math.min(30, max)}" required></label>
       <label class="check"><input id="treat" type="checkbox"> <span>Let me review the treatment (the written plan) before the picture is made</span></label>
-      ${pointBoxes("f-reviews", ["script", "shots"])}
+      ${pointBoxes("f-reviews", ["script", "cast", "shots"])}
       <div><button class="primary" type="submit" ${left === 0 || !ME.verified ? "disabled" : ""}>Make the film (uses 1 credit)</button></div>
     </form><p id="msg" class="muted" role="status"></p>`;
   $app.querySelector("input[name=style]:checked")?.closest("label")?.scrollIntoView({ block: "nearest" });
@@ -2547,7 +2557,7 @@ async function pageNew() {
     const r = /** @type {HTMLInputElement | null} */ ($app.querySelector(`input[name=style][value="${CSS.escape(c.style)}"]`));
     if (r) { r.checked = true; r.closest("label")?.scrollIntoView({ block: "nearest" }); }
     field("seconds").value = String(Math.min(c.seconds, max));
-    const on = c.reviews || ["script", "shots"];        // the channel's review points, changeable for this film
+    const on = c.reviews || ["script", "cast", "shots"];   // the channel's review points, changeable for this film (Cast only stops AE films)
     document.querySelectorAll("#f-reviews input").forEach((x) => { /** @type {HTMLInputElement} */ (x).checked = on.includes(/** @type {HTMLInputElement} */ (x).value); });
   };
   if (chSel) { chSel.onchange = fillFromChannel; if (chSel.value) fillFromChannel(); }

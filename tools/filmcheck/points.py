@@ -154,6 +154,11 @@ def state(film_dir: Path, point: str, pending: bool = False) -> str:
                 return "approved"                   # every character approved with its current pictures
         except cast.CastError:
             return "ready"
+        # not every character is approved: never "approved" from the point's saved approval (its fingerprint leaves
+        # out cast-notes.json), so a note written after "Approve cast" stops the voice again (FR-003, SC-002)
+        if rv["approved"].get(point):
+            return "stale"
+        return "rejected" if rv["rejected"].get(point) else "ready"
     a = rv["approved"].get(point)
     if pending:
         return "waiting"
@@ -175,8 +180,10 @@ def status(film_dir: Path, pending: set = frozenset()) -> dict:
     return out
 
 
-def set_on(film_dir: Path, points, origin: str = None, pending: set = frozenset()) -> list:
-    """Turn points on or off for this film; a point that is approved (still valid) or waiting cannot change."""
+def set_on(film_dir: Path, points, origin: str = None, pending: set = frozenset(), chosen: bool = False) -> list:
+    """Turn points on or off for this film; a point that is approved (still valid) or waiting cannot change.
+    chosen: the list was picked by a person (new-job form, a channel's saved list), so a point of AE_ON missing
+    from it stays off even when the film becomes an AE film later (FR-002)."""
     d = Path(film_dir)
     want = parse_list(points)
     cur = load(d)["on"]
@@ -187,7 +194,7 @@ def set_on(film_dir: Path, points, origin: str = None, pending: set = frozenset(
 
     def f(rv):
         rv["on"] = want
-        rv["off"] = [p for p in AE_ON if p not in want] if is_ae(d) else list(rv.get("off") or [])
+        rv["off"] = [p for p in AE_ON if p not in want] if chosen or is_ae(d) else list(rv.get("off") or [])
         if origin:
             rv["from"] = origin
     return _save(d, f)["on"]

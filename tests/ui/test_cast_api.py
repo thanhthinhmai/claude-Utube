@@ -55,6 +55,9 @@ class CastApi(unittest.TestCase):
         self.assertIn("members", cb["characters"][2])
         self.assertIn("spec", cb["characters"][0])
         self.assertFalse(cb["library_available"])
+        from filmcheck import script                                         # T061: the passages hero plays in
+        want = script.para_map(script.read_script(self.film / "SCRIPT.md"))
+        self.assertEqual(cb["passages"], {k: want[k] for k in ("P01", "P02")})
         page = self.steps(self.job("pagefilm"))
         self.assertNotIn("Cast", [s["name"] for s in page["steps"]])
         self.assertIsNone(page["cast"])

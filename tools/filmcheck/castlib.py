@@ -247,6 +247,19 @@ def save_approved(film_dir, ids, by: str = None) -> list:
     return lines
 
 
+def save_if_wanted(film_dir, ids=None, by: str = None) -> list:
+    """After an approval in the app (Approve cast, or one character): save the approved characters when the film says
+    save_to_library and the library is there (FR-015). Never raises: the approval stands, the copy can be redone."""
+    d = Path(film_dir)
+    try:
+        doc = cast.load(d)
+        if not doc.get("save_to_library", True) or root(d) is None:
+            return []
+        return save_approved(d, ids or [c["id"] for c in doc["characters"]], by)
+    except Exception as e:                    # noqa: BLE001
+        return [f"! not saved to the cast library: {e}"]
+
+
 # ---------- using a character in a film ----------
 def library_frames(film_dir, only=None) -> tuple:
     """For `ae sheet`: {id: [keys kept from the library]}, {id: library sheet folder} of the characters that came from
@@ -333,7 +346,18 @@ def use(film_dir, ref: str, by: str = "local") -> dict:
         cc = cast.find(doc, cid)
         cc["approved"] = {"fingerprint": cast.char_fingerprint(d, cc), "at": now(), "by": by or "local", "source": "library"}
         cast.save(d, doc)
+    _add_film(acc, channel, cid, g["v"], d.name)
     return {"channel": channel, "id": cid, "v": g["v"], "approved": not lacking, "lacking": lacking}
+
+
+def _add_film(acc: Path, channel: str, cid: str, v: int, film: str) -> None:
+    """The library version records the films that used it (FR-018); the only change a written version allows."""
+    with _locked(_cast_dir(acc, channel)):
+        p = version_dir(acc, channel, cid, v) / "character.json"
+        ch = _read(p, None)
+        if ch is not None and film not in ch.setdefault("films", []):
+            ch["films"].append(film)
+            _write_json(p, ch)
 
 
 # ---------- new rig versions, previews, fixes (specs/034 US4) ----------

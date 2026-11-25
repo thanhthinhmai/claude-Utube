@@ -86,7 +86,16 @@ def cast_block(d: Path):
                "approved": c.get("approved")}
         row["members" if row["kind"] == "group" else "spec"] = c.get("members") if row["kind"] == "group" else c.get("spec")
         chars.append(row)
-    return {"characters": chars, "errors": errors, "notes": notes, "notes_base": notes_base,
+    used = {r.get("para") for c in chars for k in ("expressions", "poses") for r in ((c.get("needs") or {}).get(k) or [])
+            if isinstance(r, dict)}
+    passages = {}
+    if used - {None}:
+        from filmcheck import script                                # T061: the passages each character plays in
+        try:
+            passages = {k: v for k, v in script.para_map(script.read_script(d / "SCRIPT.md")).items() if k in used}
+        except Exception:                                           # no script or a broken one: ids only
+            passages = {}
+    return {"characters": chars, "errors": errors, "notes": notes, "notes_base": notes_base, "passages": passages,
             "save_to_library": doc.get("save_to_library", True), "library_available": lib,
             "fingerprint": cast.fingerprint(d), "skip": points.cast_skip_reason(d)}
 

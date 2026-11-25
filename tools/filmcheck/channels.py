@@ -470,7 +470,7 @@ def attach(root: Path, film_dir: Path, slug: str, shared_path: Path = None, lib:
     from filmcheck import points, report                            # specs/026: the film's review points (checks.json)
     if (report.load(film_dir).get("reviews") or {}).get("from") != "this film":   # chosen for this film: kept
         try:
-            points.set_on(film_dir, reviews_of(ch), origin=f"channel {slug}")
+            points.set_on(film_dir, reviews_of(ch), origin=f"channel {slug}", chosen=ch.get("reviews") is not None)
         except points.PointError:
             pass                                                    # a point already approved or waiting keeps its state
     warn = f"{left} lessons did not fit in CHANNEL_BRIEF.md ({BRIEF_MAX} characters): merge or retire some" if left else None

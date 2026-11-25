@@ -107,6 +107,9 @@ def point_decision(r: dict, value: str, note: str, source: str, base, by) -> Non
         raise StudioError("changed", "the film changed since you opened it: reload the page", 409)
     if code:
         raise StudioError("checks_not_passed", "; ".join(why), 422)
+    if r["kind"] == "cast":                         # specs/034 FR-015: "Approve cast" saves to the channel's cast
+        from filmcheck import castlib
+        castlib.save_if_wanted(d, None, by or r.get("owner"))
 
 
 def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str = None, by: str = None) -> dict:

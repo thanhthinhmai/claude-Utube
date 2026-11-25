@@ -518,7 +518,10 @@ def cast_approve(d: Path, a: dict) -> dict:
         raise EditError(e.message) from None
     if why:
         return {"ok": False, "ref": cid, "error": "; ".join(why), "no_stale": True}
-    return {"ok": True, "ref": cid, "old": None, "new": "approved", "files": ["cast/cast.json"], "no_stale": True}
+    from filmcheck import castlib                   # FR-015: the app's approval saves to the channel's cast too
+    saved = castlib.save_if_wanted(d, [cid], a.get("by"))
+    return {"ok": True, "ref": cid, "old": None, "new": "approved", "files": ["cast/cast.json"], "no_stale": True,
+            **({"saved": saved} if saved else {})}
 
 
 @op("cast-save", "cast")

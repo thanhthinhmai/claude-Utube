@@ -243,14 +243,25 @@ def start_lot(film_dir, job: str) -> dict:
     doc = load(film_dir)
     ids = [n["id"] for _, n in all_notes(doc) if not n.get("done")]
     doc["lot"] = {"job": job, "notes": ids, "since": now()}
+    doc.pop("failed_lot", None)
+    doc.pop("last_lot", None)
     _write(film_dir, doc)
     return doc["lot"]
 
 
-def end_lot(film_dir) -> None:
+def end_lot(film_dir, job: str = None, error: str = None) -> None:
+    """The round is over: Claude sent the cast again, or (job, error) the job failed or stopped — then the notes stay
+    open, the page shows the error and the notes can be sent again (edge case "redraw fails")."""
     doc = load(film_dir)
-    if doc.pop("lot", None) is not None:
-        _write(film_dir, doc)
+    lot = doc.get("lot")
+    if lot is None or (job and lot.get("job") != job):
+        return
+    doc.pop("lot")
+    if error:
+        doc["failed_lot"] = {"job": lot.get("job"), "error": str(error)[:300], "at": now()}
+    else:                                       # the page shows this round's notes and Claude's answers (FR-011)
+        doc["last_lot"] = {"job": lot.get("job"), "notes": list(lot.get("notes") or []), "at": now()}
+    _write(film_dir, doc)
 
 
 def summary(film_dir) -> str:

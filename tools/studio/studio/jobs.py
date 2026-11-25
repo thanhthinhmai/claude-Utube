@@ -219,7 +219,22 @@ def finish(job_id: str, status: str, error: str = None, links: dict = None, fail
         if refund and j.get("charged"):
             j["charged"] = False
             j["log"].append(_line("Credit refunded"))
-    return update(job_id, f)
+    out = update(job_id, f)
+    if status in ("failed", "stopped"):
+        _end_cast_round(out, error or status)
+    return out
+
+
+def _end_cast_round(j: dict, error: str) -> None:
+    """specs/034: a film job that fails or stops during a cast redraw ends that round (the notes stay open)."""
+    try:
+        from . import donesofar
+        d = donesofar.film_dir(j)
+        if d is not None and (d / "cast-notes.json").is_file():
+            from filmcheck import castnotes
+            castnotes.end_lot(d, j["id"], f"The job {'stopped' if j.get('status') == 'stopped' else 'failed'}: {error}")
+    except Exception:                                   # noqa: BLE001 — never blocks ending the job
+        pass
 
 
 def set_status(job_id: str, status: str, note: str = None) -> dict:

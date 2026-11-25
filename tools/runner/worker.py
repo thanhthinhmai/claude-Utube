@@ -591,7 +591,7 @@ class Worker:
             if j["kind"] == "film" and inp.get("reviews") is not None and inp.get("film"):     # specs/026: this film's points
                 from filmcheck import points
                 try:
-                    points.set_on(work / "films" / inp["film"], inp["reviews"], origin="this film")
+                    points.set_on(work / "films" / inp["film"], inp["reviews"], origin="this film", chosen=True)
                 except points.PointError:
                     pass
             return {}, None
@@ -633,7 +633,8 @@ class Worker:
                            f"a description of the characters only. Change cast/cast.json (spec, needs; a view request means "
                            f"draw that picture: if the rig cannot, say why), then redraw only the characters with notes: "
                            f"`sh {{STUDIO}}/bin/studio job run {j['id']} --step Cast -- sh {{STUDIO}}/bin/studio ae sheet {film} "
-                           f"--only <ids>`. Answer every note: `cast notes reply {film} <note id> \"<what you changed>\" --done "
+                           f"--only <ids>`. Answer every note it lists (the notes of this round; notes written later wait for the next "
+                           f"round): `cast notes reply {film} <note id> \"<what you changed>\" --done "
                            f"--base <base>` (or without --done and with the reason when it cannot be done). Never edit the "
                            f"shared kit; a fix goes in ae/kit_fixes.jsx. Then send `review request --kind cast --film {film}` "
                            f"again and end your turn.")

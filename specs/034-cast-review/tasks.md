@@ -175,3 +175,13 @@ description: "Task list: Duyệt nhân vật cho phim After Effects (034-cast-re
 2. **US3** kho nhân vật → test, commit.
 3. **US4** phiên bản rig → test, commit.
 4. Polish, quickstart với AE thật, mở PR (không tự merge).
+
+## Phase 8: Convergence
+
+- [X] T055 Lưu nhân vật vào kho của kênh khi duyệt trong app (review approve của điểm Cast và thao tác `cast-approve`) lúc `save_to_library` bật và kho dùng được: gọi `castlib.save_approved`; thêm test per FR-015, US3/AC1 (partial)
+- [X] T056 Cho trạng thái và cổng của điểm Cast chỉ theo `cast.unapproved()` (không lùi về lần duyệt đã lưu của điểm); test: ghi chú mới sau "Approve cast" làm `voice make` bị chặn per FR-003, SC-002 (contradicts)
+- [X] T057 Hiện các ghi chú của lượt vừa xong kèm câu trả lời của Claude trong khung Cast sau khi vẽ lại (không chỉ ghi chú còn mở) per FR-011, US2/AC5 (partial)
+- [X] T058 `cast notes show` và lời nhắn khi tiếp tục việc chỉ lấy ghi chú của lượt đang mở (`lot.notes`); ghi chú thêm trong lúc vẽ lại chờ lượt sau per FR-013, Edge "ghi chú trong lúc vẽ lại" (partial)
+- [X] T059 Kết thúc lượt vẽ lại khi việc phim thất bại hoặc bị dừng, hiện lỗi trong khung Cast và cho gửi lại per Edge "vẽ lại thất bại" (partial)
+- [X] T060 Ghi bật/tắt điểm Cast mỗi khi áp danh sách điểm duyệt (kênh, form việc mới) bất kể bộ máy; form việc mới tick Cast mặc định cho phim AE per FR-002 (partial)
+- [X] T061 `cast use` thêm phim vào `films` của phiên bản kho; khung Cast liệt kê đoạn kịch bản có nhân vật (không chỉ mã đoạn) per FR-018, FR-006 (partial)
