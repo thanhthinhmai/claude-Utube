@@ -12,7 +12,7 @@ from pathlib import Path
 from . import jobs, store
 from .store import StudioError
 
-OPS = {"script": ("script-para",), "cast": ("cast-approve", "cast-save"), "voice": ("voice-say", "voice-remake", "voice-set"),
+OPS = {"script": ("script-para",), "cast": ("cast-approve", "cast-save", "cast-note-add", "cast-note-edit", "cast-note-delete", "cast-view-toggle"), "voice": ("voice-say", "voice-remake", "voice-set"),
        "shots": ("shot", "shots-check", "except", "accept-style"), "mix": ("mix",), "publish": ("publish",)}
 STATUS = ("queued", "running", "done", "failed", "invalid", "conflict", "busy")
 BY_CODE = {0: "done", 1: "done", 2: "invalid", 4: "conflict", 5: "busy"}
@@ -88,18 +88,19 @@ def command(a: dict, film: str, tmpdir: str, studio: str = None, seen: str = Non
     for k in ("ref", "para", "line", "shot", "rule", "character"):
         if args.get(k):
             cmd += [x for x in args.pop(k).split(",") if x]
+    opts = []                               # options after every key=value (argparse stops the list at an option)
     for k in ("text", "description"):
         if k in args:
             f = Path(tmpdir) / f"{k}.txt"
             f.write_text(args.pop(k), encoding="utf-8")
             if k == "text":
-                cmd += ["--text-file", f"{seen}/{k}.txt"]
+                opts += ["--text-file", f"{seen}/{k}.txt"]
             else:
                 cmd.append(f"description-file={seen}/{k}.txt")
     for k in ("say", "reason", "confirm"):
         if k in args:
-            cmd += [f"--{k}", args.pop(k)]
-    cmd += [f"{k.replace('_', '-')}={v}" for k, v in args.items()]
+            opts += [f"--{k}", args.pop(k)]
+    cmd += [f"{k.replace('_', '-')}={v}" for k, v in args.items()] + opts
     if a.get("base"):
         cmd += ["--base", a["base"]]
     return cmd + ["--by", a["by"], "--source", "ui", "--json"]

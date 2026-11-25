@@ -60,6 +60,8 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
          "summary_md": summary_md, "set": set_name or None, "compare": compare,
          "final_round": bool(final_round and kind == "style-2"), "waiting": {"last_poll_at": None}}
     store.doc_put("review", r["id"], r)
+    if kind == "cast":                               # specs/034: Claude sends the cast again, the redraw lot is over
+        _cast_notes(lambda cn, d: cn.end_lot(d), job)
 
     def f(j):
         if j["status"] in jobs.FINAL:
@@ -71,6 +73,18 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
     jobs.update(job["id"], f)
     r["decision"] = None
     return r
+
+
+def _cast_notes(fn, job: dict):
+    """Run fn(castnotes, film folder); a broken notes file never blocks the review itself."""
+    d = film_folder(job)
+    if d is None:
+        return None
+    try:
+        from filmcheck import castnotes
+        return fn(castnotes, d)
+    except Exception:                                # noqa: BLE001
+        return None
 
 
 def film_folder(job: dict):
@@ -110,6 +124,8 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str
         raise StudioError("value_not_allowed", "câu hỏi chỉ cần trả lời", 422)
     if r["kind"] == "question" and len(note) < 1:
         raise StudioError("note_required", "hãy ghi câu trả lời", 422)
+    if r["kind"] == "cast" and value == "revise" and not note:     # "Send notes to Claude" (specs/034 FR-011)
+        note = _cast_notes(lambda cn, d: cn.summary(d), jobs.load(r["job_id"])) or ""
     if value == "revise" and len(note) < 3:
         raise StudioError("note_required", "hãy ghi góp ý (ít nhất 3 ký tự) khi yêu cầu sửa", 422)
     if len(note) > 4000:
@@ -118,6 +134,8 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str
         if store.doc_get("decision", rid):
             raise StudioError("already_decided", "yêu cầu này đã được duyệt", 409)
         point_decision(r, value, note, source, base, by)
+        if r["kind"] == "cast" and value == "revise":
+            _cast_notes(lambda cn, d: cn.start_lot(d, r["job_id"]), jobs.load(r["job_id"]))
     d = {"value": value, "note": note, "source": source, "at": store.now_iso()}
     if not store.doc_create("decision", rid, {**d, "owner": r.get("owner", "local")}):
         raise StudioError("already_decided", "yêu cầu này đã được duyệt", 409)

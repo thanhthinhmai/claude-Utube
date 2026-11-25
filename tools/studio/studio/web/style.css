@@ -778,3 +778,18 @@ main.wide-film #film-player .sh-strip-tools .sh-filters button { padding: 2px 10
 .cast-split .how strong { display: block; color: var(--ink); margin-bottom: 4px; }
 .cast-split .how ol { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 3px; }
 .cast-save { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.cast-split .imgwrap { position: relative; display: block; cursor: crosshair; }
+.cast-split .pin { position: absolute; transform: translate(-50%, -50%); width: 20px; height: 20px; border-radius: 50%; background: var(--warn); color: var(--panel); font: 700 11px/20px system-ui, sans-serif; font-style: normal; text-align: center; box-shadow: 0 0 0 2px var(--panel); pointer-events: none; }
+.cast-split .pin.new { background: var(--accent); }
+.cast-split .hint .pin { position: static; transform: none; display: inline-block; margin-right: 4px; }
+.cast-split .fr.noted { border-color: var(--warn); }
+.cast-split .fr.sel { box-shadow: 0 0 0 2px var(--accent); }
+.cast-split .pinbox { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; border: 1px solid var(--accent-line, var(--accent)); border-radius: 10px; padding: 10px; background: var(--panel); }
+@media (max-width: 600px) { .cast-split .pinbox { grid-template-columns: minmax(0, 1fr); } }
+.cast-split .pinbox .big img { width: 100%; height: auto; display: block; border-radius: 8px; background: var(--hover); }
+.cast-split .pinbox textarea, .cast-split .notebox textarea { width: 100%; min-height: 70px; box-sizing: border-box; }
+.cast-split .notebox { margin-top: 16px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 8px; }
+.cast-split .notebox p { margin: 0; }
+.cast-split .cast-notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.cast-split .cast-notes li { border-left: 3px solid var(--warn); padding: 2px 8px; }
+.cast-split .cast-notes .row { flex-wrap: nowrap; align-items: start; }

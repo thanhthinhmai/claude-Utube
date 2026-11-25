@@ -1310,6 +1310,54 @@ def cmd_cast_approve(a) -> int:
     return 0
 
 
+def cmd_cast_notes(a) -> int:
+    """cast notes show <film> [--all] [--json] · cast notes reply <film> <id> "<text>" [--done|--open] --base <b>."""
+    from filmcheck import cast, castnotes
+    d = _cast_film(a)
+    if d is None:
+        return 2
+    try:
+        if a.ncmd == "reply":
+            done = True if a.done else False if a.open else None
+            n = castnotes.reply(d, a.note_id, a.text, done, a.base)
+            print(f"✓ {n['id']}: replied" + (" · done" if n["done"] else ""))
+            return 0
+        doc = castnotes.load(d)
+        b = castnotes.base(d)
+        rows = []
+        for cid, n in castnotes.all_notes(doc):
+            if n.get("done") and not a.all:
+                continue
+            pic = None
+            if n.get("frame"):
+                f = castnotes._frames(d, cid).get(n["frame"]) or {}
+                if f.get("file"):
+                    pic = str(cast.sheet_dir(d, cid) / f["file"])
+            rows.append({"character": cid, **n, "picture": pic})
+    except castnotes.CastNoteError as e:
+        print(f"✗ {e.code}: {e.message}", file=sys.stderr)
+        return e.exit_code()
+    if a.json:
+        print(json.dumps({"notes": rows, "base": b, "lot": doc.get("lot")}, ensure_ascii=False))
+        return 0
+    last = None
+    for i, r in enumerate(rows, 1):
+        if r["character"] != last:
+            print(f"{r['character']}:")
+            last = r["character"]
+        where = "whole character" if not r.get("frame") else (f"{r['frame']} (request: draw it)" if r["kind"] == "view"
+                else r["frame"] + (f" pin {r['x']},{r['y']}" if r.get("x") is not None else ""))
+        print(f"  {i}. {r['id']} · {where}{' · done' if r.get('done') else ''}: {r['text']}")
+        if r.get("picture"):
+            print(f"     picture: {r['picture']}")
+        if r.get("reply"):
+            print(f"     reply: {r['reply']}")
+    if not rows:
+        print("(no open notes)")
+    print(f"base: {b}")
+    return 0
+
+
 def edit_args(a) -> dict:
     args = {"ref": []}
     for t in a.args:
@@ -1661,6 +1709,11 @@ def parser() -> argparse.ArgumentParser:
     g = s.add_mutually_exclusive_group()
     g.add_argument("--save", dest="save", action="store_true", default=None); g.add_argument("--no-save", dest="save", action="store_false")
     s.add_argument("--source", choices=["chat", "ui"], default="chat"); s.add_argument("--base")
+    s = ca.add_parser("notes", help="notes pinned on the cast sheet").add_subparsers(dest="ncmd", required=True)
+    n = s.add_parser("show"); n.add_argument("film"); n.add_argument("--all", action="store_true"); n.add_argument("--json", action="store_true")
+    n = s.add_parser("reply"); n.add_argument("film"); n.add_argument("note_id"); n.add_argument("text")
+    g = n.add_mutually_exclusive_group(); g.add_argument("--done", action="store_true"); g.add_argument("--open", action="store_true")
+    n.add_argument("--base")
     fm = sub.add_parser("film", help="the film's video (specs/029)").add_subparsers(dest="cmd", required=True)
     s = fm.add_parser("replace", help="put a new video in place, keeping one previous")
     s.add_argument("film"); s.add_argument("video"); s.add_argument("--shots"); s.add_argument("--dir")
@@ -1689,7 +1742,7 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach, ("kit", "use"): cmd_kit_use,
             ("shots", "export"): cmd_shots_export,
             ("notes", "show"): cmd_notes_show, ("notes", "reply"): cmd_notes_reply, ("film", "replace"): cmd_film_replace,
-            ("cast", "check"): cmd_cast_check, ("cast", "status"): cmd_cast_status, ("cast", "approve"): cmd_cast_approve,
+            ("cast", "check"): cmd_cast_check, ("cast", "status"): cmd_cast_status, ("cast", "approve"): cmd_cast_approve, ("cast", "notes"): cmd_cast_notes,
             ("people", "list"): cmd_people_list, ("people", "new"): cmd_people_new, ("people", "sheet"): cmd_people_sheet,
             ("people", "approve"): cmd_people_approve, ("people", "use"): cmd_people_use, ("people", "check"): cmd_people_check,
             ("lesson", "list"): cmd_lesson_list, ("lesson", "draft"): cmd_lesson_draft, ("lesson", "add"): cmd_lesson_add,

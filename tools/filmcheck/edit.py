@@ -95,9 +95,10 @@ def blocks(lock_step: str, own: str) -> bool:
 OPS = {}
 
 
-def op(name, point):
+def op(name, point, fp=None):
+    """fp: the fingerprint the edit's base is checked against (default: the point's)."""
     def reg(fn):
-        OPS[name] = {"point": point, "fn": fn}
+        OPS[name] = {"point": point, "fn": fn, "fp": fp}
         return fn
     return reg
 
@@ -126,7 +127,7 @@ def run(film_dir: Path, name: str, args: dict, base: str = None, by: str = "loca
     if lk and blocks(lk["step"], own):
         res.update(code=5, error=f"busy: {lk['step']} is running ({lk.get('by', '')}); try again when it ends")
         return res
-    fp = points.fingerprint(d, point)
+    fp = spec["fp"](d) if spec.get("fp") else points.fingerprint(d, point)
     if base is not None and base != fp:
         res.update(code=4, fingerprint=fp, error="changed since you opened it: reload")
         return res
@@ -140,7 +141,8 @@ def run(film_dir: Path, name: str, args: dict, base: str = None, by: str = "loca
         drop_lock(d, mine["pid"])
     stale = steps.impact(point, d) if point in steps.POINT_STEP and not out.get("no_stale") else []
     res.update(ok=bool(out.get("ok", True)), code=0 if out.get("ok", True) else 1, ref=out.get("ref"),
-               check=out.get("check"), files=out.get("files") or [], stale=stale, fingerprint=points.fingerprint(d, point),
+               check=out.get("check"), files=out.get("files") or [], stale=stale,
+               fingerprint=spec["fp"](d) if spec.get("fp") else points.fingerprint(d, point),
                error=out.get("error"))
     log_edit(d, {"at": now(), "by": by, "source": source, "op": name, "point": point, "ref": out.get("ref"),
                  "old": out.get("old"), "new": out.get("new"), "result": "ok" if res["ok"] else "check_failed",
@@ -535,6 +537,76 @@ def cast_save(d: Path, a: dict) -> dict:
     cast.save(d, doc)
     return {"ok": True, "ref": "save_to_library", "old": old, "new": doc["save_to_library"], "files": ["cast/cast.json"],
             "no_stale": True}
+
+
+def _notes_base(d: Path) -> str:
+    from filmcheck import castnotes
+    return castnotes.base(d)
+
+
+def _note_text(a: dict):
+    if a.get("text") is not None:
+        return a["text"]
+    if a.get("text_file"):
+        try:
+            return Path(a["text_file"]).read_text(encoding="utf-8")
+        except OSError as e:
+            raise EditError(f"cannot read the note text: {e}") from None
+    return None
+
+
+def _note_call(fn, *args, **kw):
+    from filmcheck import castnotes
+    try:
+        return fn(*args, **kw)
+    except castnotes.CastNoteError as e:
+        raise EditError(f"{e.code}: {e.message}") from None
+
+
+@op("cast-note-add", "cast", _notes_base)
+def cast_note_add(d: Path, a: dict) -> dict:
+    """A note on the cast sheet: character, kind (note|view), frame (none = the whole character), x, y (%), text."""
+    from filmcheck import castnotes
+    cid = a.get("character") or (a.get("ref") or [None])[0]
+    if not cid:
+        raise EditError("cast-note-add: character=<id>")
+    x, y = a.get("x") or None, a.get("y") or None
+    n = _note_call(castnotes.add, d, cid, a.get("kind") or "note", a.get("frame") or None, x, y, _note_text(a),
+                   a.get("by") or "owner")
+    return {"ok": True, "ref": n["id"], "new": n["text"], "files": ["cast-notes.json"], "no_stale": True}
+
+
+@op("cast-note-edit", "cast", _notes_base)
+def cast_note_edit(d: Path, a: dict) -> dict:
+    """Change a note's words or move its pin: character, note, text?, x?, y?."""
+    from filmcheck import castnotes
+    a.setdefault("character", (a.get("ref") or [None])[0])
+    if not a.get("character") or not a.get("note"):
+        raise EditError("cast-note-edit: character=<id> note=<id>")
+    n = _note_call(castnotes.edit, d, a["character"], a["note"], _note_text(a), a.get("x") or None, a.get("y") or None)
+    return {"ok": True, "ref": n["id"], "new": n["text"], "files": ["cast-notes.json"], "no_stale": True}
+
+
+@op("cast-note-delete", "cast", _notes_base)
+def cast_note_delete(d: Path, a: dict) -> dict:
+    from filmcheck import castnotes
+    a.setdefault("character", (a.get("ref") or [None])[0])
+    if not a.get("character") or not a.get("note"):
+        raise EditError("cast-note-delete: character=<id> note=<id>")
+    _note_call(castnotes.delete, d, a["character"], a["note"])
+    return {"ok": True, "ref": a["note"], "files": ["cast-notes.json"], "no_stale": True}
+
+
+@op("cast-view-toggle", "cast", _notes_base)
+def cast_view_toggle(d: Path, a: dict) -> dict:
+    """"Request this view" / "Undo" on a picture the sheet lacks: character, frame."""
+    from filmcheck import castnotes
+    a.setdefault("character", (a.get("ref") or [None])[0])
+    if not a.get("character") or not a.get("frame"):
+        raise EditError("cast-view-toggle: character=<id> frame=<key>")
+    n = _note_call(castnotes.toggle_view, d, a["character"], a["frame"])
+    return {"ok": True, "ref": n["id"] if n else a["frame"], "new": "requested" if n else "undone",
+            "files": ["cast-notes.json"], "no_stale": True}
 
 # ---------- publish (US5) ----------
 @op("publish", "publish")

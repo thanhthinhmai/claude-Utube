@@ -779,8 +779,62 @@ const CAST_ROLE = { hero: "Hero", support: "Support", background: "Background" }
 /** @param {any} c */
 const castChip = (c) => { const [k, l] = CAST_STATE[c.state] || ["", c.state]; return `<span class="chip ${k}">${esc(l)}</span>`
   + (c.notes_open ? ` <span class="chip warn">${c.notes_open} note${c.notes_open === 1 ? "" : "s"}</span>` : ""); };
-/** @param {any} c @param {any} f @param {boolean} [prev] */
+/** @param {any} c @param {string} f @param {boolean} [prev] */
 const castFile = (c, f, prev) => fileUrl(`cast/sheets/${c.id}${prev ? ".prev" : ""}/${f}`);
+/** The open notes of one character, in order (numbered 1, 2, … on the page). @param {string} id */
+const castNotes = (id) => {
+  const n = RAIL.data && RAIL.data.cast && RAIL.data.cast.notes;
+  return ((n && n.characters && n.characters[id] && n.characters[id].notes) || []).filter((/** @type {any} */ x) => !x.done);
+};
+// a picture is shown cropped (object-fit: cover); pins are stored in percent of the whole picture
+/** @param {HTMLImageElement} img */
+function coverBox(img) {
+  const W = img.clientWidth, H = img.clientHeight, nw = img.naturalWidth || W, nh = img.naturalHeight || H;
+  const s = Math.max(W / nw, H / nh);
+  return { W, H, dw: nw * s, dh: nh * s, ox: (nw * s - W) / 2, oy: (nh * s - H) / 2 };
+}
+/** element % → picture % @param {HTMLImageElement} img @param {number} ex @param {number} ey */
+function toPicture(img, ex, ey) {
+  const k = coverBox(img);
+  return [Math.min(100, Math.max(0, ((ex / 100) * k.W + k.ox) / k.dw * 100)), Math.min(100, Math.max(0, ((ey / 100) * k.H + k.oy) / k.dh * 100))];
+}
+/** picture % → element % (null when cropped away) @param {HTMLImageElement} img @param {number} x @param {number} y */
+function toElement(img, x, y) {
+  const k = coverBox(img);
+  const ex = ((x / 100) * k.dw - k.ox) / k.W * 100, ey = ((y / 100) * k.dh - k.oy) / k.H * 100;
+  return ex < 0 || ex > 100 || ey < 0 || ey > 100 ? null : [ex, ey];
+}
+/** Pins of the open notes on one picture. @param {string} id @param {string} key @param {any} [extra] a pin being placed */
+function castPins(id, key, extra) {
+  const pins = castNotes(id).map((/** @type {any} */ n, /** @type {number} */ i) => n.frame === key && n.x != null
+    ? `<i class="pin" data-x="${n.x}" data-y="${n.y}">${i + 1}</i>` : "").join("");
+  return pins + (extra ? `<i class="pin new" data-x="${extra.x}" data-y="${extra.y}">${castNotes(id).length + 1}</i>` : "");
+}
+/** Place the pins of a box (data-x/y in picture %) on its image. @param {HTMLElement} root */
+function placePins(root) {
+  root.querySelectorAll(".imgwrap").forEach((w) => {
+    const img = /** @type {HTMLImageElement | null} */ (w.querySelector("img"));
+    if (!img) return;
+    const put = () => w.querySelectorAll(".pin").forEach((p) => {
+      const el = /** @type {HTMLElement} */ (p);
+      const big = w.classList.contains("big");
+      const at = big ? [Number(el.dataset.x), Number(el.dataset.y)] : toElement(img, Number(el.dataset.x), Number(el.dataset.y));
+      el.hidden = !at;
+      if (at) { el.style.left = `${at[0]}%`; el.style.top = `${at[1]}%`; }
+    });
+    if (img.complete) put(); else img.addEventListener("load", put, { once: true });
+  });
+}
+/** Send one cast note edit on the notes' base. @param {string} op @param {any} args */
+async function castNoteEdit(op, args) {
+  const a = await post(`/jobs/${encodeURIComponent(DONE.job.id)}/actions`, { point: "cast", op, args, base: RAIL.data.cast.notes_base || undefined });
+  for (let i = 0; i < 600; i++) {
+    await new Promise((r) => setTimeout(r, i < 20 ? 250 : 1000));
+    const x = await get(`/jobs/${encodeURIComponent(DONE.job.id)}/actions/${a.id}`);
+    if (!["queued", "running"].includes(x.status)) { await railRefresh(); return x; }
+  }
+  throw new Error("The edit is taking long; its result will show in the log.");
+}
 
 /** @param {HTMLElement} body @param {any} s */
 function doneCast(body, s) {
@@ -791,6 +845,9 @@ function doneCast(body, s) {
   if (!chars.length) { body.innerHTML = `<p class="muted">No characters in this film${cb.skip ? ` (${esc(cb.skip)})` : ""}.</p>`; return; }
   if (!DONE.castWho || !chars.some((/** @type {any} */ c) => c.id === DONE.castWho)) DONE.castWho = chars[0].id;
   const c = chars.find((/** @type {any} */ x) => x.id === DONE.castWho);
+  const can = canEdit("cast");
+  const pin = DONE.castPin && DONE.castPin.who === c.id ? DONE.castPin : null;
+  const notes = castNotes(c.id);
   const thumb = (/** @type {any} */ x) => {
     const f = x.sheet && x.sheet.frames.find((/** @type {any} */ r) => r.file && r.file.endsWith(".jpg"));
     return f ? `<img src="${castFile(x, f.file)}" alt="" loading="lazy">` : `<span class="cast-noimg" aria-hidden="true"></span>`;
@@ -798,21 +855,39 @@ function doneCast(body, s) {
   const list = chars.map((/** @type {any} */ x) => `<button role="tab" aria-selected="${x.id === c.id}" data-who="${esc(x.id)}">${thumb(x)}
       <span><b>${esc(x.name || x.id)}</b><small class="muted">${esc(CAST_ROLE[x.role] || x.role || "")}${x.kind === "group" ? ` · group of ${(x.members || []).length}` : ""}</small><br>${castChip(x)}</span></button>`).join("");
   const frames = (c.sheet && c.sheet.frames) || [];
+  const noted = (/** @type {string} */ k) => notes.some((/** @type {any} */ n) => n.frame === k);
   const tile = (/** @type {any} */ f) => {
-    if (!f.file) return `<div class="fr missing"><b>${esc(f.label)}</b><span>No picture yet</span>${f.missing_reason ? `<small class="muted">${esc(f.missing_reason)}</small>` : ""}</div>`;
+    if (!f.file) {
+      const asked = notes.some((/** @type {any} */ n) => n.kind === "view" && n.frame === f.key);
+      return `<div class="fr missing ${asked ? "noted" : ""}"><b>${esc(f.label)}</b><span>${asked ? "Requested: Claude will draw it" : "No picture yet"}</span>
+        ${f.missing_reason && !asked ? `<small class="muted">${esc(f.missing_reason)}</small>` : ""}
+        ${can ? `<button class="btn small" data-ask="${esc(f.key)}">${asked ? "Undo" : "Request this view"}</button>` : ""}</div>`;
+    }
     const tall = f.group === "pose" || f.group === "walk";
-    const media = f.file.endsWith(".mp4") ? `<video src="${castFile(c, f.file)}" autoplay muted loop playsinline aria-label="${esc(f.label)}"></video>`
-      : `<img src="${castFile(c, f.file)}" alt="${esc(f.label)}" loading="lazy">`;
-    return `<figure class="fr ${tall ? "tall" : ""} ${f.group === "group" ? "wide" : ""}">${media}<figcaption>${esc(f.label)}${f.para ? ` <span class="muted">${esc(f.para)}</span>` : ""}</figcaption></figure>`;
+    const cls = `fr ${tall ? "tall" : ""} ${f.group === "group" ? "wide" : ""} ${noted(f.key) ? "noted" : ""} ${pin && pin.frame === f.key ? "sel" : ""}`;
+    const cap = `<figcaption>${esc(f.label)}${f.para ? ` <span class="muted">${esc(f.para)}</span>` : ""}</figcaption>`;
+    if (f.file.endsWith(".mp4")) return `<figure class="${cls}"><video src="${castFile(c, f.file)}" autoplay muted loop playsinline aria-label="${esc(f.label)}"></video>${cap}</figure>`;
+    return `<figure class="${cls}"><span class="imgwrap" ${can ? `data-pick="${esc(f.key)}" data-file="${esc(f.file)}" role="button" tabindex="0" aria-label="Pin a note on ${esc(f.label)}"` : ""}>
+      <img src="${castFile(c, f.file)}" alt="${esc(f.label)}" loading="lazy">${castPins(c.id, f.key)}</span>${cap}</figure>`;
   };
+  const pinbox = () => pin ? `<div class="pinbox"><div class="imgwrap big" data-repin><img src="${castFile(c, pin.file)}" alt="${esc(pin.label)}, larger">${castPins(c.id, pin.frame, pin)}</div>
+      <div class="form"><p><b>Note ${notes.length + 1} on ${esc(pin.label)}</b> · ${esc(c.name || c.id)}</p>
+        <p class="muted small">Click the big picture to move the pin.</p>
+        <textarea id="pin-note" maxlength="2000" placeholder="e.g. Hair: bigger curls that fall over the forehead" aria-label="Note text">${esc(pin.text || "")}</textarea>
+        <div class="row"><button class="primary small" id="pin-save">Add note</button><button class="btn small" id="pin-cancel">Cancel</button></div>
+        <p class="small fail" id="pin-msg" role="status"></p></div></div>` : "";
   const groups = CAST_GROUPS.map(([g, l]) => {
     const fs = frames.filter((/** @type {any} */ f) => f.group === g);
-    return fs.length ? `<h3>${esc(l)}</h3><div class="frames">${fs.map(tile).join("")}</div>` : "";
+    return fs.length ? `<h3>${esc(l)}</h3><div class="frames">${fs.map(tile).join("")}${pin && fs.some((/** @type {any} */ f) => f.key === pin.frame) ? pinbox() : ""}</div>` : "";
   }).join("");
   const paras = [...new Set([...(c.needs?.expressions || []), ...(c.needs?.poses || [])].map((/** @type {any} */ r) => r.para).filter(Boolean))];
   const look = (c.palette || []).map((/** @type {any} */ [k, h]) => `<dt>${esc(k)}</dt><dd><span class="sw" style="background:${esc(h)}"></span><span class="muted num">${esc(h)}</span></dd>`).join("");
   const done = chars.filter((/** @type {any} */ x) => x.state === "approved").length;
   const errs = (cb.errors || []).filter((/** @type {any} */ e) => !e.character || e.character === c.id);
+  const label = (/** @type {any} */ n) => !n.frame ? "Whole character" : (frames.find((/** @type {any} */ f) => f.key === n.frame) || {}).label || n.frame;
+  const noteList = notes.length ? `<ul class="cast-notes">${notes.map((/** @type {any} */ n, /** @type {number} */ i) => `<li><b>${i + 1} · ${esc(label(n))}${n.kind === "view" ? " (draw it)" : ""}</b>
+      <span class="row spread"><span>${esc(n.text)}${n.reply ? `<br><small class="muted">Claude: ${esc(n.reply)}</small>` : ""}</span>
+      ${can ? `<button class="btn small" data-del="${esc(n.id)}" aria-label="Delete note ${i + 1}">✕ Delete</button>` : ""}</span></li>`).join("")}</ul>` : "";
   body.innerHTML = facts([`${b(chars.length)} character${chars.length === 1 ? "" : "s"}`, `${b(done)} approved`,
       chars.some((/** @type {any} */ x) => x.source !== "film") ? `${b(chars.filter((/** @type {any} */ x) => x.source !== "film").length)} from the channel's cast` : ""])
     + `<div class="cast-split"><div class="cast">
@@ -821,20 +896,83 @@ function doneCast(body, s) {
         <div class="sheet-head"><div><h2>${esc(c.name || c.id)}</h2><p class="muted small">${esc(CAST_ROLE[c.role] || "")} · ${esc(c.source === "film" ? "new in this film" : c.source)} · rig ${esc(c.rig)}</p></div>
           <div class="row" id="cast-who-act">${castChip(c)}</div></div>
         ${errs.length ? `<ul class="fail small">${errs.map((/** @type {any} */ e) => `<li>${esc(e.code)}: ${esc(e.message)}</li>`).join("")}</ul>` : ""}
-        ${c.sheet ? groups : `<div class="fr missing wide"><b>No cast sheet yet</b><span>Claude draws it in After Effects. If it does not come, After Effects or its bridge is not ready: open After Effects (desktop app tray → After Effects… → Test), then ask Claude to run <code>ae sheet</code> again.</span></div>`}
+        ${c.sheet ? (can ? `<p class="hint small muted"><i class="pin">1</i> Click the exact spot on any picture (the hair, a hand, the hat) to pin a note there.</p>` : "") + groups
+          : `<div class="fr missing wide"><b>No cast sheet yet</b><span>Claude draws it in After Effects. If it does not come, After Effects or its bridge is not ready: open After Effects (desktop app tray → After Effects… → Test), then ask Claude to run <code>ae sheet</code> again.</span></div>`}
         ${look ? `<h3>Look</h3><dl class="spec">${look}${paras.length ? `<dt>Used in</dt><dd>${paras.map((p) => esc(p)).join(", ")}</dd>` : ""}</dl>` : ""}
         ${c.has_prev ? `<p class="muted small">The sheet before the last redraw is kept: <a href="${castFile(c, "sheet.json", true)}" target="_blank" rel="noopener">previous sheet</a>.</p>` : ""}
+        ${can || notes.length ? `<div class="notebox"><p><b>Notes for ${esc(c.name || c.id)}</b> <span class="muted small">· pinned notes appear here; write below for a note about the whole character</span></p>
+          ${noteList}
+          ${can ? `<textarea id="cast-note" maxlength="2000" placeholder="e.g. Make him a bit taller than the hero" aria-label="Note for the whole character"></textarea>
+          <div class="row spread"><span class="muted small">"Send notes to Claude" sends every note at once. Claude redraws only the characters with notes.</span>
+            <button class="btn small" id="cast-note-add">Add note</button></div><p class="small fail" id="cast-note-msg" role="status"></p>` : ""}</div>` : ""}
       </div></div>
       <aside class="how"><strong>How it works</strong><ol>
         <li>Claude reads the script and lists the film's characters.</li>
         <li>After Effects draws each one: three views, the expressions and poses the script needs, a walk loop.</li>
+        <li>Pin notes on the pictures, then send them to Claude: only the characters with notes are drawn again.</li>
         <li>Approve each character, or the whole cast at once. The voice is made only after that.</li>
         <li>Approved characters can be saved to the channel's cast, so the next film uses them without a new review.</li></ol></aside></div>`;
+  placePins(body);
+  const redraw = () => { doneCast(body, s); castBar(body); };
   body.querySelectorAll(".who [data-who]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
-    DONE.castWho = /** @type {HTMLElement} */ (el).dataset.who; DONE.drawn = {}; doneRefresh(true);
+    DONE.castWho = /** @type {HTMLElement} */ (el).dataset.who; DONE.castPin = null; redraw();
+  }; });
+  body.querySelectorAll("[data-pick]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = (e) => {
+    const w = /** @type {HTMLElement} */ (el), img = /** @type {HTMLImageElement} */ (w.querySelector("img")), r = img.getBoundingClientRect();
+    const [x, y] = toPicture(img, ((e.clientX - r.left) / r.width) * 100, ((e.clientY - r.top) / r.height) * 100);
+    const f = frames.find((/** @type {any} */ q) => q.key === w.dataset.pick);
+    DONE.castPin = { who: c.id, frame: w.dataset.pick, file: w.dataset.file, label: f ? f.label : w.dataset.pick,
+      x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, text: pin ? /** @type {HTMLTextAreaElement} */ (body.querySelector("#pin-note"))?.value : "" };
+    redraw();
+    /** @type {HTMLElement | null} */ (body.querySelector("#pin-note"))?.focus();
+  }; });
+  const big = /** @type {HTMLElement | null} */ (body.querySelector("[data-repin]"));
+  if (big) big.onclick = (e) => {
+    const r = /** @type {HTMLElement} */ (big.querySelector("img")).getBoundingClientRect();
+    DONE.castPin.x = Math.round(Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100)) * 10) / 10;
+    DONE.castPin.y = Math.round(Math.min(100, Math.max(0, ((e.clientY - r.top) / r.height) * 100)) * 10) / 10;
+    DONE.castPin.text = /** @type {HTMLTextAreaElement} */ (body.querySelector("#pin-note")).value;
+    redraw();
+  };
+  const cancel = body.querySelector("#pin-cancel");
+  if (cancel) /** @type {HTMLElement} */ (cancel).onclick = () => { DONE.castPin = null; redraw(); };
+  const save = /** @type {HTMLButtonElement | null} */ (body.querySelector("#pin-save"));
+  if (save) save.onclick = async () => {
+    const text = /** @type {HTMLTextAreaElement} */ (body.querySelector("#pin-note")).value.trim();
+    const m = /** @type {HTMLElement} */ (body.querySelector("#pin-msg"));
+    if (!text) { m.textContent = "Write what should change."; return; }
+    save.disabled = true;
+    try {
+      const x = await castNoteEdit("cast-note-add", { character: c.id, kind: "note", frame: pin.frame, x: pin.x, y: pin.y, text });
+      if (x.status !== "done") { m.textContent = editMsg(x); save.disabled = false; return; }
+      DONE.castPin = null; redraw();
+    } catch (err) { m.textContent = /** @type {Error} */ (err).message; save.disabled = false; }
+  };
+  const add = /** @type {HTMLButtonElement | null} */ (body.querySelector("#cast-note-add"));
+  if (add) add.onclick = async () => {
+    const text = /** @type {HTMLTextAreaElement} */ (body.querySelector("#cast-note")).value.trim();
+    const m = /** @type {HTMLElement} */ (body.querySelector("#cast-note-msg"));
+    if (!text) { m.textContent = "Write the note first."; return; }
+    add.disabled = true;
+    try { const x = await castNoteEdit("cast-note-add", { character: c.id, kind: "note", text }); if (x.status !== "done") m.textContent = editMsg(x); else redraw(); }
+    catch (err) { m.textContent = /** @type {Error} */ (err).message; }
+    add.disabled = false;
+  };
+  body.querySelectorAll("[data-del]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = async () => {
+    /** @type {HTMLButtonElement} */ (el).disabled = true;
+    try { const x = await castNoteEdit("cast-note-delete", { character: c.id, note: /** @type {HTMLElement} */ (el).dataset.del }); if (x.status !== "done") alert(editMsg(x)); }
+    catch (err) { alert(/** @type {Error} */ (err).message); }
+    redraw();
+  }; });
+  body.querySelectorAll("[data-ask]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = async (e) => {
+    e.stopPropagation();
+    /** @type {HTMLButtonElement} */ (el).disabled = true;
+    try { const x = await castNoteEdit("cast-view-toggle", { character: c.id, frame: /** @type {HTMLElement} */ (el).dataset.ask }); if (x.status !== "done") alert(editMsg(x)); }
+    catch (err) { alert(/** @type {Error} */ (err).message); }
+    redraw();
   }; });
 }
-/** The approve part of the Cast step: one character, the whole cast, save to the channel's cast. @param {HTMLElement} body */
+/** The approve part of the Cast step: one character, the whole cast, send the notes, save to the channel's cast. @param {HTMLElement} body */
 function castBar(body) {
   const cb = RAIL.data && RAIL.data.cast;
   if (!cb || !cb.characters || !cb.characters.length) return;
@@ -855,9 +993,32 @@ function castBar(body) {
     act.append(btn);
   }
   const missing = cb.characters.filter((/** @type {any} */ x) => !x.sheet).map((/** @type {any} */ x) => x.name || x.id);
-  const noted = cb.characters.filter((/** @type {any} */ x) => x.notes_open).map((/** @type {any} */ x) => x.name || x.id);
-  const blocked = missing.length ? `No cast sheet yet for ${missing.join(", ")}.` : noted.length ? `Open notes on ${noted.join(", ")}: send them to Claude or delete them.` : "";
+  const nNotes = cb.characters.reduce((/** @type {number} */ a, /** @type {any} */ x) => a + (x.notes_open || 0), 0);
+  const blocked = missing.length ? `No cast sheet yet for ${missing.join(", ")}.` : nNotes ? `${nNotes} note${nNotes === 1 ? "" : "s"} to send: Claude redraws those characters, then you approve.` : "";
   approveBar(body, "cast", blocked);
+  const bar = body.querySelector(".approve-bar");
+  const r = pendingFor("cast");
+  if (bar && r) {                                     // "Request changes…" becomes "Send N notes to Claude"
+    const ask = /** @type {HTMLElement | null} */ (bar.querySelector("#ask-changes"));
+    if (ask) {
+      const send = document.createElement("button");
+      send.className = "btn"; send.id = "send-notes"; send.disabled = !nNotes;
+      send.textContent = nNotes ? `Send ${nNotes} note${nNotes === 1 ? "" : "s"} to Claude` : "Send notes to Claude";
+      send.onclick = async () => {
+        send.disabled = true;
+        const msg = /** @type {HTMLElement} */ (bar.querySelector("#approve-msg"));
+        try { await post(`/reviews/${encodeURIComponent(r.id)}/decision`, { value: "revise", note: "" }); route(); }
+        catch (err) { msg.className = "fail small"; msg.textContent = /** @type {Error} */ (err).message; send.disabled = false; }
+      };
+      ask.replaceWith(send);
+    }
+  }
+  const lot = cb.notes && cb.notes.lot;
+  if (lot && !r) {
+    const p = document.createElement("p"); p.className = "notice small";
+    p.textContent = `Claude is redrawing the characters with notes (${lot.notes.length} note${lot.notes.length === 1 ? "" : "s"}). Notes you add now wait for the next round.`;
+    body.prepend(p);
+  }
   const save = document.createElement("label");
   save.className = "check small cast-save";
   const why = cb.library_available ? "" : "The channel's cast lives in the studio app: run the film from the app to save characters.";
@@ -870,7 +1031,6 @@ function castBar(body) {
     catch (err) { alert(/** @type {Error} */ (err).message); box.checked = !box.checked; }
     box.disabled = false;
   };
-  const bar = body.querySelector(".approve-bar");
   if (bar) bar.append(save); else body.prepend(save);
 }
 

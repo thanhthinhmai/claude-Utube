@@ -120,6 +120,12 @@ class CastApi(unittest.TestCase):
         self.assertFalse(o["approveCastDisabled"])
         self.assertEqual((o["saveBox"], o["toggleCast"]), (1, 1))
         self.assertTrue(o.get("friendApproved"))
+        for k in ("pin1280", "pin400"):                                 # the pin sits where it was clicked
+            self.assertEqual(o[k]["notes"], 1, k)
+            self.assertLess(o[k]["off"], 0.02, k)
+        self.assertEqual(o["askLabel"], "Undo")
+        self.assertEqual(o["sendNotes"], "Send 1 note to Claude")
+        self.assertLessEqual(o["scroll400"], 0)
 
 
 if __name__ == "__main__":
