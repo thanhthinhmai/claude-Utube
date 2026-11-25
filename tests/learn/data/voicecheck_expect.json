@@ -1,0 +1,12 @@
+{
+ "about": "specs/037 T033/SC-003: the 5 sound events checked by ear on references/voice-check/a.wav (not in git). Numbers and labels only: a window [t0, t1] in seconds, the level-2 AudioSet groups that count as a match, the narrator's word, the layer the event was heard in.",
+ "source": "references/voice-check/a.wav + segs.json (sentences)",
+ "events": [
+  {"name": "glass breaking", "window": [3.0, 6.0], "groups": ["Glass", "Generic impact sounds", "Specific impact sounds"], "word": "window", "layer": "fx"},
+  {"name": "near silence", "kind": "silence", "window": [7.0, 9.5], "max_db": -50, "min_len": 0.4, "word": "silent"},
+  {"name": "fish tank bubbles", "window": [21.5, 25.0], "groups": ["Water", "Liquid"], "word": "tank", "layer": "fx"},
+  {"name": "ball", "window": [157.0, 162.0], "groups": ["Generic impact sounds", "Specific impact sounds", "Surface contact"], "word": "ball", "layer": "fx"},
+  {"name": "crowd cheer", "window": [164.0, 168.5], "groups": ["Human group actions"], "word": "cheer", "layer": "vocal_off_words", "cut": "hard"}
+ ],
+ "pass": "SC-003: at least 4 of 5 found (agree, a matching group, inside the window)"
+}

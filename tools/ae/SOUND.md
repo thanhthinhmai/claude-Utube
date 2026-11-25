@@ -9,7 +9,7 @@ keyframes and mixes `out/mix.wav`. When a shot's length changes at the Animatic,
 - `SCRIPT.md`: what happens in each paragraph.
 - `animatic/keys.json`: the motions of each shot, `{shot: [{layer, prop, t0, t1}]}` in seconds within the shot. A
   motion is named `Layer · Prop`, for example `Hand R · Rotation`.
-- `kit/template.json → sound.sfx` when the style has one (from `learn sfx`): sounds per minute, gain against the
+- the style's `sound.sfx` (from `learn sfx`; read from the film's `kit/template.json` or `my-styles/<film.json → style>/template.json`): sounds per minute, gain against the
   voice, which actions get a sound, chosen silences, how sounds end at a cut. Follow it. Without it the defaults are
   12 sounds a minute at most, −6 dB against the voice, point sounds fade at the cut, whole-shot sounds stop hard.
 

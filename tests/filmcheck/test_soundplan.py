@@ -123,6 +123,20 @@ class Anchors(PlanCase):
         self.assertLessEqual(len([c for c in live if c["by"] != "user"]), 1)
 
 
+    def test_style_from_film_json(self):
+        root = Path(os.environ["STUDIO_ROOT"])
+        sd = root / "my-styles" / "demo"
+        sd.mkdir(parents=True)
+        (sd / "template.json").write_text(json.dumps({"set": "x", "sound": {"sfx": {"per_min": 9}}}))
+        self.assertEqual(soundplan.style_sfx(self.d), {})
+        fj = self.d / "film.json"
+        j = json.loads(fj.read_text()) if fj.exists() else {}
+        fj.write_text(json.dumps(dict(j, style="demo")))
+        self.assertEqual(soundplan.style_sfx(self.d)["per_min"], 9)
+        fj.write_text(json.dumps(dict(j, style="../demo")))
+        self.assertEqual(soundplan.style_sfx(self.d), {})
+
+
 class Fallback(PlanCase):
     def setUp(self):
         super().setUp()

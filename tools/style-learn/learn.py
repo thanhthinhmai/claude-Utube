@@ -175,6 +175,49 @@ def cmd_sound(a):
     return soundcraft.sound_set(a.set, a.only)
 
 
+def cmd_sfx(a):
+    """specs/037: sound effects of the reference videos (two classifiers agreeing) → profile/<v>/sfx.json;
+    --style writes the summary into my-styles/STYLE/template.json → sound.sfx and STYLE.md."""
+    import json as _json
+    from pathlib import Path as _P
+    from sl import sfxlearn
+    if a.file:
+        if not a.words:
+            print("✗ --file cần --words <words.json|segs.json>", file=sys.stderr); return 2
+        wav, wf = _P(a.file), _P(a.words)
+        if not wav.exists() or not wf.exists():
+            print("✗ không thấy tệp âm thanh hoặc tệp từ", file=sys.stderr); return 3
+        try:
+            models = sfxlearn.Models()
+        except sfxlearn.MissingDeps:
+            print("✗ chưa cài tầng học tiếng: sh bin/studio deps sound", file=sys.stderr); return 3
+        raw = _json.loads(wf.read_text(encoding="utf-8"))
+        if isinstance(raw, list) and raw and "t" in raw[0] and "start" not in raw[0]:
+            # sentence times only: muting the narrator needs word times, or a cheer inside a sentence is muted with it
+            from sl import speech
+            mix = speech.decode_16k(wav)
+            dur = len(mix) / 16000
+            print(f"… {wf.name} chỉ có mốc câu: chép lời lại để lấy mốc từ (faster-whisper, trên máy)")
+            raw = speech.transcribe(wav, {"has_audio": True, "duration": dur}, [(0.0, dur)])
+            wout = wav.with_suffix(".words.json") if not a.out else _P(a.out).with_suffix(".words.json")
+            wout.write_text(_json.dumps(raw, ensure_ascii=False) + "\n", encoding="utf-8")
+        words = sfxlearn.load_words(raw)
+        cuts = sfxlearn.load_cuts(_json.loads(_P(a.shots).read_text(encoding="utf-8"))) if a.shots else []
+        res = sfxlearn.run_file(wav, words, cuts, models, _P(a.stems) if a.stems else None)
+        out = _P(a.out) if a.out else wav.with_suffix(".sfx.json")
+        out.write_text(_json.dumps(res, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+        n_ok = sum(e["agree"] for e in res["events"])
+        print(f"✓ {out}: {len(res['events'])} sự kiện, {n_ok} hai bộ đồng ý, {len(res['silences'])} lặng chọn")
+        return 0
+    if not a.set:
+        print("✗ cần <set> hoặc --file", file=sys.stderr); return 2
+    if not a.summary:
+        rc = sfxlearn.sfx_set(a.set, a.only)
+        if rc or not a.style:
+            return rc
+    return sfxlearn.summarize_set(a.set, a.style)
+
+
 def cmd_beats(a):
     from sl import timesummary
     probs = timesummary.check_beats(a.set)
@@ -271,6 +314,16 @@ def main(argv=None) -> int:
     so.add_argument("set"); so.add_argument("--only", nargs="*")
     so.add_argument("--recompute", action="store_true", help="lọc lại sound.json đã lưu theo đoạn đo, không cần video (specs/028)")
     so.set_defaults(fn=cmd_sound)
+
+    sx = sub.add_parser("sfx", help="tiếng động của video mẫu, hai bộ phân loại đồng ý (cần deps sound, learn transcribe; specs/037)")
+    sx.add_argument("set", nargs="?"); sx.add_argument("--only", nargs="*")
+    sx.add_argument("--style", help="ghi tổng hợp vào my-styles/STYLE/template.json → sound.sfx và STYLE.md")
+    sx.add_argument("--summary", action="store_true", help="chỉ tổng hợp sfx.json đã có, không chạy mô hình")
+    sx.add_argument("--file", help="một tệp âm thanh/video ngoài bộ"); sx.add_argument("--words", help="words.json hoặc segs.json")
+    sx.add_argument("--shots", help="mốc cắt: craft.json, shots.json hoặc danh sách giây")
+    sx.add_argument("--out", help="nơi ghi kết quả (mặc định <tệp>.sfx.json)")
+    sx.add_argument("--stems", help="thư mục ghi các lớp tách ra (mặc định không ghi)")
+    sx.set_defaults(fn=cmd_sfx)
 
     bt = sub.add_parser("beats", help="kiểm profile/beats.json (specs/023)")
     bt.add_argument("set"); bt.add_argument("--check", action="store_true", required=True); bt.set_defaults(fn=cmd_beats)

@@ -222,7 +222,7 @@ def clean(name: str, keep: bool = False) -> int:
     if keep:
         print(f"= giữ video tham chiếu trong references/{name}/ (không vào git). Xoá sau: sh bin/studio learn clean {name}")
         return 0
-    targets = [d / "videos", d / "proof" / "compare.jpg"]
+    targets = [d / "videos", d / "stems", d / "proof" / "compare.jpg"]   # stems: layers split by learn sfx (specs/037)
     targets += list((d / "profile").glob("*/words.json")) + list((d / "profile").glob("*/sheets"))
     # specs/021: full-size shot frames and the unlabelled sheets; the small labelled shot sheets and the labels stay
     targets += list((d / "profile").glob("*/shot-frames")) + list((d / "profile").glob("*/label-sheets")) + [d / "profile" / "pass2"]
