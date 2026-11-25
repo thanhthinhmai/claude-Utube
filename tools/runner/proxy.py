@@ -29,7 +29,7 @@ from pydantic import BaseModel, Field
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "studio"))
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from filmcheck import eleven, topics as yt_topics, webfetch  # noqa: E402
+from filmcheck import eleven, freesound, soundlib, topics as yt_topics, webfetch  # noqa: E402
 from studio import claude_plan, db, jobs, quotas, reviews, store, voicekeys  # noqa: E402
 from studio.store import StudioError  # noqa: E402
 
@@ -259,6 +259,24 @@ class TtsIn(BaseModel):                       # specs/036 contracts/http.md
 
 TTS_PARALLEL = 3                              # ElevenLabs calls at once per job (the Starter plan allows 3)
 TTS_SLOTS: dict = {}
+
+
+class SoundSearchIn(BaseModel):                # specs/037 contracts/api.md
+    query: str = Field(max_length=200)
+    cat: Optional[str] = Field(default=None, max_length=40)
+    dur: Optional[float] = None
+
+
+class SoundFetchIn(BaseModel):
+    entry: str = Field(max_length=40)
+    film: str = Field(max_length=120)
+
+
+def sound_scope(job: dict) -> str:
+    """specs/037 FR-013a: Sonniss sounds for the studio owner's films only; a customer's job sees CC0 sounds."""
+    from studio import accounts
+    a = accounts.get(job.get("owner") or "")
+    return "all" if a and a["role"] == "admin" else "cc0"
 
 
 class ReviewIn(BaseModel):
@@ -515,6 +533,40 @@ def create_app() -> FastAPI:
         jobs.update(job["id"], add)
         log.info("job %s elevenlabs speak %s: %s characters", job["id"], body.voice_id, out["chars"])
         return out
+
+    @app.post("/internal/sound/search")
+    async def sound_search(body: SoundSearchIn, request: Request):
+        """The library for a job (specs/037 R5): searched here with the job owner's scope; Freesound CC0 fills a gap with
+        the owner's key, which stays here. The log has the number of results only."""
+        job, _ = job_of(request)
+        scope = sound_scope(job)
+        sec = voicekeys.secret("freesound")
+        try:
+            hits = await asyncio.to_thread(soundlib.find, body.query, body.cat, body.dur, scope, 8,
+                                           bool(sec), (sec or {}).get("key"))
+        except soundlib.LibraryError as e:
+            return JSONResponse({"error": {"code": e.code, "message": e.message}}, status_code=400)
+        log.info("job %s sound search (%s): %s results", job["id"], scope, len(hits))
+        return {"results": hits, "scope": scope}
+
+    @app.post("/internal/sound/fetch")
+    async def sound_fetch(body: SoundFetchIn, request: Request):
+        """Copy one chosen sound into the job's film (films/<film>/sound/cache/), within the owner's scope."""
+        job, _ = job_of(request)
+        scope = sound_scope(job)
+        film = body.film
+        if not film or "/" in film or "\\" in film or film.startswith("."):
+            raise Denied(400, "invalid_request_error", "bad film name")
+        d = db.data_dir() / "jobs" / job["id"] / "films" / film
+        if not d.is_dir():
+            raise Denied(404, "not_found_error", "no such film in this job")
+        try:
+            p = await asyncio.to_thread(soundlib.cache, body.entry, d, scope)
+        except soundlib.LibraryError as e:
+            code = {"scope": 403, "not_found": 404, "forbidden": 403}.get(e.code, 400)
+            return JSONResponse({"error": {"code": e.code, "message": e.message}}, status_code=code)
+        log.info("job %s sound fetch %s (%s)", job["id"], body.entry, scope)
+        return {"path": str(p.relative_to(d)), "entry": body.entry}
 
     @app.post("/internal/youtube")
     async def youtube(body: YouTubeIn, request: Request):

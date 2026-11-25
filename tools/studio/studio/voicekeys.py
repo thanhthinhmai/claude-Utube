@@ -1,8 +1,8 @@
-"""The studio owner's ElevenLabs key (specs/036 research R3, contracts/http.md).
+"""The studio owner's service keys: ElevenLabs (specs/036 research R3) and Freesound (specs/037 research R4).
 
-Kept encrypted (Fernet) in $STUDIO_DATA/secrets/elevenlabs.json, its key in secrets/.key; the folder 0700, files 0600.
-Only the proxy reads it back (`secret()`); every answer of the app carries the last 4 characters at most. A key is saved
-only after one call to ElevenLabs proved it works."""
+Kept encrypted (Fernet) in $STUDIO_DATA/secrets/<name>.json, the Fernet key in secrets/.key; the folder 0700, files 0600.
+Only the proxy reads one back (`secret(name)`); every answer of the app carries the last 4 characters at most. A key is
+saved only after one call to its service proved it works. Without a name every function means ElevenLabs (036 callers)."""
 import json
 import os
 import time
@@ -10,7 +10,15 @@ from pathlib import Path
 
 from . import db
 
-FILE, KEYFILE, STATUS = "elevenlabs.json", ".key", "elevenlabs.status.json"
+KEYFILE = ".key"
+NAMES = ("elevenlabs", "freesound")
+FILE, STATUS = "elevenlabs.json", "elevenlabs.status.json"       # 036 names, kept for callers and tests
+
+
+def _files(name: str):
+    if name not in NAMES:
+        raise ValueError(f"unknown key name: {name}")
+    return f"{name}.json", f"{name}.status.json"
 
 
 def folder() -> Path:
@@ -36,9 +44,9 @@ def _fernet():
     return Fernet(f.read_bytes().strip())
 
 
-def secret():
-    """{key, model} or None. For the proxy only: never put this in an answer, a log or a job."""
-    f = folder() / FILE
+def secret(name: str = "elevenlabs"):
+    """{key, model?} or None. For the proxy only: never put this in an answer, a log or a job."""
+    f = folder() / _files(name)[0]
     if not f.is_file():
         return None
     try:
@@ -47,8 +55,8 @@ def secret():
         return None
 
 
-def _status(**kw) -> dict:
-    f = folder() / STATUS
+def _status(name: str = "elevenlabs", **kw) -> dict:
+    f = folder() / _files(name)[1]
     try:
         st = json.loads(f.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -113,6 +121,34 @@ def set_model(model: str) -> dict:
     return public()
 
 
-def delete() -> None:
-    for name in (FILE, STATUS):
-        (folder() / name).unlink(missing_ok=True)
+def delete(name: str = "elevenlabs") -> None:
+    for f in _files(name):
+        (folder() / f).unlink(missing_ok=True)
+
+
+# ---------- any named key (specs/037) ----------
+def status(name: str) -> dict:
+    """{set, last4, status: none|ok|invalid, checked_at}: what an answer may carry about any key."""
+    if name == "elevenlabs":
+        p = public()
+        return {k: p[k] for k in ("set", "last4", "status", "checked_at")}
+    s = secret(name)
+    if not s:
+        return {"set": False, "last4": None, "status": "none", "checked_at": None}
+    st = _status(name)
+    return {"set": True, "last4": s["key"][-4:], "status": st.get("status", "ok"), "checked_at": st.get("checked_at")}
+
+
+def save_named(name: str, key: str, by: str = None) -> dict:
+    """Try then keep a key other than ElevenLabs. Freesound: one search call (freesound.FreesoundError when bad)."""
+    if name == "elevenlabs":
+        save(key, by=by)
+        return status(name)
+    key = key.strip()
+    if name == "freesound":
+        from filmcheck import freesound
+        freesound.check(key)
+    _write(folder() / _files(name)[0], _fernet().encrypt(json.dumps(
+        {"key": key, "saved_at": int(time.time()), "saved_by": by}).encode()))
+    _status(name, status="ok", checked_at=int(time.time()))
+    return status(name)
