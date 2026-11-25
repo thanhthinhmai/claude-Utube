@@ -231,7 +231,8 @@ def fingerprint(film_dir) -> str:
     except CastError:
         return hashlib.sha256(path(d).read_bytes()).hexdigest()[:16]
     body = dict(doc)
-    body["characters"] = [{k: v for k, v in c.items() if k != "approved"} for c in doc["characters"] if isinstance(c, dict)]
+    body["characters"] = [{k: v for k, v in c.items() if k not in ("approved", "from_library")}   # saving to the library
+                          for c in doc["characters"] if isinstance(c, dict)]                    # keeps an approval
     h = hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False).encode())
     for c in body["characters"]:
         if isinstance(c.get("id"), str) and CHAR_ID.fullmatch(c["id"]):

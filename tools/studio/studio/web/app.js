@@ -777,7 +777,7 @@ const CAST_GROUPS = [["turn", "Turnaround"], ["group", "Group"], ["expr", "Expre
 const CAST_STATE = { new: ["acc", "New"], ready: ["acc", "Ready to review"], approved: ["ok", "Approved"], changed: ["warn", "Changed since approval"] };
 const CAST_ROLE = { hero: "Hero", support: "Support", background: "Background" };
 /** @param {any} c */
-const castChip = (c) => { const [k, l] = CAST_STATE[c.state] || ["", c.state]; return `<span class="chip ${k}">${esc(l)}</span>`
+const castChip = (c) => { const [k, l] = c.state === "approved" && c.source !== "film" ? ["ok", "From the channel, approved"] : CAST_STATE[c.state] || ["", c.state]; return `<span class="chip ${k}">${esc(l)}</span>`
   + (c.notes_open ? ` <span class="chip warn">${c.notes_open} note${c.notes_open === 1 ? "" : "s"}</span>` : ""); };
 /** @param {any} c @param {string} f @param {boolean} [prev] */
 const castFile = (c, f, prev) => fileUrl(`cast/sheets/${c.id}${prev ? ".prev" : ""}/${f}`);
@@ -2181,6 +2181,57 @@ function drawOrphans() {
   zoomable(el);
 }
 
+// ---------- the channel's cast library (specs/034 US3) ----------
+/** @param {string} ch @param {string} id @param {string|number} v @param {string} f */
+const libFile = (ch, id, v, f) => `${API}/cast-library/${encodeURIComponent(ch)}/${encodeURIComponent(id)}/v${v}/${encodeURIComponent(f)}`;
+async function pageCastLib() {
+  const lib = await get("/cast-library");
+  const intro = head("Browse", "Cast", "Characters approved in a film and saved to their channel. A later film uses them as they are, without a new cast review.");
+  if (!lib.available) {
+    $app.innerHTML = `${intro}<p class="panel muted">The channel's cast lives in the studio app. Start it with <code>sh bin/studio app start</code> and open the page it prints.</p>`;
+    return;
+  }
+  const chans = lib.channels.filter((/** @type {any} */ c) => c.characters.length);
+  $app.innerHTML = intro + (chans.length ? chans.map((/** @type {any} */ ch) => `<h2>${esc(ch.channel)}</h2><div class="grid cast-lib">
+    ${ch.characters.map((/** @type {any} */ c) => `<a class="panel card" href="#/cast/${encodeURIComponent(ch.channel)}/${encodeURIComponent(c.id)}">
+      <img src="${libFile(ch.channel, c.id, c.latest, c.id === "group" ? "group.jpg" : "front.jpg")}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+      <strong>${esc(c.name)}</strong>
+      <span class="muted small">${esc(CAST_ROLE[c.role] || c.role || "")} · v${c.latest} · rig ${esc(c.rig || "–")}</span>
+      <span class="muted small">Approved ${esc((c.approved_at || "").slice(0, 10))} · ${c.films.length} film${c.films.length === 1 ? "" : "s"}</span>
+      ${c.new_rig ? `<span class="chip warn">New rig version: ${esc(c.new_rig)}</span>` : ""}</a>`).join("")}</div>`).join("")
+    : `<p class="panel muted">No characters saved yet. Approve a cast with "Save approved characters to the channel's cast" ticked.</p>`);
+}
+/** @param {string} ref */
+async function pageCastChar(ref) {
+  const [ch, id] = ref.split("/");
+  const g = await get(`/cast-library/${encodeURIComponent(ch)}/${encodeURIComponent(id)}`);
+  const c = g.character, frames = (g.sheet && g.sheet.frames) || [];
+  const groups = CAST_GROUPS.map(([k, l]) => {
+    const fs = frames.filter((/** @type {any} */ f) => f.group === k && f.file);
+    return fs.length ? `<h3>${esc(l)}</h3><div class="frames">${fs.map((/** @type {any} */ f) => `<figure class="fr ${k === "pose" || k === "walk" ? "tall" : ""} ${k === "group" ? "wide" : ""}">
+      ${f.file.endsWith(".mp4") ? `<video src="${libFile(ch, id, g.v, f.file)}" autoplay muted loop playsinline aria-label="${esc(f.label)}"></video>`
+        : `<img src="${libFile(ch, id, g.v, f.file)}" alt="${esc(f.label)}" loading="lazy">`}<figcaption>${esc(f.label)}</figcaption></figure>`).join("")}</div>` : "";
+  }).join("");
+  const look = palette(c).map(([k, h]) => `<dt>${esc(k)}</dt><dd><span class="sw" style="background:${esc(h)}"></span><span class="muted num">${esc(h)}</span></dd>`).join("");
+  $app.innerHTML = `${back("#/cast", "Cast")}${head(esc(ch), esc(c.name || id), `${esc(CAST_ROLE[c.role] || c.role || "")} · version ${g.v} · rig ${esc(c.rig || "–")} · approved ${esc(((c.approved || {}).at || "").slice(0, 10))}${c.approved && c.approved.film ? ` in ${esc(c.approved.film)}` : ""}`)}
+    <div class="cast-split"><div class="cast-sheet">${groups || `<p class="muted">No pictures.</p>`}
+      ${look ? `<h3>Look</h3><dl class="spec">${look}</dl>` : ""}
+      <h3>Films</h3><p>${(c.films || []).map((/** @type {string} */ f) => esc(f)).join(", ") || "–"}</p>
+      <h3>Versions</h3><ul class="small">${g.versions.map((/** @type {any} */ v) => `<li>v${v.v} · rig ${esc(v.rig || "–")} · approved ${esc((v.approved_at || "").slice(0, 10))}</li>`).join("")}</ul>
+      ${g.preview ? `<p class="notice small">A preview with a newer rig is waiting (v${esc(g.preview.v)}).</p>` : ""}
+    </div></div>`;
+}
+/** [(label, #hex)] of a library character (cast.palette in Python). @param {any} c @returns {[string, string][]} */
+function palette(c) {
+  const specs = c.kind === "group" ? (c.members || []) : [c.spec || {}];
+  /** @type {[string, string][]} */ const out = []; const seen = new Set();
+  for (const s of specs) for (const k of ["hoodie", "pants", "shoes", "headColor", "rimColor", "stripe", "tie"]) {
+    const v = s[k];
+    if (typeof v === "string" && !seen.has(v.toLowerCase())) { seen.add(v.toLowerCase()); out.push([k, v]); }
+  }
+  return out;
+}
+
 async function pageSets() {
   const { sets } = await get("/sets");
   $app.innerHTML = `${head("Browse", "Measurements", "Frame-by-frame measurements of the reference video sets you learned from.")}${sets.length ? `<ul class="jobs">${sets.map((s) => `<li><a class="panel job" href="#/sets/${esc(s.set)}">
@@ -3234,6 +3285,7 @@ function drawAccount() {
 const routes = [
   [/^#\/?(\?.*)?$/, pageJobs, "jobs"], [/^#\/jobs\/([^/?]+)$/, pageJob, "jobs"], [/^#\/reviews\/([^/?]+)$/, pageReview, "jobs"],
   [/^#\/films$/, pageFilms, "films"], [/^#\/films\/([^/?]+)$/, pageFilm, "films"],
+  [/^#\/cast$/, pageCastLib, "cast"], [/^#\/cast\/([^/?]+\/[^/?]+)$/, pageCastChar, "cast"],
   [/^#\/sets$/, pageSets, "sets"], [/^#\/sets\/([^/?]+)$/, pageSet, "sets"],
   [/^#\/library(\?.*)?$/, pageLibrary, "library"], [/^#\/library\/([^/?]+)$/, pageLibStyle, "library"],
   [/^#\/styles$/, pageStyles, "styles"], [/^#\/styles\/([^/?]+)$/, pageStyle, "styles"],

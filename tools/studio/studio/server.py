@@ -630,6 +630,9 @@ def create_app() -> FastAPI:
         return StreamingResponse(gen(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
+    from . import castapi                                   # the channel's cast library (specs/034 US3)
+    app.include_router(castapi.router)
+
     if online:
         from . import api_online, db
         (db.data_dir() / "tmp").mkdir(exist_ok=True)        # TMPDIR of the web container (uploads)

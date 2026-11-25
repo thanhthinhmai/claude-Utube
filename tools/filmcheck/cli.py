@@ -1310,6 +1310,52 @@ def cmd_cast_approve(a) -> int:
     return 0
 
 
+def cmd_cast_use(a) -> int:
+    """cast use <film> <channel>/<id>[@v]: a character of the channel's cast into this film (exit 3: no app / no character)."""
+    from filmcheck import cast, castlib
+    d = _cast_film(a)
+    if d is None:
+        return 2
+    try:
+        r = castlib.use(d, a.ref, os.environ.get("STUDIO_USER") or "local")
+    except cast.CastError as e:
+        print(f"✗ {e.code}: {e.message}", file=sys.stderr)
+        return 3 if e.code in ("no_app", "no_character") else 2
+    if r["approved"]:
+        print(f"✓ {r['id']}: approved (library v{r['v']})")
+    else:
+        print(f"✓ {r['id']}: from library v{r['v']} · {len(r['lacking'])} picture(s) to draw: {', '.join(r['lacking'])}\n"
+              f"  run: sh bin/studio ae sheet {d.name} --only {r['id']}, then review the cast")
+    return 0
+
+
+def cmd_cast_library(a) -> int:
+    """cast library [<channel>] [--json]."""
+    from filmcheck import cast, castlib
+    acc = castlib.root()
+    if acc is None:
+        print("✗ the app is not running: the channel's cast lives in the studio app (sh bin/studio app start)", file=sys.stderr)
+        return 3
+    try:
+        rows = castlib.listing(acc, a.channel)
+    except cast.CastError as e:
+        print(f"✗ {e.code}: {e.message}", file=sys.stderr)
+        return 2
+    if a.json:
+        print(json.dumps({"channels": rows}, ensure_ascii=False))
+        return 0
+    for ch in rows:
+        print(f"{ch['channel']}:")
+        for c in ch["characters"] or []:
+            print(f"  {c['id']:<12} v{c['latest']}  {c['rig'] or '-':<8} {(c['approved_at'] or '')[:10]}  "
+                  f"{len(c['films'])} film(s)" + (f"  new rig version: {c['new_rig']}" if c["new_rig"] else ""))
+        if not ch["characters"]:
+            print("  (empty)")
+    if not rows:
+        print("(no characters saved yet)")
+    return 0
+
+
 def cmd_cast_notes(a) -> int:
     """cast notes show <film> [--all] [--json] · cast notes reply <film> <id> "<text>" [--done|--open] --base <b>."""
     from filmcheck import cast, castnotes
@@ -1709,6 +1755,9 @@ def parser() -> argparse.ArgumentParser:
     g = s.add_mutually_exclusive_group()
     g.add_argument("--save", dest="save", action="store_true", default=None); g.add_argument("--no-save", dest="save", action="store_false")
     s.add_argument("--source", choices=["chat", "ui"], default="chat"); s.add_argument("--base")
+    s = ca.add_parser("use", help="put a character of the channel's cast in this film"); s.add_argument("film"); s.add_argument("ref")
+    s = ca.add_parser("library", help="the channel's cast (in the studio app)"); s.add_argument("channel", nargs="?")
+    s.add_argument("--json", action="store_true")
     s = ca.add_parser("notes", help="notes pinned on the cast sheet").add_subparsers(dest="ncmd", required=True)
     n = s.add_parser("show"); n.add_argument("film"); n.add_argument("--all", action="store_true"); n.add_argument("--json", action="store_true")
     n = s.add_parser("reply"); n.add_argument("film"); n.add_argument("note_id"); n.add_argument("text")
@@ -1742,7 +1791,7 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach, ("kit", "use"): cmd_kit_use,
             ("shots", "export"): cmd_shots_export,
             ("notes", "show"): cmd_notes_show, ("notes", "reply"): cmd_notes_reply, ("film", "replace"): cmd_film_replace,
-            ("cast", "check"): cmd_cast_check, ("cast", "status"): cmd_cast_status, ("cast", "approve"): cmd_cast_approve, ("cast", "notes"): cmd_cast_notes,
+            ("cast", "check"): cmd_cast_check, ("cast", "status"): cmd_cast_status, ("cast", "approve"): cmd_cast_approve, ("cast", "notes"): cmd_cast_notes, ("cast", "use"): cmd_cast_use, ("cast", "library"): cmd_cast_library,
             ("people", "list"): cmd_people_list, ("people", "new"): cmd_people_new, ("people", "sheet"): cmd_people_sheet,
             ("people", "approve"): cmd_people_approve, ("people", "use"): cmd_people_use, ("people", "check"): cmd_people_check,
             ("lesson", "list"): cmd_lesson_list, ("lesson", "draft"): cmd_lesson_draft, ("lesson", "add"): cmd_lesson_add,

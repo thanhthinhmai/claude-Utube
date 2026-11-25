@@ -87,6 +87,36 @@ class CastApi(unittest.TestCase):
             "point": "cast", "op": "shot", "args": {}}).status_code, 422)
 
 
+    def test_cast_library(self):
+        """T036: /cast-library is off outside the app; inside an account it lists and serves the saved characters."""
+        r = self.c.get("/api/v1/cast-library")
+        self.assertEqual(r.json(), {"available": False, "channels": []})
+        self.assertEqual(self.c.get("/api/v1/cast-library/default/hero").status_code, 404)
+        self.assertEqual(self.c.get("/api/v1/cast-library/default/hero/v1/front.jpg").status_code, 404)
+        from studio import castapi, store
+        from filmcheck import cast, castlib
+        acc = self.p.dir / "data" / "accounts" / "u1"
+        d = castfilm.make(acc / "films" / "f1")
+        fake_sheet(d, "hero")
+        cast.approve(d, ["hero"])
+        self.assertEqual(castlib.save_approved(d, ["hero"]), ["✓ default/hero: v1 (new)"])
+        tok = store._account_root.set(acc)
+        try:
+            lib = castapi.cast_library()
+            self.assertTrue(lib["available"])
+            self.assertEqual(lib["channels"][0]["characters"][0]["id"], "hero")
+            g = castapi.cast_library_character("default", "hero")
+            self.assertEqual((g["v"], g["sheet"]["frames"][0]["file"], g["preview"]), (1, "front.jpg", None))
+            self.assertTrue(Path(castapi.cast_library_file("default", "hero", "v1", "front.jpg").path).is_file())
+            for bad in (("default", "hero", "v1", "..%2Fcharacter.json"), ("default", "hero", "v1", "character.json"),
+                        ("default", "hero", "x1", "front.jpg"), ("..", "hero", "v1", "front.jpg"), ("default", "hero", "v2", "front.jpg")):
+                with self.assertRaises(store.StudioError, msg=bad):
+                    castapi.cast_library_file(*bad)
+            with self.assertRaises(store.StudioError):
+                castapi.cast_library_character("default", "nobody")
+        finally:
+            store._account_root.reset(tok)
+
     @unittest.skipUnless(shutil.which("node") and (REPO / "lib" / "lemo-opuscar" / "node_modules" / "playwright-core").is_dir(),
                          "no node / playwright-core")
     def test_in_browser(self):

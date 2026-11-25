@@ -70,7 +70,7 @@ def cast_block(d: Path):
         notes = None
     try:
         from filmcheck import castlib
-        lib = castlib.available()
+        lib = castlib.available(d)
     except Exception:                             # noqa: BLE001
         lib = False
     chars = []
