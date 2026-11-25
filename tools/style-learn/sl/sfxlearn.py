@@ -5,9 +5,9 @@
 2. Events in each layer: RMS in 20 ms frames and spectral flux over a MAD threshold (like soundcraft.sfx_onsets);
    an event lasts 0.1–8 s; events closer than 150 ms are one.
 3. Each event is named by two classifiers that do not share anything: AST (AudioSet, top 5) and CLAP zero-shot on a
-   closed list ("the sound of {label}", sound events and non-word human sounds only). It is trusted (`agree`) only
-   when CLAP's top label is in AST's top 5 (AST p ≥ 0.10), or both top labels have the same level-2 ancestor in the
-   AudioSet tree. Otherwise `unsure`: kept in sfx.json, never in the style's rules.
+   closed list of phrases (audioset.PHRASES, each tied to AudioSet groups). Two levels of trust (`agree()`): "sure"
+   when both name the same group, "likely" when one is very sure and the other is not against it. Anything else is
+   unsure: kept in sfx.json, never in the style's rules.
 4. Each event is tied to the nearest word (≤ 1.0 s) and to its shot; chosen silences (≤ −50 dBFS for ≥ 0.4 s right
    after a word); how a sound ends at a cut (hard: drops ≥ 20 dB within 50 ms of the cut; fade; over).
 
@@ -32,7 +32,10 @@ MIN_LEN, MAX_LEN, MERGE = 0.1, 8.0, 0.15
 FLOOR_DB = -55.0                # nothing quieter than this is an event
 END_DROP = 20.0                 # an event ends 20 dB under its peak
 RISE_DB = 3.0                   # an onset rises at least 3 dB over the 60 ms before it
-AST_MIN = 0.10
+AST_MIN = 0.10                  # an AST label that makes a match "sure"
+AST_SUPPORT = 0.03              # an AST label that only supports CLAP ("likely")
+AST_ALONE, CLAP_ALONE = 0.15, 0.9   # one side alone, very sure of itself ("likely")
+AST_VETO, CLAP_VETO = 0.25, 0.5     # the other side names another group this strongly: no
 NEAR_WORD = 1.0
 SIL_DB, SIL_LEN = -50.0, 0.4
 HARD_DB, HARD_WIN = 20.0, 0.05
@@ -204,16 +207,33 @@ def cut_kind(layer: np.ndarray, t: float, ln: float, cuts: list):
 
 
 def agree(ast5, clap1):
-    """(agree, label): CLAP's top label in AST's top 5 (p ≥ AST_MIN), or same level-2 ancestor as AST's top label."""
-    use = [(l, p) for l, p in (ast5 or []) if p >= AST_MIN and l in _SOUND]   # Speech/Music never name an effect
-    if not use or not clap1:
-        return False, None
-    cl = clap1[0]
-    if cl in [l for l, _ in use]:
-        return True, cl
-    if audioset.ancestors(cl) & audioset.ancestors(use[0][0]):
-        return True, cl
-    return False, None
+    """(trust, label), trust "sure" | "likely" | None (specs/037 R8, two levels of trust; the user's choice after the
+    voice-check run, where the two classifiers were right on different sounds and rarely together).
+
+    AST gives AudioSet labels (Speech/Music ignored); CLAP picks a phrase of audioset.PHRASES (a label in tests).
+    - sure:   CLAP's groups meet the groups of an AST label with p ≥ AST_MIN.
+    - likely: CLAP's groups meet an AST label with p ≥ AST_SUPPORT, or CLAP ≥ CLAP_ALONE, unless AST names another
+              group with p ≥ AST_VETO; or AST's top label ≥ AST_ALONE, unless CLAP names another group with p ≥ CLAP_VETO.
+    A CLAP phrase that means speech or music is never an effect."""
+    ast = [(l, p) for l, p in (ast5 or []) if l in _SOUND]          # Speech/Music never name an effect
+    if not clap1 and not ast:
+        return None, None
+    cl, cp = clap1 if clap1 else (None, 0.0)
+    if cl in audioset.NON_EFFECT:
+        cl, cp = None, 0.0
+    cg = audioset.groups(cl) if cl else set()
+    meets = lambda lo: [l for l, p in ast if p >= lo and (audioset.groups(l) & cg or l == cl)]
+    if cl and meets(AST_MIN):
+        return "sure", cl
+    veto_a = any(p >= AST_VETO and not (audioset.groups(l) & cg) for l, p in ast)
+    if cl and (meets(AST_SUPPORT) or cp >= CLAP_ALONE) and not veto_a:
+        return "likely", cl
+    if ast and ast[0][1] >= AST_ALONE:
+        top = ast[0][0]
+        if not (clap1 and clap1[1] >= CLAP_VETO and clap1[0] not in audioset.NON_EFFECT
+                and not (audioset.groups(clap1[0]) & audioset.groups(top))):
+            return "likely", top
+    return None, None
 
 
 # ---------------------------------------------------------------- one video
@@ -232,14 +252,15 @@ def analyze(mix: np.ndarray, stems: dict, words: list, cuts: list, models, hi: d
             src, sr = (hi_layers[name], HI) if hi_layers.get(name) is not None else (layer, SR)
             clip = src[int(max(0.0, t - CLIP_PRE) * sr):int((t + CLIP_MAX) * sr)]   # AST needs ~1 s to hear a sound
             a5 = [(l, round(float(p), 4)) for l, p in models.ast(clip, sr)][:5] if have else []
-            c1 = models.clap(clip, sr, audioset.SOUND_LABELS) if have else None
+            c1 = models.clap(clip, sr, list(audioset.PHRASES)) if have else None
             c1 = (c1[0], round(float(c1[1]), 4)) if c1 else None
-            ok, label = agree(a5, c1) if have else (False, None)
+            trust, label = agree(a5, c1) if have else (None, None)
+            ok = trust is not None
             for l in [x for x, _ in a5] + ([c1[0]] if c1 else []):
-                onto[l] = sorted(audioset.ancestors(l))
+                onto[l] = sorted(audioset.groups(l))
             seg = layer[int(t * SR):int((t + ln) * SR)]
             e = {"t": t, "len": ln, "layer": name, "ast": [list(x) for x in a5], "clap": list(c1) if c1 else None,
-                 "agree": ok, "label": label,
+                 "agree": ok, "trust": trust, "label": label,
                  "db_vs_voice": round(db(np.sqrt((seg.astype(np.float64) ** 2).mean())) - db(vrms), 1) if vrms else None}
             w = nearest_word(t, words)
             if w:
@@ -271,7 +292,9 @@ def sfx_summary(results: list) -> dict:
     actions = []
     for label, xs in sorted(by.items(), key=lambda kv: -len(kv[1])):
         words = Counter(e["word"]["text"].lower() for _, e in xs if e.get("word"))
+        sure = sum(1 for _, e in xs if e.get("trust", "sure") == "sure")
         actions.append({"action": words.most_common(1)[0][0] if words else label, "label": label, "n": len(xs),
+                        "trust": "sure" if sure else "likely", "n_sure": sure,
                         "evidence": [[v, e["t"]] for v, e in xs[:5]]})
     sil = [(r.get("video", "?"), s) for r in results for s in r["silences"]]
     cuts = [(v, e) for v, e in ok if e.get("cut")]
@@ -292,10 +315,11 @@ def sfx_summary(results: list) -> dict:
 
 
 def style_paragraph(s: dict, set_name: str) -> str:
-    acts = ", ".join(f"{a['action']} → {a['label']} ×{a['n']}" for a in s["actions"][:6]) or "none"
+    acts = ", ".join(f"{a['action']} → {a['label']} ×{a['n']}" + ("" if a.get("trust") == "sure" else " (likely)")
+                     for a in s["actions"][:6]) or "none"
     g = s["gain_db"]
     sil = s["silences"]
-    return (f"<!-- sfx (learn sfx, specs/037) -->\n**Sound effects** (measured on `{set_name}`, two classifiers agreeing): "
+    return (f"<!-- sfx (learn sfx, specs/037) -->\n**Sound effects** (measured on `{set_name}`, two classifiers; 'likely' = one very sure, the other not against): "
             f"{s['per_min']} sounds a minute; gain against the voice {g[1] if g else '—'} dB (p25–p75 "
             f"{g[0] if g else '—'}…{g[2] if g else '—'}); actions: {acts}. Chosen silences: "
             f"{sil['db'] if sil['db'] is not None else '—'} dB for {sil['len_s'] if sil['len_s'] is not None else '—'} s. "
@@ -508,6 +532,6 @@ def score(res: dict, expect: dict) -> dict:
         else:
             g = set(x["groups"])
             hit = [e for e in res["events"] if e["agree"] and a <= e["t"] <= b
-                   and (audioset.ancestors(e["label"]) & g or e["label"] in g)]
+                   and (audioset.groups(e["label"]) & g or e["label"] in g)]
         out.append({"name": x["name"], "found": bool(hit), "at": [round(h["t"], 2) for h in hit[:3]]})
     return {"found": sum(o["found"] for o in out), "of": len(out), "events": out}

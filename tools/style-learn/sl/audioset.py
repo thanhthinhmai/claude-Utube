@@ -911,3 +911,71 @@ SOUND_LABELS = [
 
 def ancestors(label: str) -> set:
     return set(ANCESTORS.get(label, [label]))
+
+
+# CLAP's closed list (specs/037 R8, two levels of trust): short descriptions the way a sound is heard in a film, each
+# with the AudioSet labels it stands for. CLAP picks one; its groups are the level-2 ancestors of those labels.
+# Phrases mapped to Speech/Music only (NON_EFFECT) mean "no sound effect here".
+PHRASES = {
+    "glass shattering": ["Shatter", "Glass", "Breaking"],
+    "window breaking": ["Shatter", "Breaking", "Glass"],
+    "crowd cheering": ["Cheering", "Crowd"],
+    "people applauding": ["Applause", "Clapping"],
+    "crowd laughing": ["Laughter", "Crowd"],
+    "water bubbling": ["Gurgling", "Liquid", "Water", "Boiling"],
+    "aquarium bubbles": ["Gurgling", "Liquid", "Water"],
+    "water splash": ["Splash, splatter", "Water"],
+    "pouring liquid": ["Pour", "Liquid"],
+    "ball bouncing": ["Bouncing"],
+    "basketball dribbling": ["Bouncing"],
+    "sneakers squeaking": ["Squeak"],
+    "footsteps": ["Walk, footsteps"],
+    "running footsteps": ["Run", "Walk, footsteps"],
+    "door slam": ["Slam", "Door"],
+    "door knock": ["Knock", "Door"],
+    "door creak": ["Creak", "Door"],
+    "whistle": ["Whistle", "Whistling"],
+    "whoosh": ["Whoosh, swoosh, swish"],
+    "ding": ["Ding", "Bell"],
+    "bell ringing": ["Bell"],
+    "phone ringing": ["Telephone bell ringing", "Ringtone"],
+    "alarm": ["Alarm", "Alarm clock"],
+    "clock ticking": ["Tick-tock", "Tick"],
+    "paper rustling": ["Rustle", "Crumpling, crinkling"],
+    "pen writing": ["Writing"],
+    "typing on a keyboard": ["Typing", "Computer keyboard"],
+    "mouse click": ["Clicking"],
+    "camera shutter": ["Camera"],
+    "coins dropping": ["Coin (dropping)"],
+    "keys jangling": ["Keys jangling"],
+    "cutlery clinking": ["Cutlery, silverware", "Chink, clink"],
+    "car engine": ["Engine", "Car", "Vehicle"],
+    "car horn": ["Vehicle horn, car horn, honking"],
+    "explosion": ["Explosion"],
+    "gunshot": ["Gunshot, gunfire"],
+    "punch hit": ["Slap, smack", "Thump, thud"],
+    "thud": ["Thump, thud"],
+    "cartoon boing": ["Boing"],
+    "pop": ["Burst, pop"],
+    "zipper": ["Zipper (clothing)"],
+    "dog barking": ["Bark", "Dog"],
+    "birds chirping": ["Chirp, tweet", "Bird"],
+    "wind blowing": ["Wind"],
+    "rain": ["Rain"],
+    "thunder": ["Thunder"],
+    "fire crackling": ["Crackle", "Fire"],
+    "gasp": ["Gasp"],
+    "sigh": ["Sigh"],
+    "heartbeat": ["Heart sounds, heartbeat"],
+    "silence": ["Silence"],
+    "background music": ["Music"],
+    "a man talking": ["Speech"],
+}
+NON_EFFECT = {"background music", "a man talking"}
+
+
+def groups(label: str) -> set:
+    """Level-2 groups of an AudioSet label or of a CLAP phrase."""
+    if label in PHRASES:
+        return set().union(*(ancestors(l) for l in PHRASES[label]))
+    return ancestors(label)
