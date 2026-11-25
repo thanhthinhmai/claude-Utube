@@ -18,13 +18,25 @@ ROLES = ("boy", "girl", "woman", "man", "old_man", "old_woman")
 EMOTIONS = ("neutral", "whisper", "shout", "laugh", "cry", "sarcastic")
 FXS = ("none", "phone", "wall", "radio", "hall")
 SPEAKER = re.compile(r"^[a-z0-9-]{1,32}$")
-# research R6: the narrator plays the part, pitched in semitones
-DEFAULT_ROLES = {"boy": [{"mode": "narrator", "pitch": 4, "speed": 1.08}],
-                 "girl": [{"mode": "narrator", "pitch": 5, "speed": 1.08}],
-                 "woman": [{"mode": "narrator", "pitch": 3, "speed": 1.0}],
-                 "man": [{"mode": "narrator", "pitch": -2, "speed": 0.95}],
-                 "old_man": [{"mode": "narrator", "pitch": -3, "speed": 0.9}],
-                 "old_woman": [{"mode": "narrator", "pitch": 2, "speed": 0.9}]}
+# research R6, changed 2026-11-25 after a listening test (own voices sound like other people, a pitched narrator does
+# not): two Kokoro voices of their own per role, the second for a scene where the first is taken; the narrator pitched
+# for the part is the last choice
+DEFAULT_ROLES = {"boy": [{"mode": "own", "voice": "am_puck", "pitch": 3, "speed": 1.05},
+                         {"mode": "own", "voice": "am_echo", "pitch": 3, "speed": 1.05},
+                         {"mode": "narrator", "pitch": 4, "speed": 1.08}],
+                 "girl": [{"mode": "own", "voice": "af_sky", "pitch": 2, "speed": 1.05},
+                          {"mode": "own", "voice": "af_nova", "pitch": 2, "speed": 1.05},
+                          {"mode": "narrator", "pitch": 5, "speed": 1.08}],
+                 "woman": [{"mode": "own", "voice": "af_sarah"}, {"mode": "own", "voice": "af_nicole"},
+                           {"mode": "narrator", "pitch": 3, "speed": 1.0}],
+                 "man": [{"mode": "own", "voice": "am_onyx", "speed": 0.95}, {"mode": "own", "voice": "am_eric"},
+                         {"mode": "narrator", "pitch": -2, "speed": 0.95}],
+                 "old_man": [{"mode": "own", "voice": "bm_lewis", "pitch": -2, "speed": 0.9},
+                             {"mode": "own", "voice": "bm_daniel", "pitch": -2, "speed": 0.9},
+                             {"mode": "narrator", "pitch": -3, "speed": 0.9}],
+                 "old_woman": [{"mode": "own", "voice": "bf_isabella", "speed": 0.92},
+                               {"mode": "own", "voice": "bf_alice", "speed": 0.92},
+                               {"mode": "narrator", "pitch": 2, "speed": 0.9}]}
 SETTING_FIELDS = ("mode", "voice", "pitch", "formant", "speed", "emotion", "el", "cloned_ok")
 
 

@@ -61,7 +61,7 @@ class ChannelsApi(unittest.TestCase):
         url = "/api/v1/channels/honey-facts/voice"
         v = c.get(url).json()
         self.assertEqual(v["roles_order"], ["boy", "girl", "woman", "man", "old_man", "old_woman"])
-        self.assertEqual(v["roles"]["boy"][0]["mode"], "narrator")
+        self.assertEqual(v["roles"]["boy"][0]["voice"], "am_puck")         # own voices first (2026-11-25 listening test)
         self.assertTrue(any(r["id"].endswith("af_bella") for r in v["voice_rows"]))
         r = c.put(url, json={"role": "boy", "settings": [{"mode": "own", "voice": "am_adam", "speed": 1.1}]}, headers=W)
         self.assertEqual(r.status_code, 200, r.text)
