@@ -52,6 +52,13 @@ building the studio, and everything you read is paid again on every later turn. 
   voice: after the voice check; shots: after the shot check, before render; mix: after the mix; publish: after the
   pack), write a short summary file and run `sh {STUDIO}/bin/studio review request {job} --kind <point> --film <name>
   --summary <file>`, then end your turn at once. `voice make` and `render` refuse until their point is approved.
+- Voices (specs/036): in lines.json a line a character says out loud gets `"speaker": "<id>"` (lowercase, digits,
+  dashes); narration has no `speaker` and no `voice` (the channel's narrator reads it). When the hero told in "you"
+  speaks out loud, the speaker is the hero. A side part without its own voice adds `"role"` (boy, girl, woman, man,
+  old_man, old_woman). Put a main character's voice in film.json → voices.<id>: `{{"mode": "own", "voice": "el:<id>"}}`
+  or `{{"mode": "narrator", "pitch": 4}}` (the narrator plays the part); pick from `sh {STUDIO}/bin/studio eleven
+  voices` and the Kokoro voices by age and gender. Use `emotion` and `fx` only where the scene needs them. Run
+  `sh {STUDIO}/bin/studio voice check <name>` before `voice make`.
 - When the film is finished and checked, make its publish pack (JOB.md, Publish step: `job step {job} Publish`,
   write publish/pack.json, `sh {STUDIO}/bin/studio publish <name>`), then run `sh {STUDIO}/bin/studio job done {job} --film <name>`.
   The studio then checks loudness (−14 ± 1 LUFS, true peak ≤ −1 dB) and reading time before it is delivered.
@@ -208,7 +215,7 @@ def film_prompt(inp: dict) -> str:
             f"- Length: about {inp['seconds']} seconds.\n"
             f"- Film folder name: `{inp['film']}` (use exactly this name).\n"
             + (f"- Channel: `{inp['channel']}`. Read {WORK}/films/{inp['film']}/CHANNEL_BRIEF.md first, before the treatment, "
-               f"and follow it: language, length, style, voice and speed for every line of lines.json, title and "
+               f"and follow it: language, length, style, the channel's narrator voice and speed for the narrator lines of lines.json, title and "
                f"thumbnail rules, words never to use, hashtags, and the lessons (repeating one is a serious mistake).\n"
                if inp.get("channel") else "")
             + f"- The customer's idea:\n<idea>\n{inp['idea']}\n</idea>\n\n"

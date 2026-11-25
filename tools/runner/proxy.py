@@ -29,8 +29,8 @@ from pydantic import BaseModel, Field
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "studio"))
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from filmcheck import topics as yt_topics, webfetch  # noqa: E402
-from studio import claude_plan, db, jobs, quotas, reviews, store  # noqa: E402
+from filmcheck import eleven, topics as yt_topics, webfetch  # noqa: E402
+from studio import claude_plan, db, jobs, quotas, reviews, store, voicekeys  # noqa: E402
 from studio.store import StudioError  # noqa: E402
 
 log = logging.getLogger("studio.proxy")
@@ -247,6 +247,18 @@ class FailIn(BaseModel):
 
 class FetchIn(BaseModel):
     url: str = Field(max_length=2000)
+
+
+class TtsIn(BaseModel):                       # specs/036 contracts/http.md
+    refresh: bool = False
+    voice_id: Optional[str] = Field(default=None, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    text: Optional[str] = Field(default=None, max_length=5000)
+    model_id: Optional[str] = Field(default=None, max_length=60)
+    voice_settings: dict = Field(default_factory=dict)
+
+
+TTS_PARALLEL = 4                              # ElevenLabs calls at once per job
+TTS_SLOTS: dict = {}
 
 
 class ReviewIn(BaseModel):
@@ -468,6 +480,41 @@ def create_app() -> FastAPI:
             return JSONResponse({"error": {"code": e.code, "message": e.message}}, status_code=e.http)
         log.info("job %s web fetch %s: %s", job["id"], host, r["status"])
         return r
+
+    @app.post("/internal/tts/elevenlabs/{what}")
+    async def tts_elevenlabs(what: str, body: TtsIn, request: Request):
+        """ElevenLabs for a job (specs/036 R3): the owner's key stays here; the log has characters and voice ids only."""
+        job, _ = job_of(request)
+        if what not in ("subscription", "voices", "speak"):
+            raise Denied(404, "not_found_error", "unknown ElevenLabs call")
+        sec = voicekeys.secret()
+        if not sec:
+            return JSONResponse({"error": {"code": "no_key", "message": "the studio has no ElevenLabs key: the owner "
+                                           "adds it in Settings"}}, status_code=409)
+        key, model = sec["key"], sec.get("model") or eleven.DEFAULT_MODEL
+        try:
+            if what == "subscription":
+                return await asyncio.to_thread(eleven.subscription, key)
+            if what == "voices":
+                return {"voices": await asyncio.to_thread(eleven.list_voices, key)}
+            if not body.voice_id or not body.text:
+                raise Denied(400, "invalid_request_error", "voice_id and text are needed")
+            if len(body.text) > eleven.MAX_CHARS:
+                raise Denied(400, "invalid_request_error", f"a line may have at most {eleven.MAX_CHARS} characters")
+            slot = TTS_SLOTS.setdefault(job["id"], asyncio.Semaphore(TTS_PARALLEL))
+            async with slot:
+                out = await asyncio.to_thread(eleven.direct_speak, body.voice_id, body.text, body.model_id or model,
+                                              body.voice_settings, key)
+        except eleven.ElevenError as e:
+            log.info("job %s elevenlabs %s: %s", job["id"], what, e.code)
+            status = {"invalid_key": 502, "quota": 402, "too_long": 400}.get(e.code, 502)
+            return JSONResponse({"error": {"code": e.code, "message": eleven.redact(e.message, key)}}, status_code=status)
+
+        def add(j):
+            j["tts_chars"] = int(j.get("tts_chars") or 0) + out["chars"]
+        jobs.update(job["id"], add)
+        log.info("job %s elevenlabs speak %s: %s characters", job["id"], body.voice_id, out["chars"])
+        return out
 
     @app.post("/internal/youtube")
     async def youtube(body: YouTubeIn, request: Request):

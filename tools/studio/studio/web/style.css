@@ -803,3 +803,8 @@ main.wide-film #film-player .sh-strip-tools .sh-filters button { padding: 2px 10
 .lib-compare figcaption { font-size: 12px; color: var(--muted); }
 .lib-compare h3 { margin: 8px 0 6px; font-size: 13px; }
 .cast-lib .chip.acc { background: var(--accent-soft); color: var(--accent-ink); justify-self: start; }
+/* specs/036: speakers on the Voice step */
+.speakers { margin: 8px 0 12px; display: grid; gap: 6px; }
+.speakers h4 { margin: 0; }
+.speakers .spk { flex-wrap: wrap; gap: 6px; align-items: center; }
+.speakers .spk select { max-width: 260px; }

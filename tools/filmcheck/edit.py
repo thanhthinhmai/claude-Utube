@@ -352,12 +352,13 @@ def line_of(rows: list, lid: str) -> dict:
     return r
 
 
-def voice_after(d: Path, ids=None) -> dict:
-    """Make the voice of these lines again (all when None), stamp them and run the voice check."""
+def voice_after(d: Path, ids=None, yes: bool = False) -> dict:
+    """Make the voice of these lines again (all when None), stamp them and run the voice check. yes: the person
+    confirmed the ElevenLabs characters (specs/036 FR-005); one line never asks."""
     if no_run():
         return {"ok": True, "check": {"skipped": True}}
     only = ["--only", ",".join(ids)] if ids else []
-    code, txt = studio_cli("voice-make", str(d), *only)
+    code, txt = studio_cli("voice-make", str(d), *only, *(["--yes"] if yes else []))
     if code:
         return {"ok": False, "error": txt.splitlines()[-1] if txt else "voice make failed"}
     code, txt = studio_cli("voice-asr", str(d), *only)
@@ -425,16 +426,85 @@ def voice_set(d: Path, a: dict) -> dict:
             if speed is not None:
                 r["speed"] = speed
     write_atomic(d / "lines.json", json.dumps(rows, ensure_ascii=False, indent=1) + "\n")
-    out = voice_after(d)
+    out = voice_after(d, yes=True)                  # "confirm all" is the person's yes to the characters shown
     out.update(ref="all lines", old=old, new={"voice": voice or old["voice"], "speed": speed if speed is not None else old["speed"]})
     return out
+
+
+@op("voice-speaker", "voice")
+def voice_speaker(d: Path, a: dict) -> dict:
+    """specs/036 FR-012/FR-042: one speaker's voice — film.json → voices.<speaker> (the narrator: film.json → narrator,
+    or the channel's narrator with scope=channel). Only that speaker's lines are made again."""
+    from filmcheck import speakers
+    sp = (a.get("speaker") or "").strip()
+    if sp != "narrator" and not speakers.SPEAKER.match(sp):
+        raise EditError("speaker: narrator or a character id")
+    st = {"mode": a.get("mode") or "own"}
+    if a.get("voice"):
+        st["voice"] = a["voice"]
+    for k in ("pitch", "speed"):
+        if a.get(k) not in (None, ""):
+            try:
+                st[k] = float(a[k])
+            except ValueError:
+                raise EditError(f"{k}: a number") from None
+    if st["mode"] == "own" and st.get("voice") and not voice_known(st["voice"]):
+        raise EditError(f"\"{st['voice']}\" is not a voice of the library")
+    if sp == "narrator" and st["mode"] == "narrator":
+        raise EditError("the narrator needs its own voice")
+    errs = speakers.check_setting(st, sp)
+    if errs:
+        raise EditError("; ".join(errs))
+    rows = read_lines(d)
+    mine = [r for r in rows if isinstance(r, dict) and r.get("id") and (r.get("speaker") or "narrator") == sp]
+    if not mine:
+        raise EditError(f"no line is said by \"{sp}\"")
+    if len(mine) > 1 and a.get("confirm") != "speaker":
+        raise EditError(f"this makes the {len(mine)} lines of {sp} again: confirm with confirm=speaker")
+    film_p = d / "film.json"
+    try:
+        film = json.loads(film_p.read_text(encoding="utf-8")) if film_p.is_file() else {}
+    except ValueError:
+        raise EditError("film.json cannot be read") from None
+    old = None
+    if sp == "narrator" and a.get("scope") == "channel":
+        slug = speakers.channel_of(d)
+        if not slug:
+            raise EditError("this film has no channel")
+        old = speakers.channel_voice(store_root(d), slug)["narrator"]
+        try:
+            speakers.save_channel_voice(store_root(d), slug, narrator=st, by=a.get("by") or "local")
+        except speakers.SpeakerError as e:
+            raise EditError(str(e)) from None
+    elif sp == "narrator":
+        old, film["narrator"] = film.get("narrator"), st
+    else:
+        film.setdefault("voices", {})
+        old, film["voices"][sp] = film["voices"].get(sp), st
+    if not (sp == "narrator" and a.get("scope") == "channel"):
+        write_atomic(film_p, json.dumps(film, ensure_ascii=False, indent=1) + "\n")
+    for r in mine:                                   # the speaker's voice now speaks these lines
+        r.pop("voice", None)
+        if sp == "narrator":
+            r.pop("speed", None)
+    write_atomic(d / "lines.json", json.dumps(rows, ensure_ascii=False, indent=1) + "\n")
+    out = voice_after(d, [r["id"] for r in mine], yes=True)
+    out.update(ref=f"speaker {sp}", old=old, new=st)
+    return out
+
+
+def store_root(d: Path) -> Path:
+    """Where the film's channels live: the film's own root when it has channels/, else STUDIO_ROOT."""
+    own = Path(d).resolve().parent.parent
+    return own if (own / "channels").is_dir() else Path(os.environ.get("STUDIO_ROOT") or own)
 
 
 def voice_known(v: str) -> bool:
     """A Kokoro voice in the library's voices-v1.0.bin (a zip of .npy files); edge-tts names pass when they look right."""
     import zipfile
-    if v.endswith("Neural"):
+    if v.endswith("Neural") or v.startswith("el:"):   # specs/036: ElevenLabs ids are checked by their form
         return True
+    v = v[7:] if v.startswith("kokoro:") else v
     try:
         with zipfile.ZipFile(lib_path() / "core" / "tts" / "voices-v1.0.bin") as z:
             return f"{v}.npy" in z.namelist()

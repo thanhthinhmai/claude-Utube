@@ -12,7 +12,7 @@ from fastapi import APIRouter, File, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
-from . import accounts, claude_plan, db, jobs, tokens, moderation, quotas, ratelimit, resources, reviews, store
+from . import accounts, claude_plan, db, voicekeys, jobs, tokens, moderation, quotas, ratelimit, resources, reviews, store
 from .store import StudioError
 
 router = APIRouter(prefix="/api/v1")
@@ -433,6 +433,33 @@ def put_channel(slug: str, body: ChannelIn, request: Request):
     if "reviews" in body.model_fields_set:
         ch["cast_chosen"] = True                        # specs/034 FR-002: Cast left out on purpose stays off
     return _ch(lambda: channels.save(store.root(), ch, resources.lib_dir()))
+
+
+class ChannelVoiceIn(BaseModel):
+    narrator: Optional[dict] = None
+    role: Optional[str] = Field(default=None, max_length=12)
+    settings: Optional[list] = Field(default=None, max_length=6)
+
+
+@router.get("/channels/{slug}/voice")
+def get_channel_voice(slug: str, request: Request):
+    """specs/036: the channel's narrator and side-part voices (defaults where nothing is chosen)."""
+    me(request)
+    channel_or_404(slug)
+    from filmcheck import speakers
+    return speakers.channel_voice(store.root(), slug)
+
+
+@router.put("/channels/{slug}/voice")
+def put_channel_voice(slug: str, body: ChannelVoiceIn, request: Request):
+    u = me(request)
+    channel_or_404(slug)
+    from filmcheck import speakers
+    try:
+        return speakers.save_channel_voice(store.root(), slug, narrator=body.narrator, role=body.role,
+                                           settings=body.settings, by=u.get("email") if isinstance(u, dict) else "owner")
+    except speakers.SpeakerError as e:
+        raise StudioError("invalid", str(e), 422) from e
 
 
 @router.post("/channels/{slug}/decisions", status_code=201)
@@ -951,7 +978,8 @@ def get_settings(request: Request):
     key = yt_topics.read_online_key(db.data_dir())        # specs/013: never the key itself
     return {**s, "models": [{"id": k, "name": v} for k, v in quotas.models()["allowed"].items()],   # specs/024
             "youtube_key_set": bool(key), "youtube_key_last4": key[-4:] if key else None,
-            "youtube_units_today": yt_topics.online_usage(db.data_dir(), s.get("youtube_daily_units", 9000)).today()}
+            "youtube_units_today": yt_topics.online_usage(db.data_dir(), s.get("youtube_daily_units", 9000)).today(),
+            "elevenlabs": voicekeys.public()}                 # specs/036: never the key itself
 
 
 class YouTubeKeyIn(BaseModel):
@@ -978,6 +1006,50 @@ def put_youtube_key(body: YouTubeKeyIn, request: Request):
 def delete_youtube_key(request: Request):
     admin(request)
     yt_topics.online_key_file(db.data_dir()).unlink(missing_ok=True)
+    return Response(status_code=204)
+
+
+class ElevenKeyIn(BaseModel):
+    key: str = Field(min_length=20, max_length=200)
+    model: Optional[str] = Field(default=None, max_length=60)
+
+
+def _eleven_error(e) -> StudioError:
+    code = {"invalid_key": "elevenlabs_key_invalid", "quota": "elevenlabs_quota"}.get(e.code, "elevenlabs_error")
+    return StudioError(code, e.message, 422 if e.code == "invalid_key" else 502)
+
+
+@router.put("/admin/elevenlabs-key")
+def put_elevenlabs_key(body: ElevenKeyIn, request: Request):
+    """Try the key with one subscription call, then keep it encrypted (specs/036 FR-001, FR-002). Never answered back."""
+    from filmcheck import eleven
+    who = admin(request)
+    try:
+        return voicekeys.save(body.key, body.model, by=(who or {}).get("id") if isinstance(who, dict) else None)
+    except eleven.ElevenError as e:
+        raise _eleven_error(e) from None
+
+
+@router.post("/admin/elevenlabs-key/test")
+def test_elevenlabs_key(request: Request):
+    admin(request)
+    return voicekeys.test()
+
+
+class ElevenModelIn(BaseModel):
+    model: str = Field(min_length=3, max_length=60, pattern=r"^[a-z0-9_.-]+$")
+
+
+@router.put("/admin/elevenlabs-model")
+def put_elevenlabs_model(body: ElevenModelIn, request: Request):
+    admin(request)
+    return voicekeys.set_model(body.model)
+
+
+@router.delete("/admin/elevenlabs-key", status_code=204)
+def delete_elevenlabs_key(request: Request):
+    admin(request)
+    voicekeys.delete()
     return Response(status_code=204)
 
 

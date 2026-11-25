@@ -13,7 +13,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 
-from filmcheck import editor, report, script, webfetch  # noqa: E402
+from filmcheck import editor, eleven, report, script, speakers, voicecat, voicefx, webfetch  # noqa: E402
 
 NORMAL_ROUNDS = 3        # the first review and at most 2 fix rounds (FR-010)
 EDITOR_PASS = 8.0
@@ -936,8 +936,20 @@ def say_file(d: Path) -> Path:
 
 
 def made_key(r: dict) -> dict:
-    """What a voice file was made from (specs/026 R7): the spoken text, voice and speed."""
-    return {"text": r.get("say") or r.get("text", ""), "voice": r.get("voice"), "speed": r.get("speed")}
+    """What a voice file was made from (specs/026 R7, specs/036 data-model): the spoken text, voice and speed, plus
+    pitch, formant, emotion, fx and the ElevenLabs model when they are not the default (old .made.json still match)."""
+    k = {"text": r.get("say") or r.get("text", ""), "voice": r.get("voice"), "speed": r.get("speed")}
+    for f, default in (("pitch", 0), ("formant", None), ("emotion", "neutral"), ("fx", "none")):
+        if r.get(f) not in (None, default):
+            k[f] = r[f]
+    if voicecat.parse(r.get("voice") or "")[0] == "elevenlabs":
+        k["model"] = r.get("model") or eleven.model()
+    return k
+
+
+def raw_key(k: dict) -> dict:
+    """The part of a made key that needs the provider again; the rest (pitch, formant, fx) is redone from voices/.raw/."""
+    return {f: v for f, v in k.items() if f not in ("pitch", "formant", "fx")}
 
 
 def lines_to_make(d: Path, rows: list, only=None, changed=False) -> list:
@@ -973,6 +985,38 @@ def fake_tts(lines_file: Path, out: Path) -> int:
     return 0
 
 
+KOKORO_FALLBACK = {"female": "af_heart", "male": "am_michael", None: "am_michael"}
+
+
+def kokoro_for(voice: str, el_rows: list) -> str:
+    """The Kokoro voice that stands in for an ElevenLabs voice (same gender) when the film is read with Kokoro."""
+    row = next((v for v in el_rows if v["id"] == voice), {})
+    return KOKORO_FALLBACK.get(row.get("gender"), "am_michael")
+
+
+def emotion_acted(provider: str, model: str) -> bool:
+    """Only ElevenLabs v3 acts an emotion (research R2); elsewhere a small gain stands in for whisper and shout."""
+    return provider == "elevenlabs" and model.startswith("eleven_v3")
+
+
+EMOTION_TAG = {"whisper": "[whispers]", "shout": "[shouts]", "laugh": "[laughs]", "cry": "[crying]",
+               "sarcastic": "[sarcastic]"}
+
+
+def spoken(r: dict, model: str = "") -> str:
+    """The text sent to the provider: "say" or "text", with the emotion tag in front for ElevenLabs v3."""
+    t = r.get("say") or r.get("text", "")
+    tag = EMOTION_TAG.get(r.get("emotion") or "")
+    return f"{tag} {t}" if tag and emotion_acted("elevenlabs", model) else t
+
+
+def _load(f: Path, default):
+    try:
+        return json.loads(f.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return default
+
+
 def cmd_voice_make(a) -> int:
     d = film_dir(a.film)
     from filmcheck import points                   # specs/026: the voice is made from an approved script
@@ -991,58 +1035,276 @@ def cmd_voice_make(a) -> int:
         return 1
     try:
         rows = json.loads((d / "lines.json").read_text(encoding="utf-8"))
-        ids = lines_to_make(d, rows, a.only, a.changed)
-        f = say_file(d)
+        rows = [r for r in rows if isinstance(r, dict) and r.get("id")]
     except (OSError, ValueError) as e:
         print(f"✗ lines.json cannot be read: {e}", file=sys.stderr)
+        return 2
+    try:                                            # specs/036 US2: each line's voice comes from its speaker
+        rows = speakers.apply(d, rows, root=root(), write=not os.environ.get("STUDIO_TTS_DRY"))
+    except speakers.SpeakerError as e:
+        for w in str(e).splitlines():
+            print(f"✗ voice make: {w}", file=sys.stderr)
+        return 1
+    vdir = d / "voices"
+    fallback = {}
+    if getattr(a, "provider", None) == "kokoro":    # the whole film with Kokoro (FR-006), never a part of it
+        el_rows = []
+        if any(voicecat.parse(r.get("voice") or "")[0] == "elevenlabs" for r in rows):
+            try:
+                el_rows = eleven.voices()
+            except eleven.ElevenError:
+                pass
+        for r in rows:
+            if voicecat.parse(r.get("voice") or "")[0] == "elevenlabs":
+                fallback[r["voice"]] = r["voice"] = kokoro_for(r["voice"], el_rows)
+    try:
+        ids = lines_to_make(d, rows, a.only, a.changed)
+    except ValueError as e:
+        print(f"✗ lines.json: {e}", file=sys.stderr)
         return 2
     if not ids:
         print("voice: every line is up to date")
         return 0
-    part = bool(a.only or a.changed) and len(ids) < sum(1 for r in rows if isinstance(r, dict))
-    said = [r["id"] for r in rows if isinstance(r, dict) and r.get("say") and r["id"] in ids]
+    by_id = {r["id"]: r for r in rows}
+    made = _load(vdir / ".made.json", {})
+    keys = {i: made_key(by_id[i]) for i in ids}
+    fx_only = [i for i in ids if isinstance(made.get(i), dict) and raw_key(made[i]) == raw_key(keys[i])
+               and (vdir / ".raw" / f"{i}.wav").is_file()]
+    read = [i for i in ids if i not in fx_only]
+    k_ids = [i for i in read if voicecat.parse(by_id[i].get("voice") or "")[0] == "kokoro"]
+    e_ids = [i for i in read if i not in k_ids]
+    model = eleven.model()
+    said = [i for i in read if by_id[i].get("say")]
+    print(f"voice: {len(ids)} line(s)" + (f" ({', '.join(ids[:12])}{' …' if len(ids) > 12 else ''})" if len(ids) < len(rows) else "")
+          + (f"; Kokoro {len(k_ids)}, ElevenLabs {len(e_ids)}" if e_ids else "")
+          + (f"; effects only {len(fx_only)}" if fx_only else "")
+          + (f"; spoken as written in \"say\": {', '.join(said)}" if said else ""))
+    if fallback:
+        print("voice: read with Kokoro: " + ", ".join(f"{k} → {v}" for k, v in sorted(set(fallback.items()))))
+
+    chars = sum(len(spoken(by_id[i], model)) for i in e_ids)
+    if e_ids and not os.environ.get("STUDIO_TTS_DRY"):
+        try:
+            left = eleven.subscription()["left"]
+        except eleven.ElevenError as e:
+            print(f"✗ voice make: {e.message}", file=sys.stderr)
+            return 3
+        print(f"elevenlabs: {chars} characters for {len(e_ids)} line(s); {left} left")
+        if chars > left:
+            print(f"✗ not enough characters: need {chars}, have {left} — use --provider kokoro for this film",
+                  file=sys.stderr)
+            return 3
+        if len(e_ids) > 1 and not getattr(a, "yes", False):
+            print("✗ voice make: add --yes to spend these characters", file=sys.stderr)
+            return 1
+
     lib = Path(lib_dir())
     py = lib / ".venv" / "bin" / "python"
     import subprocess
-    import shutil
-    tmp = Path(tempfile.mkdtemp(prefix="voice.", dir=d / "voices")) if part else None
-    if part:                                       # tts.py rewrites dur.json with the lines it gets: make them aside
-        sub = [r for r in json.loads(f.read_text(encoding="utf-8")) if isinstance(r, dict) and r.get("id") in ids]
-        f = tmp / ".say.json"
-        f.write_text(json.dumps(sub, ensure_ascii=False, indent=1), encoding="utf-8")
-    out_dir = tmp if part else d / "voices"
-    cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "tts.py"), str(f), str(out_dir)]
-    print(f"voice: {len(ids)} line(s)" + (f" ({', '.join(ids[:12])}{' …' if len(ids) > 12 else ''})" if part else "")
-          + (f"; spoken as written in \"say\": {', '.join(said)}" if said else ""))
-    if os.environ.get("STUDIO_TTS_DRY"):
-        print(" ".join(cmd))
-        if tmp:
-            shutil.rmtree(tmp, ignore_errors=True)
-        return 0
+    vdir.mkdir(parents=True, exist_ok=True)
+    (vdir / ".raw").mkdir(exist_ok=True)
+    tmp = Path(tempfile.mkdtemp(prefix="voice.", dir=vdir))
+    rc, k_ok, e_ok = 0, [], []
     try:
-        rc = fake_tts(f, out_dir) if os.environ.get("STUDIO_TTS_FAKE") else subprocess.run(cmd, cwd=str(lib)).returncode
-        if rc == 0 and part:
-            dur_f = d / "voices" / "dur.json"
-            try:
-                dur = json.loads(dur_f.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                dur = {}
-            dur.update(json.loads((tmp / "dur.json").read_text(encoding="utf-8")))
-            for i in ids:
-                os.replace(tmp / f"{i}.wav", d / "voices" / f"{i}.wav")
-            dur_f.write_text(json.dumps(dur, indent=1), encoding="utf-8")
+        if k_ids:                                  # Kokoro through the library's tts.py, as before (FR-007)
+            f = say_file(d)
+            raw = [r for r in json.loads(f.read_text(encoding="utf-8")) if isinstance(r, dict) and r.get("id") in k_ids]
+            sub = []
+            for r in raw:                          # the resolved voice and speed (speaker, fallback), without prefix
+                eff = by_id[r["id"]]
+                r2 = dict(r)
+                if eff.get("voice"):
+                    r2["voice"] = voicecat.parse(eff["voice"])[1]
+                if eff.get("speed") is not None:
+                    r2["speed"] = eff["speed"]
+                sub.append(r2)
+            if len(k_ids) < len(rows) or sub != raw:
+                f = tmp / ".say.json"
+                f.write_text(json.dumps(sub, ensure_ascii=False, indent=1), encoding="utf-8")
+            cmd = [str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "tts.py"), str(f), str(tmp)]
+            if os.environ.get("STUDIO_TTS_DRY"):
+                print(" ".join(cmd))
+            else:
+                rc = fake_tts(f, tmp) if os.environ.get("STUDIO_TTS_FAKE") else subprocess.run(cmd, cwd=str(lib)).returncode
+                if rc == 0:
+                    for i in k_ids:
+                        os.replace(tmp / f"{i}.wav", vdir / ".raw" / f"{i}.wav")
+                    k_ok = k_ids
+        if e_ids and os.environ.get("STUDIO_TTS_DRY"):
+            print(f"elevenlabs {model}: {', '.join(e_ids)} ({chars} characters)")
+        elif e_ids and rc == 0:
+            rc, e_ok = read_eleven(d, [by_id[i] for i in e_ids], model, chars)
+        if os.environ.get("STUDIO_TTS_DRY"):
+            return 0
+        done = []
+        for i in [i for i in ids if i in fx_only or i in k_ok or i in e_ok]:   # the lines read keep their files
+            r = by_id[i]
+            prov = voicecat.parse(r.get("voice") or "")[0]
+            emo = r.get("emotion") if r.get("emotion") in ("whisper", "shout") and not emotion_acted(prov, model) else None
+            voicefx.apply(vdir / ".raw" / f"{i}.wav", vdir / f"{i}.wav", r.get("pitch") or 0, r.get("formant"),
+                          r.get("fx") or "none", emo)
+            done.append(i)
+        if done:
+            dur = _load(vdir / "dur.json", {})
+            dur.update({i: round(voicefx.duration(vdir / f"{i}.wav"), 3) for i in done})
+            (vdir / "dur.json").write_text(json.dumps(dur, indent=1), encoding="utf-8")
+            made.update({i: keys[i] for i in done})
+            (vdir / ".made.json").write_text(json.dumps(made, ensure_ascii=False, indent=1), encoding="utf-8")
+        if fallback:
+            sp = _load(vdir / "speakers.json", {})
+            sp["fallback"] = {"provider": "kokoro", "voices": fallback}
+            (vdir / "speakers.json").write_text(json.dumps(sp, ensure_ascii=False, indent=1), encoding="utf-8")
     finally:
-        if tmp:
-            shutil.rmtree(tmp, ignore_errors=True)
-    if rc == 0:                                    # remember what each file was made from (--changed)
-        mf = d / "voices" / ".made.json"
-        try:
-            made = json.loads(mf.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            made = {}
-        made.update({r["id"]: made_key(r) for r in rows if isinstance(r, dict) and r.get("id") in ids})
-        mf.write_text(json.dumps(made, ensure_ascii=False, indent=1), encoding="utf-8")
+        shutil.rmtree(tmp, ignore_errors=True)
     return rc
+
+
+def read_eleven(d: Path, rows: list, model: str, estimated: int):
+    """Read lines with ElevenLabs (at most 4 at once) into voices/.raw/; align.json and usage.json.
+    (0 or 3 on a provider error, the ids read: those stay)."""
+    from concurrent.futures import ThreadPoolExecutor
+    vdir = d / "voices"
+    align = _load(vdir / "align.json", {})
+    charged, ok, errors = 0, [], []
+
+    def one(r):
+        vs = dict(r.get("el") or {})
+        if r.get("speed") is not None:
+            vs["speed"] = r["speed"]
+        pcm, al, n = eleven.speak(r["voice"], spoken(r, model), model, vs)
+        eleven.write_wav(vdir / ".raw" / f"{r['id']}.wav", pcm)
+        return r["id"], al, n
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        futs = [ex.submit(one, r) for r in rows]
+        for r, fu in zip(rows, futs):
+            try:
+                i, al, n = fu.result()
+            except eleven.ElevenError as e:
+                errors.append((r["id"], e))
+                continue
+            charged += n
+            ok.append(i)
+            if al:
+                align[i] = {"chars": al.get("characters") or [], "start": al.get("character_start_times_seconds") or [],
+                            "end": al.get("character_end_times_seconds") or [], "source": "el"}
+    if ok:
+        (vdir / "align.json").write_text(json.dumps(align, ensure_ascii=False), encoding="utf-8")
+        u = _load(vdir / "usage.json", {"provider": "elevenlabs", "total": 0, "runs": []})
+        u["total"] = int(u.get("total") or 0) + charged
+        u.setdefault("runs", []).append({"at": now(), "chars_estimated": estimated, "chars": charged, "lines": ok,
+                                         **({"job": os.environ["STUDIO_JOB"]} if os.environ.get("STUDIO_JOB") else {})})
+        (vdir / "usage.json").write_text(json.dumps(u, ensure_ascii=False, indent=1), encoding="utf-8")
+    for i, e in errors:
+        print(f"✗ elevenlabs {i}: {e.message}", file=sys.stderr)
+    return (3 if errors else 0), ok
+
+
+def cmd_voice_usage(a) -> int:
+    d = film_dir(a.film)
+    u = _load(d / "voices" / "usage.json", None)
+    if a.json:
+        print(json.dumps(u or {"provider": "elevenlabs", "total": 0, "runs": []}, indent=1))
+        return 0
+    if not u:
+        print("elevenlabs: no characters used by this film")
+        return 0
+    print(f"elevenlabs: {u.get('total', 0)} characters in {len(u.get('runs') or [])} run(s)")
+    for r in u.get("runs") or []:
+        print(f"  {r.get('at')}  {r.get('chars')} (estimated {r.get('chars_estimated')})  {len(r.get('lines') or [])} line(s)")
+    return 0
+
+
+def _setting_text(s: dict) -> str:
+    if not s:
+        return "—"
+    parts = [s.get("voice") or ("narrator plays it" if s.get("mode") == "narrator" else "?")]
+    if s.get("pitch"):
+        parts.append(f"pitch {s['pitch']:+g}")
+    if s.get("speed") not in (None, 1, 1.0):
+        parts.append(f"speed {s['speed']:g}")
+    if s.get("emotion") not in (None, "neutral"):
+        parts.append(s["emotion"])
+    return ", ".join(parts)
+
+
+def cmd_voice_check(a) -> int:
+    """specs/036 contracts/cli.md: the speaker ↔ voice table and its problems; exit 1 when there is one."""
+    d = film_dir(a.film)
+    try:
+        rows = [r for r in json.loads((d / "lines.json").read_text(encoding="utf-8")) if isinstance(r, dict) and r.get("id")]
+    except (OSError, ValueError) as e:
+        print(f"✗ lines.json cannot be read: {e}", file=sys.stderr)
+        return 2
+    res = speakers.resolve(d, rows, root())
+    errs = list(res["errors"]) + [f"line {r['id']}: {e}" for r in rows for e in speakers.line_errors(r)]
+    if a.json:
+        print(json.dumps({"speakers": res["speakers"], "errors": errs}, ensure_ascii=False, indent=1))
+    else:
+        for sp, e in res["speakers"].items():
+            print(f"{sp:<14} {e['source']:<9} {_setting_text(e['setting']):<40} {len(e['lines'])} line(s)"
+                  + (f"  [{e['role']}]" if e.get("role") else ""))
+        for w in errs:
+            print(f"✗ {w}", file=sys.stderr)
+        if not errs:
+            print("voice check: ok")
+    return 1 if errs else 0
+
+
+def cmd_voice_channel(a) -> int:
+    from filmcheck import channels
+    r = root()
+    try:
+        if a.what == "narrator":
+            if not a.voice:
+                print("✗ voice channel: --voice is needed", file=sys.stderr)
+                return 2
+            st = {"voice": a.voice, "speed": a.speed if a.speed is not None else 1.0}
+            if a.pitch:
+                st["pitch"] = a.pitch
+            speakers.save_channel_voice(r, a.slug, narrator=st)
+        elif a.what == "role":
+            if not a.role:
+                print(f"✗ voice channel: give a role ({', '.join(speakers.ROLES)})", file=sys.stderr)
+                return 2
+            st = {"mode": a.mode or ("own" if a.voice else "narrator")}
+            for k in ("voice", "pitch", "speed"):
+                if getattr(a, k) is not None:
+                    st[k] = getattr(a, k)
+            cur = speakers.channel_voice(r, a.slug)["roles"].get(a.role, []) if a.add else []
+            speakers.save_channel_voice(r, a.slug, role=a.role, settings=cur + [st])
+        doc = speakers.channel_voice(r, a.slug)
+    except (speakers.SpeakerError, channels.ChannelError) as e:
+        print(f"✗ voice channel: {e}", file=sys.stderr)
+        return 2
+    if a.json:
+        print(json.dumps(doc, ensure_ascii=False, indent=1))
+        return 0
+    print(f"narrator   {_setting_text(doc['narrator']) if doc['narrator'] else 'not chosen yet'}")
+    for k, v in doc["roles"].items():
+        print(f"{k:<10} " + " | ".join(_setting_text(x) for x in v))
+    return 0
+
+
+def cmd_eleven(a) -> int:
+    """eleven test | eleven voices (contracts/cli.md). Never prints the key."""
+    try:
+        if a.cmd == "test":
+            s = eleven.subscription()
+            reset = datetime.fromtimestamp(s["reset_at"], timezone.utc).strftime("%Y-%m-%d") if s.get("reset_at") else "?"
+            print(f"ok · tier {s.get('tier')} · {s['left']}/{s['limit']} characters left · resets {reset}"
+                  f" · model {eleven.model()}")
+            return 0
+        rows = eleven.voices(refresh=a.refresh)
+    except eleven.ElevenError as e:
+        print(f"✗ {e.message}", file=sys.stderr)
+        return 3
+    if a.json:
+        print(json.dumps(rows, ensure_ascii=False, indent=1))
+        return 0
+    for v in rows:
+        print(f"{v['id']:<26} {v['name'][:28]:<28} {v.get('gender') or '-'}/{v.get('age') or '-':<12} "
+              f"{(v.get('accent') or '')[:14]:<14}{' [cloned]' if v.get('cloned') else ''}")
+    return 0
 
 
 def cmd_voice_asr(a) -> int:
@@ -1618,6 +1880,29 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--skip-review", default=None, help="make the voice without an approved script review (recorded)")
     s.add_argument("--only", default=None, help="L03,L07: make only these lines (specs/026)")
     s.add_argument("--changed", action="store_true", help="make only the lines whose text, say, voice or speed changed (specs/026)")
+    s.add_argument("--yes", action="store_true", help="spend the ElevenLabs characters shown (specs/036)")
+    s.add_argument("--provider", choices=["kokoro"], default=None, help="read the whole film with Kokoro (specs/036)")
+    s = sub.add_parser("voice-usage", help="ElevenLabs characters used by a film (specs/036)")
+    s.add_argument("film")
+    s.add_argument("--json", action="store_true")
+    s = sub.add_parser("voice-check", help="who says each line and with which voice (specs/036)")
+    s.add_argument("film")
+    s.add_argument("--json", action="store_true")
+    s = sub.add_parser("voice-channel", help="a channel's narrator and side-part voices (specs/036)")
+    s.add_argument("slug")
+    s.add_argument("what", choices=["show", "narrator", "role"])
+    s.add_argument("role", nargs="?", default=None, help="boy|girl|woman|man|old_man|old_woman (with role)")
+    s.add_argument("--voice", default=None, help="kokoro name or el:<id>")
+    s.add_argument("--mode", choices=["own", "narrator"], default=None, help="role: own voice or the narrator plays it")
+    s.add_argument("--pitch", type=float, default=None)
+    s.add_argument("--speed", type=float, default=None)
+    s.add_argument("--add", action="store_true", help="role: add this choice instead of replacing the list")
+    s.add_argument("--json", action="store_true")
+    el = sub.add_parser("eleven", help="the ElevenLabs account (specs/036)").add_subparsers(dest="cmd", required=True)
+    s = el.add_parser("test", help="is the key good, and how many characters are left")
+    s = el.add_parser("voices", help="the account's voices")
+    s.add_argument("--json", action="store_true")
+    s.add_argument("--refresh", action="store_true")
     s = sub.add_parser("voice-asr", help="word stamps with the studio's recogniser model (specs/020)")
     s.add_argument("film")
     s.add_argument("--only", default=None, help="L03,L07: stamp only these lines, merged into words.json (specs/026)")
@@ -1828,7 +2113,10 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("qc-plan", "qc-plan"): cmd_qc_plan, ("render-gate", "render-gate"): cmd_render_gate,
             ("qc-shots", "qc-shots"): cmd_qc_shots, ("qc-accept-style", "qc-accept-style"): cmd_qc_accept_style,
             ("qc-except", "qc-except"): cmd_qc_except, ("qc-voice", "qc-voice"): cmd_qc_voice,
-            ("voice-asr", "voice-asr"): cmd_voice_asr, ("voice-make", "voice-make"): cmd_voice_make, ("qc-limits", "qc-limits"): cmd_qc_limits,
+            ("voice-asr", "voice-asr"): cmd_voice_asr, ("voice-make", "voice-make"): cmd_voice_make,
+            ("voice-usage", "voice-usage"): cmd_voice_usage, ("eleven", "test"): cmd_eleven, ("eleven", "voices"): cmd_eleven,
+            ("voice-check", "voice-check"): cmd_voice_check, ("voice-channel", "voice-channel"): cmd_voice_channel,
+            ("qc-limits", "qc-limits"): cmd_qc_limits,
             ("render-done", "render-done"): cmd_render_done,
             ("point", "status"): cmd_point_status, ("point", "set"): cmd_point_set, ("point", "approve"): cmd_point_approve,
             ("point", "gate"): cmd_point_gate, ("edit", "edit"): cmd_edit,

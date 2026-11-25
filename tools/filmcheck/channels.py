@@ -15,7 +15,8 @@ from pathlib import Path
 SLUG = re.compile(r"^[a-z0-9-]{1,40}$")
 LANG = re.compile(r"^[a-z]{2,3}$")
 TAG = re.compile(r"^#[^\s#]{1,29}$")
-VOICE = (re.compile(r"^[a-z]{2}_[a-z]+$"), re.compile(r"^[a-z]{2,3}-[A-Z]{2,4}-\w+Neural$"))
+VOICE = (re.compile(r"^(kokoro:)?[a-z]{2}_[a-z]+$"), re.compile(r"^[a-z]{2,3}-[A-Z]{2,4}-\w+Neural$"),
+         re.compile(r"^el:[A-Za-z0-9]{8,40}$"))          # specs/036: an ElevenLabs voice of the owner's account
 DEFAULT_VOICE, DEFAULT_SPEED = "af_bella", 1.0
 MAX_CHANNELS, MAX_LESSONS, BRIEF_MAX = 20, 200, 6000
 RULES = {"phrase": (1, 80), "max_sentence_words": (5, 60), "max_title_chars": (20, 100)}

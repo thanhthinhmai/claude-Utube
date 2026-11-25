@@ -313,6 +313,13 @@ def measure(d: Path, lib=None) -> dict:
             rows = json.loads((d / nar["lines_file"]).read_text(encoding="utf-8")) if nar.get("lines_file") else []
         except (OSError, ValueError):
             rows = []
+        from filmcheck import speakers           # specs/036: characters have their own voice; the narrator is checked
+        film_narr = isinstance((speakers.film_voices(d) or {}).get("narrator"), dict)
+        try:
+            rows = speakers.apply(d, [r for r in rows if isinstance(r, dict)], write=False)
+        except speakers.SpeakerError:
+            pass
+        rows = [] if film_narr else [r for r in rows if (r.get("speaker") or "narrator") == "narrator"]
         bad = [r.get("id") for r in rows if isinstance(r, dict) and ((r.get("voice") or channels.DEFAULT_VOICE) != want_v
                                                                      or abs(float(r.get("speed") or 1.0) - want_s) > 0.01)]
         measures["channel_voice_bad"] = bad

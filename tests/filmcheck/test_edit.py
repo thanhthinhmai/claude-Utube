@@ -204,6 +204,21 @@ class Voice(unittest.TestCase):                                    # specs/026 T
         self.assertTrue(all(x["speed"] == 0.95 for x in self.rows()))
 
 
+    def test_voice_speaker_changes_only_that_speaker(self):          # specs/036 T026 (FR-012, FR-042)
+        rows = self.rows()
+        rows[1]["speaker"], rows[2]["speaker"] = "kid", "kid"
+        (self.d / "lines.json").write_text(json.dumps(rows))
+        self.assertEqual(self.run_op("voice-speaker", speaker="kid", voice="bf_emma")["code"], 2)   # two lines: confirm
+        self.assertEqual(self.run_op("voice-speaker", speaker="ghost", voice="bf_emma", confirm="speaker")["code"], 2)
+        self.assertEqual(self.run_op("voice-speaker", speaker="kid", mode="narrator", pitch="9", confirm="speaker")["code"], 2)
+        r = self.run_op("voice-speaker", speaker="kid", mode="narrator", pitch="4", confirm="speaker")
+        self.assertEqual(r["code"], 0, r)
+        film = json.loads((self.d / "film.json").read_text())
+        self.assertEqual(film["voices"]["kid"], {"mode": "narrator", "pitch": 4.0})
+        after = self.rows()
+        self.assertEqual([("voice" in x) for x in after[:4]], [True, False, False, True])   # only kid's lines lost "voice"
+
+
 class Mix(unittest.TestCase):                                      # specs/026 T045
     def setUp(self):
         TMP.mkdir(exist_ok=True)

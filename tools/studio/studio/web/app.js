@@ -1207,6 +1207,51 @@ async function editShots(body) {
   draw(); bar();
 }
 
+/** specs/036 US2: who says the lines and with which voice; a speaker's voice changes only that speaker's lines.
+ * @param {any} v @param {boolean} ed */
+function speakersBox(v, ed) {
+  /** @type {any[]} */ const sps = v.speakers || [];
+  if (!sps.length || (sps.length === 1 && sps[0].source === "manual" && !sps[0].issues.length)) return "";
+  const txt = (/** @type {any} */ s) => !s ? "no voice yet" : [s.voice || "narrator plays it", s.pitch ? `pitch ${s.pitch > 0 ? "+" : ""}${s.pitch}` : "",
+    s.speed && s.speed !== 1 ? `speed ${s.speed}` : ""].filter(Boolean).join(" · ");
+  const pitches = ["-4", "-3", "-2", "-1", "0", "1", "2", "3", "4", "5", "6"];
+  return `<div class="speakers"><h4>Speakers</h4>${sps.map((sp) => {
+    const cur = sp.setting || {}, p = String(cur.pitch || 0);
+    const narrOpt = sp.id === "narrator" ? "" : `<option value="@narrator"${cur.mode === "narrator" ? " selected" : ""}>Narrator plays it</option>`;
+    const scope = sp.id === "narrator" && (sp.source === "narrator" || !sp.source) ? "channel" : "film";
+    return `<div class="spk row" data-sp="${esc(sp.id)}" data-n="${sp.lines.length}" data-scope="${scope}">
+      <strong>${esc(sp.name)}</strong>${sp.role ? ` <span class="tag small">${esc(sp.role)}</span>` : ""}
+      <span class="muted small">${esc(sp.source || "")} · ${esc(txt(sp.setting))} · ${sp.lines.length} line(s)</span>
+      ${sp.issues.map((/** @type {string} */ w) => `<span class="tag warn small">${esc(w)}</span>`).join(" ")}
+      ${ed ? `<select class="spk-voice" aria-label="Voice of ${esc(sp.name)}">${narrOpt}${voiceOptions(v, cur.mode === "narrator" ? "" : cur.voice || "")}</select>
+        <select class="spk-pitch" aria-label="Pitch of ${esc(sp.name)}">${pitches.map((x) => `<option${x === p ? " selected" : ""}>${x}</option>`).join("")}</select>
+        <button class="btn small" data-use>Use</button>${scope === "channel" ? `<span class="muted small">for every film of the channel</span>` : ""}` : ""}
+      <span class="msg small"></span></div>`;
+  }).join("")}</div>`;
+}
+
+/** specs/036: which provider reads a voice id ("el:<id>" is ElevenLabs; "kokoro:<name>" or a bare name is Kokoro). @param {string} id */
+function voiceProvider(id) { return String(id || "").startsWith("el:") ? "elevenlabs" : "kokoro"; }
+
+/** The Voice picker: both providers in groups, ElevenLabs voices named with their tags. @param {any} v @param {string} cur */
+function voiceOptions(v, cur) {
+  /** @type {any[]} */ const rows = v.voice_rows && v.voice_rows.length ? v.voice_rows
+    : (v.voices || []).map((/** @type {string} */ x) => ({ id: x, name: x, provider: voiceProvider(x) }));
+  const bare = (/** @type {string} */ x) => String(x || "").replace(/^kokoro:/, "");
+  const same = (/** @type {any} */ r) => r.id === cur || bare(r.id) === bare(cur);
+  const opt = (/** @type {any} */ r) => {
+    const tags = [r.cloned ? "cloned" : "", r.library ? "library" : "", r.gender || "", r.accent || ""].filter(Boolean).join(", ");
+    const val = r.provider === "kokoro" ? bare(r.id) : r.id;
+    return `<option value="${esc(val)}"${same(r) ? " selected" : ""}>${esc(r.name || val)}${tags ? ` (${esc(tags)})` : ""}</option>`;
+  };
+  const group = (/** @type {string} */ p, /** @type {string} */ label) => {
+    const g = rows.filter((r) => r.provider === p);
+    return g.length ? `<optgroup label="${label}">${g.map(opt).join("")}</optgroup>` : "";
+  };
+  const missing = cur && !rows.some(same) ? `<option selected>${esc(cur)}</option>` : "";
+  return missing + group("kokoro", "Kokoro (free, on this machine)") + group("elevenlabs", "ElevenLabs");
+}
+
 /** Voice panel: play each line, fix how a word is said ("say"), make one line again, or change the voice or speed
  * of the whole film after a confirmation on the page (US3). The written words come from the script only. @param {HTMLElement} body */
 async function editVoice(body) {
@@ -1225,16 +1270,17 @@ async function editVoice(body) {
     const shown = rows.filter((r) => r && r.id && (RAIL.voiceAll || r.say || issues.some((/** @type {any} */ i) => i.ref === r.id)));
     const speeds = ["0.85", "0.9", "0.95", "1", "1.05", "1.1", "1.15"];
     const sp = String(first.speed ?? 1);
-    box.innerHTML = `<div class="row done-actions"><label>Voice <select id="v-voice" ${ed ? "" : "disabled"}>${(v.voices.includes(first.voice) ? v.voices : [first.voice, ...v.voices]).map((x) =>
-        `<option${x === first.voice ? " selected" : ""}>${esc(x)}</option>`).join("")}</select></label>
+    box.innerHTML = `<div class="row done-actions"><label>Voice <select id="v-voice" ${ed ? "" : "disabled"}>${voiceOptions(v, first.voice)}</select></label>
       <label>Speed <select id="v-speed" ${ed ? "" : "disabled"}>${(speeds.includes(sp) ? speeds : [sp, ...speeds]).map((x) => `<option${x === sp ? " selected" : ""}>${x}</option>`).join("")}</select></label>
       <span class="muted small" id="v-confirm"></span>
       <span class="seg"><button data-f="all" aria-pressed="${RAIL.voiceAll}">All lines</button><button data-f="some" aria-pressed="${!RAIL.voiceAll}">With say or warnings</button></span></div>
+      ${speakersBox(v, ed)}
+      ${v.voice_cost && (v.voice_cost.used || v.voice_cost.lines) ? `<p class="muted small">ElevenLabs: ${v.voice_cost.lines} line(s) use it · ${v.voice_cost.used} characters spent on this film so far</p>` : ""}
       ${issues.filter((/** @type {any} */ i) => i.ref === "lines").map((/** @type {any} */ i) => `<p class="notice warn small">${esc(i.measure)}: ${esc(i.fix)}</p>`).join("")}
       <div class="vlines">${shown.map((r) => {
         const mine = issues.filter((/** @type {any} */ i) => i.ref === r.id);
         return `<div class="vline ${mine.length ? "warnl" : ""}" data-id="${esc(r.id)}"><button class="play" data-a="${esc(r.id)}" aria-label="Play ${esc(r.id)}">▶</button>
-          <div class="vtxt"><div><code>${esc(r.id)}</code> ${esc(r.text)}</div>
+          <div class="vtxt"><div><code>${esc(r.id)}</code> ${r.speaker && r.speaker !== "narrator" ? `<span class="tag small">${esc(r.speaker)}</span> ` : ""}${esc(r.text)}</div>
             <label class="small muted">say <input class="say-in" maxlength="400" value="${esc(r.say || "")}" placeholder="as written" ${ed ? "" : "disabled"}></label>
             ${mine.map((/** @type {any} */ i) => `<span class="tag warn small">${esc(i.rule)}${i.text ? `: ${esc(i.text)}` : ""}</span>`).join(" ")}
             <span class="msg small">${esc(RAIL.msg[r.id] || "")}</span></div>
@@ -1262,12 +1308,30 @@ async function editVoice(body) {
       } catch (err) { RAIL.msg[id] = /** @type {Error} */ (err).message; }
       DONE.drawn = {}; doneRefresh(true);
     };
+    box.querySelectorAll(".spk [data-use]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = async () => {
+      const row = /** @type {HTMLElement} */ (el.closest(".spk")), sp = row.dataset.sp || "";
+      const val = /** @type {HTMLSelectElement} */ (row.querySelector(".spk-voice")).value;
+      const pitch = /** @type {HTMLSelectElement} */ (row.querySelector(".spk-pitch")).value;
+      const n = Number(row.dataset.n || 0);
+      const msg = /** @type {HTMLElement} */ (row.querySelector(".msg"));
+      const el11 = voiceProvider(val) === "elevenlabs";
+      if (n > 1 && !confirm(`Make the ${n} lines of ${sp} again${el11 ? " with ElevenLabs (it spends characters)" : ""}?`)) return;
+      msg.textContent = "Making the lines again…";
+      /** @type {any} */ const args = val === "@narrator" ? { speaker: sp, mode: "narrator", pitch } : { speaker: sp, voice: val, pitch };
+      if (sp === "narrator" && row.dataset.scope === "channel") args.scope = "channel";
+      args.confirm = "speaker";
+      try { const x = await sendEdit("voice", "voice-speaker", args); RAIL.msg = { film: editMsg(x) }; }
+      catch (err) { RAIL.msg = { film: /** @type {Error} */ (err).message }; }
+      DONE.drawn = {}; doneRefresh(true);
+    }; });
     box.querySelectorAll("[data-save]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => act(el, "voice-say"); });
     box.querySelectorAll("[data-remake]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => act(el, "voice-remake"); });
     const ask = () => {                                // the whole film is made again: confirm on the page
       const c = /** @type {HTMLElement} */ (box.querySelector("#v-confirm"));
       const voice = /** @type {HTMLSelectElement} */ (box.querySelector("#v-voice")).value, speed = /** @type {HTMLSelectElement} */ (box.querySelector("#v-speed")).value;
-      c.innerHTML = `This makes all ${rows.length} lines again. <button class="btn small" id="v-go">Make all again</button> <button class="btn small" id="v-no">Cancel</button>`;
+      const chars = rows.reduce((n, r) => n + String((r && (r.say || r.text)) || "").length, 0);
+      const cost = voiceProvider(voice) === "elevenlabs" ? ` ElevenLabs will spend about ${chars} characters.` : " Kokoro is free.";
+      c.innerHTML = `This makes all ${rows.length} lines again.${esc(cost)} <button class="btn small" id="v-go">Make all again</button> <button class="btn small" id="v-no">Cancel</button>`;
       /** @type {HTMLElement} */ (c.querySelector("#v-no")).onclick = () => draw();
       /** @type {HTMLElement} */ (c.querySelector("#v-go")).onclick = async () => {
         c.textContent = "Making every line again…";
@@ -2699,7 +2763,22 @@ async function pageSettings(tab = "general") {
       Units used today: ${st.youtube_units_today ?? 0} of ${st.youtube_daily_units}.</p>
     <div class="row"><input id="yt-key-input" type="password" autocomplete="off" placeholder="Paste a YouTube Data API key"><button id="yt-key-save">Save key</button>
       ${st.youtube_key_set ? `<button class="danger" id="yt-key-del">Remove</button>` : ""}</div><p id="yt-msg" class="muted" role="status"></p></section>`;
-  $app.innerHTML = `${top}${ytKey}<section class="panel card-pad"><h2>Studio</h2><p class="muted">Limits for every member, and how many films run at once.</p>
+  // specs/036: the owner's ElevenLabs key, tried before it is kept; only the last 4 characters come back
+  const el = st.elevenlabs || { set: false };
+  const elState = !el.set ? "<strong>No key yet.</strong> Voices are read with Kokoro (free, on this machine)."
+    : el.status === "invalid" ? `<strong class="fail">Key …${esc(el.last4)} does not work any more.</strong>`
+    : `<strong>Key set (…${esc(el.last4)})</strong> · plan ${esc(el.tier || "?")} · ${el.left ?? "?"} of ${el.limit ?? "?"} characters left`
+      + (el.reset_at ? ` · resets ${new Date(el.reset_at * 1000).toLocaleDateString()}` : "") + ` · model ${esc(el.model || "")}`;
+  const elKey = `<section class="panel card-pad" id="el-key"><h2>ElevenLabs voices</h2>
+    <p class="muted">Adds the voices of your ElevenLabs account (your clones too) next to the Kokoro voices. The key is kept
+      encrypted on this machine, only the studio's proxy uses it, and it is never shown again. Commercial use of a voice depends
+      on your ElevenLabs plan. ${elState}</p>
+    <div class="row"><input id="el-key-input" type="password" autocomplete="off" placeholder="Paste an ElevenLabs API key">
+      <button id="el-key-save">${el.set ? "Replace key" : "Save key"}</button>
+      ${el.set ? `<button id="el-key-test">Test</button><select id="el-model" aria-label="ElevenLabs model">${["eleven_multilingual_v2", "eleven_v3", "eleven_turbo_v2_5", "eleven_flash_v2_5"]
+        .map((m) => `<option${m === el.model ? " selected" : ""}>${m}</option>`).join("")}</select><button class="danger" id="el-key-del">Remove</button>` : ""}</div>
+    <p id="el-msg" class="muted" role="status"></p></section>`;
+  $app.innerHTML = `${top}${ytKey}${elKey}<section class="panel card-pad"><h2>Studio</h2><p class="muted">Limits for every member, and how many films run at once.</p>
     <form class="form" id="settings"><div class="admin-grid">${SETTING.map(input).join("")}</div>
       <div><button class="primary" type="submit">Save settings</button></div></form><p id="msg" class="muted" role="status"></p></section>`;
   /** @type {HTMLButtonElement} */ (document.getElementById("yt-key-save")).onclick = async () => {
@@ -2707,6 +2786,19 @@ async function pageSettings(tab = "general") {
     try { await send("PUT", "/admin/youtube-key", { key: field("yt-key-input").value.trim() }); pageSettings("general"); }
     catch (e) { msg.className = "fail"; msg.textContent = e.message; }
   };
+  const elMsg = document.getElementById("el-msg");
+  const elRun = (/** @type {() => Promise<any>} */ fn) => async () => {
+    elMsg.className = "muted"; elMsg.textContent = "Checking with ElevenLabs…";
+    try { await fn(); pageSettings("general"); } catch (e) { elMsg.className = "fail"; elMsg.textContent = e.message; }
+  };
+  /** @type {HTMLButtonElement} */ (document.getElementById("el-key-save")).onclick =
+    elRun(() => send("PUT", "/admin/elevenlabs-key", { key: field("el-key-input").value.trim() }));
+  const elTest = document.getElementById("el-key-test");
+  if (elTest) elTest.onclick = elRun(() => send("POST", "/admin/elevenlabs-key/test"));
+  const elModel = /** @type {HTMLSelectElement} */ (document.getElementById("el-model"));
+  if (elModel) elModel.onchange = elRun(() => send("PUT", "/admin/elevenlabs-model", { model: elModel.value }));
+  const elDel = document.getElementById("el-key-del");
+  if (elDel) elDel.onclick = async () => { if (confirm("Remove the ElevenLabs key? Voices already made stay.")) { await send("DELETE", "/admin/elevenlabs-key"); pageSettings("general"); } };
   const ytDel = document.getElementById("yt-key-del");
   if (ytDel) ytDel.onclick = async () => { if (confirm("Remove the YouTube key?")) { await send("DELETE", "/admin/youtube-key"); pageSettings("general"); } };
   onSubmit(async () => {
