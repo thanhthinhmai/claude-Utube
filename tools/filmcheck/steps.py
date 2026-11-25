@@ -5,15 +5,17 @@ from pathlib import Path
 
 from filmcheck import points, report, tiers
 
-STEPS = ["Treatment", "Script", "Voice", "Look", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"]
-GRAPH = {"Script": ["Voice"], "Voice": ["Picture", "Mix"], "Look": ["Picture"], "Picture": ["Shots"],
+STEPS = ["Treatment", "Script", "Cast", "Voice", "Look", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"]
+GRAPH = {"Script": ["Cast", "Voice"], "Cast": ["Picture"], "Voice": ["Picture", "Mix"], "Look": ["Picture"], "Picture": ["Shots"],
          "Shots": ["Render"], "Mix": ["Self-check"], "Render": ["Self-check"], "Self-check": ["Publish"], "Publish": []}
-POINT_STEP = {"script": "Script", "voice": "Voice", "shots": "Shots", "mix": "Mix", "publish": "Publish"}
+POINT_STEP = {"script": "Script", "cast": "Cast", "voice": "Voice", "shots": "Shots", "mix": "Mix", "publish": "Publish"}
 STEP_POINT = {v: k for k, v in POINT_STEP.items()}
 
 
-def after(step: str) -> list:
-    """Every step that depends on this one, in film order."""
+def after(step: str, film_dir=None) -> list:
+    """Every step that depends on this one, in film order (the Cast step only for AE films when film_dir is given)."""
+    if film_dir is not None and not points.is_ae(Path(film_dir)):
+        return [s for s in after(step) if s != "Cast"]
     seen, todo = set(), list(GRAPH.get(step, []))
     while todo:
         s = todo.pop()
@@ -23,9 +25,9 @@ def after(step: str) -> list:
     return [s for s in STEPS if s in seen]
 
 
-def impact(point: str) -> list:
+def impact(point: str, film_dir=None) -> list:
     """The steps that must run again when this point's work changes ("If you change this")."""
-    return after(POINT_STEP[points.check_point(point)])
+    return after(POINT_STEP[points.check_point(point)], film_dir)
 
 
 def _mtime(p: Path) -> float:
@@ -71,6 +73,22 @@ def _tier_state(d: Path, name: str, fp: str):
     return "stale" if t.get("fingerprint") != fp else "done"
 
 
+def cast_state(d: Path) -> tuple:
+    """Cast step (AE films, specs/034): skipped · todo (no cast.json, or a character without sheet) · done."""
+    why = points.cast_skip_reason(d)
+    if why:
+        return ("skipped", why)
+    from filmcheck import cast
+    if not cast.exists(d):
+        return ("todo", "")
+    try:
+        doc = cast.load(d)
+    except cast.CastError as e:
+        return ("stale", e.message)
+    missing = [c["id"] for c in doc["characters"] if not cast.has_sheet(d, c["id"])]
+    return ("todo", f"no sheet: {', '.join(missing)}") if missing else ("done", "")
+
+
 def base_states(film_dir: Path) -> dict:
     """{step: (state, note)} from the film's files only: done · todo · stale · skipped."""
     d = Path(film_dir)
@@ -88,6 +106,7 @@ def base_states(film_dir: Path) -> dict:
             out["Voice"] = ("stale", why) if why else ("done", "")
         else:
             out["Voice"] = ("todo", "")
+    out["Cast"] = cast_state(d)
     out["Look"] = ("done", "") if (d / "index.html").is_file() else ("todo", "")
     out["Picture"] = (_tier_state(d, "plan", fp) or "todo", "")
     out["Shots"] = (_tier_state(d, "shots", fp) or "todo", "")
@@ -131,7 +150,10 @@ def status(film_dir: Path, job_step: str = None, pending: set = frozenset(), bus
     base = base_states(d)
     pst = points.status(d, pending)
     out = []
+    ae = points.is_ae(d)
     for name in STEPS:
+        if name == "Cast" and not ae:
+            continue                     # web page films have no Cast step (specs/034)
         state, note = base[name]
         pt = STEP_POINT.get(name)
         info = pst.get(pt) if pt else None

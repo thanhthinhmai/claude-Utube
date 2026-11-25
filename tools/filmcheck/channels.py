@@ -171,10 +171,12 @@ def normal(ch: dict) -> dict:
         out["hero"] = ch["hero"]
     if ch.get("reviews") is not None:
         out["reviews"] = list(ch["reviews"])
+        if ch.get("cast_chosen") is True:      # the list was saved knowing the Cast point (specs/034); older lists were not
+            out["cast_chosen"] = True
     return out
 
 
-REVIEW_POINTS = ("script", "voice", "shots", "mix", "publish")       # specs/026; = filmcheck.points.POINTS
+REVIEW_POINTS = ("script", "cast", "voice", "shots", "mix", "publish")   # specs/026, 034; = filmcheck.points.POINTS
 DEFAULT_REVIEWS = ["script", "shots"]
 
 
@@ -470,7 +472,7 @@ def attach(root: Path, film_dir: Path, slug: str, shared_path: Path = None, lib:
     from filmcheck import points, report                            # specs/026: the film's review points (checks.json)
     if (report.load(film_dir).get("reviews") or {}).get("from") != "this film":   # chosen for this film: kept
         try:
-            points.set_on(film_dir, reviews_of(ch), origin=f"channel {slug}")
+            points.set_on(film_dir, reviews_of(ch), origin=f"channel {slug}", chosen=ch.get("cast_chosen") is True)
         except points.PointError:
             pass                                                    # a point already approved or waiting keeps its state
     warn = f"{left} lessons did not fit in CHANNEL_BRIEF.md ({BRIEF_MAX} characters): merge or retire some" if left else None

@@ -43,6 +43,13 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 | `POST /ae/bridge/{id}/progress` body `{state, shot, index, total}` hoặc `{}` (nhịp) | yêu cầu (032) | `409 not_active` |
 | `PUT /ae/bridge/{id}/result/{name}` thân mp4 ≤ 500 MB, `name` = `MASTER` hoặc mã shot | `201 {bytes}` (032) | `413` · `422` · `409` |
 | `POST /ae/bridge/{id}/finish` body `{ok, checks, marks, duration}` hoặc `{ok: false, error}` | yêu cầu (032) | `409` · `422` |
+| `GET /cast-library` | `{available, channels: [{channel, characters: [{id, name, role, latest, rig, approved_at, films, new_rig}]}]}`: kho nhân vật của kênh trong kho app (specs/034); ngoài app `available: false` | |
+| `GET /cast-library/{channel}/{id}` | `{channel, id, v, versions, character, sheet, preview}` (034) | `404` (không có kho, không có nhân vật) |
+| `GET /cast-library/{channel}/{id}/{ver}/{file}` | ảnh hoặc clip của bảng mẫu, `ver` = `v<n>` hoặc `v<n>.preview`, `file` = `<khoá>.jpg`, `walk.mp4`, `sheet.json` (034) | `404` |
+| `POST /cast-library/{channel}/{id}/preview` body `{rig}` | `201 {job}`: việc `fix` (`target: cast`, `mode: preview`) dựng bảng mẫu bằng rig mới vào `v<n>.preview/` (034) | `422 bad_rig` · `409 ae_unavailable` · `409 in_progress` · `409 app_only` · `404` |
+| `POST /cast-library/{channel}/{id}/fix` body `{notes: [≤ 10]}` | `201 {job}`: việc `fix` (`mode: library`) sửa nhân vật theo ghi chú → bản mới chờ duyệt (034) | `422 invalid` · `409` như trên · `404` |
+| `POST /cast-library/{channel}/{id}/update` | `{v}`: bản xem trước thành bản `v` chờ duyệt (034) | `422 no_preview` · `409 app_only` · `404` |
+| `POST /cast-library/{channel}/{id}/approve` | `{v}`: duyệt bản chờ duyệt, thành bản mới nhất (034) | `422 nothing_to_approve` · `409 app_only` · `404` |
 | `GET /sets` | `{sets: [{set, videos, measured, media_removed}]}` | |
 | `GET /sets/{set}` | `summary`, `videos[]` (không có `origin`, `title`, `channel`) | `404` |
 | `GET /sets/{set}/sheets` | `{sheets: [file]}` hoặc `{removed: true}` | |

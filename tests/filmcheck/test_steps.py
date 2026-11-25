@@ -27,7 +27,10 @@ class Steps(unittest.TestCase):
     def test_order_and_impact(self):
         self.assertEqual([s["name"] for s in steps.status(self.d)],
                          ["Treatment", "Script", "Voice", "Look", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
-        self.assertEqual(steps.impact("script"), ["Voice", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
+        self.assertEqual(steps.impact("script", self.d), ["Voice", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
+        # specs/034: AE films have a Cast step between Script and Voice; a cast change re-runs the picture, not the voice
+        self.assertEqual(steps.impact("script"), ["Cast", "Voice", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
+        self.assertEqual(steps.impact("cast"), ["Picture", "Shots", "Render", "Self-check", "Publish"])
         self.assertEqual(steps.impact("voice"), ["Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
         self.assertEqual(steps.impact("shots"), ["Render", "Self-check", "Publish"])
         self.assertEqual(steps.impact("mix"), ["Self-check", "Publish"])

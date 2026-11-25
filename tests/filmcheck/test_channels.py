@@ -179,6 +179,19 @@ class Snapshot(unittest.TestCase):
         ch["reviews"] = ["script", "bogus"]
         self.assertTrue(any(e.startswith("reviews:") for e in channels.validate(ch, self.root)))
 
+    def test_old_channel_list_does_not_turn_cast_off(self):   # specs/034 FR-002 (Phase 9)
+        from filmcheck import report
+        ch = channels.load(self.root, "honey-facts")
+        ch["reviews"] = ["script", "shots"]                     # saved before 034: never chose about Cast
+        channels.save(self.root, ch)
+        channels.attach(self.root, self.film, "honey-facts")
+        self.assertEqual(report.load(self.film)["reviews"]["off"], [])
+        ch["cast_chosen"] = True                                # saved by the app or the CLI after 034
+        channels.save(self.root, ch)
+        self.assertTrue(channels.load(self.root, "honey-facts")["cast_chosen"])
+        channels.attach(self.root, self.film, "honey-facts")
+        self.assertEqual(report.load(self.film)["reviews"]["off"], ["cast"])
+
     def test_missing_style_is_refused(self):
         with self.assertRaises(channels.ChannelError):
             channels.attach(self.root, self.film, "honey-facts", style="gone")

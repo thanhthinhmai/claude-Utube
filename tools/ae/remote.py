@@ -56,10 +56,10 @@ def submit(film: str, shots: list, tar: bytes) -> str:
         return json.loads(r.read())["id"]
 
 
-def build(film_dir, shots=None, progress=None) -> dict:
+def build(film_dir, shots=None, progress=None, sheet: dict = None) -> dict:
     d = Path(film_dir)
     with tempfile.TemporaryDirectory() as tmp:
-        b = bundle.make(d, shots, Path(tmp) / "bundle.tar")
+        b = bundle.make(d, shots, Path(tmp) / "bundle.tar", sheet=sheet)
         rid = submit(d.name, b["shots"], Path(b["path"]).read_bytes())
     print(f"AE request {rid}: waiting for the desktop app", flush=True)
     last = None

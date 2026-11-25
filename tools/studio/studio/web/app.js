@@ -9,7 +9,7 @@ const STATUS = {
 };
 const KIND = { learn: "Learn a style", film: "Make a film", topics: "Score topics" };
 const REVIEW = { "style-1": "Review 1: style draft", "style-2": "Review 2: proof frame", question: "Question from the studio",
-  treatment: "Treatment review", script: "Script review", voice: "Voice review", shots: "Shots review", mix: "Mix review",
+  treatment: "Treatment review", script: "Script review", cast: "Cast review", voice: "Voice review", shots: "Shots review", mix: "Mix review",
   publish: "Publish review" };
 // Online mode (specs/007): the same page serves many customers; MODE comes from GET /health
 let MODE = "local";
@@ -282,10 +282,12 @@ async function pageChannels() {
   });
 }
 
-const POINTS = [["script", "Script"], ["voice", "Voice"], ["shots", "Shots (before render)"], ["mix", "Mix"], ["publish", "Publish"]];
+const POINTS = [["script", "Script"], ["cast", "Cast (After Effects films)"], ["voice", "Voice"], ["shots", "Shots (before render)"], ["mix", "Mix"], ["publish", "Publish"]];
 /** Five boxes: where a film stops for this person's review (specs/026). @param {string} id @param {string[]} on */
 const pointBoxes = (id, on) => `<fieldset class="points" id="${id}"><legend>Stop for my review at <span class="hint">You can change and approve each one on the job page</span></legend>
   ${POINTS.map(([k, l]) => `<label class="check"><input type="checkbox" value="${k}" ${on.includes(k) ? "checked" : ""}> <span>${l}</span></label>`).join("")}</fieldset>`;
+/** a channel's review points; a list saved before specs/034 never chose about Cast, so Cast shows ticked @param {any} c */
+const reviewsOf = (c) => !c.reviews ? ["script", "cast", "shots"] : c.cast_chosen || c.reviews.includes("cast") ? c.reviews : [...c.reviews, "cast"];
 const pointsOf = (/** @type {string} */ id) => Array.from(document.querySelectorAll(`#${id} input:checked`)).map((x) => /** @type {HTMLInputElement} */ (x).value);
 
 async function pageChannel(slug) {
@@ -302,7 +304,7 @@ async function pageChannel(slug) {
       ${a("title_rules", "Title rules", "In your own words")}${t("title_max", "Longest title", "20–100 characters, or empty")}
       ${a("thumbnail_rules", "Thumbnail rules", "In your own words")}
       ${a("hashtags", "Hashtags always used", "One per line, like #science; at most 5")}${a("banned", "Words never used", "One per line")}
-      ${pointBoxes("p-reviews", c.reviews || ["script", "shots"])}
+      ${pointBoxes("p-reviews", reviewsOf(c))}
       <div><button class="primary" type="submit">Save the profile</button></div></form><p id="msg" class="muted" role="status"></p>
     <div class="panel"><p class="section-title">Decisions</p>
       ${(c.decisions || []).length ? `<ul>${c.decisions.map((/** @type {any} */ d) => `<li>${esc(d.date)}: ${esc(d.text)}</li>`).join("")}</ul>` : `<p class="muted">None yet.</p>`}
@@ -503,7 +505,7 @@ async function doneRefresh(clicked = false) {
   if (!clicked && DONE.playing && body.contains(DONE.playing)) return;
   DONE.drawn.key = key;
   stopAudio();
-  await ({ script: doneScript, voice: doneVoice, shots: doneShots, mix: doneMix, render: doneRender }[DONE.tab] || (() => {}))(body, sec);
+  await ({ script: doneScript, cast: doneCast, voice: doneVoice, shots: doneShots, mix: doneMix, render: doneRender }[DONE.tab] || (() => {}))(body, sec);
   await editPanel(body);
 }
 /** specs/026: the edit part of the open section. @param {HTMLElement} body */
@@ -515,6 +517,7 @@ async function editPanel(body) {
     const n = document.createElement("p"); n.className = "muted small"; n.textContent = "Edits open when the film stops for your review.";
     body.prepend(n);
   }
+  if (pt === "cast") { castBar(body); return; }
   const edit = { script: async () => { const sc = body.querySelector(".script"); if (sc) sc.remove(); await editScript(body); },
     voice: async () => { body.querySelectorAll(".tbl, .done-actions").forEach((x) => x.remove()); await editVoice(body); },
     mix: async () => editMix(body),
@@ -669,9 +672,9 @@ function doneRender(body, s) {
 /** @type {any} */
 const RAIL = { data: null, editing: {}, last: {}, msg: {} };
 const STATE_LABEL = { done: "Done", running: "Running", waiting: "Waiting for you", todo: "Not yet", stale: "Must run again", skipped: "Skipped" };
-const STEP_TAB = { Script: "script", Voice: "voice", Shots: "shots", Mix: "mix", Render: "render", "Self-check": "selfcheck", Publish: "publish" };
-const TAB_POINT = { script: "script", voice: "voice", shots: "shots", mix: "mix", publish: "publish" };
-const POINT_STEP = { script: "Script", voice: "Voice", shots: "Shots", mix: "Mix", publish: "Publish" };
+const STEP_TAB = { Script: "script", Cast: "cast", Voice: "voice", Shots: "shots", Mix: "mix", Render: "render", "Self-check": "selfcheck", Publish: "publish" };
+const TAB_POINT = { script: "script", cast: "cast", voice: "voice", shots: "shots", mix: "mix", publish: "publish" };
+const POINT_STEP = { script: "Script", cast: "Cast", voice: "Voice", shots: "Shots", mix: "Mix", publish: "Publish" };
 
 async function railRefresh() {
   const slot = document.getElementById("rail-slot");
@@ -691,9 +694,9 @@ async function railRefresh() {
           : s.note || STATE_LABEL[s.state] || s.state)}</span></button></li>`).join("")}</ol>
     <div id="impact"></div>
     <div class="point-toggles" id="point-toggles"><span class="muted small">Stop for my review at:</span>
-      ${POINTS.map(([k, l]) => {
+      ${POINTS.filter(([k]) => v.points[k] && !(k === "cast" && v.points[k].state === "skipped")).map(([k, l]) => {
         const pt = v.points[k], locked = ["approved", "waiting", "skipped"].includes(pt.state) || ["done", "failed", "stopped"].includes(DONE.job.status);
-        return `<label class="check small" title="${locked ? esc(`${l}: ${pt.state}`) : ""}"><input type="checkbox" value="${k}" ${pt.on ? "checked" : ""} ${locked ? "disabled" : ""}> <span>${esc(l.replace(" (before render)", ""))}</span></label>`;
+        return `<label class="check small" title="${locked ? esc(`${l}: ${pt.state}`) : ""}"><input type="checkbox" value="${k}" ${pt.on ? "checked" : ""} ${locked ? "disabled" : ""}> <span>${esc(l.replace(" (before render)", "").replace(" (After Effects films)", ""))}</span></label>`;
       }).join("")}<span class="msg small" id="points-msg"></span></div>`;
   slot.querySelectorAll("#point-toggles input").forEach((el) => { /** @type {HTMLInputElement} */ (el).onchange = async () => {
     const on = Array.from(slot.querySelectorAll("#point-toggles input:checked")).map((x) => /** @type {HTMLInputElement} */ (x).value);
@@ -769,6 +772,289 @@ function approveBar(body, pt, blocked) {
     try { await post(`/reviews/${encodeURIComponent(r.id)}/decision`, { value: "revise", note }); route(); }
     catch (err) { msg.className = "fail small"; msg.textContent = err.message; }
   };
+}
+
+// ---------- the Cast step of an After Effects film (specs/034) ----------
+const CAST_GROUPS = [["turn", "Turnaround"], ["group", "Group"], ["expr", "Expressions"], ["pose", "Poses"], ["walk", "Walk loop"]];
+const CAST_STATE = { new: ["acc", "New"], ready: ["acc", "Ready to review"], approved: ["ok", "Approved"], changed: ["warn", "Changed since approval"] };
+const CAST_ROLE = { hero: "Hero", support: "Support", background: "Background" };
+/** @param {any} c */
+const castChip = (c) => { const [k, l] = c.state === "approved" && c.source !== "film" ? ["ok", "From the channel, approved"] : CAST_STATE[c.state] || ["", c.state]; return `<span class="chip ${k}">${esc(l)}</span>`
+  + (c.notes_open ? ` <span class="chip warn">${c.notes_open} note${c.notes_open === 1 ? "" : "s"}</span>` : ""); };
+/** @param {any} c @param {string} f @param {boolean} [prev] */
+const castFile = (c, f, prev) => fileUrl(`cast/sheets/${c.id}${prev ? ".prev" : ""}/${f}`);
+/** The open notes of one character, in order (numbered 1, 2, … on the page). @param {string} id */
+const castNotes = (id) => {
+  const n = RAIL.data && RAIL.data.cast && RAIL.data.cast.notes;
+  return ((n && n.characters && n.characters[id] && n.characters[id].notes) || []).filter((/** @type {any} */ x) => !x.done);
+};
+// a picture is shown cropped (object-fit: cover); pins are stored in percent of the whole picture
+/** @param {HTMLImageElement} img */
+function coverBox(img) {
+  const W = img.clientWidth, H = img.clientHeight, nw = img.naturalWidth || W, nh = img.naturalHeight || H;
+  const s = Math.max(W / nw, H / nh);
+  return { W, H, dw: nw * s, dh: nh * s, ox: (nw * s - W) / 2, oy: (nh * s - H) / 2 };
+}
+/** element % → picture % @param {HTMLImageElement} img @param {number} ex @param {number} ey */
+function toPicture(img, ex, ey) {
+  const k = coverBox(img);
+  return [Math.min(100, Math.max(0, ((ex / 100) * k.W + k.ox) / k.dw * 100)), Math.min(100, Math.max(0, ((ey / 100) * k.H + k.oy) / k.dh * 100))];
+}
+/** picture % → element % (null when cropped away) @param {HTMLImageElement} img @param {number} x @param {number} y */
+function toElement(img, x, y) {
+  const k = coverBox(img);
+  const ex = ((x / 100) * k.dw - k.ox) / k.W * 100, ey = ((y / 100) * k.dh - k.oy) / k.H * 100;
+  return ex < 0 || ex > 100 || ey < 0 || ey > 100 ? null : [ex, ey];
+}
+/** Pins of the open notes on one picture. @param {string} id @param {string} key @param {any} [extra] a pin being placed */
+function castPins(id, key, extra) {
+  const pins = castNotes(id).map((/** @type {any} */ n, /** @type {number} */ i) => n.frame === key && n.x != null
+    ? `<i class="pin" data-x="${n.x}" data-y="${n.y}">${i + 1}</i>` : "").join("");
+  return pins + (extra ? `<i class="pin new" data-x="${extra.x}" data-y="${extra.y}">${castNotes(id).length + 1}</i>` : "");
+}
+/** Place the pins of a box (data-x/y in picture %) on its image. @param {HTMLElement} root */
+function placePins(root) {
+  root.querySelectorAll(".imgwrap").forEach((w) => {
+    const img = /** @type {HTMLImageElement | null} */ (w.querySelector("img"));
+    if (!img) return;
+    const put = () => w.querySelectorAll(".pin").forEach((p) => {
+      const el = /** @type {HTMLElement} */ (p);
+      const big = w.classList.contains("big");
+      const at = big ? [Number(el.dataset.x), Number(el.dataset.y)] : toElement(img, Number(el.dataset.x), Number(el.dataset.y));
+      el.hidden = !at;
+      if (at) { el.style.left = `${at[0]}%`; el.style.top = `${at[1]}%`; }
+    });
+    if (img.complete) put(); else img.addEventListener("load", put, { once: true });
+  });
+}
+/** Send one cast note edit on the notes' base. @param {string} op @param {any} args */
+async function castNoteEdit(op, args) {
+  const a = await post(`/jobs/${encodeURIComponent(DONE.job.id)}/actions`, { point: "cast", op, args, base: RAIL.data.cast.notes_base || undefined });
+  for (let i = 0; i < 600; i++) {
+    await new Promise((r) => setTimeout(r, i < 20 ? 250 : 1000));
+    const x = await get(`/jobs/${encodeURIComponent(DONE.job.id)}/actions/${a.id}`);
+    if (!["queued", "running"].includes(x.status)) { await railRefresh(); return x; }
+  }
+  throw new Error("The edit is taking long; its result will show in the log.");
+}
+
+/** @param {HTMLElement} body @param {any} s */
+function doneCast(body, s) {
+  const cb = RAIL.data && RAIL.data.cast;
+  if (!cb) { body.innerHTML = `<p class="muted">This film has no cast review.</p>`; return; }
+  if (cb.error) { body.innerHTML = `<p class="fail">cast/cast.json cannot be read: ${esc(cb.error)}</p>`; return; }
+  const chars = cb.characters;
+  if (!chars.length) { body.innerHTML = `<p class="muted">No characters in this film${cb.skip ? ` (${esc(cb.skip)})` : ""}.</p>`; return; }
+  if (!DONE.castWho || !chars.some((/** @type {any} */ c) => c.id === DONE.castWho)) DONE.castWho = chars[0].id;
+  const c = chars.find((/** @type {any} */ x) => x.id === DONE.castWho);
+  const can = canEdit("cast");
+  const pin = DONE.castPin && DONE.castPin.who === c.id ? DONE.castPin : null;
+  const notes = castNotes(c.id);
+  const thumb = (/** @type {any} */ x) => {
+    const f = x.sheet && x.sheet.frames.find((/** @type {any} */ r) => r.file && r.file.endsWith(".jpg"));
+    return f ? `<img src="${castFile(x, f.file)}" alt="" loading="lazy">` : `<span class="cast-noimg" aria-hidden="true"></span>`;
+  };
+  const list = chars.map((/** @type {any} */ x) => `<button role="tab" aria-selected="${x.id === c.id}" data-who="${esc(x.id)}">${thumb(x)}
+      <span><b>${esc(x.name || x.id)}</b><small class="muted">${esc(CAST_ROLE[x.role] || x.role || "")}${x.kind === "group" ? ` · group of ${(x.members || []).length}` : ""}</small><br>${castChip(x)}</span></button>`).join("");
+  const frames = (c.sheet && c.sheet.frames) || [];
+  const noted = (/** @type {string} */ k) => notes.some((/** @type {any} */ n) => n.frame === k);
+  const tile = (/** @type {any} */ f) => {
+    if (!f.file) {
+      const asked = notes.some((/** @type {any} */ n) => n.kind === "view" && n.frame === f.key);
+      return `<div class="fr missing ${asked ? "noted" : ""}"><b>${esc(f.label)}</b><span>${asked ? "Requested: Claude will draw it" : "No picture yet"}</span>
+        ${f.missing_reason && !asked ? `<small class="muted">${esc(f.missing_reason)}</small>` : ""}
+        ${can ? `<button class="btn small" data-ask="${esc(f.key)}">${asked ? "Undo" : "Request this view"}</button>` : ""}</div>`;
+    }
+    const tall = f.group === "pose" || f.group === "walk";
+    const cls = `fr ${tall ? "tall" : ""} ${f.group === "group" ? "wide" : ""} ${noted(f.key) ? "noted" : ""} ${pin && pin.frame === f.key ? "sel" : ""}`;
+    const cap = `<figcaption>${esc(f.label)}${f.para ? ` <span class="muted">${esc(f.para)}</span>` : ""}</figcaption>`;
+    if (f.file.endsWith(".mp4")) return `<figure class="${cls}"><video src="${castFile(c, f.file)}" autoplay muted loop playsinline aria-label="${esc(f.label)}"></video>${cap}</figure>`;
+    return `<figure class="${cls}"><span class="imgwrap" ${can ? `data-pick="${esc(f.key)}" data-file="${esc(f.file)}" role="button" tabindex="0" aria-label="Pin a note on ${esc(f.label)}"` : ""}>
+      <img src="${castFile(c, f.file)}" alt="${esc(f.label)}" loading="lazy">${castPins(c.id, f.key)}</span>${cap}</figure>`;
+  };
+  const pinbox = () => pin ? `<div class="pinbox"><div class="imgwrap big" data-repin><img src="${castFile(c, pin.file)}" alt="${esc(pin.label)}, larger">${castPins(c.id, pin.frame, pin)}</div>
+      <div class="form"><p><b>Note ${notes.length + 1} on ${esc(pin.label)}</b> · ${esc(c.name || c.id)}</p>
+        <p class="muted small">Click the big picture to move the pin.</p>
+        <textarea id="pin-note" maxlength="2000" placeholder="e.g. Hair: bigger curls that fall over the forehead" aria-label="Note text">${esc(pin.text || "")}</textarea>
+        <div class="row"><button class="primary small" id="pin-save">Add note</button><button class="btn small" id="pin-cancel">Cancel</button></div>
+        <p class="small fail" id="pin-msg" role="status"></p></div></div>` : "";
+  const groups = CAST_GROUPS.map(([g, l]) => {
+    const fs = frames.filter((/** @type {any} */ f) => f.group === g);
+    return fs.length ? `<h3>${esc(l)}</h3><div class="frames">${fs.map(tile).join("")}${pin && fs.some((/** @type {any} */ f) => f.key === pin.frame) ? pinbox() : ""}</div>` : "";
+  }).join("");
+  const paras = [...new Set([...(c.needs?.expressions || []), ...(c.needs?.poses || [])].map((/** @type {any} */ r) => r.para).filter(Boolean))];
+  const look = (c.palette || []).map((/** @type {any} */ [k, h]) => `<dt>${esc(k)}</dt><dd><span class="sw" style="background:${esc(h)}"></span><span class="muted num">${esc(h)}</span></dd>`).join("");
+  const done = chars.filter((/** @type {any} */ x) => x.state === "approved").length;
+  const errs = (cb.errors || []).filter((/** @type {any} */ e) => !e.character || e.character === c.id);
+  const label = (/** @type {any} */ n) => !n.frame ? "Whole character" : (frames.find((/** @type {any} */ f) => f.key === n.frame) || {}).label || n.frame;
+  const noteList = notes.length ? `<ul class="cast-notes">${notes.map((/** @type {any} */ n, /** @type {number} */ i) => `<li><b>${i + 1} · ${esc(label(n))}${n.kind === "view" ? " (draw it)" : ""}</b>
+      <span class="row spread"><span>${esc(n.text)}${n.reply ? `<br><small class="muted">Claude: ${esc(n.reply)}</small>` : ""}</span>
+      ${can ? `<button class="btn small" data-del="${esc(n.id)}" aria-label="Delete note ${i + 1}">✕ Delete</button>` : ""}</span></li>`).join("")}</ul>` : "";
+  const lastIds = (cb.notes && cb.notes.last_lot && cb.notes.last_lot.notes) || [];      // the round just redrawn (FR-011)
+  const last = (((cb.notes && cb.notes.characters && cb.notes.characters[c.id]) || {}).notes || []).filter((/** @type {any} */ n) => n.done && lastIds.includes(n.id));
+  const lastList = last.length ? `<details class="cast-last" open><summary class="small">Last round: ${last.length} note${last.length === 1 ? "" : "s"} answered</summary><ul class="cast-notes">${last.map((/** @type {any} */ n) => `<li class="done"><b>✓ ${esc(label(n))}</b>
+      <span>${esc(n.text)}<br><small class="muted">Claude: ${esc(n.reply || "no answer")}</small></span></li>`).join("")}</ul></details>` : "";
+  body.innerHTML = facts([`${b(chars.length)} character${chars.length === 1 ? "" : "s"}`, `${b(done)} approved`,
+      chars.some((/** @type {any} */ x) => x.source !== "film") ? `${b(chars.filter((/** @type {any} */ x) => x.source !== "film").length)} from the channel's cast` : ""])
+    + `<div class="cast-split"><div class="cast">
+      <div class="who" role="tablist" aria-label="Characters">${list}</div>
+      <div class="cast-sheet">
+        <div class="sheet-head"><div><h2>${esc(c.name || c.id)}</h2><p class="muted small">${esc(CAST_ROLE[c.role] || "")} · ${esc(c.source === "film" ? "new in this film" : c.source)} · rig ${esc(c.rig)}</p></div>
+          <div class="row" id="cast-who-act">${castChip(c)}</div></div>
+        ${errs.length ? `<ul class="fail small">${errs.map((/** @type {any} */ e) => `<li>${esc(e.code)}: ${esc(e.message)}</li>`).join("")}</ul>` : ""}
+        ${c.sheet ? (can ? `<p class="hint small muted"><i class="pin">1</i> Click the exact spot on any picture (the hair, a hand, the hat) to pin a note there.</p>` : "") + groups
+          : `<div class="fr missing wide"><b>No cast sheet yet</b><span>Claude draws it in After Effects. If it does not come, After Effects or its bridge is not ready: open After Effects (desktop app tray → After Effects… → Test), then ask Claude to run <code>ae sheet</code> again.</span></div>`}
+        ${look ? `<h3>Look</h3><dl class="spec">${look}${paras.length ? `<dt>Used in</dt><dd>${paras.map((p) => cb.passages?.[p] ? `<details class="passage"><summary>${esc(p)}</summary><p class="small">${esc(cb.passages[p])}</p></details>` : esc(p)).join(" ")}</dd>` : ""}</dl>` : ""}
+        ${c.has_prev ? `<p class="muted small">The sheet before the last redraw is kept: <a href="${castFile(c, "sheet.json", true)}" target="_blank" rel="noopener">previous sheet</a>.</p>` : ""}
+        ${can || notes.length ? `<div class="notebox"><p><b>Notes for ${esc(c.name || c.id)}</b> <span class="muted small">· pinned notes appear here; write below for a note about the whole character</span></p>
+          ${noteList}${lastList}
+          ${can ? `<textarea id="cast-note" maxlength="2000" placeholder="e.g. Make him a bit taller than the hero" aria-label="Note for the whole character"></textarea>
+          <div class="row spread"><span class="muted small">"Send notes to Claude" sends every note at once. Claude redraws only the characters with notes.</span>
+            <button class="btn small" id="cast-note-add">Add note</button></div><p class="small fail" id="cast-note-msg" role="status"></p>` : ""}</div>` : ""}
+      </div></div>
+      <aside class="how"><strong>How it works</strong><ol>
+        <li>Claude reads the script and lists the film's characters.</li>
+        <li>After Effects draws each one: three views, the expressions and poses the script needs, a walk loop.</li>
+        <li>Pin notes on the pictures, then send them to Claude: only the characters with notes are drawn again.</li>
+        <li>Approve each character, or the whole cast at once. The voice is made only after that.</li>
+        <li>Approved characters can be saved to the channel's cast, so the next film uses them without a new review.</li></ol></aside></div>`;
+  placePins(body);
+  const redraw = () => { doneCast(body, s); castBar(body); };
+  body.querySelectorAll(".who [data-who]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+    DONE.castWho = /** @type {HTMLElement} */ (el).dataset.who; DONE.castPin = null; redraw();
+  }; });
+  body.querySelectorAll("[data-pick]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = (e) => {
+    const w = /** @type {HTMLElement} */ (el), img = /** @type {HTMLImageElement} */ (w.querySelector("img")), r = img.getBoundingClientRect();
+    const [x, y] = toPicture(img, ((e.clientX - r.left) / r.width) * 100, ((e.clientY - r.top) / r.height) * 100);
+    const f = frames.find((/** @type {any} */ q) => q.key === w.dataset.pick);
+    DONE.castPin = { who: c.id, frame: w.dataset.pick, file: w.dataset.file, label: f ? f.label : w.dataset.pick,
+      x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, text: pin ? /** @type {HTMLTextAreaElement} */ (body.querySelector("#pin-note"))?.value : "" };
+    redraw();
+    /** @type {HTMLElement | null} */ (body.querySelector("#pin-note"))?.focus();
+  }; });
+  const big = /** @type {HTMLElement | null} */ (body.querySelector("[data-repin]"));
+  if (big) big.onclick = (e) => {
+    const r = /** @type {HTMLElement} */ (big.querySelector("img")).getBoundingClientRect();
+    DONE.castPin.x = Math.round(Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100)) * 10) / 10;
+    DONE.castPin.y = Math.round(Math.min(100, Math.max(0, ((e.clientY - r.top) / r.height) * 100)) * 10) / 10;
+    DONE.castPin.text = /** @type {HTMLTextAreaElement} */ (body.querySelector("#pin-note")).value;
+    redraw();
+  };
+  const cancel = body.querySelector("#pin-cancel");
+  if (cancel) /** @type {HTMLElement} */ (cancel).onclick = () => { DONE.castPin = null; redraw(); };
+  const save = /** @type {HTMLButtonElement | null} */ (body.querySelector("#pin-save"));
+  if (save) save.onclick = async () => {
+    const text = /** @type {HTMLTextAreaElement} */ (body.querySelector("#pin-note")).value.trim();
+    const m = /** @type {HTMLElement} */ (body.querySelector("#pin-msg"));
+    if (!text) { m.textContent = "Write what should change."; return; }
+    save.disabled = true;
+    try {
+      const x = await castNoteEdit("cast-note-add", { character: c.id, kind: "note", frame: pin.frame, x: pin.x, y: pin.y, text });
+      if (x.status !== "done") { m.textContent = editMsg(x); save.disabled = false; return; }
+      DONE.castPin = null; redraw();
+    } catch (err) { m.textContent = /** @type {Error} */ (err).message; save.disabled = false; }
+  };
+  const add = /** @type {HTMLButtonElement | null} */ (body.querySelector("#cast-note-add"));
+  if (add) add.onclick = async () => {
+    const text = /** @type {HTMLTextAreaElement} */ (body.querySelector("#cast-note")).value.trim();
+    const m = /** @type {HTMLElement} */ (body.querySelector("#cast-note-msg"));
+    if (!text) { m.textContent = "Write the note first."; return; }
+    add.disabled = true;
+    try { const x = await castNoteEdit("cast-note-add", { character: c.id, kind: "note", text }); if (x.status !== "done") m.textContent = editMsg(x); else redraw(); }
+    catch (err) { m.textContent = /** @type {Error} */ (err).message; }
+    add.disabled = false;
+  };
+  body.querySelectorAll("[data-del]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = async () => {
+    /** @type {HTMLButtonElement} */ (el).disabled = true;
+    try { const x = await castNoteEdit("cast-note-delete", { character: c.id, note: /** @type {HTMLElement} */ (el).dataset.del }); if (x.status !== "done") alert(editMsg(x)); }
+    catch (err) { alert(/** @type {Error} */ (err).message); }
+    redraw();
+  }; });
+  body.querySelectorAll("[data-ask]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = async (e) => {
+    e.stopPropagation();
+    /** @type {HTMLButtonElement} */ (el).disabled = true;
+    try { const x = await castNoteEdit("cast-view-toggle", { character: c.id, frame: /** @type {HTMLElement} */ (el).dataset.ask }); if (x.status !== "done") alert(editMsg(x)); }
+    catch (err) { alert(/** @type {Error} */ (err).message); }
+    redraw();
+  }; });
+}
+/** The approve part of the Cast step: one character, the whole cast, send the notes, save to the channel's cast. @param {HTMLElement} body */
+function castBar(body) {
+  const cb = RAIL.data && RAIL.data.cast;
+  if (!cb || !cb.characters || !cb.characters.length) return;
+  const c = cb.characters.find((/** @type {any} */ x) => x.id === DONE.castWho);
+  const can = canEdit("cast");
+  const act = body.querySelector("#cast-who-act");
+  if (act && c && can && c.state !== "approved") {
+    const btn = document.createElement("button");
+    btn.className = "btn small"; btn.textContent = `Approve ${(c.name || c.id).split(" ")[0]}`;
+    btn.disabled = !c.sheet || c.notes_open > 0;
+    btn.title = !c.sheet ? "No cast sheet yet" : c.notes_open ? "Send or delete the open notes first" : "";
+    btn.onclick = async () => {
+      btn.disabled = true; btn.textContent = "Approving…";
+      try { const x = await sendEdit("cast", "cast-approve", { character: c.id }); if (x.status !== "done" || x.result.code) alert(editMsg(x)); }
+      catch (err) { alert(/** @type {Error} */ (err).message); }
+      DONE.drawn = {}; doneRefresh(true);
+    };
+    act.append(btn);
+  }
+  const missing = cb.characters.filter((/** @type {any} */ x) => !x.sheet).map((/** @type {any} */ x) => x.name || x.id);
+  const nNotes = cb.characters.reduce((/** @type {number} */ a, /** @type {any} */ x) => a + (x.notes_open || 0), 0);
+  const blocked = missing.length ? `No cast sheet yet for ${missing.join(", ")}.` : nNotes ? `${nNotes} note${nNotes === 1 ? "" : "s"} to send: Claude redraws those characters, then you approve.` : "";
+  approveBar(body, "cast", blocked);
+  const bar = body.querySelector(".approve-bar");
+  const r = pendingFor("cast");
+  if (bar && r) {                                     // "Request changes…" becomes "Send N notes to Claude"
+    const ask = /** @type {HTMLElement | null} */ (bar.querySelector("#ask-changes"));
+    if (ask) {
+      const send = document.createElement("button");
+      send.className = "btn"; send.id = "send-notes"; send.disabled = !nNotes;
+      send.textContent = nNotes ? `Send ${nNotes} note${nNotes === 1 ? "" : "s"} to Claude` : "Send notes to Claude";
+      send.onclick = async () => {
+        send.disabled = true;
+        const msg = /** @type {HTMLElement} */ (bar.querySelector("#approve-msg"));
+        try { await post(`/reviews/${encodeURIComponent(r.id)}/decision`, { value: "revise", note: "" }); route(); }
+        catch (err) { msg.className = "fail small"; msg.textContent = /** @type {Error} */ (err).message; send.disabled = false; }
+      };
+      ask.replaceWith(send);
+    }
+  }
+  const lot = cb.notes && cb.notes.lot;
+  if (lot && !r) {
+    const p = document.createElement("p"); p.className = "notice small";
+    p.textContent = `Claude is redrawing the characters with notes (${lot.notes.length} note${lot.notes.length === 1 ? "" : "s"}). Notes you add now wait for the next round.`;
+    body.prepend(p);
+  }
+  const failedLot = !lot && cb.notes && cb.notes.failed_lot;     // specs/034: the redraw failed; the notes stay open
+  if (failedLot) {
+    const p = document.createElement("p"); p.className = "notice warn small";
+    const again = MODE === "online" && DONE.job && DONE.job.id === failedLot.job && ["failed", "stopped"].includes(DONE.job.status);
+    p.textContent = `The last redraw did not finish (${failedLot.error}). Your notes are still open` + (again ? ". " : ": send them again with the next cast review.");
+    if (again) {                                   // the same job resumes at Cast, no new credit (specs/034)
+      const btn = document.createElement("button");
+      btn.className = "primary small"; btn.textContent = "Send notes again";
+      btn.onclick = async () => {
+        btn.disabled = true;
+        try { await post(`/jobs/${encodeURIComponent(failedLot.job)}/cast/resend`, {}); route(); }
+        catch (e) { p.append(Object.assign(document.createElement("span"), { className: "fail", textContent: ` ${e.message}` })); btn.disabled = false; }
+      };
+      p.append(btn);
+    }
+    body.prepend(p);
+  }
+  const save = document.createElement("label");
+  save.className = "check small cast-save";
+  const why = cb.library_available ? "" : "The channel's cast lives in the studio app: run the film from the app to save characters.";
+  save.innerHTML = `<input type="checkbox" ${cb.save_to_library && cb.library_available ? "checked" : ""} ${cb.library_available && can ? "" : "disabled"}>
+    <span>Save approved characters to the channel's cast</span>${why ? ` <span class="muted">(${esc(why)})</span>` : ""}`;
+  const box = /** @type {HTMLInputElement} */ (save.querySelector("input"));
+  box.onchange = async () => {
+    box.disabled = true;
+    try { const x = await sendEdit("cast", "cast-save", { on: box.checked }); if (x.status !== "done") { alert(editMsg(x)); box.checked = !box.checked; } }
+    catch (err) { alert(/** @type {Error} */ (err).message); box.checked = !box.checked; }
+    box.disabled = false;
+  };
+  if (bar) bar.append(save); else body.prepend(save);
 }
 
 /** Script panel: every paragraph, edit one, run the check, approve (US1). @param {HTMLElement} body */
@@ -1918,6 +2204,98 @@ function drawOrphans() {
   zoomable(el);
 }
 
+// ---------- the channel's cast library (specs/034 US3) ----------
+/** @param {string} ch @param {string} id @param {string|number} v @param {string} f */
+const libFile = (ch, id, v, f) => `${API}/cast-library/${encodeURIComponent(ch)}/${encodeURIComponent(id)}/v${v}/${encodeURIComponent(f)}`;
+async function pageCastLib() {
+  const lib = await get("/cast-library");
+  const intro = head("Browse", "Cast", "Characters approved in a film and saved to their channel. A later film uses them as they are, without a new cast review.");
+  if (!lib.available) {
+    $app.innerHTML = `${intro}<p class="panel muted">The channel's cast lives in the studio app. Start it with <code>sh bin/studio app start</code> and open the page it prints.</p>`;
+    return;
+  }
+  const chans = lib.channels.filter((/** @type {any} */ c) => c.characters.length);
+  $app.innerHTML = intro + (chans.length ? chans.map((/** @type {any} */ ch) => `<h2>${esc(ch.channel)}</h2><div class="grid cast-lib">
+    ${ch.characters.map((/** @type {any} */ c) => `<a class="panel card" href="#/cast/${encodeURIComponent(ch.channel)}/${encodeURIComponent(c.id)}">
+      <img src="${libFile(ch.channel, c.id, c.latest, c.id === "group" ? "group.jpg" : "front.jpg")}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+      <strong>${esc(c.name)}</strong>
+      <span class="muted small">${esc(CAST_ROLE[c.role] || c.role || "")} · v${c.latest} · rig ${esc(c.rig || "–")}</span>
+      <span class="muted small">Approved ${esc((c.approved_at || "").slice(0, 10))} · ${c.films.length} film${c.films.length === 1 ? "" : "s"}</span>
+      ${c.new_rig ? `<span class="chip warn">New rig version: ${esc(c.new_rig)}</span>` : ""}
+      ${c.pending ? `<span class="chip acc">v${c.pending} waits for approval</span>` : c.preview ? `<span class="chip acc">Preview ready</span>` : ""}</a>`).join("")}</div>`).join("")
+    : `<p class="panel muted">No characters saved yet. Approve a cast with "Save approved characters to the channel's cast" ticked.</p>`);
+}
+/** The pictures of one library sheet, grouped. @param {string} ch @param {string} id @param {string|number} v @param {any[]} frames */
+function libSheet(ch, id, v, frames) {
+  return CAST_GROUPS.map(([k, l]) => {
+    const fs = frames.filter((/** @type {any} */ f) => f.group === k && f.file);
+    return fs.length ? `<h3>${esc(l)}</h3><div class="frames">${fs.map((/** @type {any} */ f) => `<figure class="fr ${k === "pose" || k === "walk" ? "tall" : ""} ${k === "group" ? "wide" : ""}">
+      ${f.file.endsWith(".mp4") ? `<video src="${libFile(ch, id, v, f.file)}" autoplay muted loop playsinline aria-label="${esc(f.label)}"></video>`
+        : `<img src="${libFile(ch, id, v, f.file)}" alt="${esc(f.label)}" loading="lazy">`}<figcaption>${esc(f.label)}</figcaption></figure>`).join("")}</div>` : "";
+  }).join("") || `<p class="muted">No pictures.</p>`;
+}
+/** @param {string} ref */
+async function pageCastChar(ref) {
+  const [ch, id] = ref.split("/");
+  const url = `/cast-library/${encodeURIComponent(ch)}/${encodeURIComponent(id)}`;
+  const g = await get(url);
+  const c = g.character, frames = (g.sheet && g.sheet.frames) || [];
+  const look = palette(c).map(([k, h]) => `<dt>${esc(k)}</dt><dd><span class="sw" style="background:${esc(h)}"></span><span class="muted num">${esc(h)}</span></dd>`).join("");
+  const pv = g.preview, pd = g.pending;
+  const compare = (/** @type {string} */ title, /** @type {string|number} */ v, /** @type {any} */ x, /** @type {string} */ act) => `<section class="panel lib-compare">
+      <div class="row spread"><h2>${title}</h2><div class="row">${act}</div></div>
+      <div class="lib-two"><div><p class="muted small">Approved: v${g.v} · rig ${esc(c.rig || "–")}</p>${libSheet(ch, id, g.v, frames)}</div>
+        <div><p class="muted small">New: v${esc(String(v))} · rig ${esc((x.character || {}).rig || "–")}</p>${libSheet(ch, id, v, (x.sheet || {}).frames || [])}</div></div>
+      ${x.notes ? `<ul class="cast-notes">${Object.values(x.notes.characters || {}).flatMap((/** @type {any} */ y) => y.notes || []).map((/** @type {any} */ n) => `<li><b>${esc(n.text)}</b><br><small class="muted">Claude: ${esc(n.reply || "no answer")}</small></li>`).join("")}</ul>` : ""}
+    </section>`;
+  const busy = g.job ? `<p class="notice small">Claude is redrawing this character: <a href="#/jobs/${esc(g.job)}">see the job</a>.</p>` : "";
+  $app.innerHTML = `${back("#/cast", "Cast")}${head(esc(ch), esc(c.name || id), `${esc(CAST_ROLE[c.role] || c.role || "")} · version ${g.v} · rig ${esc(c.rig || "–")} · approved ${esc(((c.approved || {}).at || "").slice(0, 10))}${c.approved && c.approved.film ? ` in ${esc(c.approved.film)}` : ""}`)}
+    ${busy}
+    ${g.new_rig && !pv && !g.job ? `<div class="notice row spread"><span><span class="chip warn">New rig version</span> ${esc(g.new_rig)} can draw this character too (for example a new view). Films keep v${g.v} until you update.</span>
+      <button class="btn small" id="lib-preview">Preview with ${esc(g.new_rig)}</button></div>` : ""}
+    ${pv ? compare(`Preview with the new rig`, `${pv.v}.preview`, pv, `<button class="primary small" id="lib-update">Update ${esc(c.name || id)}</button>`) : ""}
+    ${pd ? compare(`Version ${pd.v} waits for your approval`, pd.v, pd, `<button class="primary small" id="lib-approve">Approve v${pd.v}</button>`) : ""}
+    <p class="small fail" id="lib-msg" role="status"></p>
+    <div class="cast-split"><div class="cast-sheet">${libSheet(ch, id, g.v, frames)}
+      ${look ? `<h3>Look</h3><dl class="spec">${look}</dl>` : ""}
+      <h3>Films</h3><p>${(c.films || []).map((/** @type {string} */ f) => esc(f)).join(", ") || "–"}</p>
+      <h3>Versions</h3><ul class="small">${g.versions.map((/** @type {any} */ v) => `<li>v${v.v} · rig ${esc(v.rig || "–")} · ${v.approved_at ? `approved ${esc(v.approved_at.slice(0, 10))}` : "waiting for approval"}</li>`).join("")}</ul>
+      <div class="notebox"><p><b>Notes for ${esc(c.name || id)}</b> <span class="muted small">· Claude redraws the character from them; the result is a new version for you to approve (films keep v${g.v} until then)</span></p>
+        <textarea id="lib-note" maxlength="2000" placeholder="e.g. Make the beanie a bit bigger" aria-label="Note for the character"></textarea>
+        <div class="row spread"><span class="muted small">Needs After Effects open on this computer.</span><button class="btn small" id="lib-fix" ${g.job ? "disabled" : ""}>Send to Claude</button></div></div>
+    </div></div>`;
+  const msg = /** @type {HTMLElement} */ (document.getElementById("lib-msg"));
+  /** @param {string} id @param {string} path @param {any} body */
+  const act = (id, path, body) => {
+    const btn = /** @type {HTMLButtonElement | null} */ (document.getElementById(id));
+    if (!btn) return;
+    btn.onclick = async () => {
+      if (typeof body === "function") { body = body(); if (!body) return; }
+      btn.disabled = true; msg.textContent = "";
+      try { const r = await post(`${url}/${path}`, body); if (r.job) { location.hash = `#/jobs/${r.job}`; return; } pageCastChar(ref); }
+      catch (err) { msg.textContent = /** @type {Error} */ (err).message; btn.disabled = false; }
+    };
+  };
+  act("lib-preview", "preview", { rig: g.new_rig });
+  act("lib-update", "update", {});
+  act("lib-approve", "approve", {});
+  act("lib-fix", "fix", () => {
+    const t = /** @type {HTMLTextAreaElement} */ (document.getElementById("lib-note")).value.trim();
+    if (!t) { msg.textContent = "Write the note first."; return null; }
+    return { notes: [t] };
+  });
+}
+/** [(label, #hex)] of a library character (cast.palette in Python). @param {any} c @returns {[string, string][]} */
+function palette(c) {
+  const specs = c.kind === "group" ? (c.members || []) : [c.spec || {}];
+  /** @type {[string, string][]} */ const out = []; const seen = new Set();
+  for (const s of specs) for (const k of ["hoodie", "pants", "shoes", "headColor", "rimColor", "stripe", "tie"]) {
+    const v = s[k];
+    if (typeof v === "string" && !seen.has(v.toLowerCase())) { seen.add(v.toLowerCase()); out.push([k, v]); }
+  }
+  return out;
+}
+
 async function pageSets() {
   const { sets } = await get("/sets");
   $app.innerHTML = `${head("Browse", "Measurements", "Frame-by-frame measurements of the reference video sets you learned from.")}${sets.length ? `<ul class="jobs">${sets.map((s) => `<li><a class="panel job" href="#/sets/${esc(s.set)}">
@@ -2181,7 +2559,7 @@ async function pageNew() {
       <label>Length in seconds <span class="hint">Up to ${max} seconds.</span>
         <input id="seconds" type="number" min="5" max="${max}" value="${Math.min(30, max)}" required></label>
       <label class="check"><input id="treat" type="checkbox"> <span>Let me review the treatment (the written plan) before the picture is made</span></label>
-      ${pointBoxes("f-reviews", ["script", "shots"])}
+      ${pointBoxes("f-reviews", ["script", "cast", "shots"])}
       <div><button class="primary" type="submit" ${left === 0 || !ME.verified ? "disabled" : ""}>Make the film (uses 1 credit)</button></div>
     </form><p id="msg" class="muted" role="status"></p>`;
   $app.querySelector("input[name=style]:checked")?.closest("label")?.scrollIntoView({ block: "nearest" });
@@ -2192,7 +2570,7 @@ async function pageNew() {
     const r = /** @type {HTMLInputElement | null} */ ($app.querySelector(`input[name=style][value="${CSS.escape(c.style)}"]`));
     if (r) { r.checked = true; r.closest("label")?.scrollIntoView({ block: "nearest" }); }
     field("seconds").value = String(Math.min(c.seconds, max));
-    const on = c.reviews || ["script", "shots"];        // the channel's review points, changeable for this film
+    const on = reviewsOf(c);                              // the channel's review points, changeable for this film (Cast only stops AE films)
     document.querySelectorAll("#f-reviews input").forEach((x) => { /** @type {HTMLInputElement} */ (x).checked = on.includes(/** @type {HTMLInputElement} */ (x).value); });
   };
   if (chSel) { chSel.onchange = fillFromChannel; if (chSel.value) fillFromChannel(); }
@@ -2971,6 +3349,7 @@ function drawAccount() {
 const routes = [
   [/^#\/?(\?.*)?$/, pageJobs, "jobs"], [/^#\/jobs\/([^/?]+)$/, pageJob, "jobs"], [/^#\/reviews\/([^/?]+)$/, pageReview, "jobs"],
   [/^#\/films$/, pageFilms, "films"], [/^#\/films\/([^/?]+)$/, pageFilm, "films"],
+  [/^#\/cast$/, pageCastLib, "cast"], [/^#\/cast\/([^/?]+\/[^/?]+)$/, pageCastChar, "cast"],
   [/^#\/sets$/, pageSets, "sets"], [/^#\/sets\/([^/?]+)$/, pageSet, "sets"],
   [/^#\/library(\?.*)?$/, pageLibrary, "library"], [/^#\/library\/([^/?]+)$/, pageLibStyle, "library"],
   [/^#\/styles$/, pageStyles, "styles"], [/^#\/styles\/([^/?]+)$/, pageStyle, "styles"],

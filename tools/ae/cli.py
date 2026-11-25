@@ -1,4 +1,4 @@
-"""sh bin/studio ae build|render|fix|uses|status|new and config ae (specs/032 contracts/cli.md).
+"""sh bin/studio ae build|render|fix|uses|status|new|sheet|rigs and config ae (specs/032, 034 contracts/cli.md).
 
 Inside a job (STUDIO_JOB and STUDIO_PROXY set) builds go through the desktop app's bridge (remote.py); elsewhere AE
 runs on this machine (local.py). Exit codes: 0 done · 1 build error or CHECK lines · 2 bad input · 3 no AE / bridge."""
@@ -14,7 +14,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 
-from ae import film as filmdoc, local, splice, uses  # noqa: E402
+from ae import film as filmdoc, local, rigs, sheet, splice, uses  # noqa: E402
 
 ROOT = Path(os.environ.get("STUDIO_ROOT") or HERE.parents[1])
 
@@ -166,6 +166,58 @@ def cmd_fix(a) -> int:
     return 1 if r["checks"] else 0
 
 
+def cmd_sheet(a) -> int:
+    """Draw the cast sheet (specs/034): every character, or only --only ids; the old sheet is kept as <id>.prev/."""
+    code, _ = film_dirs(a.film, a.dir)
+    only = [x.strip() for x in a.only.split(",") if x.strip()] if a.only else None
+    keep, carry = {}, {}
+    try:
+        from filmcheck import castlib
+        keep, carry = castlib.library_frames(code, only)
+    except ImportError:
+        pass
+    try:
+        filmdoc.require_ae(code)
+        res = sheet.build(code, runner(), only, keep, carry, progress=progress)
+    except sheet.SheetError as e:
+        print(f"✗ {e.code}: {e.message}", file=sys.stderr)
+        return 2 if e.code in ("no_cast", "bad_cast", "no_character") else 1
+    except local.AeError as e:
+        if e.exit_code() == 3:
+            print("✗ After Effects is not ready: " + e.message + "\n  turn it on: open After Effects (or the desktop app's "
+                  "tray → After Effects… → Test), then run this again", file=sys.stderr)
+            return 3
+        return fail(e)
+    except filmdoc.FilmError as e:
+        return fail(e)
+    for r in res:
+        print(f"✓ {r['character']}: {r['pictures']} picture(s)" + (f" · {len(r['missing'])} not drawn" if r["missing"] else ""))
+        for key, why in r["missing"]:
+            print(f"  ! {r['character']}/{key}: {why}")
+    print(f"sheets: {code / 'cast' / 'sheets'}")
+    return 0
+
+
+def cmd_rigs(a) -> int:
+    """List the locked rig versions; --check fails when a locked folder changed; --lock adds a new version."""
+    if a.lock:
+        try:
+            h = rigs.lock(a.lock)
+        except (ValueError, FileNotFoundError) as e:
+            print(f"✗ {e}", file=sys.stderr)
+            return 2
+        print(f"✓ locked {a.lock} · {h[:16]}")
+        return 0
+    bad = rigs.check()
+    for rid in rigs.versions():
+        print(f"{rid}  {'CHANGED' if rid in bad else 'ok'}  {rigs.folder(rid).relative_to(HERE.parents[1])}")
+    if a.check and bad:
+        print(f"✗ locked rig folder changed: {', '.join(bad)} (a change is a new version: copy the folder to "
+              "v<N+1>/ and run sh bin/studio ae rigs --lock <family>@<N+1>)", file=sys.stderr)
+        return 1
+    return 0
+
+
 def cmd_uses(a) -> int:
     code, _ = film_dirs(a.film, a.dir)
     found = uses.shots_using(code, a.funcs)
@@ -244,6 +296,8 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("fix"); s.add_argument("film"); s.add_argument("shots", nargs="+"); s.add_argument("--dir"); s.set_defaults(fn=cmd_fix)
     s = sub.add_parser("uses"); s.add_argument("film"); s.add_argument("funcs", nargs="+"); s.add_argument("--dir"); s.set_defaults(fn=cmd_uses)
     s = sub.add_parser("status"); s.set_defaults(fn=cmd_status)
+    s = sub.add_parser("sheet"); s.add_argument("film"); s.add_argument("--only"); s.add_argument("--dir"); s.set_defaults(fn=cmd_sheet)
+    s = sub.add_parser("rigs"); s.add_argument("--check", action="store_true"); s.add_argument("--lock"); s.set_defaults(fn=cmd_rigs)
     s = sub.add_parser("new"); s.add_argument("film"); s.add_argument("--fps", type=int, default=30); s.add_argument("--dir"); s.set_defaults(fn=cmd_new)
     s = sub.add_parser("config"); s.add_argument("--afterfx"); s.add_argument("--aerender"); s.add_argument("--work"); s.set_defaults(fn=cmd_config)
     return p

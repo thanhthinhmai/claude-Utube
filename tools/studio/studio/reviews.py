@@ -10,9 +10,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))     # tools/: filmc
 
 # job log text is English (005); question and treatment are for online film jobs (007 FR-014)
 KINDS = {"style-1": "review 1", "style-2": "review 2", "question": "question", "treatment": "treatment review",
-         "script": "script review", "voice": "voice review", "shots": "shots review", "mix": "mix review",
+         "script": "script review", "cast": "cast review", "voice": "voice review", "shots": "shots review", "mix": "mix review",
          "publish": "publish review"}
-POINT_KINDS = ("script", "voice", "shots", "mix", "publish")     # review points of a film (specs/026)
+POINT_KINDS = ("script", "cast", "voice", "shots", "mix", "publish")     # review points of a film (specs/026, 034)
 VALUES = {"approve", "revise", "accept_anyway", "stop"}
 LABEL = {"approve": "Approve", "revise": "Request changes", "accept_anyway": "Accept anyway", "stop": "Stop"}   # = DECISION in web/app.js
 SOURCES = {"ui", "chat", "api"}
@@ -60,6 +60,8 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
          "summary_md": summary_md, "set": set_name or None, "compare": compare,
          "final_round": bool(final_round and kind == "style-2"), "waiting": {"last_poll_at": None}}
     store.doc_put("review", r["id"], r)
+    if kind == "cast":                               # specs/034: Claude sends the cast again, the redraw lot is over
+        _cast_notes(lambda cn, d: cn.end_lot(d), job)
 
     def f(j):
         if j["status"] in jobs.FINAL:
@@ -71,6 +73,18 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
     jobs.update(job["id"], f)
     r["decision"] = None
     return r
+
+
+def _cast_notes(fn, job: dict):
+    """Run fn(castnotes, film folder); a broken notes file never blocks the review itself."""
+    d = film_folder(job)
+    if d is None:
+        return None
+    try:
+        from filmcheck import castnotes
+        return fn(castnotes, d)
+    except Exception:                                # noqa: BLE001
+        return None
 
 
 def film_folder(job: dict):
@@ -93,6 +107,9 @@ def point_decision(r: dict, value: str, note: str, source: str, base, by) -> Non
         raise StudioError("changed", "the film changed since you opened it: reload the page", 409)
     if code:
         raise StudioError("checks_not_passed", "; ".join(why), 422)
+    if r["kind"] == "cast":                         # specs/034 FR-015: "Approve cast" saves to the channel's cast
+        from filmcheck import castlib
+        castlib.save_if_wanted(d, None, by or r.get("owner"))
 
 
 def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str = None, by: str = None) -> dict:
@@ -110,6 +127,8 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str
         raise StudioError("value_not_allowed", "câu hỏi chỉ cần trả lời", 422)
     if r["kind"] == "question" and len(note) < 1:
         raise StudioError("note_required", "hãy ghi câu trả lời", 422)
+    if r["kind"] == "cast" and value == "revise" and not note:     # "Send notes to Claude" (specs/034 FR-011)
+        note = _cast_notes(lambda cn, d: cn.summary(d), jobs.load(r["job_id"])) or ""
     if value == "revise" and len(note) < 3:
         raise StudioError("note_required", "hãy ghi góp ý (ít nhất 3 ký tự) khi yêu cầu sửa", 422)
     if len(note) > 4000:
@@ -118,12 +137,60 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str
         if store.doc_get("decision", rid):
             raise StudioError("already_decided", "yêu cầu này đã được duyệt", 409)
         point_decision(r, value, note, source, base, by)
+        if r["kind"] == "cast" and value == "revise":
+            _cast_notes(lambda cn, d: cn.start_lot(d, r["job_id"]), jobs.load(r["job_id"]))
     d = {"value": value, "note": note, "source": source, "at": store.now_iso()}
     if not store.doc_create("decision", rid, {**d, "owner": r.get("owner", "local")}):
         raise StudioError("already_decided", "yêu cầu này đã được duyệt", 409)
     where = "UI" if source == "ui" else "chat"
     jobs.log(r["job_id"], f"{KINDS[r['kind']].capitalize()}: {LABEL[value]} (via {where})" + (f": {note[:200]}" if note else ""))
     return d
+
+
+def resend_cast(job_id: str, by: str = None) -> dict:
+    """specs/034 edge "redraw fails": the film job failed or stopped during a cast redraw; its notes are still open.
+    "Send notes again" reopens that same job at the Cast step (no new credit) and the worker resumes Claude's session."""
+    from . import quotas
+    j = jobs.load(job_id)
+    if j.get("kind") != "film" or j["status"] not in ("failed", "stopped") or "charged" not in j:
+        raise StudioError("not_allowed", "only a failed or stopped film job of the app can send its notes again", 409)
+    d = film_folder(j)
+    doc = _cast_notes(lambda cn, f: cn.load(f), j) if d is not None else None
+    if not doc or (doc.get("failed_lot") or {}).get("job") != job_id:
+        raise StudioError("not_allowed", "this job did not stop during a cast redraw, or its film folder is gone", 409)
+    if not _cast_notes(lambda cn, f: sum(cn.open_counts(f).values()), j):
+        raise StudioError("no_notes", "there are no open notes to send", 422)
+    with db_read() as con:
+        n = con.execute("SELECT COUNT(*) FROM docs WHERE kind = 'job' AND owner = ? AND status IN (?, ?, ?, ?)",
+                        (j["owner"], *quotas.OPEN)).fetchone()[0]
+    if n >= quotas.MAX_OPEN:
+        raise StudioError("too_many_queued", f"at most {quotas.MAX_OPEN} unfinished jobs per account", 409)
+
+    if not j.get("charged"):                      # a studio failure gave the credit back: the film takes it again
+        from . import accounts
+        acc = accounts.get(j["owner"])
+        if acc is None or quotas.used(j["owner"], "film") >= quotas.limit(acc, "film"):
+            e = StudioError("quota_exceeded", "no film credit left this month to finish this film", 402)
+            e.extra = {"resets_at": quotas.next_reset_vn().isoformat(timespec="seconds")}
+            raise e
+
+    def f(x):
+        if x["status"] not in ("failed", "stopped"):
+            raise StudioError("changed", "the job changed: reload the page", 409)
+        x["status"], x["error"] = "waiting_review", None          # create() below adds the cast review to it
+        if not x.get("charged"):
+            x["charged"] = True
+            x["log"].append(jobs._line("Credit used again (it was given back when the redraw failed)"))
+        x["log"].append(jobs._line("Reopened to send the cast notes again"))
+    jobs.update(job_id, f)
+    r = create(job_id, "cast", None, "Cast notes sent again after the redraw did not finish.")
+    decide(r["id"], "revise", "", "ui", by=by)
+    return jobs.load(job_id)
+
+
+def db_read():
+    from . import db
+    return db.read()
 
 
 def poll(rid: str):
