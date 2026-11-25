@@ -10,6 +10,7 @@ Tiền tố `/api/v1`. Quyền như các route ghi chú của specs/029 (đọc:
 | `GET /jobs/{id}/files/cast/sheets/<id>/<file>` | (sửa danh sách cho phép của specs/025) ảnh và clip bảng mẫu, cả `<id>.prev/`. |
 | `POST /jobs/{id}/actions` | (sửa) `point: "cast"`, các `op`: `cast_note_add {character, kind, frame?, x?, y?, text}`, `cast_note_delete {character, note}`, `cast_view_toggle {character, frame}`, `cast_approve {character}`, `cast_save {on}`. Có `base` (của `cast-notes.json` hoặc dấu cast). |
 | `POST /reviews/{rid}/decision` | (sẵn có) yêu cầu duyệt kind `cast`: `approve` = "Approve cast" (duyệt mọi nhân vật); `revise` = "Send notes to Claude", `note` tự điền "N notes on: friend, hero". Claude của việc nhận và vẽ lại. |
+| `POST /jobs/{id}/cast/resend` | (Phase 9, T063) Việc phim (của app) thất bại hoặc bị dừng giữa lượt vẽ lại (`cast-notes.json` → `failed_lot.job` = việc này) còn ghi chú mở: mở lại chính việc đó ở bước Cast (không tốn credit thêm), tạo yêu cầu duyệt `cast` đã gửi lại ghi chú; worker tiếp tục phiên Claude. 409 `not_allowed`/`too_many_queued`, 422 `no_notes`. Thư mục việc được giữ trong `review_timeout_days` để gửi lại được. |
 
 ## Phim đã xong và kho nhân vật (ngoài việc làm phim)
 

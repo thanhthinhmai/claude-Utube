@@ -286,6 +286,8 @@ const POINTS = [["script", "Script"], ["cast", "Cast (After Effects films)"], ["
 /** Five boxes: where a film stops for this person's review (specs/026). @param {string} id @param {string[]} on */
 const pointBoxes = (id, on) => `<fieldset class="points" id="${id}"><legend>Stop for my review at <span class="hint">You can change and approve each one on the job page</span></legend>
   ${POINTS.map(([k, l]) => `<label class="check"><input type="checkbox" value="${k}" ${on.includes(k) ? "checked" : ""}> <span>${l}</span></label>`).join("")}</fieldset>`;
+/** a channel's review points; a list saved before specs/034 never chose about Cast, so Cast shows ticked @param {any} c */
+const reviewsOf = (c) => !c.reviews ? ["script", "cast", "shots"] : c.cast_chosen || c.reviews.includes("cast") ? c.reviews : [...c.reviews, "cast"];
 const pointsOf = (/** @type {string} */ id) => Array.from(document.querySelectorAll(`#${id} input:checked`)).map((x) => /** @type {HTMLInputElement} */ (x).value);
 
 async function pageChannel(slug) {
@@ -302,7 +304,7 @@ async function pageChannel(slug) {
       ${a("title_rules", "Title rules", "In your own words")}${t("title_max", "Longest title", "20–100 characters, or empty")}
       ${a("thumbnail_rules", "Thumbnail rules", "In your own words")}
       ${a("hashtags", "Hashtags always used", "One per line, like #science; at most 5")}${a("banned", "Words never used", "One per line")}
-      ${pointBoxes("p-reviews", c.reviews || ["script", "cast", "shots"])}
+      ${pointBoxes("p-reviews", reviewsOf(c))}
       <div><button class="primary" type="submit">Save the profile</button></div></form><p id="msg" class="muted" role="status"></p>
     <div class="panel"><p class="section-title">Decisions</p>
       ${(c.decisions || []).length ? `<ul>${c.decisions.map((/** @type {any} */ d) => `<li>${esc(d.date)}: ${esc(d.text)}</li>`).join("")}</ul>` : `<p class="muted">None yet.</p>`}
@@ -1026,7 +1028,18 @@ function castBar(body) {
   const failedLot = !lot && cb.notes && cb.notes.failed_lot;     // specs/034: the redraw failed; the notes stay open
   if (failedLot) {
     const p = document.createElement("p"); p.className = "notice warn small";
-    p.textContent = `The last redraw did not finish (${failedLot.error}). Your notes are still open: send them again with the next cast review.`;
+    const again = MODE === "online" && DONE.job && DONE.job.id === failedLot.job && ["failed", "stopped"].includes(DONE.job.status);
+    p.textContent = `The last redraw did not finish (${failedLot.error}). Your notes are still open` + (again ? ". " : ": send them again with the next cast review.");
+    if (again) {                                   // the same job resumes at Cast, no new credit (specs/034)
+      const btn = document.createElement("button");
+      btn.className = "primary small"; btn.textContent = "Send notes again";
+      btn.onclick = async () => {
+        btn.disabled = true;
+        try { await post(`/jobs/${encodeURIComponent(failedLot.job)}/cast/resend`, {}); route(); }
+        catch (e) { p.append(Object.assign(document.createElement("span"), { className: "fail", textContent: ` ${e.message}` })); btn.disabled = false; }
+      };
+      p.append(btn);
+    }
     body.prepend(p);
   }
   const save = document.createElement("label");
@@ -2557,7 +2570,7 @@ async function pageNew() {
     const r = /** @type {HTMLInputElement | null} */ ($app.querySelector(`input[name=style][value="${CSS.escape(c.style)}"]`));
     if (r) { r.checked = true; r.closest("label")?.scrollIntoView({ block: "nearest" }); }
     field("seconds").value = String(Math.min(c.seconds, max));
-    const on = c.reviews || ["script", "cast", "shots"];   // the channel's review points, changeable for this film (Cast only stops AE films)
+    const on = reviewsOf(c);                              // the channel's review points, changeable for this film (Cast only stops AE films)
     document.querySelectorAll("#f-reviews input").forEach((x) => { /** @type {HTMLInputElement} */ (x).checked = on.includes(/** @type {HTMLInputElement} */ (x).value); });
   };
   if (chSel) { chSel.onchange = fillFromChannel; if (chSel.value) fillFromChannel(); }

@@ -147,6 +147,41 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str
     return d
 
 
+def resend_cast(job_id: str, by: str = None) -> dict:
+    """specs/034 edge "redraw fails": the film job failed or stopped during a cast redraw; its notes are still open.
+    "Send notes again" reopens that same job at the Cast step (no new credit) and the worker resumes Claude's session."""
+    from . import quotas
+    j = jobs.load(job_id)
+    if j.get("kind") != "film" or j["status"] not in ("failed", "stopped") or "charged" not in j:
+        raise StudioError("not_allowed", "only a failed or stopped film job of the app can send its notes again", 409)
+    d = film_folder(j)
+    doc = _cast_notes(lambda cn, f: cn.load(f), j) if d is not None else None
+    if not doc or (doc.get("failed_lot") or {}).get("job") != job_id:
+        raise StudioError("not_allowed", "this job did not stop during a cast redraw, or its film folder is gone", 409)
+    if not _cast_notes(lambda cn, f: sum(cn.open_counts(f).values()), j):
+        raise StudioError("no_notes", "there are no open notes to send", 422)
+    with db_read() as con:
+        n = con.execute("SELECT COUNT(*) FROM docs WHERE kind = 'job' AND owner = ? AND status IN (?, ?, ?, ?)",
+                        (j["owner"], *quotas.OPEN)).fetchone()[0]
+    if n >= quotas.MAX_OPEN:
+        raise StudioError("too_many_queued", f"at most {quotas.MAX_OPEN} unfinished jobs per account", 409)
+
+    def f(x):
+        if x["status"] not in ("failed", "stopped"):
+            raise StudioError("changed", "the job changed: reload the page", 409)
+        x["status"], x["error"] = "waiting_review", None          # create() below adds the cast review to it
+        x["log"].append(jobs._line("Reopened to send the cast notes again"))
+    jobs.update(job_id, f)
+    r = create(job_id, "cast", None, "Cast notes sent again after the redraw did not finish.")
+    decide(r["id"], "revise", "", "ui", by=by)
+    return jobs.load(job_id)
+
+
+def db_read():
+    from . import db
+    return db.read()
+
+
 def poll(rid: str):
     """One check by `review wait`: records that someone is waiting, returns the decision or None."""
     check_id(rid)

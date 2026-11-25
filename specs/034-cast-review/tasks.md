@@ -185,3 +185,10 @@ description: "Task list: Duyệt nhân vật cho phim After Effects (034-cast-re
 - [X] T059 Kết thúc lượt vẽ lại khi việc phim thất bại hoặc bị dừng, hiện lỗi trong khung Cast và cho gửi lại per Edge "vẽ lại thất bại" (partial)
 - [X] T060 Ghi bật/tắt điểm Cast mỗi khi áp danh sách điểm duyệt (kênh, form việc mới) bất kể bộ máy; form việc mới tick Cast mặc định cho phim AE per FR-002 (partial)
 - [X] T061 `cast use` thêm phim vào `films` của phiên bản kho; khung Cast liệt kê đoạn kịch bản có nhân vật (không chỉ mã đoạn) per FR-018, FR-006 (partial)
+
+## Phase 9: Convergence
+
+- [X] T062 Danh sách điểm duyệt của kênh lưu trước 034 không tắt Cast: chỉ tính là "đã chọn" khi kênh có `cast_chosen` (app và CLI ghi khi lưu `reviews`); trang kênh và form việc mới tick Cast cho danh sách cũ per FR-002 (contradicts, do T060)
+- [X] T063 Cho gửi lại ghi chú nhân vật khi việc phim đã thất bại hoặc bị dừng giữa lượt vẽ lại (việc đã kết thúc, không còn bước Cast chờ duyệt) per Edge "vẽ lại thất bại" (partial)
+- [X] T064 Skill `film-make`: kho nhân vật của kênh (`cast library`, `cast use`), `cast approve --save/--no-save`, trả lời từng ghi chú (`cast notes show|reply`) cho luồng chat per FR-011, FR-016 (partial)
+- [X] T065 Test qua app: "Approve cast" của review lưu vào kho; việc thất bại kết thúc lượt vẽ lại per T055, T059 (partial)

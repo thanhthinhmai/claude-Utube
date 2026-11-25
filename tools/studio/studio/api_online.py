@@ -413,6 +413,8 @@ def list_channels(request: Request):
 def new_channel(body: ChannelIn, request: Request):
     me(request)
     data = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "reviews" in data:
+        data["cast_chosen"] = True                      # specs/034 FR-002: Cast left out on purpose stays off
     return _ch(lambda: channels.save(store.root(), data, resources.lib_dir(), new=True))
 
 
@@ -428,6 +430,8 @@ def put_channel(slug: str, body: ChannelIn, request: Request):
     me(request)
     ch = channel_or_404(slug)
     ch.update({k: v for k, v in body.model_dump(exclude_unset=True).items() if k != "slug"})
+    if "reviews" in body.model_fields_set:
+        ch["cast_chosen"] = True                        # specs/034 FR-002: Cast left out on purpose stays off
     return _ch(lambda: channels.save(store.root(), ch, resources.lib_dir()))
 
 
@@ -656,6 +660,14 @@ def stop_job(job_id: str, request: Request):
     a = me(request)
     jobs.load(job_id, None if a["role"] == "admin" else a["id"])
     return view(jobs.finish(job_id, "stopped", error="Stopped by the customer"), a)
+
+
+@router.post("/jobs/{job_id}/cast/resend")
+def resend_cast_notes(job_id: str, request: Request):
+    """specs/034: "Send notes again" after a cast redraw failed or was stopped: the same job resumes at Cast."""
+    a = me(request)
+    jobs.load(job_id, None if a["role"] == "admin" else a["id"])
+    return view(reviews.resend_cast(job_id, a["id"]), a)
 
 
 @router.get("/films/{name}/download")

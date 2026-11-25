@@ -89,6 +89,30 @@ class CastApi(unittest.TestCase):
         self.assertEqual(self.c.post(f"/api/v1/jobs/{self.jid}/actions", headers=W, json={
             "point": "cast", "op": "shot", "args": {}}).status_code, 422)
 
+    def test_approve_cast_review_saves_and_failed_job_ends_round(self):    # Phase 9: T055 and T059 through the app
+        from unittest import mock
+        from filmcheck import castnotes
+        from studio import jobs
+        for c in ("hero", "friend", "classmates"):
+            fake_sheet(self.film, c)
+        summary = self.p.dir / "s.md"
+        summary.write_text("Cast ready")
+        self.assertEqual(self.p.cli("review", "request", self.jid, "--kind", "cast", "--film", "aefilm",
+                                    "--summary", str(summary)).returncode, 0)
+        rid = next(r["id"] for r in self.c.get("/api/v1/reviews?status=pending").json()["reviews"] if r["kind"] == "cast")
+        base = self.steps()["points"]["cast"]["fingerprint"]
+        with mock.patch("filmcheck.castlib.save_if_wanted", return_value=[]) as saved:
+            r = self.c.post(f"/api/v1/reviews/{rid}/decision", headers=W, json={"value": "approve", "base": base})
+            self.assertEqual(r.status_code, 201, r.text)
+        saved.assert_called_once()
+        self.assertEqual(Path(saved.call_args[0][0]).name, "aefilm")
+        castnotes.add(self.film, "hero", text="bigger hair")
+        castnotes.start_lot(self.film, self.jid)
+        jobs.finish(self.jid, "failed", "AE crashed")
+        doc = castnotes.load(self.film)
+        self.assertNotIn("lot", doc)
+        self.assertIn("AE crashed", doc["failed_lot"]["error"])
+        self.assertEqual(castnotes.open_counts(self.film), {"hero": 1})
 
     def test_cast_library(self):
         """T036: /cast-library is off outside the app; inside an account it lists and serves the saved characters."""

@@ -332,6 +332,15 @@ def read_checks(work: Path, film: str) -> dict:
         return {}
 
 
+def cast_resendable(j: dict, work: Path) -> bool:
+    """specs/034: a film job that failed or stopped during a cast redraw keeps its folder so its notes can be sent again."""
+    film = (j.get("input") or {}).get("film")
+    if j.get("kind") != "film" or not film:
+        return False
+    doc = store.read_json(work / "films" / film / "cast-notes.json") or {}
+    return (doc.get("failed_lot") or {}).get("job") == j["id"]
+
+
 def script_failed(work: Path, film: str):
     """The reason to stop when the script editor did not pass the script after 2 fix rounds, else None."""
     s = (read_checks(work, film).get("script") or {})
@@ -939,7 +948,8 @@ class Worker:
             if j["status"] in jobs.FINAL:
                 self.purge(j)
                 work = self.work_dir(j["id"])
-                if work.exists() and store.age_seconds(j["updated_at"]) > 3600:
+                if work.exists() and store.age_seconds(j["updated_at"]) > 3600 and not (
+                        store.age_seconds(j["updated_at"]) < s["review_timeout_days"] * 86400 and cast_resendable(j, work)):
                     shutil.rmtree(work, ignore_errors=True)
             elif j["status"] == "waiting_review" and j["review_ids"]:
                 r = reviews.load(j["review_ids"][-1])
