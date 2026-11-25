@@ -138,7 +138,7 @@ def run(film_dir: Path, name: str, args: dict, base: str = None, by: str = "loca
         return res
     finally:
         drop_lock(d, mine["pid"])
-    stale = steps.impact(point, d) if point in steps.POINT_STEP else []
+    stale = steps.impact(point, d) if point in steps.POINT_STEP and not out.get("no_stale") else []
     res.update(ok=bool(out.get("ok", True)), code=0 if out.get("ok", True) else 1, ref=out.get("ref"),
                check=out.get("check"), files=out.get("files") or [], stale=stale, fingerprint=points.fingerprint(d, point),
                error=out.get("error"))
@@ -501,6 +501,40 @@ def mix_edit(d: Path, a: dict) -> dict:
             return {**out, "ok": False, "error": (m.stderr or m.stdout).strip()[-300:]}
     return out
 
+
+# ---------- cast of an AE film (specs/034) ----------
+@op("cast-approve", "cast")
+def cast_approve(d: Path, a: dict) -> dict:
+    """Approve one character (args: character=<id>, or ref=[id]); approving changes no picture (nothing goes stale)."""
+    from filmcheck import cast
+    cid = a.get("character") or (a.get("ref") or [None])[0]
+    if not cid:
+        raise EditError("cast-approve: character=<id>")
+    try:
+        why = cast.approve(d, [cid], "ui" if a.get("source", "ui") != "chat" else "chat", a.get("by") or "local")
+    except cast.CastError as e:
+        raise EditError(e.message) from None
+    if why:
+        return {"ok": False, "ref": cid, "error": "; ".join(why), "no_stale": True}
+    return {"ok": True, "ref": cid, "old": None, "new": "approved", "files": ["cast/cast.json"], "no_stale": True}
+
+
+@op("cast-save", "cast")
+def cast_save(d: Path, a: dict) -> dict:
+    """Turn "save approved characters to the channel's cast library" on or off (args: on=true|false)."""
+    from filmcheck import cast
+    v = str(a.get("on", "-")).lower()
+    if v not in ("true", "false", "1", "0", "on", "off", "yes", ""):
+        raise EditError("cast-save: on=true|false")
+    try:
+        doc = cast.load(d)
+    except cast.CastError as e:
+        raise EditError(e.message) from None
+    old = doc.get("save_to_library", True)
+    doc["save_to_library"] = v in ("true", "1", "on", "yes")
+    cast.save(d, doc)
+    return {"ok": True, "ref": "save_to_library", "old": old, "new": doc["save_to_library"], "files": ["cast/cast.json"],
+            "no_stale": True}
 
 # ---------- publish (US5) ----------
 @op("publish", "publish")

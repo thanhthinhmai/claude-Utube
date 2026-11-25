@@ -1,5 +1,7 @@
 """Cast of an AE film: cast.json rules, character states, the cast review point (specs/034 T011, T013)."""
 import json
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -8,7 +10,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from filmcheck import cast, points, steps  # noqa: E402
+from filmcheck import cast, edit, points, steps  # noqa: E402
 import castfilm  # noqa: E402
 
 TMP = Path(__file__).resolve().parent / ".tmp"
@@ -131,6 +133,79 @@ class Point(unittest.TestCase):
         self.assertIn("Shots", hit)
         self.assertIn("Render", hit)
         self.assertNotIn("Voice", hit)
+
+
+
+class Cli(unittest.TestCase):
+    """T013: cast check|status|approve, the voice gate (SC-002) and the cast edits of the job page."""
+
+    def setUp(self):
+        TMP.mkdir(exist_ok=True)
+        self.root = Path(tempfile.mkdtemp(dir=TMP))
+        self.d = castfilm.make(self.root / "films" / "f1")
+        (self.d / "SCRIPT.md").write_text("# f1\n")
+        (self.d / "lines.json").write_text("[]")
+        self.env = {**os.environ, "STUDIO_ROOT": str(self.root)}
+        for k in ("STUDIO_JOB", "STUDIO_PROXY", "STUDIO_MODE"):
+            self.env.pop(k, None)
+
+    def studio(self, *args):
+        return subprocess.run(["sh", str(REPO / "bin" / "studio"), *args], capture_output=True, text=True, env=self.env,
+                              cwd=self.root, timeout=120)
+
+    def sheets(self):
+        for c in ("hero", "friend", "classmates"):
+            fake_sheet(self.d, c)
+
+    def test_check_and_status(self):
+        r = self.studio("cast", "check", "f1")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("zzz", r.stdout)                                  # a need outside the catalog is a warning
+        doc = cast.load(self.d); cast.find(doc, "hero")["spec"]["pupils"] = 1; cast.save(self.d, doc)
+        r = self.studio("cast", "check", "f1")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("hero: bad_spec", r.stderr)
+        r = self.studio("cast", "status", "f1", "--json")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        js = json.loads(r.stdout)
+        self.assertEqual([c["state"] for c in js["characters"]], ["new", "new", "new"])
+        r = self.studio("cast", "status", "f1")
+        self.assertTrue(r.stdout.strip().splitlines()[-1].startswith("point cast: "))
+
+    def test_approve(self):
+        r = self.studio("cast", "approve", "f1", "hero")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("no cast sheet yet", r.stderr)
+        self.sheets()
+        r = self.studio("cast", "approve", "f1", "hero", "--no-save")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(cast.states(self.d)["hero"], "approved")
+        r = self.studio("cast", "approve", "f1", "--all", "--no-save", "--base", "0" * 16)
+        self.assertEqual(r.returncode, 4)
+        r = self.studio("cast", "approve", "f1", "--all", "--no-save", "--source", "ui")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(points.state(self.d, "cast"), "approved")
+        self.assertEqual(cast.find(cast.load(self.d), "friend")["approved"]["source"], "ui")
+
+    def test_voice_gate(self):
+        r = self.studio("voice", "make", "f1", "--skip-review", "test film")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("characters not approved: hero, friend, classmates", r.stderr)
+
+    def test_edits(self):
+        self.sheets()
+        base = points.fingerprint(self.d, "cast")
+        r = edit.run(self.d, "cast-approve", {"character": "friend"}, base=base)
+        self.assertEqual((r["code"], r["stale"]), (0, []), r)
+        self.assertEqual(cast.states(self.d)["friend"], "approved")
+        self.assertEqual(points.fingerprint(self.d, "cast"), base)       # approving changes no fingerprint
+        r = edit.run(self.d, "cast-save", {"on": "false"}, base="0" * 16)
+        self.assertEqual(r["code"], 4)
+        r = edit.run(self.d, "cast-save", {"on": "false"}, base=base)
+        self.assertEqual(r["code"], 0, r)
+        self.assertFalse(cast.load(self.d)["save_to_library"])
+        r = edit.run(self.d, "cast-approve", {"character": "nobody"})
+        self.assertEqual(r["code"], 2)
 
 
 if __name__ == "__main__":

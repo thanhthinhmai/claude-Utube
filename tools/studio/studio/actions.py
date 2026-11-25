@@ -12,7 +12,7 @@ from pathlib import Path
 from . import jobs, store
 from .store import StudioError
 
-OPS = {"script": ("script-para",), "voice": ("voice-say", "voice-remake", "voice-set"),
+OPS = {"script": ("script-para",), "cast": ("cast-approve", "cast-save"), "voice": ("voice-say", "voice-remake", "voice-set"),
        "shots": ("shot", "shots-check", "except", "accept-style"), "mix": ("mix",), "publish": ("publish",)}
 STATUS = ("queued", "running", "done", "failed", "invalid", "conflict", "busy")
 BY_CODE = {0: "done", 1: "done", 2: "invalid", 4: "conflict", 5: "busy"}
@@ -85,7 +85,7 @@ def command(a: dict, film: str, tmpdir: str, studio: str = None, seen: str = Non
     args = dict(a["args"])
     seen = seen or tmpdir
     cmd = ["sh", studio or str(ROOT / "bin" / "studio"), "edit", film, a["op"]]
-    for k in ("ref", "para", "line", "shot", "rule"):
+    for k in ("ref", "para", "line", "shot", "rule", "character"):
         if args.get(k):
             cmd += [x for x in args.pop(k).split(",") if x]
     for k in ("text", "description"):

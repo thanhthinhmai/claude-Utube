@@ -9,7 +9,7 @@ const STATUS = {
 };
 const KIND = { learn: "Learn a style", film: "Make a film", topics: "Score topics" };
 const REVIEW = { "style-1": "Review 1: style draft", "style-2": "Review 2: proof frame", question: "Question from the studio",
-  treatment: "Treatment review", script: "Script review", voice: "Voice review", shots: "Shots review", mix: "Mix review",
+  treatment: "Treatment review", script: "Script review", cast: "Cast review", voice: "Voice review", shots: "Shots review", mix: "Mix review",
   publish: "Publish review" };
 // Online mode (specs/007): the same page serves many customers; MODE comes from GET /health
 let MODE = "local";
@@ -282,7 +282,7 @@ async function pageChannels() {
   });
 }
 
-const POINTS = [["script", "Script"], ["voice", "Voice"], ["shots", "Shots (before render)"], ["mix", "Mix"], ["publish", "Publish"]];
+const POINTS = [["script", "Script"], ["cast", "Cast (After Effects films)"], ["voice", "Voice"], ["shots", "Shots (before render)"], ["mix", "Mix"], ["publish", "Publish"]];
 /** Five boxes: where a film stops for this person's review (specs/026). @param {string} id @param {string[]} on */
 const pointBoxes = (id, on) => `<fieldset class="points" id="${id}"><legend>Stop for my review at <span class="hint">You can change and approve each one on the job page</span></legend>
   ${POINTS.map(([k, l]) => `<label class="check"><input type="checkbox" value="${k}" ${on.includes(k) ? "checked" : ""}> <span>${l}</span></label>`).join("")}</fieldset>`;
@@ -503,7 +503,7 @@ async function doneRefresh(clicked = false) {
   if (!clicked && DONE.playing && body.contains(DONE.playing)) return;
   DONE.drawn.key = key;
   stopAudio();
-  await ({ script: doneScript, voice: doneVoice, shots: doneShots, mix: doneMix, render: doneRender }[DONE.tab] || (() => {}))(body, sec);
+  await ({ script: doneScript, cast: doneCast, voice: doneVoice, shots: doneShots, mix: doneMix, render: doneRender }[DONE.tab] || (() => {}))(body, sec);
   await editPanel(body);
 }
 /** specs/026: the edit part of the open section. @param {HTMLElement} body */
@@ -515,6 +515,7 @@ async function editPanel(body) {
     const n = document.createElement("p"); n.className = "muted small"; n.textContent = "Edits open when the film stops for your review.";
     body.prepend(n);
   }
+  if (pt === "cast") { castBar(body); return; }
   const edit = { script: async () => { const sc = body.querySelector(".script"); if (sc) sc.remove(); await editScript(body); },
     voice: async () => { body.querySelectorAll(".tbl, .done-actions").forEach((x) => x.remove()); await editVoice(body); },
     mix: async () => editMix(body),
@@ -669,9 +670,9 @@ function doneRender(body, s) {
 /** @type {any} */
 const RAIL = { data: null, editing: {}, last: {}, msg: {} };
 const STATE_LABEL = { done: "Done", running: "Running", waiting: "Waiting for you", todo: "Not yet", stale: "Must run again", skipped: "Skipped" };
-const STEP_TAB = { Script: "script", Voice: "voice", Shots: "shots", Mix: "mix", Render: "render", "Self-check": "selfcheck", Publish: "publish" };
-const TAB_POINT = { script: "script", voice: "voice", shots: "shots", mix: "mix", publish: "publish" };
-const POINT_STEP = { script: "Script", voice: "Voice", shots: "Shots", mix: "Mix", publish: "Publish" };
+const STEP_TAB = { Script: "script", Cast: "cast", Voice: "voice", Shots: "shots", Mix: "mix", Render: "render", "Self-check": "selfcheck", Publish: "publish" };
+const TAB_POINT = { script: "script", cast: "cast", voice: "voice", shots: "shots", mix: "mix", publish: "publish" };
+const POINT_STEP = { script: "Script", cast: "Cast", voice: "Voice", shots: "Shots", mix: "Mix", publish: "Publish" };
 
 async function railRefresh() {
   const slot = document.getElementById("rail-slot");
@@ -691,9 +692,9 @@ async function railRefresh() {
           : s.note || STATE_LABEL[s.state] || s.state)}</span></button></li>`).join("")}</ol>
     <div id="impact"></div>
     <div class="point-toggles" id="point-toggles"><span class="muted small">Stop for my review at:</span>
-      ${POINTS.map(([k, l]) => {
+      ${POINTS.filter(([k]) => v.points[k] && !(k === "cast" && v.points[k].state === "skipped")).map(([k, l]) => {
         const pt = v.points[k], locked = ["approved", "waiting", "skipped"].includes(pt.state) || ["done", "failed", "stopped"].includes(DONE.job.status);
-        return `<label class="check small" title="${locked ? esc(`${l}: ${pt.state}`) : ""}"><input type="checkbox" value="${k}" ${pt.on ? "checked" : ""} ${locked ? "disabled" : ""}> <span>${esc(l.replace(" (before render)", ""))}</span></label>`;
+        return `<label class="check small" title="${locked ? esc(`${l}: ${pt.state}`) : ""}"><input type="checkbox" value="${k}" ${pt.on ? "checked" : ""} ${locked ? "disabled" : ""}> <span>${esc(l.replace(" (before render)", "").replace(" (After Effects films)", ""))}</span></label>`;
       }).join("")}<span class="msg small" id="points-msg"></span></div>`;
   slot.querySelectorAll("#point-toggles input").forEach((el) => { /** @type {HTMLInputElement} */ (el).onchange = async () => {
     const on = Array.from(slot.querySelectorAll("#point-toggles input:checked")).map((x) => /** @type {HTMLInputElement} */ (x).value);
@@ -769,6 +770,108 @@ function approveBar(body, pt, blocked) {
     try { await post(`/reviews/${encodeURIComponent(r.id)}/decision`, { value: "revise", note }); route(); }
     catch (err) { msg.className = "fail small"; msg.textContent = err.message; }
   };
+}
+
+// ---------- the Cast step of an After Effects film (specs/034) ----------
+const CAST_GROUPS = [["turn", "Turnaround"], ["group", "Group"], ["expr", "Expressions"], ["pose", "Poses"], ["walk", "Walk loop"]];
+const CAST_STATE = { new: ["acc", "New"], ready: ["acc", "Ready to review"], approved: ["ok", "Approved"], changed: ["warn", "Changed since approval"] };
+const CAST_ROLE = { hero: "Hero", support: "Support", background: "Background" };
+/** @param {any} c */
+const castChip = (c) => { const [k, l] = CAST_STATE[c.state] || ["", c.state]; return `<span class="chip ${k}">${esc(l)}</span>`
+  + (c.notes_open ? ` <span class="chip warn">${c.notes_open} note${c.notes_open === 1 ? "" : "s"}</span>` : ""); };
+/** @param {any} c @param {any} f @param {boolean} [prev] */
+const castFile = (c, f, prev) => fileUrl(`cast/sheets/${c.id}${prev ? ".prev" : ""}/${f}`);
+
+/** @param {HTMLElement} body @param {any} s */
+function doneCast(body, s) {
+  const cb = RAIL.data && RAIL.data.cast;
+  if (!cb) { body.innerHTML = `<p class="muted">This film has no cast review.</p>`; return; }
+  if (cb.error) { body.innerHTML = `<p class="fail">cast/cast.json cannot be read: ${esc(cb.error)}</p>`; return; }
+  const chars = cb.characters;
+  if (!chars.length) { body.innerHTML = `<p class="muted">No characters in this film${cb.skip ? ` (${esc(cb.skip)})` : ""}.</p>`; return; }
+  if (!DONE.castWho || !chars.some((/** @type {any} */ c) => c.id === DONE.castWho)) DONE.castWho = chars[0].id;
+  const c = chars.find((/** @type {any} */ x) => x.id === DONE.castWho);
+  const thumb = (/** @type {any} */ x) => {
+    const f = x.sheet && x.sheet.frames.find((/** @type {any} */ r) => r.file && r.file.endsWith(".jpg"));
+    return f ? `<img src="${castFile(x, f.file)}" alt="" loading="lazy">` : `<span class="cast-noimg" aria-hidden="true"></span>`;
+  };
+  const list = chars.map((/** @type {any} */ x) => `<button role="tab" aria-selected="${x.id === c.id}" data-who="${esc(x.id)}">${thumb(x)}
+      <span><b>${esc(x.name || x.id)}</b><small class="muted">${esc(CAST_ROLE[x.role] || x.role || "")}${x.kind === "group" ? ` · group of ${(x.members || []).length}` : ""}</small><br>${castChip(x)}</span></button>`).join("");
+  const frames = (c.sheet && c.sheet.frames) || [];
+  const tile = (/** @type {any} */ f) => {
+    if (!f.file) return `<div class="fr missing"><b>${esc(f.label)}</b><span>No picture yet</span>${f.missing_reason ? `<small class="muted">${esc(f.missing_reason)}</small>` : ""}</div>`;
+    const tall = f.group === "pose" || f.group === "walk";
+    const media = f.file.endsWith(".mp4") ? `<video src="${castFile(c, f.file)}" autoplay muted loop playsinline aria-label="${esc(f.label)}"></video>`
+      : `<img src="${castFile(c, f.file)}" alt="${esc(f.label)}" loading="lazy">`;
+    return `<figure class="fr ${tall ? "tall" : ""} ${f.group === "group" ? "wide" : ""}">${media}<figcaption>${esc(f.label)}${f.para ? ` <span class="muted">${esc(f.para)}</span>` : ""}</figcaption></figure>`;
+  };
+  const groups = CAST_GROUPS.map(([g, l]) => {
+    const fs = frames.filter((/** @type {any} */ f) => f.group === g);
+    return fs.length ? `<h3>${esc(l)}</h3><div class="frames">${fs.map(tile).join("")}</div>` : "";
+  }).join("");
+  const paras = [...new Set([...(c.needs?.expressions || []), ...(c.needs?.poses || [])].map((/** @type {any} */ r) => r.para).filter(Boolean))];
+  const look = (c.palette || []).map((/** @type {any} */ [k, h]) => `<dt>${esc(k)}</dt><dd><span class="sw" style="background:${esc(h)}"></span><span class="muted num">${esc(h)}</span></dd>`).join("");
+  const done = chars.filter((/** @type {any} */ x) => x.state === "approved").length;
+  const errs = (cb.errors || []).filter((/** @type {any} */ e) => !e.character || e.character === c.id);
+  body.innerHTML = facts([`${b(chars.length)} character${chars.length === 1 ? "" : "s"}`, `${b(done)} approved`,
+      chars.some((/** @type {any} */ x) => x.source !== "film") ? `${b(chars.filter((/** @type {any} */ x) => x.source !== "film").length)} from the channel's cast` : ""])
+    + `<div class="cast-split"><div class="cast">
+      <div class="who" role="tablist" aria-label="Characters">${list}</div>
+      <div class="cast-sheet">
+        <div class="sheet-head"><div><h2>${esc(c.name || c.id)}</h2><p class="muted small">${esc(CAST_ROLE[c.role] || "")} · ${esc(c.source === "film" ? "new in this film" : c.source)} · rig ${esc(c.rig)}</p></div>
+          <div class="row" id="cast-who-act">${castChip(c)}</div></div>
+        ${errs.length ? `<ul class="fail small">${errs.map((/** @type {any} */ e) => `<li>${esc(e.code)}: ${esc(e.message)}</li>`).join("")}</ul>` : ""}
+        ${c.sheet ? groups : `<div class="fr missing wide"><b>No cast sheet yet</b><span>Claude draws it in After Effects. If it does not come, After Effects or its bridge is not ready: open After Effects (desktop app tray → After Effects… → Test), then ask Claude to run <code>ae sheet</code> again.</span></div>`}
+        ${look ? `<h3>Look</h3><dl class="spec">${look}${paras.length ? `<dt>Used in</dt><dd>${paras.map((p) => esc(p)).join(", ")}</dd>` : ""}</dl>` : ""}
+        ${c.has_prev ? `<p class="muted small">The sheet before the last redraw is kept: <a href="${castFile(c, "sheet.json", true)}" target="_blank" rel="noopener">previous sheet</a>.</p>` : ""}
+      </div></div>
+      <aside class="how"><strong>How it works</strong><ol>
+        <li>Claude reads the script and lists the film's characters.</li>
+        <li>After Effects draws each one: three views, the expressions and poses the script needs, a walk loop.</li>
+        <li>Approve each character, or the whole cast at once. The voice is made only after that.</li>
+        <li>Approved characters can be saved to the channel's cast, so the next film uses them without a new review.</li></ol></aside></div>`;
+  body.querySelectorAll(".who [data-who]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+    DONE.castWho = /** @type {HTMLElement} */ (el).dataset.who; DONE.drawn = {}; doneRefresh(true);
+  }; });
+}
+/** The approve part of the Cast step: one character, the whole cast, save to the channel's cast. @param {HTMLElement} body */
+function castBar(body) {
+  const cb = RAIL.data && RAIL.data.cast;
+  if (!cb || !cb.characters || !cb.characters.length) return;
+  const c = cb.characters.find((/** @type {any} */ x) => x.id === DONE.castWho);
+  const can = canEdit("cast");
+  const act = body.querySelector("#cast-who-act");
+  if (act && c && can && c.state !== "approved") {
+    const btn = document.createElement("button");
+    btn.className = "btn small"; btn.textContent = `Approve ${(c.name || c.id).split(" ")[0]}`;
+    btn.disabled = !c.sheet || c.notes_open > 0;
+    btn.title = !c.sheet ? "No cast sheet yet" : c.notes_open ? "Send or delete the open notes first" : "";
+    btn.onclick = async () => {
+      btn.disabled = true; btn.textContent = "Approving…";
+      try { const x = await sendEdit("cast", "cast-approve", { character: c.id }); if (x.status !== "done" || x.result.code) alert(editMsg(x)); }
+      catch (err) { alert(/** @type {Error} */ (err).message); }
+      DONE.drawn = {}; doneRefresh(true);
+    };
+    act.append(btn);
+  }
+  const missing = cb.characters.filter((/** @type {any} */ x) => !x.sheet).map((/** @type {any} */ x) => x.name || x.id);
+  const noted = cb.characters.filter((/** @type {any} */ x) => x.notes_open).map((/** @type {any} */ x) => x.name || x.id);
+  const blocked = missing.length ? `No cast sheet yet for ${missing.join(", ")}.` : noted.length ? `Open notes on ${noted.join(", ")}: send them to Claude or delete them.` : "";
+  approveBar(body, "cast", blocked);
+  const save = document.createElement("label");
+  save.className = "check small cast-save";
+  const why = cb.library_available ? "" : "The channel's cast lives in the studio app: run the film from the app to save characters.";
+  save.innerHTML = `<input type="checkbox" ${cb.save_to_library && cb.library_available ? "checked" : ""} ${cb.library_available && can ? "" : "disabled"}>
+    <span>Save approved characters to the channel's cast</span>${why ? ` <span class="muted">(${esc(why)})</span>` : ""}`;
+  const box = /** @type {HTMLInputElement} */ (save.querySelector("input"));
+  box.onchange = async () => {
+    box.disabled = true;
+    try { const x = await sendEdit("cast", "cast-save", { on: box.checked }); if (x.status !== "done") { alert(editMsg(x)); box.checked = !box.checked; } }
+    catch (err) { alert(/** @type {Error} */ (err).message); box.checked = !box.checked; }
+    box.disabled = false;
+  };
+  const bar = body.querySelector(".approve-bar");
+  if (bar) bar.append(save); else body.prepend(save);
 }
 
 /** Script panel: every paragraph, edit one, run the check, approve (US1). @param {HTMLElement} body */

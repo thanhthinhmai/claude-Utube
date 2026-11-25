@@ -14,7 +14,8 @@ STEPS = [("script", "Script"), ("voice", "Voice"), ("shots", "Shots"), ("mix", "
 ALLOWED = re.compile(r"^(SCRIPT\.md|SOURCES\.md|lines\.json|checks\.json|CHECKS\.md|voices/[lL]\d{2,4}\.wav|voices/dur\.json"
                      r"|out/mix\.wav|\.check/review-r\d+\.json|\.check/labels\.json"
                      r"|\.check/shots/(sheet|label-sheet)-\d+\.jpg|\.check/shots/S\d{2,4}(~[A-Za-z0-9._~-]+)?\.jpg"
-                     r"|scenes\.json|mix\.json|publish/pack\.json|publish/thumbnail-[123]\.(png|jpg))$")       # 026: scene table, mix settings, publish pack
+                     r"|scenes\.json|mix\.json|publish/pack\.json|publish/thumbnail-[123]\.(png|jpg)"
+                     r"|cast/sheets/[a-z0-9-]{1,32}(\.prev)?/([a-z0-9-]{1,40}\.jpg|walk\.mp4|sheet\.json))$")   # 034: cast sheets       # 026: scene table, mix settings, publish pack
 # Never listed nor served, even if the allow list grows (specs/029 contracts/files.md): shot notes' pictures, the
 # small-picture cache, the previous video and its shot marks
 EXCLUDED = re.compile(r"^(shot-notes/|\.shots/|shots\.prev\.json$|[^/]*\.prev\.mp4$)")
@@ -226,8 +227,20 @@ def summary(job: dict) -> dict:
     st["publish"] = "done" if (d / "publish" / "pack.json").is_file() and checks.get("publish") else \
         "running" if "Publish" in running_steps else "waiting"
 
+    order = list(STEPS)
+    try:                                           # specs/034: an AE film's characters, between Script and Voice
+        from filmcheck import cast
+        if cast.is_ae(d) and cast.exists(d) and cast.load(d)["characters"]:
+            st["cast"] = "done" if cast.all_approved(d) else "running" if "Cast" in running_steps else "waiting"
+            order.insert(1, ("cast", "Cast"))
+            cst = cast.states(d)
+            sections["cast"] = {"version": cast.fingerprint(d) + ":" + ",".join(f"{k}={v}" for k, v in sorted(cst.items()))
+                                + ":" + ",".join(f"{k}={v}" for k, v in sorted(cast.open_notes(d).items())),
+                                "characters": len(cst), "approved": sum(1 for v in cst.values() if v == "approved")}
+    except Exception:                              # noqa: BLE001 — a broken cast.json shows on the Cast panel
+        pass
     steps = []
-    for key, label in STEPS:
+    for key, label in order:
         s = {"key": key, "label": label, "state": st[key]}
         if key == "render" and st[key] == "running" and r and r["chunks_total"]:
             s["progress"] = {"done": r["chunks_done"], "total": r["chunks_total"]}

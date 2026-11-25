@@ -983,6 +983,7 @@ def cmd_voice_make(a) -> int:
             return 2
         print(f"! voice make: script review skipped — {a.skip_review.strip()}")
     why = points.gate(d, "script")
+    why = why or points.gate(d, "cast")             # specs/034: an AE film's characters are approved first
     for w in why:
         print(f"✗ voice make: {w}", file=sys.stderr)
     if why:
@@ -1201,6 +1202,112 @@ def cmd_point_gate(a) -> int:
     for w in why:
         print(w)
     return 1 if why else 0
+
+
+# ---------- cast of an AE film (specs/034 contracts/cli.md) ----------
+def _cast_film(a):
+    from filmcheck import cast
+    d = film_dir(a.film)
+    if not cast.is_ae(d):
+        print(f"✗ {d.name} is not an After Effects film: the cast review is for AE films (film.json engine \"ae\")",
+              file=sys.stderr)
+        return None
+    return d
+
+
+def cmd_cast_check(a) -> int:
+    from filmcheck import cast
+    d = _cast_film(a)
+    if d is None:
+        return 2
+    try:
+        doc = cast.load(d)
+    except cast.CastError as e:
+        print(f"✗ {e.code}: {e.message}", file=sys.stderr)
+        return 2
+    errs = cast.validate(doc)
+    for cid, code, msg in errs:
+        print(f"✗ {cid or '-'}: {code}: {msg}", file=sys.stderr)
+    for cid, msg in cast.catalog_warnings(d, doc):
+        print(f"! {cid}: {msg}")
+    if errs:
+        return 2
+    print(f"✓ cast/cast.json: {len(doc['characters'])} character(s)")
+    return 0
+
+
+def cmd_cast_status(a) -> int:
+    from filmcheck import cast, points
+    d = _cast_film(a)
+    if d is None:
+        return 2
+    try:
+        doc = cast.load(d)
+        st = cast.states(d, doc)
+    except cast.CastError as e:
+        print(f"✗ {e.code}: {e.message}", file=sys.stderr)
+        return 2
+    notes = cast.open_notes(d)
+    pst = points.state(d, "cast")
+    rows = [{"id": c["id"], "name": c.get("name"), "role": c.get("role"), "kind": c.get("kind", "one"),
+             "state": st.get(c["id"]), "notes_open": notes.get(c["id"], 0), "source": cast.source(c), "rig": c.get("rig")}
+            for c in doc["characters"] if isinstance(c, dict) and c.get("id")]
+    if a.json:
+        print(json.dumps({"characters": rows, "point": pst, "fingerprint": cast.fingerprint(d),
+                          "save_to_library": doc.get("save_to_library", True)}, ensure_ascii=False))
+        return 0
+    for r in rows:
+        print(f"{r['id']:<16} {r['state']:<9} notes {r['notes_open']:<3} {r['source']:<12} {r['rig']}")
+    print(f"point cast: {pst}")
+    return 0
+
+
+def cmd_cast_approve(a) -> int:
+    from filmcheck import cast, points
+    d = _cast_film(a)
+    if d is None:
+        return 2
+    if not a.all and not a.ids:
+        print("✗ cast approve: name the characters, or --all", file=sys.stderr)
+        return 2
+    try:
+        doc = cast.load(d)
+        bad = cast.validate(doc)
+        if bad:
+            for cid, code, msg in bad:
+                print(f"✗ {cid or '-'}: {code}: {msg}", file=sys.stderr)
+            return 2
+        if a.base and a.base != cast.fingerprint(d):
+            print("✗ the cast changed since you looked (base is old): reload and approve again", file=sys.stderr)
+            return 4
+        if a.all:
+            code, why = points.approve(d, "cast", source=a.source, by=os.environ.get("STUDIO_USER") or "local")
+        else:
+            why = cast.approve(d, a.ids, a.source, os.environ.get("STUDIO_USER") or "local")
+            code = 1 if why else 0
+    except cast.CastError as e:
+        print(f"✗ {e.code}: {e.message}", file=sys.stderr)
+        return 2
+    except points.PointError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    for w in why:
+        print(f"✗ cast approve: {w}", file=sys.stderr)
+    if code:
+        return code
+    ids = [c["id"] for c in cast.load(d)["characters"]] if a.all else a.ids
+    print(f"✓ approved: {', '.join(ids)} ({a.source})")
+    save = doc.get("save_to_library", True) if a.save is None else a.save
+    if save:
+        try:
+            from filmcheck import castlib
+            for line in castlib.save_approved(d, ids):
+                print(line)
+        except ImportError:
+            pass
+        except Exception as e:                    # noqa: BLE001 — the approval stands; the library copy can be redone
+            print(f"! not saved to the cast library: {e}", file=sys.stderr)
+    return 0
 
 
 def edit_args(a) -> dict:
@@ -1545,6 +1652,15 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("film"); s.add_argument("note_id"); s.add_argument("text")
     g = s.add_mutually_exclusive_group(); g.add_argument("--done", action="store_true"); g.add_argument("--open", action="store_true")
     s.add_argument("--base", required=True); s.add_argument("--dir")
+    ca = sub.add_parser("cast", help="the characters of an After Effects film (specs/034)").add_subparsers(dest="cmd", required=True)
+    s = ca.add_parser("check", help="check cast/cast.json and the rig catalog"); s.add_argument("film")
+    s = ca.add_parser("status", help="the characters, their states and open notes"); s.add_argument("film")
+    s.add_argument("--json", action="store_true")
+    s = ca.add_parser("approve", help="approve characters (--all approves the cast review point)")
+    s.add_argument("film"); s.add_argument("ids", nargs="*"); s.add_argument("--all", action="store_true")
+    g = s.add_mutually_exclusive_group()
+    g.add_argument("--save", dest="save", action="store_true", default=None); g.add_argument("--no-save", dest="save", action="store_false")
+    s.add_argument("--source", choices=["chat", "ui"], default="chat"); s.add_argument("--base")
     fm = sub.add_parser("film", help="the film's video (specs/029)").add_subparsers(dest="cmd", required=True)
     s = fm.add_parser("replace", help="put a new video in place, keeping one previous")
     s.add_argument("film"); s.add_argument("video"); s.add_argument("--shots"); s.add_argument("--dir")
@@ -1573,6 +1689,7 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach, ("kit", "use"): cmd_kit_use,
             ("shots", "export"): cmd_shots_export,
             ("notes", "show"): cmd_notes_show, ("notes", "reply"): cmd_notes_reply, ("film", "replace"): cmd_film_replace,
+            ("cast", "check"): cmd_cast_check, ("cast", "status"): cmd_cast_status, ("cast", "approve"): cmd_cast_approve,
             ("people", "list"): cmd_people_list, ("people", "new"): cmd_people_new, ("people", "sheet"): cmd_people_sheet,
             ("people", "approve"): cmd_people_approve, ("people", "use"): cmd_people_use, ("people", "check"): cmd_people_check,
             ("lesson", "list"): cmd_lesson_list, ("lesson", "draft"): cmd_lesson_draft, ("lesson", "add"): cmd_lesson_add,
