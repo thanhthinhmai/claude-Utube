@@ -7,6 +7,7 @@ import tempfile
 import os
 import shutil
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -1150,9 +1151,17 @@ def cmd_voice_make(a) -> int:
             (vdir / "dur.json").write_text(json.dumps(dur, indent=1), encoding="utf-8")
             made.update({i: keys[i] for i in done})
             (vdir / ".made.json").write_text(json.dumps(made, ensure_ascii=False, indent=1), encoding="utf-8")
-        if fallback:
+        emos = {r["id"]: {"emotion": r["emotion"], "emotion_applied": emotion_acted(
+                    voicecat.parse(r.get("voice") or "")[0], model)}
+                for r in rows if r.get("emotion") not in (None, "", "neutral")}
+        if fallback or emos or (vdir / "speakers.json").is_file():
             sp = _load(vdir / "speakers.json", {})
-            sp["fallback"] = {"provider": "kokoro", "voices": fallback}
+            if fallback:
+                sp["fallback"] = {"provider": "kokoro", "voices": fallback}
+            if emos:                               # FR-031: the Voice page says which emotions were not acted
+                sp["emotions"] = emos
+            else:
+                sp.pop("emotions", None)
             (vdir / "speakers.json").write_text(json.dumps(sp, ensure_ascii=False, indent=1), encoding="utf-8")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -1160,7 +1169,8 @@ def cmd_voice_make(a) -> int:
 
 
 def read_eleven(d: Path, rows: list, model: str, estimated: int):
-    """Read lines with ElevenLabs (at most 4 at once) into voices/.raw/; align.json and usage.json.
+    """Read lines with ElevenLabs (at most 3 at once: the Starter plan's limit; a 429 is tried again) into voices/.raw/;
+    align.json and usage.json.
     (0 or 3 on a provider error, the ids read: those stay)."""
     from concurrent.futures import ThreadPoolExecutor
     vdir = d / "voices"
@@ -1171,10 +1181,17 @@ def read_eleven(d: Path, rows: list, model: str, estimated: int):
         vs = dict(r.get("el") or {})
         if r.get("speed") is not None:
             vs["speed"] = r["speed"]
-        pcm, al, n = eleven.speak(r["voice"], spoken(r, model), model, vs)
+        for wait in (1, 2, 4, 8, 0):
+            try:
+                pcm, al, n = eleven.speak(r["voice"], spoken(r, model), model, vs)
+                break
+            except eleven.ElevenError as e:
+                if e.code != "busy" or not wait:
+                    raise
+                time.sleep(wait * float(os.environ.get("STUDIO_ELEVEN_BACKOFF", "1")))
         eleven.write_wav(vdir / ".raw" / f"{r['id']}.wav", pcm)
         return r["id"], al, n
-    with ThreadPoolExecutor(max_workers=4) as ex:
+    with ThreadPoolExecutor(max_workers=int(os.environ.get("STUDIO_ELEVEN_PARALLEL", "3"))) as ex:
         futs = [ex.submit(one, r) for r in rows]
         for r, fu in zip(rows, futs):
             try:
@@ -1187,6 +1204,8 @@ def read_eleven(d: Path, rows: list, model: str, estimated: int):
             if al:
                 align[i] = {"chars": al.get("characters") or [], "start": al.get("character_start_times_seconds") or [],
                             "end": al.get("character_end_times_seconds") or [], "source": "el"}
+            else:                                  # research R2: v3 may send no alignment; the recogniser's stamps
+                align[i] = {"source": "asr"}       # (voice asr) time this line
     if ok:
         (vdir / "align.json").write_text(json.dumps(align, ensure_ascii=False), encoding="utf-8")
         u = _load(vdir / "usage.json", {"provider": "elevenlabs", "total": 0, "runs": []})
@@ -1282,6 +1301,129 @@ def cmd_voice_channel(a) -> int:
     print(f"narrator   {_setting_text(doc['narrator']) if doc['narrator'] else 'not chosen yet'}")
     for k, v in doc["roles"].items():
         print(f"{k:<10} " + " | ".join(_setting_text(x) for x in v))
+    return 0
+
+
+def sample_line(d: Path, cid: str) -> str:
+    """The test sentence of a character: its longest line of at most 120 characters (specs/036 contracts/cli.md)."""
+    try:
+        rows = json.loads((d / "lines.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        rows = []
+    said = [(r.get("say") or r.get("text") or "").strip() for r in rows if isinstance(r, dict) and r.get("speaker") == cid]
+    said = [t for t in said if t]
+    if not said:
+        return ""
+    fit = [t for t in said if len(t) <= 120]
+    if fit:
+        return max(fit, key=len)
+    t = said[0][:120]
+    return t.rsplit(" ", 1)[0] if " " in t else t
+
+
+def cmd_voice_cast(a) -> int:
+    """voice cast <film> sample <character> [--option n] | set <character> --option n | --voice … (specs/036 US2)."""
+    from filmcheck import cast
+    d = film_dir(a.film)
+    try:
+        doc = cast.load(d)
+        c = cast.find(doc, a.character)
+    except cast.CastError as e:
+        print(f"✗ voice cast: {e}", file=sys.stderr)
+        return 2
+    opts = c.get("voice_options") or []
+    if a.option is not None and not 1 <= a.option <= len(opts):
+        print(f"✗ voice cast: {a.character} has {len(opts)} voice choice(s)", file=sys.stderr)
+        return 2
+    if a.action == "set":
+        if a.option is not None:
+            st = dict(opts[a.option - 1]["setting"])
+        elif a.voice or a.mode == "narrator":
+            st = {"mode": a.mode or "own", **({"voice": a.voice} if a.voice else {})}
+        else:
+            print("✗ voice cast set: give --option n or --voice <id> (or --mode narrator)", file=sys.stderr)
+            return 2
+        for k in ("pitch", "speed"):
+            if getattr(a, k) is not None:
+                st[k] = getattr(a, k)
+        errs = speakers.check_setting(st, "voice")
+        if errs:
+            print("✗ voice cast: " + "; ".join(errs), file=sys.stderr)
+            return 2
+        was = cast.state(d, c)
+        c["voice"] = st
+        cast.save(d, doc)
+        now_st = cast.state(d, cast.find(cast.load(d), a.character))
+        print(f"✓ {a.character}: {_setting_text(st)}" + (" (approved before: now changed, approve again)"
+                                                         if was == "approved" and now_st != "approved" else ""))
+        return 0
+    # sample: read the test sentence with each choice (or one) into cast/voices/<id>/<n>.wav
+    line = sample_line(d, a.character)
+    if not line:
+        print(f"✗ voice cast: {a.character} has no line in lines.json", file=sys.stderr)
+        return 2
+    picks = [a.option] if a.option is not None else list(range(1, len(opts) + 1))
+    if not picks:
+        print(f"✗ voice cast: {a.character} has no voice_options; write them in cast/cast.json", file=sys.stderr)
+        return 2
+    narr = speakers.resolve(d, [{"id": "_", "text": "x"}], root())["speakers"].get("narrator", {}).get("setting")
+    rows = []
+    for n in picks:
+        s = speakers._real(opts[n - 1]["setting"], narr)
+        if not s.get("voice"):
+            print(f"✗ voice cast: choice {n} is played by the narrator, and the channel has no narrator voice yet", file=sys.stderr)
+            return 2
+        rows.append({"id": f"{a.character}-{n}", "n": n, "text": line, **s})
+    chars = speakers.estimate_chars(rows)
+    print(f"sample: \"{line}\" × {len(rows)}" + (f" · ElevenLabs {chars} characters" if chars else " · Kokoro, free"))
+    if chars and not a.yes:
+        print("✗ voice cast: add --yes to spend these characters", file=sys.stderr)
+        return 1
+    out = cast.path(d).parent / "voices" / a.character
+    out.mkdir(parents=True, exist_ok=True)
+    raw = Path(tempfile.mkdtemp(prefix="sample.", dir=out))
+    try:
+        k_rows = [r for r in rows if voicecat.parse(r["voice"])[0] == "kokoro"]
+        if k_rows:
+            f = raw / ".say.json"
+            f.write_text(json.dumps([{"id": r["id"], "text": r["text"], "voice": voicecat.parse(r["voice"])[1],
+                                      "speed": r.get("speed") or 1.0} for r in k_rows], ensure_ascii=False), encoding="utf-8")
+            if os.environ.get("STUDIO_TTS_FAKE"):
+                rc = fake_tts(f, raw)
+            else:
+                import subprocess
+                lib = Path(lib_dir())
+                py = lib / ".venv" / "bin" / "python"
+                rc = subprocess.run([str(py if py.is_file() else "python3"), str(lib / "core" / "tts" / "tts.py"), str(f), str(raw)],
+                                    cwd=str(lib)).returncode
+            if rc:
+                print("✗ voice cast: Kokoro could not read the sample", file=sys.stderr)
+                return 1
+        spent = 0
+        for r in rows:
+            if voicecat.parse(r["voice"])[0] == "elevenlabs":
+                vs = dict(r.get("el") or {})
+                if r.get("speed") is not None:
+                    vs["speed"] = r["speed"]
+                try:
+                    pcm, _, n = eleven.speak(r["voice"], r["text"], eleven.model(), vs)
+                except eleven.ElevenError as e:
+                    print(f"✗ elevenlabs {r['id']}: {e.message}", file=sys.stderr)
+                    return 3
+                spent += n
+                eleven.write_wav(raw / f"{r['id']}.wav", pcm)
+            voicefx.apply(raw / f"{r['id']}.wav", out / f"{r['n']}.wav", r.get("pitch") or 0, r.get("formant"), "none", None)
+            opts[r["n"] - 1]["sample_line"], opts[r["n"] - 1]["sample"] = line, f"voices/{a.character}/{r['n']}.wav"
+            print(f"✓ choice {r['n']}: {_setting_text(r)} → cast/voices/{a.character}/{r['n']}.wav")
+        if spent:
+            u = _load(d / "voices" / "usage.json", {"provider": "elevenlabs", "total": 0, "runs": []})
+            u["total"] = int(u.get("total") or 0) + spent
+            u.setdefault("runs", []).append({"at": now(), "chars_estimated": chars, "chars": spent, "sample": a.character})
+            (d / "voices").mkdir(exist_ok=True)
+            (d / "voices" / "usage.json").write_text(json.dumps(u, ensure_ascii=False, indent=1), encoding="utf-8")
+        cast.save(d, doc)
+    finally:
+        shutil.rmtree(raw, ignore_errors=True)
     return 0
 
 
@@ -1888,6 +2030,16 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("voice-check", help="who says each line and with which voice (specs/036)")
     s.add_argument("film")
     s.add_argument("--json", action="store_true")
+    s = sub.add_parser("voice-cast", help="a character's voice: listen to the choices, set one (specs/036)")
+    s.add_argument("film")
+    s.add_argument("action", choices=["sample", "set"])
+    s.add_argument("character")
+    s.add_argument("--option", type=int, default=None, help="1–3: one of the character's voice_options")
+    s.add_argument("--voice", default=None, help="set: kokoro name or el:<id>")
+    s.add_argument("--mode", choices=["own", "narrator"], default=None)
+    s.add_argument("--pitch", type=float, default=None)
+    s.add_argument("--speed", type=float, default=None)
+    s.add_argument("--yes", action="store_true", help="sample: spend the ElevenLabs characters shown")
     s = sub.add_parser("voice-channel", help="a channel's narrator and side-part voices (specs/036)")
     s.add_argument("slug")
     s.add_argument("what", choices=["show", "narrator", "role"])
@@ -2116,6 +2268,7 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("voice-asr", "voice-asr"): cmd_voice_asr, ("voice-make", "voice-make"): cmd_voice_make,
             ("voice-usage", "voice-usage"): cmd_voice_usage, ("eleven", "test"): cmd_eleven, ("eleven", "voices"): cmd_eleven,
             ("voice-check", "voice-check"): cmd_voice_check, ("voice-channel", "voice-channel"): cmd_voice_channel,
+            ("voice-cast", "voice-cast"): cmd_voice_cast,
             ("qc-limits", "qc-limits"): cmd_qc_limits,
             ("render-done", "render-done"): cmd_render_done,
             ("point", "status"): cmd_point_status, ("point", "set"): cmd_point_set, ("point", "approve"): cmd_point_approve,

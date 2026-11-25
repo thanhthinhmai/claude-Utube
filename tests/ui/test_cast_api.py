@@ -74,6 +74,12 @@ class CastApi(unittest.TestCase):
         self.assertEqual(r.content[:2], b"\xff\xd8")
         self.assertEqual(self.c.get(f"/api/v1/jobs/{self.jid}/files/cast/sheets/hero.prev/front.jpg").status_code, 200)
         self.assertEqual(self.c.get(f"/api/v1/jobs/{self.jid}/files/cast/cast.json").status_code, 404)
+        (self.film / "cast" / "voices" / "hero").mkdir(parents=True)                   # specs/036: voice samples
+        (self.film / "cast" / "voices" / "hero" / "1.wav").write_bytes(b"RIFF....WAVE")
+        self.assertEqual(self.c.get(f"/api/v1/jobs/{self.jid}/files/cast/voices/hero/1.wav").status_code, 200)
+        self.assertEqual(self.c.get(f"/api/v1/jobs/{self.jid}/files/cast/voices/hero/4.wav").status_code, 404)
+        hero = v["cast"]["characters"][0]
+        self.assertEqual((hero["voice"], hero["voice_options"], hero["speaks"]), (None, [], 0))
         self.assertEqual(self.c.get(f"/api/v1/jobs/{self.jid}/files/cast/sheets/../cast.json").status_code, 404)
         base = v["points"]["cast"]["fingerprint"]
         r = self.c.post(f"/api/v1/jobs/{self.jid}/actions", headers=W, json={

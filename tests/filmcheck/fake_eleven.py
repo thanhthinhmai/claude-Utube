@@ -24,6 +24,9 @@ class FakeEleven:
     def __init__(self, key="sk_test_0123456789abcdef", left=10000, tier="creator", page=2):
         self.key, self.limit, self.used, self.tier, self.page = key, left, 0, tier, page
         self.calls = []
+        self.align = True
+        self.cost = None
+        self.busy = 0                                       # the next n speak calls answer 429 (too many at once)                                    # a ratio: the plan charges fewer than the letters                                   # False: like eleven_v3 at times, no alignment comes back
         self.srv = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
         self.url = f"http://127.0.0.1:{self.srv.server_address[1]}"
 
@@ -42,9 +45,11 @@ class FakeEleven:
             def log_message(self, *a):
                 pass
 
-            def send(self, code, obj):
+            def send(self, code, obj, headers=None):
                 b = json.dumps(obj).encode()
                 self.send_response(code)
+                for k, v in (headers or {}).items():
+                    self.send_header(k, v)
                 self.send_header("content-type", "application/json")
                 self.send_header("content-length", str(len(b)))
                 self.end_headers()
@@ -69,16 +74,22 @@ class FakeEleven:
                                            "next_page_token": str(start + fake.page) if more else None})
                 if u.path.startswith("/v1/text-to-speech/") and u.path.endswith("/with-timestamps"):
                     text = body["text"]
+                    if fake.busy > 0:
+                        fake.busy -= 1
+                        return self.send(429, {"detail": {"status": "too_many_concurrent_requests",
+                                                          "message": "Too many concurrent requests."}})
                     if fake.used + len(text) > fake.limit:
                         return self.send(401, {"detail": {"status": "quota_exceeded", "message": "quota"}})
-                    fake.used += len(text)
+                    cost = len(text) if fake.cost is None else int(len(text) * fake.cost)
+                    fake.used += cost
                     secs = max(0.3, 0.06 * len(text))
                     pcm = b"\0\0" * int(24000 * secs)
                     step = secs / max(1, len(text))
                     return self.send(200, {"audio_base64": base64.b64encode(pcm).decode(), "alignment": {
                         "characters": list(text),
                         "character_start_times_seconds": [round(i * step, 3) for i in range(len(text))],
-                        "character_end_times_seconds": [round((i + 1) * step, 3) for i in range(len(text))]}})
+                        "character_end_times_seconds": [round((i + 1) * step, 3) for i in range(len(text))]}
+                        if fake.align else None}, {"character-cost": str(cost)} if fake.cost is not None else None)
                 return self.send(404, {"detail": "not found"})
 
             def do_GET(self):

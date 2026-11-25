@@ -23,6 +23,9 @@ Python packages in each `*.dist-info/`, npm packages in `node_modules/*/`, Debia
   (source: https://ffmpeg.org/releases/). The GPL text ships next to the binaries.
 - Kokoro-82M voice model (https://huggingface.co/hexgrad/Kokoro-82M), Apache-2.0; downloaded at setup
   from the library's own release (onnx export by kokoro-onnx, MIT).
+- ElevenLabs text to speech (https://elevenlabs.io), an optional online service reached with the user's own API key
+  (specs/036); no ElevenLabs code is bundled. Use of its voices follows the user's ElevenLabs plan and terms. Pitch
+  changes use the rubberband filter (Rubber Band Library, GPL-2.0+) when the FFmpeg build has it, else FFmpeg's own filters.
 - Salamander Grand Piano V3 by Alexander Holm (https://archive.org/details/SalamanderGrandPianoV3), CC BY 3.0
   (https://creativecommons.org/licenses/by/3.0/); the library's sample pack, played by the style kit's score
   (my-styles/dusk-hypothetical/kit/sound/score.py, specs/023). Films that use it repeat this line in their own CREDITS.

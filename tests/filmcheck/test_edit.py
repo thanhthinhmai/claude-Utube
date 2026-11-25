@@ -218,6 +218,19 @@ class Voice(unittest.TestCase):                                    # specs/026 T
         after = self.rows()
         self.assertEqual([("voice" in x) for x in after[:4]], [True, False, False, True])   # only kid's lines lost "voice"
 
+    def test_voice_tone(self):                                          # specs/036 T041 (FR-030)
+        lid = self.rows()[1]["id"]
+        self.assertEqual(self.run_op("voice-tone", line=lid, emotion="angry")["code"], 2)
+        self.assertEqual(self.run_op("voice-tone", line=lid, fx="moon")["code"], 2)
+        self.assertEqual(self.run_op("voice-tone", line=lid)["code"], 2)           # nothing to change
+        r = self.run_op("voice-tone", line=lid, emotion="whisper", fx="wall")
+        self.assertEqual(r["code"], 0, r)
+        row = self.rows()[1]
+        self.assertEqual((row["emotion"], row["fx"]), ("whisper", "wall"))
+        self.assertEqual(self.run_op("voice-tone", line=lid, emotion="neutral", fx="none")["code"], 0)
+        self.assertNotIn("emotion", self.rows()[1])
+        self.assertNotIn("fx", self.rows()[1])
+
 
 class Mix(unittest.TestCase):                                      # specs/026 T045
     def setUp(self):

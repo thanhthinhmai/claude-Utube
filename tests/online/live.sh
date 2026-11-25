@@ -2,8 +2,15 @@
 # Bài chạy thật với Claude (specs/007 T048, specs/008 T035): dùng hạn mức gói Claude của bạn (và tiền nếu đi qua
 # khoá API dự phòng). Cần deploy/.env với DOMAIN=localhost; khoá API không bắt buộc.
 #   sh tests/online/live.sh [--videos <thư mục có ≤ 3 video của bạn>] [--films 3] [--seconds 30] [--no-up]
+#   sh tests/online/live.sh --eleven   (specs/036 T043: chỉ đọc 3 câu bằng ElevenLabs, ~100 ký tự, cần ELEVENLABS_API_KEY)
 set -eu
 HERE=$(CDPATH='' cd -- "$(dirname -- "$0")/../.." && pwd -P)
+if [ "${1:-}" = --eleven ]; then
+  printf "Bài này đọc 3 câu bằng ElevenLabs thật (khoảng 100 ký tự của gói). Gõ yes để chạy: "
+  read -r ok
+  [ "$ok" = yes ] || { echo "= đã huỷ"; exit 1; }
+  exec python3 "$HERE/tests/online/live_eleven.py"
+fi
 [ -f "$HERE/deploy/.env" ] || { echo "✗ chưa có deploy/.env (chép deploy/.env.example rồi điền)"; exit 1; }
 grep -q '^DOMAIN=localhost$' "$HERE/deploy/.env" || { echo "✗ bài chạy thật dùng DOMAIN=localhost trong deploy/.env"; exit 1; }
 echo "Bài này gọi Claude thật: 3 phim 30 giây (và 1 lần học nếu có --videos). Nó dùng nhiều hạn mức gói Claude"

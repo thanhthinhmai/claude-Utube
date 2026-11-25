@@ -90,6 +90,20 @@ def speaker_rows(d: Path) -> list:
     return out
 
 
+def narrator_now(d: Path) -> dict:
+    """The narrator's voice and speed, the same the Done so far summary shows (specs/036 FR-041)."""
+    from .donesofar import narrator_voice
+    rows = store.read_json(d / "lines.json")
+    return narrator_voice(d, rows if isinstance(rows, list) else [])
+
+
+def emotions(d: Path) -> dict:
+    """{line id: {emotion, emotion_applied}} from the last `voice make` (specs/036 FR-031)."""
+    sp = store.read_json(d / "voices" / "speakers.json")
+    e = sp.get("emotions") if isinstance(sp, dict) else None
+    return e if isinstance(e, dict) else {}
+
+
 def catalog(d: Path):
     """Names the Shots panel may offer: the kit's catalogue plus the film's custom sets; None without a scene table."""
     cat = store.read_json(d / "kit" / "catalog.json")
@@ -149,7 +163,8 @@ def cast_block(d: Path):
                "state": st.get(c["id"]), "source": cast.source(c), "rig": c.get("rig"), "needs": c.get("needs"),
                "palette": cast.palette(c), "sheet": {"frames": sheet.get("frames", []), "built_at": sheet.get("built_at")}
                if isinstance(sheet, dict) else None, "has_prev": prev, "notes_open": counts.get(c["id"], 0),
-               "approved": c.get("approved")}
+               "approved": c.get("approved"), "voice": c.get("voice"), "voice_options": c.get("voice_options") or [],
+               "speaks": cast.speaks(d, c["id"])}                     # specs/036
         row["members" if row["kind"] == "group" else "spec"] = c.get("members") if row["kind"] == "group" else c.get("spec")
         chars.append(row)
     used = {r.get("para") for c in chars for k in ("expressions", "poses") for r in ((c.get("needs") or {}).get(k) or [])
@@ -194,7 +209,7 @@ def view(j: dict) -> dict:
             "editable": {"shots": cat is not None,
                          "reason": None if cat is not None else ("no scene table" if has_kit else "style has no kit")},
             "catalog": cat, "voices": voices() + [v["id"] for v in el_voices()], "voice_rows": voice_rows(),
-            "voice_cost": voice_cost(d), "speakers": speaker_rows(d), "mix_ranges": mix_ranges(d), "review": rv, "cast": cast_block(d)}
+            "voice_cost": voice_cost(d), "speakers": speaker_rows(d), "emotions": emotions(d), "narrator_voice": narrator_now(d), "mix_ranges": mix_ranges(d), "review": rv, "cast": cast_block(d)}
 
 
 def etag(v: dict) -> str:

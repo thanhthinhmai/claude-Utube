@@ -590,7 +590,8 @@ case ${1:-} in
       usage) [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice usage <phim>" >&2; exit 2; }; shift; cmd_filmcheck voice-usage "$@" ;;
       check) [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice check <phim>" >&2; exit 2; }; shift; cmd_filmcheck voice-check "$@" ;;
       channel) [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice channel <kênh> show|narrator|role …" >&2; exit 2; }; shift; cmd_filmcheck voice-channel "$@" ;;
-      *) echo "dùng: sh bin/studio voice asr|make|usage|check|channel …" >&2; exit 2 ;;
+      cast) [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice cast <phim> sample|set <nhân vật> …" >&2; exit 2; }; shift; cmd_filmcheck voice-cast "$@" ;;
+      *) echo "dùng: sh bin/studio voice asr|make|usage|check|channel|cast …" >&2; exit 2 ;;
     esac ;;
   page) shift; cmd_page "$@" ;;
   ae) shift; cmd_ae "$@" ;;

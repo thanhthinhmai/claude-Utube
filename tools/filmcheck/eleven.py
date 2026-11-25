@@ -98,11 +98,18 @@ def _error(status: int, body: bytes, key: str = "") -> ElevenError:
         return ElevenError("quota", "not enough ElevenLabs characters left: " + msg)
     if status == 401 or st in ("invalid_api_key", "missing_permissions"):
         return ElevenError("invalid_key", "the ElevenLabs key does not work: " + msg)
+    if status == 429:                      # too many lines at once for the plan, or ElevenLabs is busy: try again
+        return ElevenError("busy", f"ElevenLabs is busy: {msg}")
     return ElevenError("api", f"ElevenLabs answered {status}: {msg}")
 
 
 def direct(method: str, path: str, body=None, key: str = None, query: dict = None) -> dict:
     """One call to ElevenLabs with a key (the proxy uses this too). Returns the JSON answer."""
+    return direct_with_headers(method, path, body, key, query)[0]
+
+
+def direct_with_headers(method: str, path: str, body=None, key: str = None, query: dict = None):
+    """(JSON answer, response headers) of one call."""
     key = key or _key()
     url = os.environ.get("STUDIO_ELEVEN_URL", API).rstrip("/") + path
     if query:
@@ -111,7 +118,7 @@ def direct(method: str, path: str, body=None, key: str = None, query: dict = Non
                                  headers={"xi-api-key": key, "content-type": "application/json", "accept": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
-            return json.loads(r.read() or b"{}")
+            return json.loads(r.read() or b"{}"), r.headers
     except urllib.error.HTTPError as e:
         raise _error(e.code, e.read(), key) from None
     except (urllib.error.URLError, OSError) as e:
@@ -199,10 +206,15 @@ def direct_speak(voice_id: str, text: str, model_id: str = None, settings: dict 
     """{audio_base64, alignment, chars} for one line (the proxy calls this with the studio's key)."""
     if len(text) > MAX_CHARS:
         raise ElevenError("too_long", f"a line may have at most {MAX_CHARS} characters")
-    d = direct("POST", f"/v1/text-to-speech/{urllib.parse.quote(voice_id)}/with-timestamps",
-               speak_body(text, model_id or model(), settings or {}), key=key, query={"output_format": f"pcm_{RATE}"})
+    d, h = direct_with_headers("POST", f"/v1/text-to-speech/{urllib.parse.quote(voice_id)}/with-timestamps",
+                               speak_body(text, model_id or model(), settings or {}), key=key,
+                               query={"output_format": f"pcm_{RATE}"})
+    try:                                   # what the plan really charged (often less than the letters): the
+        chars = int(h.get("character-cost"))   # estimate of `voice make` stays the ceiling
+    except (TypeError, ValueError):
+        chars = len(text)
     return {"audio_base64": d.get("audio_base64") or "", "alignment": d.get("alignment") or d.get("normalized_alignment"),
-            "chars": len(text)}
+            "chars": chars}
 
 
 def speak(voice_id: str, text: str, model_id: str = None, settings: dict = None):

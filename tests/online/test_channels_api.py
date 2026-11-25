@@ -55,6 +55,24 @@ class ChannelsApi(unittest.TestCase):
         row = c.get("/api/v1/channels").json()["channels"][0]
         self.assertEqual((row["slug"], row["lessons_active"]), ("honey-facts", 1))
 
+    def test_channel_voices(self):                                     # specs/036 T038: narrator and role voices
+        c = self.c
+        self.assertEqual(c.post("/api/v1/channels", json=channel_body(), headers=W).status_code, 201)
+        url = "/api/v1/channels/honey-facts/voice"
+        v = c.get(url).json()
+        self.assertEqual(v["roles_order"], ["boy", "girl", "woman", "man", "old_man", "old_woman"])
+        self.assertEqual(v["roles"]["boy"][0]["mode"], "narrator")
+        self.assertTrue(any(r["id"].endswith("af_bella") for r in v["voice_rows"]))
+        r = c.put(url, json={"role": "boy", "settings": [{"mode": "own", "voice": "am_adam", "speed": 1.1}]}, headers=W)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(c.get(url).json()["roles"]["boy"], [{"mode": "own", "voice": "am_adam", "speed": 1.1}])
+        r = c.put(url, json={"narrator": {"mode": "own", "voice": "bm_george", "speed": 1.0}}, headers=W)
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(c.get(url).json()["narrator"]["voice"], "bm_george")
+        self.assertEqual(c.put(url, json={"role": "boy", "settings": [{"mode": "narrator", "pitch": 12}]},
+                               headers=W).status_code, 422)
+        self.assertEqual(c.put(url, json={"role": "dragon", "settings": [{"mode": "narrator"}]}, headers=W).status_code, 422)
+
     def test_others_cannot_see_or_change(self):                      # SC-005
         self.c.post("/api/v1/channels", json=channel_body(), headers=W)
         other = self.s.signup_verified("other@example.com")
@@ -170,6 +188,9 @@ class ChannelsApi(unittest.TestCase):
             self.assertEqual(res["errors"], [])
             self.assertTrue(res["fits"], res)
             self.assertEqual(res["seconds"], "35")
+            self.assertEqual(res["roleRows"], 7)                        # narrator + 6 roles (specs/036 T042)
+            self.assertIn("Kokoro (free, on this machine)", res["groups"])
+            self.assertEqual(self.c.get("/api/v1/channels/tea-time/voice").json()["roles"]["boy"][0]["voice"], "am_adam")
             self.assertIn("Cheap tricks", res["lessons"])
             self.assertEqual(self.c.get("/api/v1/channels/tea-time").json()["seconds"], 35)
         finally:

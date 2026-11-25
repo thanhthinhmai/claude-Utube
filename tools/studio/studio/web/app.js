@@ -306,6 +306,7 @@ async function pageChannel(slug) {
       ${a("hashtags", "Hashtags always used", "One per line, like #science; at most 5")}${a("banned", "Words never used", "One per line")}
       ${pointBoxes("p-reviews", reviewsOf(c))}
       <div><button class="primary" type="submit">Save the profile</button></div></form><p id="msg" class="muted" role="status"></p>
+    <div class="panel" id="ch-voices"><p class="section-title">Voices</p><p class="muted">Loading…</p></div>
     <div class="panel"><p class="section-title">Decisions</p>
       ${(c.decisions || []).length ? `<ul>${c.decisions.map((/** @type {any} */ d) => `<li>${esc(d.date)}: ${esc(d.text)}</li>`).join("")}</ul>` : `<p class="muted">None yet.</p>`}
       <div class="row"><input id="d-text" maxlength="300" placeholder="Something you decided for this channel"><button id="d-add">Add</button></div></div>
@@ -313,6 +314,7 @@ async function pageChannel(slug) {
     <div class="panel" id="topics"><p class="section-title">Topics</p><p class="muted">Loading…</p></div>`;
   const again = () => pageChannel(slug);
   fillTopics(slug);
+  fillChannelVoices(slug);
   onSubmit(async () => {
     const num = (/** @type {string} */ k) => field(`p-${k}`).value.trim() === "" ? null : Number(field(`p-${k}`).value);
     await send("PUT", `/channels/${encodeURIComponent(slug)}`, {
@@ -328,6 +330,47 @@ async function pageChannel(slug) {
     catch (e) { alert(e.message); }
   };
   wireLessons(base, again);
+}
+
+// ---------- the channel's narrator and side-part voices (specs/036 T038) ----------
+const ROLE_NAMES = { boy: "Boy", girl: "Girl", woman: "Woman", man: "Man", old_man: "Old man", old_woman: "Old woman" };
+/** @param {string} slug */
+async function fillChannelVoices(slug) {
+  const box = document.getElementById("ch-voices");
+  if (!box) return;
+  const url = `/channels/${encodeURIComponent(slug)}/voice`;
+  let v;
+  try { v = await get(url); } catch (e) { box.innerHTML = `<p class="section-title">Voices</p><p class="fail">${esc(e.message)}</p>`; return; }
+  /** one editable voice row: the first setting of a role, or the narrator @param {string} key @param {string} label @param {any} st @param {boolean} narr */
+  const row = (key, label, st, narr) => {
+    st = st || {};
+    return `<tr data-vrole="${esc(key)}"><th scope="row">${esc(label)}</th><td>${esc(voiceText(st.mode || st.voice ? st : null))}</td><td><div class="row">
+      ${narr ? "" : `<select data-f="mode" aria-label="Who plays ${esc(label)}"><option value="narrator"${st.mode !== "own" ? " selected" : ""}>The narrator plays it</option><option value="own"${st.mode === "own" ? " selected" : ""}>Own voice</option></select>`}
+      <select data-f="voice" aria-label="Voice of ${esc(label)}">${voiceOptions(v, st.voice || "")}</select>
+      ${narr ? "" : `<label class="small">Pitch <input data-f="pitch" type="number" min="-6" max="6" step="0.5" value="${Number(st.pitch || 0)}" style="width:5em"></label>`}
+      <label class="small">Speed <input data-f="speed" type="number" min="0.7" max="1.3" step="0.05" value="${Number(st.speed || 1)}" style="width:5em"></label>
+      <button class="btn small" data-vsave>Save</button></div></td></tr>`;
+  };
+  box.innerHTML = `<p class="section-title">Voices</p>
+    <p class="muted small">The narrator reads every film of this channel. A side part without its own voice is played by the role's voice; the narrator pitched up or down is free.</p>
+    <table class="voice-roles"><tbody>${row("narrator", "Narrator", v.narrator, true)}
+    ${(v.roles_order || Object.keys(v.roles || {})).map((/** @type {string} */ r) => row(r, ROLE_NAMES[r] || r, (v.roles[r] || [])[0], false)).join("")}</tbody></table>
+    <p class="small" id="ch-voice-msg" role="status"></p>`;
+  box.querySelectorAll("[data-vsave]").forEach((b) => { /** @type {HTMLButtonElement} */ (b).onclick = async () => {
+    const tr = /** @type {HTMLElement} */ (b.closest("tr"));
+    const key = tr.dataset.vrole || "";
+    const f = (/** @type {string} */ n) => /** @type {HTMLInputElement|null} */ (tr.querySelector(`[data-f="${n}"]`));
+    const mode = f("mode") ? f("mode").value : "own";
+    /** @type {any} */ const st = { mode, speed: Number(f("speed").value || 1) };
+    if (mode === "own") st.voice = f("voice").value;
+    if (f("pitch") && Number(f("pitch").value)) st.pitch = Number(f("pitch").value);
+    const msg = /** @type {HTMLElement} */ (document.getElementById("ch-voice-msg"));
+    try {
+      if (key === "narrator") await send("PUT", url, { narrator: st });
+      else await send("PUT", url, { role: key, settings: [st, ...((v.roles[key] || []).slice(1))] });
+      fillChannelVoices(slug);
+    } catch (e) { msg.className = "small fail"; msg.textContent = e.message; }
+  }; });
 }
 
 // ---------- topics of a channel (specs/013) ----------
@@ -838,6 +881,66 @@ async function castNoteEdit(op, args) {
   throw new Error("The edit is taking long; its result will show in the log.");
 }
 
+/** A voice setting in words (specs/036). @param {any} st */
+function voiceText(st) {
+  if (!st) return "no voice yet";
+  const who = st.mode === "narrator" ? "the narrator plays it" : String(st.voice || "?").replace(/^kokoro:/, "");
+  const p = Number(st.pitch || 0), sp = Number(st.speed || 1);
+  return who + (p ? ` · pitch ${p > 0 ? "+" : ""}${p}` : "") + (sp !== 1 ? ` · speed ${sp}` : "");
+}
+
+/** The Voice part of the Cast panel (specs/036 T033): Claude's choices with a reason and the real line to listen to,
+ * another voice of either provider, pitch and speed when the narrator plays it. @param {any} c @param {boolean} can */
+function castVoiceBox(c, can) {
+  if (c.kind === "group" || !(c.speaks || c.voice || (c.voice_options || []).length)) return "";
+  const v = RAIL.data || {};
+  const opts = (c.voice_options || []).map((/** @type {any} */ o, /** @type {number} */ i) => `<li>
+      <span><b>${i + 1}. ${esc(voiceText(o.setting))}</b> <span class="muted small">${esc(o.why || "")}</span>
+      ${o.sample ? `<br><audio controls preload="none" src="${fileUrl(`cast/${o.sample}`)}" aria-label="Listen to choice ${i + 1}"></audio>` : `<br><small class="muted">No sample yet (Claude reads one with <code>voice cast … sample</code>).</small>`}</span>
+      ${can ? `<button class="btn small" data-vopt="${i + 1}">Use this voice</button>` : ""}</li>`).join("");
+  const cur = c.voice || {};
+  const need = c.speaks && !c.voice ? `<p class="small warn">${esc(c.name || c.id)} speaks ${c.speaks} line${c.speaks === 1 ? "" : "s"}: choose a voice before approving.</p>` : "";
+  return `<div class="cast-voice"><h3>Voice</h3>
+    <p class="small">Now: <b>${esc(voiceText(c.voice))}</b>${c.speaks ? ` <span class="muted">· ${c.speaks} line${c.speaks === 1 ? "" : "s"}</span>` : ""}</p>${need}
+    ${opts ? `<ul class="voice-opts">${opts}</ul>` : ""}
+    ${can ? `<details class="voice-other"><summary class="small">Another voice</summary><div class="row">
+      <select id="cv-mode" aria-label="Who plays it"><option value="own"${cur.mode !== "narrator" ? " selected" : ""}>Own voice</option><option value="narrator"${cur.mode === "narrator" ? " selected" : ""}>The narrator plays it</option></select>
+      <select id="cv-voice" aria-label="Voice">${voiceOptions(v, cur.voice || "")}</select>
+      <label class="small">Pitch <input id="cv-pitch" type="number" min="-6" max="6" step="0.5" value="${Number(cur.pitch || 0)}" style="width:5em"></label>
+      <label class="small">Speed <input id="cv-speed" type="number" min="0.7" max="1.3" step="0.05" value="${Number(cur.speed || 1)}" style="width:5em"></label>
+      <button class="btn small" id="cv-save">Save voice</button></div></details>` : ""}
+    <p class="small fail" id="cv-msg" role="status"></p></div>`;
+}
+
+/** @param {HTMLElement} body @param {any} c @param {() => void} redraw */
+function castVoiceWire(body, c, redraw) {
+  const msg = body.querySelector("#cv-msg");
+  const send = async (/** @type {any} */ args) => {
+    try {
+      const x = await sendEdit("cast", "cast-voice", { character: c.id, ...args });
+      if (x.status !== "done" || x.result.code) { if (msg) msg.textContent = editMsg(x); return; }
+      redraw();
+    } catch (e) { if (msg) msg.textContent = /** @type {Error} */ (e).message; }
+  };
+  const rows = (RAIL.data && RAIL.data.voice_rows) || [];
+  const clonedOk = (/** @type {string} */ id) => {          // the first time a cloned voice is used: confirm the right
+    const r = rows.find((/** @type {any} */ x) => x.id === id);
+    if (!r || !r.cloned || (c.voice && c.voice.voice === id && c.voice.cloned_ok)) return {};
+    return confirm("This is a cloned voice. Confirm you have the right to use this person's voice in the film.") ? { cloned_ok: 1 } : null;
+  };
+  body.querySelectorAll("[data-vopt]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
+    const n = Number(/** @type {HTMLElement} */ (el).dataset.vopt), o = (c.voice_options || [])[n - 1] || {};
+    const ok = clonedOk((o.setting || {}).voice || "");
+    if (ok) send({ option: n, ...ok });
+  }; });
+  const save = /** @type {HTMLButtonElement | null} */ (body.querySelector("#cv-save"));
+  if (save) save.onclick = () => {
+    const mode = field("cv-mode").value, voice = field("cv-voice").value;
+    const ok = mode === "own" ? clonedOk(voice) : {};
+    if (ok) send({ mode, ...(mode === "own" ? { voice } : {}), pitch: field("cv-pitch").value, speed: field("cv-speed").value, ...ok });
+  };
+}
+
 /** @param {HTMLElement} body @param {any} s */
 function doneCast(body, s) {
   const cb = RAIL.data && RAIL.data.cast;
@@ -905,6 +1008,7 @@ function doneCast(body, s) {
         ${c.sheet ? (can ? `<p class="hint small muted"><i class="pin">1</i> Click the exact spot on any picture (the hair, a hand, the hat) to pin a note there.</p>` : "") + groups
           : `<div class="fr missing wide"><b>No cast sheet yet</b><span>Claude draws it in After Effects. If it does not come, After Effects or its bridge is not ready: open After Effects (desktop app tray → After Effects… → Test), then ask Claude to run <code>ae sheet</code> again.</span></div>`}
         ${look ? `<h3>Look</h3><dl class="spec">${look}${paras.length ? `<dt>Used in</dt><dd>${paras.map((p) => cb.passages?.[p] ? `<details class="passage"><summary>${esc(p)}</summary><p class="small">${esc(cb.passages[p])}</p></details>` : esc(p)).join(" ")}</dd>` : ""}</dl>` : ""}
+        ${castVoiceBox(c, can)}
         ${c.has_prev ? `<p class="muted small">The sheet before the last redraw is kept: <a href="${castFile(c, "sheet.json", true)}" target="_blank" rel="noopener">previous sheet</a>.</p>` : ""}
         ${can || notes.length ? `<div class="notebox"><p><b>Notes for ${esc(c.name || c.id)}</b> <span class="muted small">· pinned notes appear here; write below for a note about the whole character</span></p>
           ${noteList}${lastList}
@@ -920,6 +1024,7 @@ function doneCast(body, s) {
         <li>Approved characters can be saved to the channel's cast, so the next film uses them without a new review.</li></ol></aside></div>`;
   placePins(body);
   const redraw = () => { doneCast(body, s); castBar(body); };
+  castVoiceWire(body, c, redraw);
   body.querySelectorAll(".who [data-who]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
     DONE.castWho = /** @type {HTMLElement} */ (el).dataset.who; DONE.castPin = null; redraw();
   }; });
@@ -1252,6 +1357,19 @@ function voiceOptions(v, cur) {
   return missing + group("kokoro", "Kokoro (free, on this machine)") + group("elevenlabs", "ElevenLabs");
 }
 
+const EMOTION_NAMES = { neutral: "Neutral", whisper: "Whisper", shout: "Shout", laugh: "Laugh", cry: "Cry", sarcastic: "Sarcastic" };
+const FX_NAMES = { none: "No effect", phone: "Phone", wall: "Behind a wall", radio: "Radio", hall: "Big hall" };
+/** One line's emotion and sound effect (specs/036 FR-030, FR-031): the last make says when the emotion was not acted.
+ * @param {any} r @param {any} made @param {boolean} ed */
+function toneBox(r, made, ed) {
+  const emo = r.emotion || "neutral", fx = r.fx || "none";
+  const sel = (/** @type {string} */ cls, /** @type {any} */ names, /** @type {string} */ cur, /** @type {string} */ label) =>
+    `<select class="${cls}" aria-label="${label} of ${esc(r.id)}" ${ed ? "" : "disabled"}>${Object.entries(names).map(([k, l]) => `<option value="${k}"${k === cur ? " selected" : ""}>${l}</option>`).join("")}</select>`;
+  const not = made && made.emotion === emo && made.emotion_applied === false
+    ? ` <span class="tag small muted" title="Only ElevenLabs v3 acts an emotion${["whisper", "shout"].includes(emo) ? "; a softer or louder level stands in" : ""}">not applied with this voice</span>` : "";
+  return `<span class="tone small muted">${sel("emo-in", EMOTION_NAMES, emo, "Emotion")} ${sel("fx-in", FX_NAMES, fx, "Effect")}${not}</span>`;
+}
+
 /** Voice panel: play each line, fix how a word is said ("say"), make one line again, or change the voice or speed
  * of the whole film after a confirmation on the page (US3). The written words come from the script only. @param {HTMLElement} body */
 async function editVoice(body) {
@@ -1261,7 +1379,7 @@ async function editVoice(body) {
   try { rows = await (await fetch(fileUrl("lines.json"), { cache: "no-store" })).json(); } catch { rows = []; }
   try { checks = await (await fetch(fileUrl("checks.json"), { cache: "no-store" })).json(); } catch { checks = {}; }
   const issues = (((checks.tiers || {}).voice || {}).issues) || [];
-  const first = rows.find((r) => r && r.id) || {};
+  const first = v.narrator_voice || rows.find((r) => r && r.id) || {};   // FR-041: the narrator as the summary shows it
   RAIL.voiceAll = RAIL.voiceAll ?? rows.length <= 40;
   const box = document.createElement("div");
   box.className = "edit-voice";
@@ -1282,9 +1400,10 @@ async function editVoice(body) {
         return `<div class="vline ${mine.length ? "warnl" : ""}" data-id="${esc(r.id)}"><button class="play" data-a="${esc(r.id)}" aria-label="Play ${esc(r.id)}">▶</button>
           <div class="vtxt"><div><code>${esc(r.id)}</code> ${r.speaker && r.speaker !== "narrator" ? `<span class="tag small">${esc(r.speaker)}</span> ` : ""}${esc(r.text)}</div>
             <label class="small muted">say <input class="say-in" maxlength="400" value="${esc(r.say || "")}" placeholder="as written" ${ed ? "" : "disabled"}></label>
+            ${toneBox(r, (v.emotions || {})[r.id], ed)}
             ${mine.map((/** @type {any} */ i) => `<span class="tag warn small">${esc(i.rule)}${i.text ? `: ${esc(i.text)}` : ""}</span>`).join(" ")}
             <span class="msg small">${esc(RAIL.msg[r.id] || "")}</span></div>
-          <div class="vact">${ed ? `<button class="btn small" data-save>Save say</button><button class="btn small" data-remake>Remake line</button>` : ""}</div></div>`;
+          <div class="vact">${ed ? `<button class="btn small" data-save>Save say</button><button class="btn small" data-tone>Save tone</button><button class="btn small" data-remake>Remake line</button>` : ""}</div></div>`;
       }).join("") || `<p class="muted">No line has a "say" or a warning.</p>`}</div>`;
     box.querySelectorAll(".seg button").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => { RAIL.voiceAll = /** @type {HTMLElement} */ (el).dataset.f === "all"; draw(); }; });
     box.querySelectorAll(".play[data-a]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = () => {
@@ -1298,7 +1417,12 @@ async function editVoice(body) {
       RAIL.msg[id] = op === "voice-remake" ? "Making the line again…" : "Saving…";
       /** @type {HTMLElement} */ (line.querySelector(".msg")).textContent = RAIL.msg[id];
       try {
-        if (op === "voice-say") {
+        if (op === "voice-tone") {
+          const x = await sendEdit("voice", "voice-tone", { line: id,
+            emotion: /** @type {HTMLSelectElement} */ (line.querySelector(".emo-in")).value,
+            fx: /** @type {HTMLSelectElement} */ (line.querySelector(".fx-in")).value });
+          RAIL.msg[id] = editMsg(x);
+        } else if (op === "voice-say") {
           const x = await sendEdit("voice", "voice-say", { line: id, say: /** @type {HTMLInputElement} */ (line.querySelector(".say-in")).value });
           RAIL.msg[id] = editMsg(x) + (x.status === "done" ? " Remake the line to hear it." : "");
         } else {
@@ -1326,6 +1450,7 @@ async function editVoice(body) {
     }; });
     box.querySelectorAll("[data-save]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => act(el, "voice-say"); });
     box.querySelectorAll("[data-remake]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => act(el, "voice-remake"); });
+    box.querySelectorAll("[data-tone]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => act(el, "voice-tone"); });
     const ask = () => {                                // the whole film is made again: confirm on the page
       const c = /** @type {HTMLElement} */ (box.querySelector("#v-confirm"));
       const voice = /** @type {HTMLSelectElement} */ (box.querySelector("#v-voice")).value, speed = /** @type {HTMLSelectElement} */ (box.querySelector("#v-speed")).value;

@@ -186,10 +186,44 @@ def validate(doc: dict) -> list:
         if fl is not None and not (isinstance(fl, dict) and isinstance(fl.get("channel"), str) and fl.get("id")
                                    and isinstance(fl.get("v"), int)):
             errs.append((cid, "bad_library", "from_library must be {channel, id, v} or null"))
+        _check_voice(c, cid, errs)                                      # specs/036
         ap = c.get("approved")
         if ap is not None and not (isinstance(ap, dict) and ap.get("fingerprint") and ap.get("source") in SOURCES):
             errs.append((cid, "bad_approved", "approved must be {fingerprint, at, by, source} or null"))
     return errs
+
+
+def _check_voice(c: dict, cid: str, errs: list) -> None:
+    """specs/036 data-model: voice (VoiceSetting | null), voice_options [{setting, why, sample_line?, sample?}] (≤ 3)."""
+    from filmcheck import speakers
+    if c.get("voice") is not None:
+        errs += [(cid, "bad_voice", e) for e in speakers.check_setting(c["voice"], "voice")]
+    opts = c.get("voice_options", [])
+    if not isinstance(opts, list) or len(opts) > 3:
+        errs.append((cid, "bad_voice", "voice_options: a list of at most 3 choices"))
+        return
+    for i, o in enumerate(opts):
+        if not (isinstance(o, dict) and isinstance(o.get("why"), str) and o["why"].strip()):
+            errs.append((cid, "bad_voice", f"voice_options[{i}]: {{setting, why}} with a reason"))
+            continue
+        errs += [(cid, "bad_voice", e) for e in speakers.check_setting(o.get("setting"), f"voice_options[{i}].setting")]
+
+
+def speaks(film_dir, cid: str) -> int:
+    """How many lines of lines.json this character speaks (specs/036)."""
+    try:
+        rows = json.loads((Path(film_dir) / "lines.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return 0
+    return sum(1 for r in rows if isinstance(r, dict) and r.get("speaker") == cid) if isinstance(rows, list) else 0
+
+
+def voice_missing(film_dir, c: dict) -> str:
+    """The reason a character cannot be approved for its voice (FR-013), or ''."""
+    if c.get("kind", "one") == "group" or c.get("voice"):
+        return ""
+    n = speaks(film_dir, c["id"])
+    return f"{c['id']}: speaks {n} line(s) but has no voice; choose one (sh bin/studio voice cast {Path(film_dir).name} set {c['id']} …)" if n else ""
 
 
 def catalog_warnings(film_dir, doc: dict = None) -> list:
@@ -218,6 +252,8 @@ def _sheet_hash(film_dir, cid: str) -> str:
 
 def char_fingerprint(film_dir, c: dict) -> str:
     body = {k: c.get(k) for k in ("rig", "kind", "spec", "members", "needs")}
+    if c.get("voice"):                                   # specs/036: the voice is part of what was approved
+        body["voice"] = c["voice"]
     h = hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False).encode())
     h.update(b"\0" + _sheet_hash(film_dir, c["id"]).encode())
     return h.hexdigest()[:16]
@@ -302,6 +338,8 @@ def approve(film_dir, ids, source: str = "chat", by: str = "local") -> list:
             why.append(f"{c['id']}: no cast sheet yet (run: sh bin/studio ae sheet {d.name} --only {c['id']})")
         elif notes.get(c["id"]):
             why.append(f"{c['id']}: {notes[c['id']]} open note(s); send them to Claude or delete them first")
+        elif voice_missing(d, c):
+            why.append(voice_missing(d, c))
     if why:
         return why
     for c in picked:

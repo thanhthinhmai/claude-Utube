@@ -447,7 +447,8 @@ def get_channel_voice(slug: str, request: Request):
     me(request)
     channel_or_404(slug)
     from filmcheck import speakers
-    return speakers.channel_voice(store.root(), slug)
+    from .filmsteps import voice_rows
+    return {**speakers.channel_voice(store.root(), slug), "roles_order": list(speakers.ROLES), "voice_rows": voice_rows()}
 
 
 @router.put("/channels/{slug}/voice")

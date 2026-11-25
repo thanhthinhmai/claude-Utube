@@ -257,7 +257,7 @@ class TtsIn(BaseModel):                       # specs/036 contracts/http.md
     voice_settings: dict = Field(default_factory=dict)
 
 
-TTS_PARALLEL = 4                              # ElevenLabs calls at once per job
+TTS_PARALLEL = 3                              # ElevenLabs calls at once per job (the Starter plan allows 3)
 TTS_SLOTS: dict = {}
 
 
@@ -507,7 +507,7 @@ def create_app() -> FastAPI:
                                               body.voice_settings, key)
         except eleven.ElevenError as e:
             log.info("job %s elevenlabs %s: %s", job["id"], what, e.code)
-            status = {"invalid_key": 502, "quota": 402, "too_long": 400}.get(e.code, 502)
+            status = {"invalid_key": 502, "quota": 402, "too_long": 400, "busy": 429}.get(e.code, 502)
             return JSONResponse({"error": {"code": e.code, "message": eleven.redact(e.message, key)}}, status_code=status)
 
         def add(j):

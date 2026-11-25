@@ -19,8 +19,8 @@ from pathlib import Path
 from filmcheck import cast
 
 HERE = Path(__file__).resolve().parent
-BODY = ("rig", "kind", "spec", "members")
-COPY = ("id", "name", "role", "kind", "rig", "spec", "members")
+BODY = ("rig", "kind", "spec", "members", "voice")      # specs/036: a new voice is a new version
+COPY = ("id", "name", "role", "kind", "rig", "spec", "members", "voice")
 
 
 class LibraryError(cast.CastError):
@@ -216,6 +216,8 @@ def save(acc: Path, channel: str, c: dict, sheet_dir: Path, film: str, by: str =
                                                   "frames": list(rows.values())})
         ch = {k: c.get(k) for k in COPY if c.get(k) is not None}
         ch.update(frames_approved=sorted(rows), approved={"at": at, "by": by or "local", "film": film}, films=[film])
+        if (c.get("voice") or {}).get("mode") == "narrator":   # specs/036 FR-016: played by the narrator heard then
+            ch["voice_narrator"] = narrator_now(acc, channel)
         _write_json(tmp / "character.json", ch)
         os.rename(tmp, final)
         ent = ent or {"versions": []}
@@ -341,6 +343,9 @@ def use(film_dir, ref: str, by: str = "local") -> dict:
         os.replace(sdir, prev)
     os.replace(stage, sdir)
     cast.save(d, doc)
+    voice_why = narrator_changed(acc, channel, g["character"])
+    if voice_why:
+        lacking.append(voice_why)
     if not lacking:
         doc = cast.load(d)
         cc = cast.find(doc, cid)
@@ -348,6 +353,24 @@ def use(film_dir, ref: str, by: str = "local") -> dict:
         cast.save(d, doc)
     _add_film(acc, channel, cid, g["v"], d.name)
     return {"channel": channel, "id": cid, "v": g["v"], "approved": not lacking, "lacking": lacking}
+
+
+def narrator_now(acc: Path, channel: str):
+    """The channel's narrator voice id now (specs/036), or None."""
+    from filmcheck import speakers
+    try:
+        return (speakers.channel_voice(acc, channel)["narrator"] or {}).get("voice")
+    except Exception:                                   # noqa: BLE001 — a bad VOICE.json: no narrator known
+        return None
+
+
+def narrator_changed(acc: Path, channel: str, ch: dict) -> str:
+    """A character played by the channel's narrator waits for its voice to be approved again when the narrator
+    changed since it was saved (FR-016); '' otherwise."""
+    if (ch.get("voice") or {}).get("mode") != "narrator" or "voice_narrator" not in ch:
+        return ""
+    now_v = narrator_now(acc, channel)
+    return "" if now_v == ch["voice_narrator"] else "voice (the channel's narrator changed: listen and approve again)"
 
 
 def _add_film(acc: Path, channel: str, cid: str, v: int, film: str) -> None:

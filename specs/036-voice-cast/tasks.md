@@ -80,11 +80,11 @@
 
 ### Cast (cần 034)
 
-- [ ] T030 [US2] Thêm `voice`, `voice_options[]`, `speaks` vào nhân vật trong `tools/filmcheck/cast.py`; dấu nhân vật gồm `voice`; cổng: `speaks > 0` và `voice` null → không duyệt được, báo tên (FR-013)
-- [ ] T031 [US2] Lưu `voice` vào `character.json` của kho trong `tools/filmcheck/castlib.py` (đổi giọng = bản `v<n+1>`); phim dùng lại nhân vật lấy giọng từ kho, không hỏi (FR-014); đổi người kể kênh → nhân vật `mode=narrator` của kênh "chờ duyệt lại giọng" (FR-016)
-- [ ] T032 [US2] Lệnh `voice cast <phim> sample|set …` theo `contracts/cli.md` trong `tools/filmcheck/cli.py`; câu thử = câu thoại dài nhất ≤ 120 ký tự; báo ký tự trước
-- [ ] T033 [US2] Phần Giọng ở khung Cast trong `tools/studio/studio/web/app.js`: 2–3 lựa chọn có lý do và nút nghe câu thật, chọn giọng khác ngoài đề xuất, chỉnh pitch/speed khi `mode=narrator`, xác nhận quyền khi chọn giọng nhân bản lần đầu (`cloned_ok`)
-- [ ] T034 [P] [US2] Test cổng giọng ở Cast và kho trong `tests/filmcheck/test_cast_voice.py` (SC-005)
+- [X] T030 [US2] Thêm `voice`, `voice_options[]`, `speaks` vào nhân vật trong `tools/filmcheck/cast.py`; dấu nhân vật gồm `voice`; cổng: `speaks > 0` và `voice` null → không duyệt được, báo tên (FR-013)
+- [X] T031 [US2] Lưu `voice` vào `character.json` của kho trong `tools/filmcheck/castlib.py` (đổi giọng = bản `v<n+1>`); phim dùng lại nhân vật lấy giọng từ kho, không hỏi (FR-014); đổi người kể kênh → nhân vật `mode=narrator` của kênh "chờ duyệt lại giọng" (FR-016)
+- [X] T032 [US2] Lệnh `voice cast <phim> sample|set …` theo `contracts/cli.md` trong `tools/filmcheck/cli.py`; câu thử = câu thoại dài nhất ≤ 120 ký tự; báo ký tự trước
+- [X] T033 [US2] Phần Giọng ở khung Cast trong `tools/studio/studio/web/app.js`: 2–3 lựa chọn có lý do và nút nghe câu thật, chọn giọng khác ngoài đề xuất, chỉnh pitch/speed khi `mode=narrator`, xác nhận quyền khi chọn giọng nhân bản lần đầu (`cloned_ok`)
+- [X] T034 [P] [US2] Test cổng giọng ở Cast và kho trong `tests/filmcheck/test_cast_voice.py` (SC-005)
 
 **Checkpoint**: phim có người kể và nhân vật đọc đúng giọng theo người nói.
 
@@ -98,7 +98,7 @@
 - [X] T035 [P] [US3] Test trong `tests/filmcheck/test_speakers.py`: 3 vai phụ cùng `para` → 3 khoá giọng khác nhau, không trùng người kể; vai phụ 2 câu ở 2 `para` một giọng; hết lựa chọn trong vai → người kể đóng vai lệch thêm ±1 bán cung; ép trùng → `voice check` mã 1 nêu tên và cảnh (SC-006)
 - [X] T036 [US3] Gán vai phụ và khoá trùng `(provider, voice đã giải, round(pitch,1), round(speed,2))` trong `tools/filmcheck/speakers.py` (research R5)
 - [X] T037 [US3] Lệnh `voice check <phim>` theo `contracts/cli.md` trong `tools/filmcheck/cli.py`; `voice make` gọi nó trước khi đọc
-- [ ] T038 [US3] Đổi giọng vai phụ ở trang Voice (`web/app.js` + `edit.py`): chỉ đọc lại câu của vai đó; sửa bộ giọng theo vai trong hồ sơ kênh
+- [X] T038 [US3] Đổi giọng vai phụ ở trang Voice (`web/app.js` + `edit.py`): chỉ đọc lại câu của vai đó; sửa bộ giọng theo vai trong hồ sơ kênh
 
 ---
 
@@ -107,18 +107,18 @@
 **Goal**: cảm xúc chuyển cho ElevenLabs v3, hiệu ứng âm cho mọi nhà cung cấp.
 **Independent Test**: quickstart §5.
 
-- [ ] T039 [P] [US4] Test trong `tests/filmcheck/test_voice_make_providers.py`: `emotion: whisper` + `eleven_v3` → chữ gửi đi bắt đầu bằng `[whispers]`, chữ kịch bản không đổi, ký tự tính cả thẻ; mô hình khác / Kokoro → `emotion_applied: false` trong `speakers.json`; `fx: wall` qua kiểm lời giả
-- [ ] T040 [US4] Chèn thẻ cảm xúc khi mô hình là `eleven_v3` trong `tools/filmcheck/eleven.py`; khi v3 không trả alignment thì dùng thời điểm Whisper và ghi `align.source: "asr"` (research R2)
-- [ ] T041 [US4] Trang Voice: chọn cảm xúc và hiệu ứng mỗi câu, ghi "not applied with this voice" khi không hỗ trợ (FR-031) trong `tools/studio/studio/web/app.js` và `edit.py`
+- [X] T039 [P] [US4] Test trong `tests/filmcheck/test_voice_make_providers.py`: `emotion: whisper` + `eleven_v3` → chữ gửi đi bắt đầu bằng `[whispers]`, chữ kịch bản không đổi, ký tự tính cả thẻ; mô hình khác / Kokoro → `emotion_applied: false` trong `speakers.json`; `fx: wall` qua kiểm lời giả
+- [X] T040 [US4] Chèn thẻ cảm xúc khi mô hình là `eleven_v3` trong `tools/filmcheck/eleven.py`; khi v3 không trả alignment thì dùng thời điểm Whisper và ghi `align.source: "asr"` (research R2)
+- [X] T041 [US4] Trang Voice: chọn cảm xúc và hiệu ứng mỗi câu, ghi "not applied with this voice" khi không hỗ trợ (FR-031) trong `tools/studio/studio/web/app.js` và `edit.py`
 
 ---
 
 ## Phase 7: Polish
 
-- [ ] T042 [P] Test trình duyệt `tests/ui/browser_voice_cast.cjs`: Settings ô khoá, ô chọn giọng gộp, Voice nhóm theo người nói, tóm tắt khớp ô chọn (quickstart §6)
-- [ ] T043 [P] Thêm lượt thật vào `tests/online/live.sh` (chỉ khi có `ELEVENLABS_API_KEY`): đọc 3 câu, so ước tính với chênh lệch `character_count` ≤ 1% (SC-003)
-- [ ] T044 [P] Cập nhật tài liệu: `tools/CLAUDE.md` (eleven.py, voicecat, speakers, voicefx), mục giọng trong `.claude/skills/film-make/SKILL.md`, `CREDITS` nếu thêm gì bên thứ ba
-- [ ] T045 Chạy đủ 5 bộ test (`sh tests/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`, `sh tests/render/run.sh`) và quickstart §1, §3, §5 (miễn phí); hỏi người dùng trước quickstart §2 (tốn ký tự)
+- [X] T042 [P] Test trình duyệt `tests/ui/browser_voice_cast.cjs`: Settings ô khoá, ô chọn giọng gộp, Voice nhóm theo người nói, tóm tắt khớp ô chọn (quickstart §6)
+- [X] T043 [P] Thêm lượt thật vào `tests/online/live.sh` (chỉ khi có `ELEVENLABS_API_KEY`): đọc 3 câu, so ước tính với chênh lệch `character_count` ≤ 1% (SC-003)
+- [X] T044 [P] Cập nhật tài liệu: `tools/CLAUDE.md` (eleven.py, voicecat, speakers, voicefx), mục giọng trong `.claude/skills/film-make/SKILL.md`, `CREDITS` nếu thêm gì bên thứ ba
+- [X] T045 Chạy đủ 5 bộ test (`sh tests/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`, `sh tests/render/run.sh`) và quickstart §1, §3, §5 (miễn phí); hỏi người dùng trước quickstart §2 (tốn ký tự)
 
 ---
 
