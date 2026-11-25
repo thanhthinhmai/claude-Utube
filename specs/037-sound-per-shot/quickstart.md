@@ -49,3 +49,6 @@ Mở app → việc của phim → bước Sound: bấm S1 phát clip nháp vớ
 sh bin/studio learn sfx --file references/voice-check/a.wav --words references/voice-check/segs.json
 ```
 Kỳ vọng: 5/5 sự kiện của `tests/learn/data/voicecheck_expect.json` (kính vỡ ~"window", lặng ≤ −50 dB ở "goes silent", đám đông ở "people cheer" tắt ≤ 0,1 s quanh điểm cắt, bóng, bọt nước) có `agree: true`, mốc lệch ≤ 0,25 s; không sự kiện `agree: false` nào được dùng làm luật. Sau đó `git status` không có tệp âm thanh mới; `references/voice-check/stems/` chỉ trên máy.
+
+### Kết quả (2026-11-26)
+Chạy thật trên máy (CPU, tách lớp đã có cache, ~14 phút cho 724 sự kiện). SC-003: **2/5, chưa đạt**. Tìm thấy: lặng, bóng. Trượt: kính vỡ (nghe thành tiếng kim loại), bọt nước và đám đông (có nhãn đúng nhưng mốc lệch 0,18 s và 0,54 s ra ngoài cửa sổ). Chi tiết và hướng chỉnh ở research R8.

@@ -81,13 +81,13 @@ Khối được thay mỗi lần trộn, giữa `# sound effects (studio, 037)` 
 | Trường | Kiểu |
 |---|---|
 | `video`, `models` | id; `{separator, ast, clap}` có phiên bản |
-| `events` | `[{t, len, layer: "fx"\|"vocal_off_words", ast: [[label, p]×5], clap: [label, p], agree: bool, label, word?: {text, t}, shot?, db_vs_voice, cut?: {kind, fade_s}}]` |
+| `events` | `[{t, len, layer: "fx"\|"vocal_off_words", ast: [[label, p]×5], clap: [label, p], agree: bool, trust: "sure"|"likely"|null, label, word?: {text, t}, shot?, db_vs_voice, cut?: {kind, fade_s}}]` |
 | `silences` | `[{t, len, db, word}]` |
 | `ontology` | `{label: ancestor_level2}` cho các nhãn đã gặp (bảng đồng ý, FR-018) |
 
 ### `my-styles/<style>/template.json → sound.sfx` (phim đọc qua `kit/template.json` của phim hoặc `film.json → style`)
 
-`{per_min, gain_db: [p25, p50, p75], actions: [{action, label, n, evidence: [[v, t]]}], silences: {db, len_s, evidence}, cut: {kind, fade_s, evidence}, unsure_n}` — chỉ số đo, nhãn và mốc (FR-022).
+`{per_min, gain_db: [p25, p50, p75], actions: [{action, label, n, trust, n_sure, evidence: [[v, t]]}], silences: {db, len_s, evidence}, cut: {kind, fade_s, evidence}, unsure_n}` — chỉ số đo, nhãn và mốc (FR-022).
 
 ## Điểm duyệt `mix` (phim AE) — `checks.json → reviews`
 
