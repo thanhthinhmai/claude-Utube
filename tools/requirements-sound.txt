@@ -1,0 +1,8 @@
+# Học tiếng từ video mẫu (specs/037): tách lớp + hai bộ phân loại, chạy trên CPU. Cài: sh bin/studio deps sound
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchaudio
+demucs
+transformers
+soundfile
+numpy>=1.26

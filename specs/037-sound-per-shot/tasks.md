@@ -16,17 +16,17 @@ description: "Task list for 037-sound-per-shot"
 
 ## Phase 1: Setup
 
-- [ ] T001 Thêm `sound/cache/`, `sound/stems/`, `references/*/stems/` vào `.gitignore`; thêm `tools/requirements-sound.txt` (`--index-url https://download.pytorch.org/whl/cpu` cho `torch`, rồi `demucs`, `transformers`, `soundfile`) theo research R9
-- [ ] T002 Thêm lệnh `deps sound` (cài `requirements-sound.txt` vào `tools/.venv` theo mẫu `deps_learn`) và nhóm lệnh `sound …` (chuyển cho `tools/filmcheck/cli.py`) trong `bin/studio`, cập nhật `--help`
-- [ ] T003 [P] Tạo bộ tiếng thử nhỏ tự tổng hợp `tests/filmcheck/data/soundlib/` bằng `tests/filmcheck/make_soundlib.py`: ~12 tệp WAV ≤ 1 s (vỡ, bụp, vút, bước chân, bọt nước…) tên kiểu UCS (`GLASBrk_Window Shatter_TEST.wav`), vài tệp có chunk `bext`/`LIST INFO`/`iXML`, một tệp hỏng; tổng ≤ 300 KB
+- [X] T001 Thêm `sound/cache/`, `sound/stems/`, `references/*/stems/` vào `.gitignore`; thêm `tools/requirements-sound.txt` (`--index-url https://download.pytorch.org/whl/cpu` cho `torch`, rồi `demucs`, `transformers`, `soundfile`) theo research R9
+- [X] T002 Thêm lệnh `deps sound` (cài `requirements-sound.txt` vào `tools/.venv` theo mẫu `deps_learn`) và nhóm lệnh `sound …` (chuyển cho `tools/filmcheck/cli.py`) trong `bin/studio`, cập nhật `--help`
+- [X] T003 [P] Tạo bộ tiếng thử nhỏ tự tổng hợp lúc chạy test bằng `tests/filmcheck/soundfix.py` (không giữ tệp âm thanh nào trong git): ~12 tệp WAV ≤ 1 s (vỡ, bụp, vút, bước chân, bọt nước…) tên kiểu UCS (`GLASBrk_Window Shatter_TEST.wav`), vài tệp có chunk `bext`/`LIST INFO`/`iXML`, một tệp hỏng; tổng ≤ 300 KB
 
 ---
 
 ## Phase 2: Foundational
 
-- [ ] T004 Tổng quát `tools/studio/studio/voicekeys.py` theo tên khoá (`elevenlabs`, `freesound`): `secret(name)`, `save(name, key, …)`, `status(name)`; giữ tương thích mọi chỗ gọi ElevenLabs hiện có (`tools/runner/proxy.py`, `tools/studio/studio/server.py`); test trong `tests/online/test_voicekeys.py` (sửa hoặc thêm) cho khoá thứ hai, quyền tệp 0600, chỉ trả 4 ký tự cuối
-- [ ] T005 [P] Tạo `tools/filmcheck/ucs.py`: bảng `CatID → (category, subcategory)` của UCS (danh mục chính ~80 mục, đủ cho GLASS, IMPACT, WHOOSH, FOLEY, CROWDS, WATER, AMBIENCE, UI, CARTOON, BALL, PAPER, DOOR, FOOTSTEPS…) và `parse_name(stem) → {cat_id, category, subcategory, descriptor}`
-- [ ] T006 Thêm `sound_root()` (thư mục `$STUDIO_DATA/sound`, mặc định `~/.local/share/claude-utube/sound`) và hàm từ chối thư mục nằm dưới `<repo>/references/` hoặc dữ liệu học trong `tools/filmcheck/soundlib.py` (khung mô-đun, research R2, R11)
+- [X] T004 Tổng quát `tools/studio/studio/voicekeys.py` theo tên khoá (`elevenlabs`, `freesound`): `secret(name)`, `save(name, key, …)`, `status(name)`; giữ tương thích mọi chỗ gọi ElevenLabs hiện có (`tools/runner/proxy.py`, `tools/studio/studio/server.py`); test trong `tests/online/test_voicekeys.py` (sửa hoặc thêm) cho khoá thứ hai, quyền tệp 0600, chỉ trả 4 ký tự cuối
+- [X] T005 [P] Tạo `tools/filmcheck/ucs.py`: bảng `CatID → (category, subcategory)` của UCS (danh mục chính ~80 mục, đủ cho GLASS, IMPACT, WHOOSH, FOLEY, CROWDS, WATER, AMBIENCE, UI, CARTOON, BALL, PAPER, DOOR, FOOTSTEPS…) và `parse_name(stem) → {cat_id, category, subcategory, descriptor}`
+- [X] T006 Thêm `sound_root()` (thư mục `$STUDIO_DATA/sound`, mặc định `~/.local/share/claude-utube/sound`) và hàm từ chối thư mục nằm dưới `<repo>/references/` hoặc dữ liệu học trong `tools/filmcheck/soundlib.py` (khung mô-đun, research R2, R11)
 
 **Checkpoint**: nền xong.
 
@@ -40,20 +40,20 @@ description: "Task list for 037-sound-per-shot"
 
 ### Tests (viết trước, phải đỏ)
 
-- [ ] T007 [P] [US2] `tests/filmcheck/test_soundlib.py`: lập mục lục kho thử (đủ mục, tệp hỏng `ok=false`, metadata `bext`/`INFO`/`iXML`/UCS vào đúng cột), lập lại chỉ đọc tệp mới/đổi (đếm số lần mở tệp), tệp mất bị xoá mục, từ chối thư mục dưới `references/`, `search()` xếp hạng bm25 + loại + độ dài, `scope="cc0"` chỉ trả mục `license = "cc0-1.0"`; kiểm **không** mô-đun nào đọc mẫu âm thanh Sonniss ngoài header (giả lập `soundfile`/`wave.readframes` ném lỗi khi bị gọi)
-- [ ] T008 [P] [US2] `tests/filmcheck/test_freesound.py` với máy chủ giả (`STUDIO_FREESOUND_URL`): truy vấn gửi `filter=license:"Creative Commons 0"`, kết quả có license khác CC0 bị bỏ dù máy chủ trả về, tải `preview-hq-ogg` vào `freesound/<id>.ogg`, mục mới có `source=freesound`, `credit "Freesound #<id> by <user>"`, `url`, `license cc0-1.0`, `fetched_at`; khoá không xuất hiện trong log/ngoại lệ; không có khoá → lỗi `no_key` rõ ràng
-- [ ] T009 [P] [US2] `tests/online/test_sound_scope.py`: proxy `/internal/sound/search` và `/internal/sound/fetch` với việc của `admin` (thấy Sonniss) và của `customer` (chỉ CC0; fetch mục Sonniss → 403 `scope`); `fetch` chép đúng tệp vào `films/<phim>/sound/cache/`; app `GET /api/sound/preview/{entry}` 403 với khách cho mục Sonniss
+- [X] T007 [P] [US2] `tests/filmcheck/test_soundlib.py`: lập mục lục kho thử (đủ mục, tệp hỏng `ok=false`, metadata `bext`/`INFO`/`iXML`/UCS vào đúng cột), lập lại chỉ đọc tệp mới/đổi (đếm số lần mở tệp), tệp mất bị xoá mục, từ chối thư mục dưới `references/`, `search()` xếp hạng bm25 + loại + độ dài, `scope="cc0"` chỉ trả mục `license = "cc0-1.0"`; kiểm **không** mô-đun nào đọc mẫu âm thanh Sonniss ngoài header (giả lập `soundfile`/`wave.readframes` ném lỗi khi bị gọi)
+- [X] T008 [P] [US2] `tests/filmcheck/test_freesound.py` với máy chủ giả (`STUDIO_FREESOUND_URL`): truy vấn gửi `filter=license:"Creative Commons 0"`, kết quả có license khác CC0 bị bỏ dù máy chủ trả về, tải `preview-hq-ogg` vào `freesound/<id>.ogg`, mục mới có `source=freesound`, `credit "Freesound #<id> by <user>"`, `url`, `license cc0-1.0`, `fetched_at`; khoá không xuất hiện trong log/ngoại lệ; không có khoá → lỗi `no_key` rõ ràng
+- [X] T009 [P] [US2] `tests/online/test_sound_scope.py`: proxy `/internal/sound/search` và `/internal/sound/fetch` với việc của `admin` (thấy Sonniss) và của `customer` (chỉ CC0; fetch mục Sonniss → 403 `scope`); `fetch` chép đúng tệp vào `films/<phim>/sound/cache/`; app `GET /api/sound/preview/{entry}` 403 với khách cho mục Sonniss
 
 ### Implementation
 
-- [ ] T010 [US2] `tools/filmcheck/soundlib.py`: `roots.json` (`{version: 1, roots: [{path, kind: "sonniss", added_at}]}`), quét đệ quy `.wav/.flac/.ogg/.mp3/.aif`, đọc header + chunk RIFF `bext`, `LIST/INFO` (INAM, ICMT, IKEY, ISBJ), `iXML` (UCS CatID, USER/CATEGORY) bằng thư viện chuẩn (không đọc mẫu âm thanh), nguồn `Sonniss GDC <năm>` từ tên thư mục gói; `library.db` bảng `entry` đúng các trường của data-model (id `s:` + sha1(path)[:12] hoặc `fs:<id>`; `license` ∈ `sonniss-gdc-2.0|cc0-1.0`, "lúc lấy về; không đổi sau đó") + FTS5 `entry_fts`; khoá lập lại `(path, size, mtime_ns)`
-- [ ] T011 [US2] `soundlib.search(query, cat=None, dur=None, scope="all", n=8)`: bm25 trọng số name 3 / description 2 / keywords 2 / category 1, cộng điểm khi loại khớp, trừ khi độ dài lệch; trả id, tên, loại, độ dài, nguồn, credit (chỉ chữ, R3)
-- [ ] T012 [US2] `tools/filmcheck/freesound.py`: `search_cc0(query, dur)` và `fetch(id)` (preview-hq-ogg), kiểm license từng kết quả, ghi mục vào `library.db`; hai đường: trực tiếp (`FREESOUND_API_KEY` từ môi trường hoặc `.env`) và qua proxy khi có `STUDIO_JOB_TOKEN` + `STUDIO_PROXY` (như `eleven.py`); `redact()` khoá trong mọi thông báo
-- [ ] T013 [US2] Hàm `find(query, cat, dur, scope)` trong `soundlib.py`: tìm trên máy, nếu điểm đầu dưới ngưỡng (hoặc 0 kết quả) và có khoá → Freesound CC0 tự động (FR-013), trả kết quả gộp
-- [ ] T014 [US2] Lệnh `sound lib add|index|status|search` và `sound key freesound` trong `tools/filmcheck/cli.py` theo `contracts/cli.md` (in `indexed N new · M changed · K gone · B broken · <giây> s`; `status` không in khoá)
-- [ ] T015 [US2] Proxy `tools/runner/proxy.py`: `POST /internal/sound/search {query, cat?, dur?}` và `POST /internal/sound/fetch {entry, film}`; phạm vi theo `jobs.owner` → `accounts.role` (`admin` → all, `customer` → cc0); khoá Freesound từ `voicekeys.secret("freesound")`; log chỉ số kết quả
-- [ ] T016 [US2] App `tools/studio/studio/server.py`: `GET/POST/DELETE /api/settings/sound` (thư mục kho, lập mục lục chạy nền, khoá Freesound lưu sau một lần gọi thử), `GET /api/sound/preview/{entry}` (≤ 30 s, kiểm phạm vi); mục "Sound library" trong Settings của `tools/studio/studio/web/app.js`
-- [ ] T017 [US2] Ghi `CREDITS` chung: Sonniss GDC (giấy phép 2.0, dùng thương mại, không phát tán, không AI; chỉ phim của chủ xưởng) và Freesound (chỉ CC0, tải qua API bằng khoá của người dùng)
+- [X] T010 [US2] `tools/filmcheck/soundlib.py`: `roots.json` (`{version: 1, roots: [{path, kind: "sonniss", added_at}]}`), quét đệ quy `.wav/.flac/.ogg/.mp3/.aif`, đọc header + chunk RIFF `bext`, `LIST/INFO` (INAM, ICMT, IKEY, ISBJ), `iXML` (UCS CatID, USER/CATEGORY) bằng thư viện chuẩn (không đọc mẫu âm thanh), nguồn `Sonniss GDC <năm>` từ tên thư mục gói; `library.db` bảng `entry` đúng các trường của data-model (id `s:` + sha1(path)[:12] hoặc `fs:<id>`; `license` ∈ `sonniss-gdc-2.0|cc0-1.0`, "lúc lấy về; không đổi sau đó") + FTS5 `entry_fts`; khoá lập lại `(path, size, mtime_ns)`
+- [X] T011 [US2] `soundlib.search(query, cat=None, dur=None, scope="all", n=8)`: bm25 trọng số name 3 / description 2 / keywords 2 / category 1, cộng điểm khi loại khớp, trừ khi độ dài lệch; trả id, tên, loại, độ dài, nguồn, credit (chỉ chữ, R3)
+- [X] T012 [US2] `tools/filmcheck/freesound.py`: `search_cc0(query, dur)` và `fetch(id)` (preview-hq-ogg), kiểm license từng kết quả, ghi mục vào `library.db`; hai đường: trực tiếp (`FREESOUND_API_KEY` từ môi trường hoặc `.env`) và qua proxy khi có `STUDIO_JOB_TOKEN` + `STUDIO_PROXY` (như `eleven.py`); `redact()` khoá trong mọi thông báo
+- [X] T013 [US2] Hàm `find(query, cat, dur, scope)` trong `soundlib.py`: tìm trên máy, nếu điểm đầu dưới ngưỡng (hoặc 0 kết quả) và có khoá → Freesound CC0 tự động (FR-013), trả kết quả gộp
+- [X] T014 [US2] Lệnh `sound lib add|index|status|search` và `sound key freesound` trong `tools/filmcheck/cli.py` theo `contracts/cli.md` (in `indexed N new · M changed · K gone · B broken · <giây> s`; `status` không in khoá)
+- [X] T015 [US2] Proxy `tools/runner/proxy.py`: `POST /internal/sound/search {query, cat?, dur?}` và `POST /internal/sound/fetch {entry, film}`; phạm vi theo `jobs.owner` → `accounts.role` (`admin` → all, `customer` → cc0); khoá Freesound từ `voicekeys.secret("freesound")`; log chỉ số kết quả
+- [X] T016 [US2] App `tools/studio/studio/server.py`: `GET/POST/DELETE /api/settings/sound` (thư mục kho, lập mục lục chạy nền, khoá Freesound lưu sau một lần gọi thử), `GET /api/sound/preview/{entry}` (≤ 30 s, kiểm phạm vi); mục "Sound library" trong Settings của `tools/studio/studio/web/app.js`
+- [X] T017 [US2] Ghi `CREDITS` chung: Sonniss GDC (giấy phép 2.0, dùng thương mại, không phát tán, không AI; chỉ phim của chủ xưởng) và Freesound (chỉ CC0, tải qua API bằng khoá của người dùng)
 
 **Checkpoint**: chạy `tests/filmcheck`, `tests/online`; kho thử dùng được bằng lệnh. Commit.
 
@@ -139,7 +139,7 @@ description: "Task list for 037-sound-per-shot"
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T049 [P] Test repo `tests/test_no_media.py` (hoặc thêm vào bộ có sẵn trong `tests/run.sh`): 0 tệp âm thanh trong git ngoài `tests/filmcheck/data/soundlib/` (≤ 300 KB); `desktop/core-build` không gói `sound/` hay `requirements-sound.txt` (SC-005)
+- [ ] T049 [P] Test repo `tests/test_no_media.py` (hoặc thêm vào bộ có sẵn trong `tests/run.sh`): 0 tệp âm thanh mới trong git (kho thử tự tổng hợp lúc chạy test); `desktop/core-build` không gói `sound/` hay `requirements-sound.txt` (SC-005)
 - [ ] T050 [P] Cập nhật `CLAUDE.md` (mục ngắn "Âm thanh theo shot (specs/037)"), `tools/CLAUDE.md` (mô-đun mới), `desktop/core-build/credits-check.py` nếu cần cho dòng CREDITS mới
 - [ ] T051 Kho thật: khi người dùng đã tải Sonniss 2026 + 2024 vào `/mnt/e/SoundLibrary/Sonniss`, giải nén (nếu còn zip), `sound lib add`, đo SC-007, ghi kết quả vào quickstart
 - [ ] T052 Chạy đủ bộ test (`sh tests/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`, `sh tests/ae/run.sh`, `sh tests/render/run.sh`, `sh tests/license/run.sh`) rồi mở PR (không merge)

@@ -51,3 +51,7 @@ my-styles/*/test.mp4
 
 # Real-person library: model sheets carry third-party reference photos (specs/028 R2)
 people/*/.sheet/
+
+# Sound per shot (specs/037): the sound library lives in $STUDIO_DATA/sound, never here.
+# films/*/sound/cache, films/*/sound/stems and references/*/stems are already covered by films/* and references/*.
+sound-library/

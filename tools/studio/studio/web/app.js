@@ -3175,7 +3175,25 @@ async function pageSettings(tab = "general") {
       ${el.set ? `<button id="el-key-test">Test</button><select id="el-model" aria-label="ElevenLabs model">${["eleven_multilingual_v2", "eleven_v3", "eleven_turbo_v2_5", "eleven_flash_v2_5"]
         .map((m) => `<option${m === el.model ? " selected" : ""}>${m}</option>`).join("")}</select><button class="danger" id="el-key-del">Remove</button>` : ""}</div>
     <p id="el-msg" class="muted" role="status"></p></section>`;
-  $app.innerHTML = `${top}${ytKey}${elKey}<section class="panel card-pad"><h2>Studio</h2><p class="muted">Limits for every member, and how many films run at once.</p>
+  // specs/037: the sound library on this machine (Sonniss packs, names and text only) and Freesound CC0 for gaps
+  const snd = await get("/admin/sound").catch(() => null);
+  const fs = (snd && snd.freesound) || { set: false };
+  const sndCount = snd ? Object.entries(snd.by_source || {}).map(([k, n]) => `${n} ${esc(k)}`).join(" · ") || "no sounds yet" : "";
+  const sndKey = !snd ? "" : `<section class="panel card-pad" id="sound-lib"><h2>Sound library</h2>
+    <p class="muted">Sound effects for After Effects films. Add the folders where you unpacked the Sonniss GDC bundles: the
+      studio reads only file names and the text inside the files, never the sounds themselves. Sonniss sounds are used in
+      your own films only; members' films get CC0 sounds from Freesound. ${sndCount}${snd.broken ? ` · ${snd.broken} broken files` : ""}
+      ${snd.index.running ? " · <strong>indexing…</strong>" : snd.index.last ? ` · last index ${snd.index.last.new} new, ${snd.index.last.gone} gone, ${snd.index.last.secs} s` : ""}</p>
+    <ul class="plain">${(snd.roots || []).map((r) => `<li><code>${esc(r.path)}</code> <button class="link danger" data-snd-del="${esc(r.path)}">Remove</button></li>`).join("")}</ul>
+    <div class="row"><input id="snd-path" type="text" autocomplete="off" placeholder="/mnt/e/SoundLibrary/Sonniss"><button id="snd-add">Add folder</button>
+      <button id="snd-index">Index again</button></div>
+    <h3>Freesound (CC0 only)</h3>
+    <p class="muted">Fills what the library lacks with public-domain (CC0) sounds. Get a free API key at freesound.org/apiv2/apply.
+      ${fs.set ? `<strong>Key set (…${esc(fs.last4)})</strong>` : "<strong>No key yet.</strong>"}</p>
+    <div class="row"><input id="fs-key-input" type="password" autocomplete="off" placeholder="Paste a Freesound API key">
+      <button id="fs-key-save">${fs.set ? "Replace key" : "Save key"}</button>${fs.set ? `<button class="danger" id="fs-key-del">Remove</button>` : ""}</div>
+    <p id="snd-msg" class="muted" role="status"></p></section>`;
+  $app.innerHTML = `${top}${ytKey}${elKey}${sndKey}<section class="panel card-pad"><h2>Studio</h2><p class="muted">Limits for every member, and how many films run at once.</p>
     <form class="form" id="settings"><div class="admin-grid">${SETTING.map(input).join("")}</div>
       <div><button class="primary" type="submit">Save settings</button></div></form><p id="msg" class="muted" role="status"></p></section>`;
   /** @type {HTMLButtonElement} */ (document.getElementById("yt-key-save")).onclick = async () => {
@@ -3196,6 +3214,22 @@ async function pageSettings(tab = "general") {
   if (elModel) elModel.onchange = elRun(() => send("PUT", "/admin/elevenlabs-model", { model: elModel.value }));
   const elDel = document.getElementById("el-key-del");
   if (elDel) elDel.onclick = async () => { if (confirm("Remove the ElevenLabs key? Voices already made stay.")) { await send("DELETE", "/admin/elevenlabs-key"); pageSettings("general"); } };
+  const sndMsg = document.getElementById("snd-msg");
+  const sndRun = (/** @type {() => Promise<any>} */ fn) => async () => {
+    sndMsg.className = "muted"; sndMsg.textContent = "Working…";
+    try { await fn(); pageSettings("general"); } catch (e) { sndMsg.className = "fail"; sndMsg.textContent = e.message; }
+  };
+  const sndAdd = document.getElementById("snd-add");
+  if (sndAdd) sndAdd.onclick = sndRun(() => send("POST", "/admin/sound", { path: field("snd-path").value.trim() }));
+  const sndIndex = document.getElementById("snd-index");
+  if (sndIndex) sndIndex.onclick = sndRun(() => send("POST", "/admin/sound/index"));
+  document.querySelectorAll("[data-snd-del]").forEach((b) => {
+    /** @type {HTMLElement} */ (b).onclick = sndRun(() => send("DELETE", `/admin/sound?path=${encodeURIComponent(/** @type {HTMLElement} */ (b).dataset.sndDel || "")}`));
+  });
+  const fsSave = document.getElementById("fs-key-save");
+  if (fsSave) fsSave.onclick = sndRun(() => send("PUT", "/admin/sound/freesound-key", { key: field("fs-key-input").value.trim() }));
+  const fsDel = document.getElementById("fs-key-del");
+  if (fsDel) fsDel.onclick = async () => { if (confirm("Remove the Freesound key? Sounds already fetched stay.")) { await send("DELETE", "/admin/sound/freesound-key"); pageSettings("general"); } };
   const ytDel = document.getElementById("yt-key-del");
   if (ytDel) ytDel.onclick = async () => { if (confirm("Remove the YouTube key?")) { await send("DELETE", "/admin/youtube-key"); pageSettings("general"); } };
   onSubmit(async () => {

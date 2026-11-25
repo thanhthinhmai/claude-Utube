@@ -4,7 +4,7 @@
 
 - Worktree `~/claude-Utube-037`, `tools/.venv` và `lib/lemo-opuscar/.venv` như các tính năng trước.
 - Học tiếng: `sh bin/studio deps sound` (torch CPU, demucs, transformers). Mô hình htdemucs, AST, CLAP đã có trong `~/.cache/huggingface/hub`.
-- Kho thật: gói Sonniss GDC 2026 + 2024 do người dùng tải bằng trình duyệt vào `E:\SoundLibrary\Sonniss` (`/mnt/e/SoundLibrary/Sonniss`). Chưa có thì dùng kho thử `tests/filmcheck/data/soundlib/` (tiếng tự tổng hợp, có metadata kiểu UCS).
+- Kho thật: gói Sonniss GDC 2026 + 2024 do người dùng tải bằng trình duyệt vào `E:\SoundLibrary\Sonniss` (`/mnt/e/SoundLibrary/Sonniss`). Chưa có thì dùng kho thử do `tests/filmcheck/soundfix.py` tổng hợp (có metadata kiểu UCS).
 - Freesound: khoá miễn phí của người dùng trong `.env` (`FREESOUND_API_KEY`). Không có thì bỏ bước 3.
 
 ## 1. Bộ test tự động
