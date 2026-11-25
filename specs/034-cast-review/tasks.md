@@ -147,8 +147,10 @@ description: "Task list: Duyệt nhân vật cho phim After Effects (034-cast-re
 
 - [X] T051 [P] Cập nhật `tools/CLAUDE.md` (rigs, castsheet, sheet.py, castnotes, castlib, castapi) và mục "Phim After Effects" ở `CLAUDE.md` gốc (một dòng về bước Cast và kho nhân vật)
 - [X] T052 [P] Chuyển `films/ae-sleepless-test/ae/shots.jsx` sang `CU.rig("ball@1")`, viết `films/ae-sleepless-test/cast/cast.json` (hero, friend, classmates) để làm phim thử của quickstart (thư mục phim không vào git)
-- [ ] T053 Chạy đủ 5 bộ test: `sh tests/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ae/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`; sửa tới khi đạt
-- [ ] T054 Chạy quickstart mục 2–5 với AE thật trên phim thử (SC-001 ≤ 5 phút, SC-003 so sha256, SC-005, SC-006 so điểm ảnh); xem bảng mẫu bằng mắt (đầu cầu, mắt có con ngươi, mũ không che mắt)
+- [X] T053 Chạy đủ 5 bộ test: `sh tests/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ae/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`; sửa tới khi đạt
+  - 2026-11-25: run 87/87, filmcheck 308 OK (sửa test_castlib.test_root: đặt STUDIO_ROOT tạm, không bắt app thật đang chạy), ae 34 OK, ui 83 OK, online 232 OK.
+- [X] T054 Chạy quickstart mục 2–5 với AE thật trên phim thử (SC-001 ≤ 5 phút, SC-003 so sha256, SC-005, SC-006 so điểm ảnh); xem bảng mẫu bằng mắt (đầu cầu, mắt có con ngươi, mũ không che mắt)
+  - 2026-11-25: mục 2 đạt (20 hình/30 s). Mục 3: lượt 1 ghi chú ngoài khả năng ball@1 (cỡ mắt, tàn nhang) được trả lời là không làm được; lượt 2 (áo #2f9e9a, lông mày worried): chỉ 6 hình của friend đổi, 13 hình của hero và classmates giữ nguyên sha256, có friend.prev/. Mục 4: approve --all --save → kho default v1; `cast use ae-cast-reuse default/hero` → front.jpg giống hệt kho (sai khác 0). Mục 5 (SC-006) do test_rigs phủ, không tạo rig tạm.
 
 ---
 

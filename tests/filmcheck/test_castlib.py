@@ -49,7 +49,9 @@ class Library(unittest.TestCase):
     def test_root(self):
         self.assertEqual(castlib.root(self.d), self.acc)
         out = castfilm.make(self.tmp / "films" / "f2")
-        self.assertIsNone(castlib.root(out))                        # outside the app, and no app runs for STUDIO_ROOT
+        from unittest import mock
+        with mock.patch.dict(os.environ, {"STUDIO_ROOT": str(self.tmp)}):   # not the app that may run for this repo
+            self.assertIsNone(castlib.root(out))                    # outside the app, and no app runs for STUDIO_ROOT
 
     def test_save_versions(self):
         r = self.approve_all(self.d)
