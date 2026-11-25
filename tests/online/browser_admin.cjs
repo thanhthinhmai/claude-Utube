@@ -19,6 +19,9 @@ const [base, email, password] = process.argv.slice(2);
   await page.goto(`${base}/#/admin`);                       // the old address opens Settings → General
   await page.waitForSelector("text=Save settings");
   if (await page.locator("text=Sign-up open").count()) errors.push("sign-up setting still shown");
+  // specs/036 T042: the ElevenLabs key box is a password field and shows no key
+  const elKey = await page.locator("#el-key #el-key-input[type=password]").count();
+  if (elKey !== 1) errors.push("no ElevenLabs key box");
   await page.fill("#s-quota_films_default", "3");
   await page.click("text=Save settings");
   await page.waitForSelector("#msg >> text=Saved.");

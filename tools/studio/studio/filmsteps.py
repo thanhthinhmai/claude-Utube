@@ -24,6 +24,86 @@ def voices() -> list:
     return _voices
 
 
+_el = {}
+
+
+def el_voices() -> list:
+    """The ElevenLabs voices of the owner's key (app) or of .env (command line), cached 10 minutes; [] without a key
+    or when ElevenLabs cannot be reached (specs/036 FR-003)."""
+    import time
+    from filmcheck import eleven
+    hit = _el.get("rows")
+    if hit and time.time() - hit[0] < 600:
+        return hit[1]
+    rows = []
+    try:
+        if store.mode() == "online":
+            from . import voicekeys
+            sec = voicekeys.secret()
+            rows = eleven.list_voices(sec["key"]) if sec else []
+        elif eleven.setting("ELEVENLABS_API_KEY"):
+            rows = eleven.list_voices()
+    except eleven.ElevenError:
+        rows = []
+    _el["rows"] = (time.time(), rows)
+    return rows
+
+
+def voice_rows() -> list:
+    """Both providers for the voice pickers: Kokoro then ElevenLabs, each with its provider, gender, age, cloned."""
+    from filmcheck import voicecat
+    return voicecat.catalog(el_voices(), kokoro=voices())
+
+
+def voice_cost(d: Path) -> dict:
+    """What reading the whole film again would spend at ElevenLabs (specs/036 FR-005, research R8)."""
+    from filmcheck import voicecat
+    rows = store.read_json(d / "lines.json") or []
+    el = [r for r in rows if isinstance(r, dict) and voicecat.parse(r.get("voice") or "")[0] == "elevenlabs"]
+    used = store.read_json(d / "voices" / "usage.json") or {}
+    return {"chars": sum(len(r.get("say") or r.get("text") or "") for r in el), "lines": len(el),
+            "used": int(used.get("total") or 0)}
+
+
+def speaker_rows(d: Path) -> list:
+    """specs/036 US2: [{id, name, source, role, setting, lines, issues}] for the Voice step; [] when lines.json is
+    missing. Issues are the speaker's problems from the resolver (no narrator, no voice, same voice in a scene)."""
+    from filmcheck import speakers
+    rows = store.read_json(d / "lines.json")
+    if not isinstance(rows, list):
+        return []
+    rows = [r for r in rows if isinstance(r, dict) and r.get("id")]
+    try:
+        res = speakers.resolve(d, rows, store.root())
+    except Exception:                       # noqa: BLE001 — the page still opens with a damaged file
+        return []
+    out = []
+    for sp, e in res["speakers"].items():
+        out.append({"id": sp, "name": "Narrator" if sp == "narrator" else sp, "source": e["source"], "role": e.get("role"),
+                    "setting": e["setting"], "lines": e["lines"],
+                    "issues": [w for w in res["errors"] if f" {sp} " in f" {w} " or f'"{sp}"' in w]})
+    missing = {r.get("speaker") or "narrator" for r in rows} - set(res["speakers"])
+    for sp in sorted(missing):
+        out.append({"id": sp, "name": "Narrator" if sp == "narrator" else sp, "source": None, "role": None, "setting": None,
+                    "lines": [r["id"] for r in rows if (r.get("speaker") or "narrator") == sp],
+                    "issues": [w for w in res["errors"] if f'"{sp}"' in w or (sp == "narrator" and "narrator" in w)]})
+    return out
+
+
+def narrator_now(d: Path) -> dict:
+    """The narrator's voice and speed, the same the Done so far summary shows (specs/036 FR-041)."""
+    from .donesofar import narrator_voice
+    rows = store.read_json(d / "lines.json")
+    return narrator_voice(d, rows if isinstance(rows, list) else [])
+
+
+def emotions(d: Path) -> dict:
+    """{line id: {emotion, emotion_applied}} from the last `voice make` (specs/036 FR-031)."""
+    sp = store.read_json(d / "voices" / "speakers.json")
+    e = sp.get("emotions") if isinstance(sp, dict) else None
+    return e if isinstance(e, dict) else {}
+
+
 def catalog(d: Path):
     """Names the Shots panel may offer: the kit's catalogue plus the film's custom sets; None without a scene table."""
     cat = store.read_json(d / "kit" / "catalog.json")
@@ -83,7 +163,8 @@ def cast_block(d: Path):
                "state": st.get(c["id"]), "source": cast.source(c), "rig": c.get("rig"), "needs": c.get("needs"),
                "palette": cast.palette(c), "sheet": {"frames": sheet.get("frames", []), "built_at": sheet.get("built_at")}
                if isinstance(sheet, dict) else None, "has_prev": prev, "notes_open": counts.get(c["id"], 0),
-               "approved": c.get("approved")}
+               "approved": c.get("approved"), "voice": c.get("voice"), "voice_options": c.get("voice_options") or [],
+               "speaks": cast.speaks(d, c["id"])}                     # specs/036
         row["members" if row["kind"] == "group" else "spec"] = c.get("members") if row["kind"] == "group" else c.get("spec")
         chars.append(row)
     used = {r.get("para") for c in chars for k in ("expressions", "poses") for r in ((c.get("needs") or {}).get(k) or [])
@@ -127,7 +208,8 @@ def view(j: dict) -> dict:
             "busy": {"step": busy["step"], "since": busy["since"]} if busy else None,
             "editable": {"shots": cat is not None,
                          "reason": None if cat is not None else ("no scene table" if has_kit else "style has no kit")},
-            "catalog": cat, "voices": voices(), "mix_ranges": mix_ranges(d), "review": rv, "cast": cast_block(d)}
+            "catalog": cat, "voices": voices() + [v["id"] for v in el_voices()], "voice_rows": voice_rows(),
+            "voice_cost": voice_cost(d), "speakers": speaker_rows(d), "emotions": emotions(d), "narrator_voice": narrator_now(d), "mix_ranges": mix_ranges(d), "review": rv, "cast": cast_block(d)}
 
 
 def etag(v: dict) -> str:

@@ -586,14 +586,18 @@ case ${1:-} in
     shift
     case ${1:-} in
       asr) [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice asr <phim> [--lang L]" >&2; exit 2; }; shift; cmd_filmcheck voice-asr "$@" ;;
-      make) [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice make <phim>" >&2; exit 2; }; shift; cmd_filmcheck voice-make "$@" ;;
-      *) echo "dùng: sh bin/studio voice asr|make <phim>" >&2; exit 2 ;;
+      make) [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice make <phim> [--yes] [--provider kokoro]" >&2; exit 2; }; shift; cmd_filmcheck voice-make "$@" ;;
+      usage) [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice usage <phim>" >&2; exit 2; }; shift; cmd_filmcheck voice-usage "$@" ;;
+      check) [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice check <phim>" >&2; exit 2; }; shift; cmd_filmcheck voice-check "$@" ;;
+      channel) [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice channel <kênh> show|narrator|role …" >&2; exit 2; }; shift; cmd_filmcheck voice-channel "$@" ;;
+      cast) [ -n "${2:-}" ] || { echo "dùng: sh bin/studio voice cast <phim> sample|set <nhân vật> …" >&2; exit 2; }; shift; cmd_filmcheck voice-cast "$@" ;;
+      *) echo "dùng: sh bin/studio voice asr|make|usage|check|channel|cast …" >&2; exit 2 ;;
     esac ;;
   page) shift; cmd_page "$@" ;;
   ae) shift; cmd_ae "$@" ;;
   config) if [ "${2:-}" = ae ]; then shift 2; cmd_ae config "$@"; else cmd_filmcheck "$@"; fi ;;
   ui | job | review | admin | app) cmd_studio "$@" ;;
-  script | web | qc | publish | channel | lesson | topics | kit | point | edit | people | shots | notes | film | cast) cmd_filmcheck "$@" ;;
+  script | web | qc | publish | eleven | channel | lesson | topics | kit | point | edit | people | shots | notes | film | cast) cmd_filmcheck "$@" ;;
   help | -h | --help) usage ;;
   '') usage >&2; exit 2 ;;
   *) echo "✗ lệnh lạ: $1" >&2; usage >&2; exit 2 ;;

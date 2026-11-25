@@ -352,12 +352,13 @@ def line_of(rows: list, lid: str) -> dict:
     return r
 
 
-def voice_after(d: Path, ids=None) -> dict:
-    """Make the voice of these lines again (all when None), stamp them and run the voice check."""
+def voice_after(d: Path, ids=None, yes: bool = False) -> dict:
+    """Make the voice of these lines again (all when None), stamp them and run the voice check. yes: the person
+    confirmed the ElevenLabs characters (specs/036 FR-005); one line never asks."""
     if no_run():
         return {"ok": True, "check": {"skipped": True}}
     only = ["--only", ",".join(ids)] if ids else []
-    code, txt = studio_cli("voice-make", str(d), *only)
+    code, txt = studio_cli("voice-make", str(d), *only, *(["--yes"] if yes else []))
     if code:
         return {"ok": False, "error": txt.splitlines()[-1] if txt else "voice make failed"}
     code, txt = studio_cli("voice-asr", str(d), *only)
@@ -398,6 +399,33 @@ def voice_remake(d: Path, a: dict) -> dict:
     return out
 
 
+@op("voice-tone", "voice")
+def voice_tone(d: Path, a: dict) -> dict:
+    """specs/036 FR-030: one line's emotion and sound effect; the line is made again (an effect alone does not read
+    the line again, research R5)."""
+    from filmcheck import speakers
+    lid = ref_of(a, "line")
+    emo, fx = a.get("emotion") or "neutral", a.get("fx") or "none"
+    if emo not in speakers.EMOTIONS:
+        raise EditError(f"emotion is one of {', '.join(speakers.EMOTIONS)}")
+    if fx not in speakers.FXS:
+        raise EditError(f"fx is one of {', '.join(speakers.FXS)}")
+    rows = read_lines(d)
+    r = line_of(rows, lid)
+    old = {"emotion": r.get("emotion") or "neutral", "fx": r.get("fx") or "none"}
+    if old == {"emotion": emo, "fx": fx}:
+        raise EditError("nothing to change")
+    for k, v, none in (("emotion", emo, "neutral"), ("fx", fx, "none")):
+        if v == none:
+            r.pop(k, None)
+        else:
+            r[k] = v
+    write_atomic(d / "lines.json", json.dumps(rows, ensure_ascii=False, indent=1) + "\n")
+    out = voice_after(d, [lid])
+    out.update(ref=lid, old=old, new={"emotion": emo, "fx": fx})
+    return out
+
+
 @op("voice-set", "voice")
 def voice_set(d: Path, a: dict) -> dict:
     from filmcheck import channels
@@ -425,16 +453,102 @@ def voice_set(d: Path, a: dict) -> dict:
             if speed is not None:
                 r["speed"] = speed
     write_atomic(d / "lines.json", json.dumps(rows, ensure_ascii=False, indent=1) + "\n")
-    out = voice_after(d)
+    out = voice_after(d, yes=True)                  # "confirm all" is the person's yes to the characters shown
     out.update(ref="all lines", old=old, new={"voice": voice or old["voice"], "speed": speed if speed is not None else old["speed"]})
     return out
+
+
+@op("voice-speaker", "voice")
+def voice_speaker(d: Path, a: dict) -> dict:
+    """specs/036 FR-012/FR-042: one speaker's voice — film.json → voices.<speaker> (the narrator: film.json → narrator,
+    or the channel's narrator with scope=channel). Only that speaker's lines are made again."""
+    from filmcheck import speakers
+    sp = (a.get("speaker") or "").strip()
+    if sp != "narrator" and not speakers.SPEAKER.match(sp):
+        raise EditError("speaker: narrator or a character id")
+    st = {"mode": a.get("mode") or "own"}
+    if a.get("voice"):
+        st["voice"] = a["voice"]
+    for k in ("pitch", "speed"):
+        if a.get(k) not in (None, ""):
+            try:
+                st[k] = float(a[k])
+            except ValueError:
+                raise EditError(f"{k}: a number") from None
+    if st["mode"] == "own" and st.get("voice") and not voice_known(st["voice"]):
+        raise EditError(f"\"{st['voice']}\" is not a voice of the library")
+    if sp == "narrator" and st["mode"] == "narrator":
+        raise EditError("the narrator needs its own voice")
+    errs = speakers.check_setting(st, sp)
+    if errs:
+        raise EditError("; ".join(errs))
+    rows = read_lines(d)
+    mine = [r for r in rows if isinstance(r, dict) and r.get("id") and (r.get("speaker") or "narrator") == sp]
+    if not mine:
+        raise EditError(f"no line is said by \"{sp}\"")
+    if len(mine) > 1 and a.get("confirm") != "speaker":
+        raise EditError(f"this makes the {len(mine)} lines of {sp} again: confirm with confirm=speaker")
+    film_p = d / "film.json"
+    try:
+        film = json.loads(film_p.read_text(encoding="utf-8")) if film_p.is_file() else {}
+    except ValueError:
+        raise EditError("film.json cannot be read") from None
+    old = None
+    if sp == "narrator" and a.get("scope") == "channel":
+        slug = speakers.channel_of(d)
+        if not slug:
+            raise EditError("this film has no channel")
+        old = speakers.channel_voice(store_root(d), slug)["narrator"]
+        try:
+            speakers.save_channel_voice(store_root(d), slug, narrator=st, by=a.get("by") or "local")
+        except speakers.SpeakerError as e:
+            raise EditError(str(e)) from None
+    elif sp == "narrator":
+        old, film["narrator"] = film.get("narrator"), st
+    elif cast_char(d, sp) is not None:               # a cast character (specs/034): its voice lives in cast.json and
+        from filmcheck import cast                  # wins there; the change asks for the character's approval again
+        doc = cast.load(d)
+        c = cast.find(doc, sp)
+        old, c["voice"] = c.get("voice"), st
+        cast.save(d, doc)
+    else:
+        film.setdefault("voices", {})
+        old, film["voices"][sp] = film["voices"].get(sp), st
+    if not (sp == "narrator" and a.get("scope") == "channel") and cast_char(d, sp) is None:
+        write_atomic(film_p, json.dumps(film, ensure_ascii=False, indent=1) + "\n")
+    for r in mine:                                   # the speaker's voice now speaks these lines
+        r.pop("voice", None)
+        if sp == "narrator":
+            r.pop("speed", None)
+    write_atomic(d / "lines.json", json.dumps(rows, ensure_ascii=False, indent=1) + "\n")
+    out = voice_after(d, [r["id"] for r in mine], yes=True)
+    out.update(ref=f"speaker {sp}", old=old, new=st)
+    return out
+
+
+def cast_char(d: Path, sp: str):
+    """The cast character with this id when the film has cast/cast.json (specs/034), else None."""
+    from filmcheck import cast
+    if sp == "narrator" or not cast.exists(d):
+        return None
+    try:
+        return cast.find(cast.load(d), sp)
+    except cast.CastError:
+        return None
+
+
+def store_root(d: Path) -> Path:
+    """Where the film's channels live: the film's own root when it has channels/, else STUDIO_ROOT."""
+    own = Path(d).resolve().parent.parent
+    return own if (own / "channels").is_dir() else Path(os.environ.get("STUDIO_ROOT") or own)
 
 
 def voice_known(v: str) -> bool:
     """A Kokoro voice in the library's voices-v1.0.bin (a zip of .npy files); edge-tts names pass when they look right."""
     import zipfile
-    if v.endswith("Neural"):
+    if v.endswith("Neural") or v.startswith("el:"):   # specs/036: ElevenLabs ids are checked by their form
         return True
+    v = v[7:] if v.startswith("kokoro:") else v
     try:
         with zipfile.ZipFile(lib_path() / "core" / "tts" / "voices-v1.0.bin") as z:
             return f"{v}.npy" in z.namelist()
@@ -522,6 +636,53 @@ def cast_approve(d: Path, a: dict) -> dict:
     saved = castlib.save_if_wanted(d, [cid], a.get("by"))
     return {"ok": True, "ref": cid, "old": None, "new": "approved", "files": ["cast/cast.json"], "no_stale": True,
             **({"saved": saved} if saved else {})}
+
+
+@op("cast-voice", "cast")
+def cast_voice(d: Path, a: dict) -> dict:
+    """specs/036 FR-013: a character's voice (args: character, option=1..3 | voice=<id>, mode=own|narrator, pitch,
+    speed; cloned_ok=1 the first time a cloned voice is chosen). An approved character must be approved again."""
+    from filmcheck import cast, speakers
+    cid = a.get("character") or (a.get("ref") or [None])[0]
+    if not cid:
+        raise EditError("cast-voice: character=<id>")
+    try:
+        doc = cast.load(d)
+        c = cast.find(doc, cid)
+    except cast.CastError as e:
+        raise EditError(e.message) from None
+    opts = c.get("voice_options") or []
+    if a.get("option") not in (None, ""):
+        try:
+            n = int(a["option"])
+        except ValueError:
+            raise EditError("option: 1 to 3") from None
+        if not 1 <= n <= len(opts):
+            raise EditError(f"{cid} has {len(opts)} voice choice(s)")
+        st = dict(opts[n - 1]["setting"])
+    else:
+        st = {"mode": a.get("mode") or "own"}
+        if a.get("voice"):
+            st["voice"] = a["voice"]
+    for k in ("pitch", "speed"):
+        if a.get(k) not in (None, ""):
+            try:
+                st[k] = float(a[k])
+            except ValueError:
+                raise EditError(f"{k}: a number") from None
+    if st.get("mode", "own") == "own" and st.get("voice") and not voice_known(st["voice"]):
+        raise EditError(f"\"{st['voice']}\" is not a voice of the library")
+    if str(a.get("cloned_ok", "")).lower() in ("1", "true", "yes"):
+        st["cloned_ok"] = {"at": cast.now(), "by": a.get("by") or "local"}
+    elif (c.get("voice") or {}).get("cloned_ok") and (c.get("voice") or {}).get("voice") == st.get("voice"):
+        st["cloned_ok"] = c["voice"]["cloned_ok"]
+    errs = speakers.check_setting(st, "voice")
+    if errs:
+        raise EditError("; ".join(errs))
+    old = c.get("voice")
+    c["voice"] = st
+    cast.save(d, doc)
+    return {"ok": True, "ref": cid, "old": old, "new": st, "files": ["cast/cast.json"], "no_stale": True}
 
 
 @op("cast-save", "cast")

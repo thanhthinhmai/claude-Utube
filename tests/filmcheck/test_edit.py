@@ -204,6 +204,34 @@ class Voice(unittest.TestCase):                                    # specs/026 T
         self.assertTrue(all(x["speed"] == 0.95 for x in self.rows()))
 
 
+    def test_voice_speaker_changes_only_that_speaker(self):          # specs/036 T026 (FR-012, FR-042)
+        rows = self.rows()
+        rows[1]["speaker"], rows[2]["speaker"] = "kid", "kid"
+        (self.d / "lines.json").write_text(json.dumps(rows))
+        self.assertEqual(self.run_op("voice-speaker", speaker="kid", voice="bf_emma")["code"], 2)   # two lines: confirm
+        self.assertEqual(self.run_op("voice-speaker", speaker="ghost", voice="bf_emma", confirm="speaker")["code"], 2)
+        self.assertEqual(self.run_op("voice-speaker", speaker="kid", mode="narrator", pitch="9", confirm="speaker")["code"], 2)
+        r = self.run_op("voice-speaker", speaker="kid", mode="narrator", pitch="4", confirm="speaker")
+        self.assertEqual(r["code"], 0, r)
+        film = json.loads((self.d / "film.json").read_text())
+        self.assertEqual(film["voices"]["kid"], {"mode": "narrator", "pitch": 4.0})
+        after = self.rows()
+        self.assertEqual([("voice" in x) for x in after[:4]], [True, False, False, True])   # only kid's lines lost "voice"
+
+    def test_voice_tone(self):                                          # specs/036 T041 (FR-030)
+        lid = self.rows()[1]["id"]
+        self.assertEqual(self.run_op("voice-tone", line=lid, emotion="angry")["code"], 2)
+        self.assertEqual(self.run_op("voice-tone", line=lid, fx="moon")["code"], 2)
+        self.assertEqual(self.run_op("voice-tone", line=lid)["code"], 2)           # nothing to change
+        r = self.run_op("voice-tone", line=lid, emotion="whisper", fx="wall")
+        self.assertEqual(r["code"], 0, r)
+        row = self.rows()[1]
+        self.assertEqual((row["emotion"], row["fx"]), ("whisper", "wall"))
+        self.assertEqual(self.run_op("voice-tone", line=lid, emotion="neutral", fx="none")["code"], 0)
+        self.assertNotIn("emotion", self.rows()[1])
+        self.assertNotIn("fx", self.rows()[1])
+
+
 class Mix(unittest.TestCase):                                      # specs/026 T045
     def setUp(self):
         TMP.mkdir(exist_ok=True)

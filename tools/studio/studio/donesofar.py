@@ -15,7 +15,8 @@ ALLOWED = re.compile(r"^(SCRIPT\.md|SOURCES\.md|lines\.json|checks\.json|CHECKS\
                      r"|out/mix\.wav|\.check/review-r\d+\.json|\.check/labels\.json"
                      r"|\.check/shots/(sheet|label-sheet)-\d+\.jpg|\.check/shots/S\d{2,4}(~[A-Za-z0-9._~-]+)?\.jpg"
                      r"|scenes\.json|mix\.json|publish/pack\.json|publish/thumbnail-[123]\.(png|jpg)"
-                     r"|cast/sheets/[a-z0-9-]{1,32}(\.prev)?/([a-z0-9-]{1,40}\.jpg|walk\.mp4|sheet\.json))$")   # 034: cast sheets       # 026: scene table, mix settings, publish pack
+                     r"|cast/sheets/[a-z0-9-]{1,32}(\.prev)?/([a-z0-9-]{1,40}\.jpg|walk\.mp4|sheet\.json)"
+                     r"|cast/voices/[a-z0-9-]{1,32}/[123]\.wav)$")   # 036: voice samples of a character   # 034: cast sheets       # 026: scene table, mix settings, publish pack
 # Never listed nor served, even if the allow list grows (specs/029 contracts/files.md): shot notes' pictures, the
 # small-picture cache, the previous video and its shot marks
 EXCLUDED = re.compile(r"^(shot-notes/|\.shots/|shots\.prev\.json$|[^/]*\.prev\.mp4$)")
@@ -125,9 +126,24 @@ def _script(d: Path, checks: dict) -> dict:
             if ed else None, "verdict": s.get("verdict"), "rounds": rounds}
 
 
+def narrator_voice(d: Path, lines: list) -> dict:
+    """{voice, speed} of the narrator as `voice make` reads it (specs/036 FR-041: the summary and the Voice picker show
+    the same voice): the resolved speaker table, else the first narrator line as written."""
+    rows = [x for x in lines if isinstance(x, dict) and x.get("id")]
+    try:
+        from filmcheck import speakers
+        st = ((speakers.resolve(d, rows, store.root())["speakers"].get("narrator") or {}).get("setting")) or {}
+    except Exception:                       # noqa: BLE001 — the page still opens with a damaged file
+        st = {}
+    first = next((x for x in rows if (x.get("speaker") or "narrator") == "narrator"), rows[0] if rows else {})
+    voice = first.get("voice") or st.get("voice")
+    speed = first.get("speed") if first.get("voice") else st.get("speed", first.get("speed"))
+    return {"voice": voice, "speed": speed}
+
+
 def _voice(d: Path, lines, tiers: dict) -> dict:
     lines = lines if isinstance(lines, list) else []
-    first = lines[0] if lines else {}
+    first = narrator_voice(d, lines)
     paras = list(dict.fromkeys(x.get("para") for x in lines if x.get("para")))
     return {"version": _mtime(d / "lines.json", d / "voices" / "dur.json", d / "checks.json"),
             "lines": len(lines), "voice": first.get("voice"), "speed": first.get("speed"),
