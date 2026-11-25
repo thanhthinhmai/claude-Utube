@@ -127,17 +127,17 @@ description: "Task list: Duyệt nhân vật cho phim After Effects (034-cast-re
 
 ### Tests US4
 
-- [ ] T043 [P] [US4] `tests/ae/test_rigs.py`: `rigs.lock` khớp mọi thư mục đã khoá trong repo; sửa một tệp trong bản sao tạm của `v1/` → `check()` báo `ball@1`; `lock` từ chối id đã có; `bundle.py` gói cả `v1` và `v2` khi `cast.json` nhắc `ball@1` và lock có `ball@2`, `entry.jsx` có `CU.rig`, `CU.CAST` và `CU.char`; nhân vật `ball@1` trong `cast.json` được `CU.char` dựng bằng `ball@1` dù lock có `ball@2`
-- [ ] T044 [P] [US4] `tests/online/test_cast_fix_job.py` (agent giả `tests/online/fake_agent.py`): `POST /cast-library/{ch}/{id}/preview {rig}` tạo việc `fix` `target:"cast"`, `mode:"preview"` → `v<n+1>.preview/`; `update` biến preview thành `v<n+1>` chưa duyệt, 422 `no_preview` khi không có; `approve`; `fix {notes}` → `mode:"library"` → `v<n+1>` chưa duyệt; 409 `ae_unavailable` khi cầu nối chưa sẵn sàng; đăng ký trong `tests/online/run.sh`
+- [X] T043 [P] [US4] `tests/ae/test_rigs.py`: `rigs.lock` khớp mọi thư mục đã khoá trong repo; sửa một tệp trong bản sao tạm của `v1/` → `check()` báo `ball@1`; `lock` từ chối id đã có; `bundle.py` gói cả `v1` và `v2` khi `cast.json` nhắc `ball@1` và lock có `ball@2`, `entry.jsx` có `CU.rig`, `CU.CAST` và `CU.char`; nhân vật `ball@1` trong `cast.json` được `CU.char` dựng bằng `ball@1` dù lock có `ball@2`
+- [X] T044 [P] [US4] `tests/online/test_cast_fix_job.py` (agent giả `tests/online/fake_agent.py`): `POST /cast-library/{ch}/{id}/preview {rig}` tạo việc `fix` `target:"cast"`, `mode:"preview"` → `v<n+1>.preview/`; `update` biến preview thành `v<n+1>` chưa duyệt, 422 `no_preview` khi không có; `approve`; `fix {notes}` → `mode:"library"` → `v<n+1>` chưa duyệt; 409 `ae_unavailable` khi cầu nối chưa sẵn sàng; đăng ký trong `tests/online/run.sh`
 
 ### Implementation US4
 
-- [ ] T045 [US4] Lệnh `ae rigs [--check]` và `ae rigs --lock ball@N` trong `tools/ae/cli.py` (dùng `tools/ae/rigs.py`; `--check` mã 1 khi có bản đã khoá bị đổi)
-- [ ] T046 [US4] `castlib.py`: cờ `new_rig` (nhân vật `rig = ball@N`, lock có `ball@M`, M > N); `preview_dir`, `update_from_preview` (preview → `v<n+1>` chưa duyệt, xoá preview), `approve_latest`; lệnh `cast preview <kênh>/<id> --rig ball@N`, `cast update <kênh>/<id> --from-preview`, `cast library-approve <kênh>/<id>` trong `tools/filmcheck/cli.py`
-- [ ] T047 [US4] `castapi.py`: POST `/cast-library/{channel}/{id}/preview|update|approve|fix` theo contracts/api.md; `tools/studio/studio/jobs.py`: `build("fix", …)` nhận `input = {kind:"fix", target:"cast", mode:"preview"|"library", channel, character, rig?, notes?}`
-- [ ] T048 [US4] `tools/runner/worker.py`: việc `fix` `target:"cast"` dựng thư mục tạm `work/cast/<channel>-<id>/` (`cast/cast.json` một nhân vật từ kho, `cast-notes.json` nếu có); `finish_fix` chép `cast/sheets/<id>/` vào `v<n+1>.preview/` (preview) hoặc `v<n+1>/` chưa duyệt (library), kèm câu trả lời ghi chú
-- [ ] T049 [US4] `tools/runner/agent.py` `fix_prompt` nhánh cast: đổi `rig` khi `mode=preview`, sửa thông số theo ghi chú khi `mode=library`, `ae sheet`, trả lời từng ghi chú
-- [ ] T050 [US4] Trang Cast library trong `web/app.js` + `style.css`: nhãn "New rig version", nút xem trước, bảng mẫu bản mới cạnh bản đã duyệt, "Update" từng nhân vật, "Approve"; ghi chú lên nhân vật trong kho gửi `fix`
+- [X] T045 [US4] Lệnh `ae rigs [--check]` và `ae rigs --lock ball@N` trong `tools/ae/cli.py` (dùng `tools/ae/rigs.py`; `--check` mã 1 khi có bản đã khoá bị đổi)
+- [X] T046 [US4] `castlib.py`: cờ `new_rig` (nhân vật `rig = ball@N`, lock có `ball@M`, M > N); `preview_dir`, `update_from_preview` (preview → `v<n+1>` chưa duyệt, xoá preview), `approve_latest`; lệnh `cast preview <kênh>/<id> --rig ball@N`, `cast update <kênh>/<id> --from-preview`, `cast library-approve <kênh>/<id>` trong `tools/filmcheck/cli.py`
+- [X] T047 [US4] `castapi.py`: POST `/cast-library/{channel}/{id}/preview|update|approve|fix` theo contracts/api.md; `tools/studio/studio/jobs.py`: `build("fix", …)` nhận `input = {kind:"fix", target:"cast", mode:"preview"|"library", channel, character, rig?, notes?}`
+- [X] T048 [US4] `tools/runner/worker.py`: việc `fix` `target:"cast"` dựng thư mục tạm `work/cast/<channel>-<id>/` (`cast/cast.json` một nhân vật từ kho, `cast-notes.json` nếu có); `finish_fix` chép `cast/sheets/<id>/` vào `v<n+1>.preview/` (preview) hoặc `v<n+1>/` chưa duyệt (library), kèm câu trả lời ghi chú
+- [X] T049 [US4] `tools/runner/agent.py` `fix_prompt` nhánh cast: đổi `rig` khi `mode=preview`, sửa thông số theo ghi chú khi `mode=library`, `ae sheet`, trả lời từng ghi chú
+- [X] T050 [US4] Trang Cast library trong `web/app.js` + `style.css`: nhãn "New rig version", nút xem trước, bảng mẫu bản mới cạnh bản đã duyệt, "Update" từng nhân vật, "Approve"; ghi chú lên nhân vật trong kho gửi `fix`
 
 **Checkpoint**: US4 chạy độc lập (quickstart mục 5).
 
@@ -145,8 +145,8 @@ description: "Task list: Duyệt nhân vật cho phim After Effects (034-cast-re
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T051 [P] Cập nhật `tools/CLAUDE.md` (rigs, castsheet, sheet.py, castnotes, castlib, castapi) và mục "Phim After Effects" ở `CLAUDE.md` gốc (một dòng về bước Cast và kho nhân vật)
-- [ ] T052 [P] Chuyển `films/ae-sleepless-test/ae/shots.jsx` sang `CU.rig("ball@1")`, viết `films/ae-sleepless-test/cast/cast.json` (hero, friend, classmates) để làm phim thử của quickstart (thư mục phim không vào git)
+- [X] T051 [P] Cập nhật `tools/CLAUDE.md` (rigs, castsheet, sheet.py, castnotes, castlib, castapi) và mục "Phim After Effects" ở `CLAUDE.md` gốc (một dòng về bước Cast và kho nhân vật)
+- [X] T052 [P] Chuyển `films/ae-sleepless-test/ae/shots.jsx` sang `CU.rig("ball@1")`, viết `films/ae-sleepless-test/cast/cast.json` (hero, friend, classmates) để làm phim thử của quickstart (thư mục phim không vào git)
 - [ ] T053 Chạy đủ 5 bộ test: `sh tests/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ae/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`; sửa tới khi đạt
 - [ ] T054 Chạy quickstart mục 2–5 với AE thật trên phim thử (SC-001 ≤ 5 phút, SC-003 so sha256, SC-005, SC-006 so điểm ảnh); xem bảng mẫu bằng mắt (đầu cầu, mắt có con ngươi, mũ không che mắt)
 

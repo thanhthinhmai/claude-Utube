@@ -126,10 +126,14 @@ def _ff(args: list) -> None:
         raise SheetError("ffmpeg", (r.stderr or "ffmpeg failed").strip()[-400:])
 
 
-def cut_jpeg(master: Path, t: float, out: Path) -> None:
+def cut_jpeg(master: Path, n: int, out: Path) -> None:
+    """Frame n of master (picked by index: a seek past the last frame's start gives nothing)."""
     for q in (3, 5, 8, 12):
-        _ff(["-ss", f"{t:.4f}", "-i", str(master), "-frames:v", "1",
-             "-vf", f"scale='if(gt(iw,ih),{JPEG_LONG},-2)':'if(gt(iw,ih),-2,{JPEG_LONG})'", "-q:v", str(q), str(out)])
+        _ff(["-i", str(master), "-frames:v", "1", "-fps_mode", "passthrough",
+             "-vf", f"select=eq(n\\,{n}),scale='if(gt(iw,ih),{JPEG_LONG},-2)':'if(gt(iw,ih),-2,{JPEG_LONG})'",
+             "-q:v", str(q), str(out)])
+        if not out.is_file():
+            raise SheetError("bad_result", f"master.mp4 has no frame {n} for {out.name}")
         if out.stat().st_size <= JPEG_MAX:
             return
     raise SheetError("too_big", f"{out.name} stays larger than 300 KB")
@@ -163,7 +167,7 @@ def cut(master, marks: list, frames: list, fps: float, dest: Path, checks=()) ->
             cut_walk(master, m[0], m[1] - m[0], out)
         else:
             out = folder / f"{fr['key']}.jpg"
-            cut_jpeg(master, m[0] + 0.5 / fps, out)
+            cut_jpeg(master, int(round(m[0] * fps)), out)
         got[(fr["character"], fr["key"])] = {"file": out.name}
     return got
 
