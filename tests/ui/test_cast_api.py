@@ -93,6 +93,10 @@ class CastApi(unittest.TestCase):
         self.assertEqual(r.json(), {"available": False, "channels": []})
         self.assertEqual(self.c.get("/api/v1/cast-library/default/hero").status_code, 404)
         self.assertEqual(self.c.get("/api/v1/cast-library/default/hero/v1/front.jpg").status_code, 404)
+        for p, body in (("/api/v1/cast-library/default/hero/preview", {"rig": "ball@1"}), ("/api/v1/cast-library/default/hero/fix", {"notes": ["x"]}),
+                        ("/api/v1/cast-library/default/hero/update", {}), ("/api/v1/cast-library/default/hero/approve", {})):
+            r = self.c.post(p, json=body, headers=W)
+            self.assertEqual((r.status_code, r.json()["error"]["code"]), (409, "app_only"), p)   # changes run in the app
         from studio import castapi, store
         from filmcheck import cast, castlib
         acc = self.p.dir / "data" / "accounts" / "u1"

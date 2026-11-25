@@ -795,3 +795,11 @@ main.wide-film #film-player .sh-strip-tools .sh-filters button { padding: 2px 10
 .cast-split .cast-notes .row { flex-wrap: nowrap; align-items: start; }
 .cast-lib .card { display: grid; gap: 4px; text-decoration: none; color: inherit; }
 .cast-lib .card img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; background: var(--hover); }
+.lib-compare { margin: 12px 0; }
+.lib-compare .lib-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.lib-compare .frames { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.lib-compare .fr img, .lib-compare .fr video { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: var(--hover); }
+.lib-compare figure { margin: 0; display: grid; gap: 4px; }
+.lib-compare figcaption { font-size: 12px; color: var(--muted); }
+.lib-compare h3 { margin: 8px 0 6px; font-size: 13px; }
+.cast-lib .chip.acc { background: var(--accent-soft); color: var(--accent-ink); justify-self: start; }

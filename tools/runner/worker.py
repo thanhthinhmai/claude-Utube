@@ -436,7 +436,9 @@ class Worker:
         if job_id not in self.runs:      # media go first, as for done jobs
             self.purge(jobs.load(job_id))
         j = quotas.fail(job_id, error, by)
-        if j.get("kind") == "fix":       # specs/032: the notes are free again; the video and the notes stay as they were
+        if j.get("kind") == "fix" and (j.get("input") or {}).get("target") == "cast":
+            pass                         # specs/034: the library is untouched
+        elif j.get("kind") == "fix":     # specs/032: the notes are free again; the video and the notes stay as they were
             try:
                 from filmcheck import shotnotes
                 shotnotes.end_lot(store.account_dir(j["owner"]) / "films" / (j.get("input") or {}).get("film", ""), job_id)
@@ -556,6 +558,13 @@ class Worker:
         if (acct / "my-styles").is_dir() and not mine.exists():
             shutil.copytree(acct / "my-styles", mine)
         inp = j.get("input") or {}
+        if j["kind"] == "fix" and inp.get("target") == "cast":     # specs/034 US4: one library character as a small film
+            from filmcheck import castlib
+            dst = work / "films" / f"cast-{inp['character']}"
+            if not dst.exists():
+                castlib.work_film(acct, inp["channel"], inp["character"], dst,
+                                  inp.get("rig") if inp.get("mode") == "preview" else None, inp.get("notes") or ())
+            return {}, None
         if j["kind"] == "fix":                        # specs/032: the AE film with its notes; videos as hard links
             src, dst = acct / "films" / inp["film"], work / "films" / inp["film"]
             if src.is_dir() and not dst.exists():
@@ -744,6 +753,8 @@ class Worker:
         but the lot is dropped (in failed())."""
         from filmcheck import shotnotes
         inp = j.get("input") or {}
+        if inp.get("target") == "cast":
+            return self.finish_cast_fix(j, work, rep, result, rc)
         film = inp.get("film")
         lib, wf = store.account_dir(j["owner"]) / "films" / film, work / "films" / film
         if rep.get("done") is False or not rep.get("done"):
@@ -774,6 +785,29 @@ class Worker:
         self.notify(j, "job_done")
         shutil.rmtree(work, ignore_errors=True)
         log.info("job %s done (fix)", j["id"])
+
+    def finish_cast_fix(self, j: dict, work: Path, rep: dict, result: dict, rc: int) -> None:
+        """A library character redrawn (specs/034 US4): the sheet goes to v<n>.preview/ (a newer rig) or to a new version
+        waiting for approval (notes), with the notes and Claude's answers. Failed: the library stays as it was."""
+        from filmcheck import castlib
+        inp = j.get("input") or {}
+        if not rep.get("done"):
+            self.failed(j["id"], rep.get("error") or result.get("error") or f"The redraw stopped without finishing (exit code {rc}).",
+                        rep.get("by", "studio"))
+            return
+        try:
+            v = castlib.store_result(store.account_dir(j["owner"]), inp["channel"], inp["character"],
+                                     work / "films" / f"cast-{inp['character']}", inp.get("mode") or "library")
+        except Exception as e:      # noqa: BLE001 - nothing drawn: the studio's fault, the library is untouched
+            log.exception("job %s: cast result", j["id"])
+            self.failed(j["id"], f"The redrawn character could not be saved: {e}")
+            return
+        what = "preview" if inp.get("mode") == "preview" else "version"
+        jobs.update(j["id"], lambda x: x["log"].append(jobs._line(f"{inp['channel']}/{inp['character']}: {what} v{v} ready to review")))
+        j = jobs.finish(j["id"], "done")
+        self.notify(j, "job_done")
+        shutil.rmtree(work, ignore_errors=True)
+        log.info("job %s done (cast %s)", j["id"], what)
 
     def finish_topics(self, j: dict, work: Path, result: dict) -> None:
         from filmcheck import topics

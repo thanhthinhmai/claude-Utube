@@ -1356,6 +1356,40 @@ def cmd_cast_library(a) -> int:
     return 0
 
 
+def cmd_cast_lib_change(a) -> int:
+    """cast preview <ch>/<id> --rig ball@N (draws in AE) · cast update <ch>/<id> --from-preview · cast library-approve <ch>/<id>."""
+    import shutil
+    import subprocess
+    import tempfile
+    from filmcheck import cast, castlib
+    acc = castlib.root()
+    if acc is None:
+        print("✗ the app is not running: the channel's cast lives in the studio app (sh bin/studio app start)", file=sys.stderr)
+        return 3
+    try:
+        ch, cid, _ = castlib.parse_ref(a.ref)
+        if a.cmd == "update":
+            print(f"✓ {ch}/{cid}: v{castlib.update_from_preview(acc, ch, cid)} waits for approval (cast library-approve {ch}/{cid})")
+            return 0
+        if a.cmd == "library-approve":
+            print(f"✓ {ch}/{cid}: v{castlib.approve_latest(acc, ch, cid, os.environ.get('STUDIO_USER') or 'local')} approved")
+            return 0
+        work = Path(tempfile.mkdtemp(prefix=f"cast-{ch}-{cid}-", dir=acc))
+        try:
+            d = castlib.work_film(acc, ch, cid, work / "films" / f"cast-{cid}", a.rig)
+            r = subprocess.run(["sh", str(HERE.parents[1] / "bin" / "studio"), "ae", "sheet", str(d.name), "--dir", str(d)])
+            if r.returncode:
+                return r.returncode
+            print(f"✓ {ch}/{cid}: preview v{castlib.store_result(acc, ch, cid, d, 'preview')} with {a.rig} "
+                  f"(look at it in the app's Cast page; keep it: cast update {ch}/{cid} --from-preview)")
+            return 0
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+    except (cast.CastError, ValueError) as e:
+        print(f"✗ {getattr(e, 'code', 'bad_rig')}: {getattr(e, 'message', e)}", file=sys.stderr)
+        return 3 if getattr(e, "code", "") == "no_character" else 2
+
+
 def cmd_cast_notes(a) -> int:
     """cast notes show <film> [--all] [--json] · cast notes reply <film> <id> "<text>" [--done|--open] --base <b>."""
     from filmcheck import cast, castnotes
@@ -1758,6 +1792,11 @@ def parser() -> argparse.ArgumentParser:
     s = ca.add_parser("use", help="put a character of the channel's cast in this film"); s.add_argument("film"); s.add_argument("ref")
     s = ca.add_parser("library", help="the channel's cast (in the studio app)"); s.add_argument("channel", nargs="?")
     s.add_argument("--json", action="store_true")
+    s = ca.add_parser("preview", help="draw a library character with a newer rig (After Effects)"); s.add_argument("ref")
+    s.add_argument("--rig", required=True)
+    s = ca.add_parser("update", help="the preview becomes a new version waiting for approval"); s.add_argument("ref")
+    s.add_argument("--from-preview", action="store_true", required=True)
+    s = ca.add_parser("library-approve", help="approve the library version waiting for approval"); s.add_argument("ref")
     s = ca.add_parser("notes", help="notes pinned on the cast sheet").add_subparsers(dest="ncmd", required=True)
     n = s.add_parser("show"); n.add_argument("film"); n.add_argument("--all", action="store_true"); n.add_argument("--json", action="store_true")
     n = s.add_parser("reply"); n.add_argument("film"); n.add_argument("note_id"); n.add_argument("text")
@@ -1791,7 +1830,7 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach, ("kit", "use"): cmd_kit_use,
             ("shots", "export"): cmd_shots_export,
             ("notes", "show"): cmd_notes_show, ("notes", "reply"): cmd_notes_reply, ("film", "replace"): cmd_film_replace,
-            ("cast", "check"): cmd_cast_check, ("cast", "status"): cmd_cast_status, ("cast", "approve"): cmd_cast_approve, ("cast", "notes"): cmd_cast_notes, ("cast", "use"): cmd_cast_use, ("cast", "library"): cmd_cast_library,
+            ("cast", "check"): cmd_cast_check, ("cast", "status"): cmd_cast_status, ("cast", "approve"): cmd_cast_approve, ("cast", "notes"): cmd_cast_notes, ("cast", "use"): cmd_cast_use, ("cast", "preview"): cmd_cast_lib_change, ("cast", "update"): cmd_cast_lib_change, ("cast", "library-approve"): cmd_cast_lib_change, ("cast", "library"): cmd_cast_library,
             ("people", "list"): cmd_people_list, ("people", "new"): cmd_people_new, ("people", "sheet"): cmd_people_sheet,
             ("people", "approve"): cmd_people_approve, ("people", "use"): cmd_people_use, ("people", "check"): cmd_people_check,
             ("lesson", "list"): cmd_lesson_list, ("lesson", "draft"): cmd_lesson_draft, ("lesson", "add"): cmd_lesson_add,

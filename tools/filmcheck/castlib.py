@@ -146,13 +146,14 @@ def listing(acc: Path, channel: str = None) -> list:
     for ch in ([channel] if channel else channels(acc)):
         rows = []
         for cid, ent in sorted(index(acc, ch)["characters"].items()):
-            last = (ent.get("versions") or [{}])[-1]
+            last = next((x for x in ent.get("versions", []) if x["v"] == ent["latest"]), {})
             info = _read(version_dir(acc, ch, cid, ent["latest"]) / "character.json", {}) or {}
             try:
                 newer = rigs.newer(last.get("rig") or "")
             except ValueError:
                 newer = None
             rows.append({"id": cid, "name": ent.get("name") or cid, "role": info.get("role"), "latest": ent["latest"],
+                         "pending": ent.get("pending"), "preview": bool(preview_dir(acc, ch, cid)),
                          "rig": last.get("rig"), "approved_at": last.get("approved_at"),
                          "films": info.get("films", []), "new_rig": newer})
         out.append({"channel": ch, "characters": rows})
@@ -333,3 +334,131 @@ def use(film_dir, ref: str, by: str = "local") -> dict:
         cc["approved"] = {"fingerprint": cast.char_fingerprint(d, cc), "at": now(), "by": by or "local", "source": "library"}
         cast.save(d, doc)
     return {"channel": channel, "id": cid, "v": g["v"], "approved": not lacking, "lacking": lacking}
+
+
+# ---------- new rig versions, previews, fixes (specs/034 US4) ----------
+def preview_dir(acc: Path, channel: str, cid: str):
+    """The character's preview folder v<n>.preview/ (one at most), or None."""
+    d = _cast_dir(acc, channel) / cid
+    got = sorted(d.glob("v*.preview"), key=lambda p: int(p.name[1:].split(".")[0])) if d.is_dir() else []
+    return got[-1] if got else None
+
+
+def _next_v(acc: Path, channel: str, cid: str, ent: dict) -> int:
+    v = max([x["v"] for x in (ent or {}).get("versions", [])] or [0]) + 1
+    while version_dir(acc, channel, cid, v).exists() or (_cast_dir(acc, channel) / cid / f"v{v}.preview").exists():
+        v += 1
+    return v
+
+
+def needs_of(character: dict) -> dict:
+    """The needs that redraw every approved picture of a library character."""
+    keys = character.get("frames_approved", [])
+    return {"expressions": [{"key": k[5:], "label": k[5:]} for k in keys if k.startswith("expr-")],
+            "poses": [{"key": k[5:], "label": k[5:]} for k in keys if k.startswith("pose-")],
+            "walk": "walk" in keys}
+
+
+def work_film(acc: Path, channel: str, cid: str, dest: Path, rig: str = None, notes=()) -> Path:
+    """A small AE film holding one library character (the latest version, or rig changed), for `ae sheet`. notes: texts
+    written as general notes on the character (cast-notes.json) for Claude to answer."""
+    g = get(acc, channel, cid)
+    c = {k: g["character"].get(k) for k in COPY if g["character"].get(k) is not None}
+    if rig:
+        from ae import rigs
+        rigs.parse(rig)
+        if not rigs.is_locked(rig):
+            raise LibraryError("bad_rig", f"{rig} is not a locked rig version (sh bin/studio ae rigs)")
+        c["rig"] = rig
+    c.update(needs=needs_of(g["character"]), from_library={"channel": channel, "id": cid, "v": g["v"]}, approved=None)
+    d = Path(dest)
+    (d / "ae").mkdir(parents=True, exist_ok=True)
+    (d / "ae" / "shots.jsx").write_text(f'CU.shot1 = function () {{ return CU.char("{cid}", {{dur: 1}}).comp; }};\n')
+    _write_json(d / "film.json", {"engine": "ae", "fps": 30, "shots": ["S1"], "ae_files": ["shots.jsx"]})
+    _write_json(d / "cast" / "cast.json", {"version": 1, "channel": channel, "save_to_library": False, "characters": [c]})
+    if notes:
+        from filmcheck import castnotes
+        for t in notes:
+            castnotes.add(d, cid, "note", text=t)
+    return d
+
+
+def store_result(acc: Path, channel: str, cid: str, film_dir: Path, mode: str) -> int:
+    """Put a redrawn sheet in the library: mode "preview" → v<n>.preview/ (replacing an older preview), "library" → a new
+    version v<n>/ waiting for approval. Notes and Claude's answers are kept as notes.json. Returns n."""
+    src = cast.sheet_dir(film_dir, cid)
+    if not _pictures(src):
+        raise LibraryError("no_sheet", f"no pictures were drawn for {cid}")
+    c = cast.find(cast.load(film_dir), cid)
+    cdir = _cast_dir(acc, channel)
+    with _locked(cdir):
+        idx = index(acc, channel)
+        ent = idx["characters"].get(cid)
+        if not ent:
+            raise LibraryError("no_character", f"no character {cid} in the {channel} cast")
+        old = preview_dir(acc, channel, cid)
+        if mode == "preview" and old:
+            shutil.rmtree(old)
+        v = _next_v(acc, channel, cid, ent)
+        final = cdir / cid / (f"v{v}.preview" if mode == "preview" else f"v{v}")
+        tmp = final.with_name(f".{final.name}.{os.getpid()}.tmp")
+        if tmp.exists():
+            shutil.rmtree(tmp)
+        shutil.copytree(src, tmp / "sheet")
+        rows = _pictures(tmp / "sheet")
+        last = _read(version_dir(acc, channel, cid, ent["latest"]) / "character.json", {}) or {}
+        ch = {k: c.get(k) for k in COPY if c.get(k) is not None}
+        ch.update(frames_approved=sorted(rows), approved=None, films=list(last.get("films", [])), based_on=ent["latest"])
+        _write_json(tmp / "character.json", ch)
+        notes = Path(film_dir) / "cast-notes.json"
+        if notes.is_file():
+            shutil.copyfile(notes, tmp / "notes.json")
+        os.rename(tmp, final)
+        if mode != "preview":
+            ent["versions"].append({"v": v, "rig": c.get("rig"), "approved_at": None})
+            ent["pending"] = v
+            _write_json(cdir / "index.json", idx)
+        return v
+
+
+def update_from_preview(acc: Path, channel: str, cid: str) -> int:
+    """"Update": the preview becomes version v<n>, waiting for approval."""
+    cdir = _cast_dir(acc, channel)
+    with _locked(cdir):
+        p = preview_dir(acc, channel, cid)
+        if not p:
+            raise LibraryError("no_preview", f"{channel}/{cid} has no preview: make one first (cast preview … --rig …)")
+        idx = index(acc, channel)
+        ent = idx["characters"][cid]
+        v = int(p.name[1:].split(".")[0])
+        os.rename(p, cdir / cid / f"v{v}")
+        ch = _read(cdir / cid / f"v{v}" / "character.json", {})
+        ent["versions"].append({"v": v, "rig": ch.get("rig"), "approved_at": None})
+        ent["pending"] = v
+        _write_json(cdir / "index.json", idx)
+        return v
+
+
+def approve_latest(acc: Path, channel: str, cid: str, by: str = "local") -> int:
+    """Approve the version waiting for approval: it becomes the latest, used by later films."""
+    cdir = _cast_dir(acc, channel)
+    with _locked(cdir):
+        idx = index(acc, channel)
+        ent = idx["characters"].get(cid)
+        if not ent:
+            raise LibraryError("no_character", f"no character {cid} in the {channel} cast")
+        v = ent.get("pending")
+        if not v:
+            raise LibraryError("nothing_to_approve", f"{channel}/{cid} v{ent['latest']} is already approved")
+        d = version_dir(acc, channel, cid, v)
+        ch = _read(d / "character.json", {})
+        at = now()
+        ch["approved"] = {"at": at, "by": by or "local", "film": None}
+        _write_json(d / "character.json", ch)
+        for x in ent["versions"]:
+            if x["v"] == v:
+                x["approved_at"] = at
+        ent.pop("pending", None)
+        ent["latest"] = v
+        _write_json(cdir / "index.json", idx)
+        return v

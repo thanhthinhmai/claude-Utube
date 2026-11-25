@@ -2198,28 +2198,69 @@ async function pageCastLib() {
       <strong>${esc(c.name)}</strong>
       <span class="muted small">${esc(CAST_ROLE[c.role] || c.role || "")} · v${c.latest} · rig ${esc(c.rig || "–")}</span>
       <span class="muted small">Approved ${esc((c.approved_at || "").slice(0, 10))} · ${c.films.length} film${c.films.length === 1 ? "" : "s"}</span>
-      ${c.new_rig ? `<span class="chip warn">New rig version: ${esc(c.new_rig)}</span>` : ""}</a>`).join("")}</div>`).join("")
+      ${c.new_rig ? `<span class="chip warn">New rig version: ${esc(c.new_rig)}</span>` : ""}
+      ${c.pending ? `<span class="chip acc">v${c.pending} waits for approval</span>` : c.preview ? `<span class="chip acc">Preview ready</span>` : ""}</a>`).join("")}</div>`).join("")
     : `<p class="panel muted">No characters saved yet. Approve a cast with "Save approved characters to the channel's cast" ticked.</p>`);
+}
+/** The pictures of one library sheet, grouped. @param {string} ch @param {string} id @param {string|number} v @param {any[]} frames */
+function libSheet(ch, id, v, frames) {
+  return CAST_GROUPS.map(([k, l]) => {
+    const fs = frames.filter((/** @type {any} */ f) => f.group === k && f.file);
+    return fs.length ? `<h3>${esc(l)}</h3><div class="frames">${fs.map((/** @type {any} */ f) => `<figure class="fr ${k === "pose" || k === "walk" ? "tall" : ""} ${k === "group" ? "wide" : ""}">
+      ${f.file.endsWith(".mp4") ? `<video src="${libFile(ch, id, v, f.file)}" autoplay muted loop playsinline aria-label="${esc(f.label)}"></video>`
+        : `<img src="${libFile(ch, id, v, f.file)}" alt="${esc(f.label)}" loading="lazy">`}<figcaption>${esc(f.label)}</figcaption></figure>`).join("")}</div>` : "";
+  }).join("") || `<p class="muted">No pictures.</p>`;
 }
 /** @param {string} ref */
 async function pageCastChar(ref) {
   const [ch, id] = ref.split("/");
-  const g = await get(`/cast-library/${encodeURIComponent(ch)}/${encodeURIComponent(id)}`);
+  const url = `/cast-library/${encodeURIComponent(ch)}/${encodeURIComponent(id)}`;
+  const g = await get(url);
   const c = g.character, frames = (g.sheet && g.sheet.frames) || [];
-  const groups = CAST_GROUPS.map(([k, l]) => {
-    const fs = frames.filter((/** @type {any} */ f) => f.group === k && f.file);
-    return fs.length ? `<h3>${esc(l)}</h3><div class="frames">${fs.map((/** @type {any} */ f) => `<figure class="fr ${k === "pose" || k === "walk" ? "tall" : ""} ${k === "group" ? "wide" : ""}">
-      ${f.file.endsWith(".mp4") ? `<video src="${libFile(ch, id, g.v, f.file)}" autoplay muted loop playsinline aria-label="${esc(f.label)}"></video>`
-        : `<img src="${libFile(ch, id, g.v, f.file)}" alt="${esc(f.label)}" loading="lazy">`}<figcaption>${esc(f.label)}</figcaption></figure>`).join("")}</div>` : "";
-  }).join("");
   const look = palette(c).map(([k, h]) => `<dt>${esc(k)}</dt><dd><span class="sw" style="background:${esc(h)}"></span><span class="muted num">${esc(h)}</span></dd>`).join("");
+  const pv = g.preview, pd = g.pending;
+  const compare = (/** @type {string} */ title, /** @type {string|number} */ v, /** @type {any} */ x, /** @type {string} */ act) => `<section class="panel lib-compare">
+      <div class="row spread"><h2>${title}</h2><div class="row">${act}</div></div>
+      <div class="lib-two"><div><p class="muted small">Approved: v${g.v} · rig ${esc(c.rig || "–")}</p>${libSheet(ch, id, g.v, frames)}</div>
+        <div><p class="muted small">New: v${esc(String(v))} · rig ${esc((x.character || {}).rig || "–")}</p>${libSheet(ch, id, v, (x.sheet || {}).frames || [])}</div></div>
+      ${x.notes ? `<ul class="cast-notes">${Object.values(x.notes.characters || {}).flatMap((/** @type {any} */ y) => y.notes || []).map((/** @type {any} */ n) => `<li><b>${esc(n.text)}</b><br><small class="muted">Claude: ${esc(n.reply || "no answer")}</small></li>`).join("")}</ul>` : ""}
+    </section>`;
+  const busy = g.job ? `<p class="notice small">Claude is redrawing this character: <a href="#/jobs/${esc(g.job)}">see the job</a>.</p>` : "";
   $app.innerHTML = `${back("#/cast", "Cast")}${head(esc(ch), esc(c.name || id), `${esc(CAST_ROLE[c.role] || c.role || "")} · version ${g.v} · rig ${esc(c.rig || "–")} · approved ${esc(((c.approved || {}).at || "").slice(0, 10))}${c.approved && c.approved.film ? ` in ${esc(c.approved.film)}` : ""}`)}
-    <div class="cast-split"><div class="cast-sheet">${groups || `<p class="muted">No pictures.</p>`}
+    ${busy}
+    ${g.new_rig && !pv && !g.job ? `<div class="notice row spread"><span><span class="chip warn">New rig version</span> ${esc(g.new_rig)} can draw this character too (for example a new view). Films keep v${g.v} until you update.</span>
+      <button class="btn small" id="lib-preview">Preview with ${esc(g.new_rig)}</button></div>` : ""}
+    ${pv ? compare(`Preview with the new rig`, `${pv.v}.preview`, pv, `<button class="primary small" id="lib-update">Update ${esc(c.name || id)}</button>`) : ""}
+    ${pd ? compare(`Version ${pd.v} waits for your approval`, pd.v, pd, `<button class="primary small" id="lib-approve">Approve v${pd.v}</button>`) : ""}
+    <p class="small fail" id="lib-msg" role="status"></p>
+    <div class="cast-split"><div class="cast-sheet">${libSheet(ch, id, g.v, frames)}
       ${look ? `<h3>Look</h3><dl class="spec">${look}</dl>` : ""}
       <h3>Films</h3><p>${(c.films || []).map((/** @type {string} */ f) => esc(f)).join(", ") || "–"}</p>
-      <h3>Versions</h3><ul class="small">${g.versions.map((/** @type {any} */ v) => `<li>v${v.v} · rig ${esc(v.rig || "–")} · approved ${esc((v.approved_at || "").slice(0, 10))}</li>`).join("")}</ul>
-      ${g.preview ? `<p class="notice small">A preview with a newer rig is waiting (v${esc(g.preview.v)}).</p>` : ""}
+      <h3>Versions</h3><ul class="small">${g.versions.map((/** @type {any} */ v) => `<li>v${v.v} · rig ${esc(v.rig || "–")} · ${v.approved_at ? `approved ${esc(v.approved_at.slice(0, 10))}` : "waiting for approval"}</li>`).join("")}</ul>
+      <div class="notebox"><p><b>Notes for ${esc(c.name || id)}</b> <span class="muted small">· Claude redraws the character from them; the result is a new version for you to approve (films keep v${g.v} until then)</span></p>
+        <textarea id="lib-note" maxlength="2000" placeholder="e.g. Make the beanie a bit bigger" aria-label="Note for the character"></textarea>
+        <div class="row spread"><span class="muted small">Needs After Effects open on this computer.</span><button class="btn small" id="lib-fix" ${g.job ? "disabled" : ""}>Send to Claude</button></div></div>
     </div></div>`;
+  const msg = /** @type {HTMLElement} */ (document.getElementById("lib-msg"));
+  /** @param {string} id @param {string} path @param {any} body */
+  const act = (id, path, body) => {
+    const btn = /** @type {HTMLButtonElement | null} */ (document.getElementById(id));
+    if (!btn) return;
+    btn.onclick = async () => {
+      if (typeof body === "function") { body = body(); if (!body) return; }
+      btn.disabled = true; msg.textContent = "";
+      try { const r = await post(`${url}/${path}`, body); if (r.job) { location.hash = `#/jobs/${r.job}`; return; } pageCastChar(ref); }
+      catch (err) { msg.textContent = /** @type {Error} */ (err).message; btn.disabled = false; }
+    };
+  };
+  act("lib-preview", "preview", { rig: g.new_rig });
+  act("lib-update", "update", {});
+  act("lib-approve", "approve", {});
+  act("lib-fix", "fix", () => {
+    const t = /** @type {HTMLTextAreaElement} */ (document.getElementById("lib-note")).value.trim();
+    if (!t) { msg.textContent = "Write the note first."; return null; }
+    return { notes: [t] };
+  });
 }
 /** [(label, #hex)] of a library character (cast.palette in Python). @param {any} c @returns {[string, string][]} */
 function palette(c) {
