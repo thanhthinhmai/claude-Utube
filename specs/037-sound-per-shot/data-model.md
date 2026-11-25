@@ -72,7 +72,7 @@ Lớp của lần trộn gần nhất (tính khác biệt, phát thử).
 Mẫu `pins.py` (035): `{version, base_sha, shots: {S2: [{id, text, state, reply, lot}]}}` (ghi chú chung, không ghim x/y).
 
 ### `CREDITS` của phim
-Khối được thay mỗi lần trộn, giữa `# sound effects (studio, 037)` và `# end sound effects`: một dòng mỗi mục kho đã dùng: `<credit> — <license> — <url>` (FR-016).
+Khối được thay mỗi lần trộn, giữa `# sound effects (studio, 037)` và `# end sound effects`: một dòng mỗi mục kho đã dùng: `<credit> · <tên tiếng> — <license>[ — <url>]` (FR-016).
 
 ## Phong cách — học tiếng
 
