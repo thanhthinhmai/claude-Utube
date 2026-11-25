@@ -184,7 +184,7 @@ def render(s: dict, aep: Path, out: Path, timeout: float) -> str:     # aerender
     return (r.stdout or "") + (r.stderr or "")
 
 
-def build(film_dir, shots=None, progress=None, s: dict = None) -> dict:
+def build(film_dir, shots=None, progress=None, s: dict = None, sheet: dict = None) -> dict:
     """Build and render these shots on this machine; returns {master, marks, checks, log, dir}."""
     s = s or settings()
     check(s)
@@ -196,7 +196,7 @@ def build(film_dir, shots=None, progress=None, s: dict = None) -> dict:
         raise AeError("disk_low", f"the work folder {work} has less than 2 GB free")
     rid = time.strftime("ae-%Y%m%d-%H%M%S-") + secrets.token_hex(2)
     folder = work / rid
-    b = bundle.make(film_dir, shots, folder.with_suffix(".tar"))
+    b = bundle.make(film_dir, shots, folder.with_suffix(".tar"), sheet=sheet)
     bundle.extract(b["path"], folder)
     Path(b["path"]).unlink()
     return run_folder(s, folder, b["shots"], b["proj"], progress)

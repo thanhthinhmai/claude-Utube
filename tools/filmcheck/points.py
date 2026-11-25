@@ -7,9 +7,10 @@ from pathlib import Path
 
 from filmcheck import report, tiers
 
-POINTS = ("script", "voice", "shots", "mix", "publish")
+POINTS = ("script", "cast", "voice", "shots", "mix", "publish")
 DEFAULT_ON = ["script", "shots"]
-STEP = {"script": "Script", "voice": "Voice", "shots": "Shots", "mix": "Mix", "publish": "Publish"}
+AE_ON = ("cast",)                       # on by default for After Effects films unless turned off (specs/034)
+STEP = {"script": "Script", "cast": "Cast", "voice": "Voice", "shots": "Shots", "mix": "Mix", "publish": "Publish"}
 LOCKED = {"approved", "waiting"}            # a point in these states cannot be turned on or off (data-model)
 
 
@@ -53,16 +54,33 @@ def fingerprint(film_dir: Path, point: str) -> str:
         return tiers.fingerprint(d, "voice")
     if point == "shots":
         return tiers.fingerprint(d)
+    if point == "cast":
+        from filmcheck import cast
+        return cast.fingerprint(d) if cast.exists(d) else ""
     files = {"script": ["SCRIPT.md", "SOURCES.md"], "mix": ["mix.json", "out/mix.wav"],
              "publish": ["publish/pack.json"]}[point]
     return _hash(d, [d / f for f in files])
 
 
 # ---------- state ----------
+def is_ae(film_dir: Path) -> bool:
+    from ae import film as filmdoc
+    return filmdoc.engine(film_dir) == "ae"
+
+
+def _with_ae(film_dir: Path, on: list, off: list) -> list:
+    """AE films have the cast point on unless it was turned off for the film (FR-002)."""
+    if is_ae(film_dir):
+        on = on + [p for p in AE_ON if p not in on and p not in off]
+    return [p for p in POINTS if p in on]
+
+
 def load(film_dir: Path) -> dict:
     r = report.load(Path(film_dir)).get("reviews") or {}
     on = r.get("on")
-    return {"on": list(DEFAULT_ON) if on is None else list(on), "from": r.get("from") or ("studio default" if on is None else None),
+    off = list(r.get("off") or [])
+    return {"on": _with_ae(Path(film_dir), list(DEFAULT_ON) if on is None else list(on), off), "off": off,
+            "from": r.get("from") or ("studio default" if on is None else None),
             "approved": dict(r.get("approved") or {}), "skipped": dict(r.get("skipped") or {}),
             "rejected": dict(r.get("rejected") or {})}
 
@@ -70,7 +88,7 @@ def load(film_dir: Path) -> dict:
 def _save(film_dir: Path, fn) -> dict:
     def put(x):
         cur = x.get("reviews") or {}
-        rv = {"on": cur.get("on"), "from": cur.get("from"), "approved": dict(cur.get("approved") or {}),
+        rv = {"on": cur.get("on"), "off": list(cur.get("off") or []), "from": cur.get("from"), "approved": dict(cur.get("approved") or {}),
               "skipped": dict(cur.get("skipped") or {}), "rejected": dict(cur.get("rejected") or {})}
         if rv["on"] is None:
             rv["on"], rv["from"] = list(DEFAULT_ON), "studio default"
@@ -93,7 +111,30 @@ def reached(film_dir: Path, point: str) -> bool:
             "voice": (d / "voices").is_dir() and any((d / "voices").glob("*.wav")),
             "shots": tiers.load_tier(d, "shots") is not None,
             "mix": (d / "out" / "mix.wav").is_file(),
-            "publish": (d / "publish" / "pack.json").is_file()}[point]
+            "publish": (d / "publish" / "pack.json").is_file(),
+            "cast": _cast_reached(d)}[point]
+
+
+def _cast_reached(d: Path) -> bool:
+    from filmcheck import cast
+    try:
+        return cast.exists(d) and bool(cast.load(d)["characters"])
+    except cast.CastError:
+        return True             # a broken cast.json must be fixed, not skipped
+
+
+def cast_skip_reason(film_dir: Path):
+    """Why the cast point does not apply: not an AE film, or a film without characters."""
+    d = Path(film_dir)
+    if not is_ae(d):
+        return "not an After Effects film"
+    from filmcheck import cast
+    try:
+        if cast.exists(d) and not cast.load(d)["characters"]:
+            return "no characters"
+    except cast.CastError:
+        return None
+    return None
 
 
 def state(film_dir: Path, point: str, pending: bool = False) -> str:
@@ -102,8 +143,17 @@ def state(film_dir: Path, point: str, pending: bool = False) -> str:
     rv = load(d)
     if point in ("script", "voice") and not narrated(d):
         return "skipped"
+    if point == "cast" and cast_skip_reason(d):
+        return "skipped"
     if point not in rv["on"]:
         return "off"
+    if point == "cast" and not pending and reached(d, point):
+        from filmcheck import cast
+        try:
+            if cast.all_approved(d):
+                return "approved"                   # every character approved with its current pictures
+        except cast.CastError:
+            return "ready"
     a = rv["approved"].get(point)
     if pending:
         return "waiting"
@@ -137,6 +187,7 @@ def set_on(film_dir: Path, points, origin: str = None, pending: set = frozenset(
 
     def f(rv):
         rv["on"] = want
+        rv["off"] = [p for p in AE_ON if p not in want] if is_ae(d) else list(rv.get("off") or [])
         if origin:
             rv["from"] = origin
     return _save(d, f)["on"]
@@ -164,6 +215,19 @@ def checks_pass(film_dir: Path, point: str) -> list:
         return [f"the voice check has {n} open problem(s)"] if not t["pass"] else []
     if point == "shots":
         why = tiers.gate(d)
+        return why
+    if point == "cast":
+        from filmcheck import cast
+        try:
+            doc = cast.load(d)
+        except cast.CastError as e:
+            return [e.message]
+        bad = cast.validate(doc)
+        if bad:
+            return [f"cast/cast.json: {bad[0][2]}" + (f" ({bad[0][0]})" if bad[0][0] else "")]
+        notes = cast.open_notes(d)
+        why = [f"{c['id']}: no cast sheet yet" for c in doc["characters"] if not cast.has_sheet(d, c["id"])]
+        why += [f"{cid}: {n} open note(s)" for cid, n in notes.items() if n]
         return why
     if point == "mix":
         mix = d / "out" / "mix.wav"
@@ -193,6 +257,12 @@ def approve(film_dir: Path, point: str, base: str = None, source: str = "chat", 
     why = checks_pass(d, point)
     if why:
         return 1, why
+    if point == "cast":           # approving the point approves every character ("Approve cast", FR US1-3)
+        from filmcheck import cast
+        doc = cast.load(d)
+        why = cast.approve(d, [c["id"] for c in doc["characters"]], "chat" if source == "chat" else "ui", by)
+        if why:
+            return 1, why
 
     def f(rv):
         rv["approved"][point] = {"fingerprint": fp, "at": now(), "by": by or "local", "source": source,
@@ -227,6 +297,16 @@ def gate(film_dir: Path, point: str) -> list:
         return []
     sk = load(d)["skipped"].get(point)
     if sk and sk.get("fingerprint") == fingerprint(d, point):
+        return []
+    if point == "cast":
+        from filmcheck import cast
+        try:
+            names = cast.unapproved(d)
+        except cast.CastError as e:
+            return [e.message]
+        if names:
+            return [f"characters not approved: {', '.join(names)} (approve on the job page, or in the chat: "
+                    f"sh bin/studio cast approve {d.name} --all --source chat)"]
         return []
     what = {"script": "the script review", "shots": "the shots review"}.get(point, f"the {point} review")
     if st == "stale":

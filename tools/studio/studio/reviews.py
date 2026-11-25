@@ -10,9 +10,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))     # tools/: filmc
 
 # job log text is English (005); question and treatment are for online film jobs (007 FR-014)
 KINDS = {"style-1": "review 1", "style-2": "review 2", "question": "question", "treatment": "treatment review",
-         "script": "script review", "voice": "voice review", "shots": "shots review", "mix": "mix review",
+         "script": "script review", "cast": "cast review", "voice": "voice review", "shots": "shots review", "mix": "mix review",
          "publish": "publish review"}
-POINT_KINDS = ("script", "voice", "shots", "mix", "publish")     # review points of a film (specs/026)
+POINT_KINDS = ("script", "cast", "voice", "shots", "mix", "publish")     # review points of a film (specs/026, 034)
 VALUES = {"approve", "revise", "accept_anyway", "stop"}
 LABEL = {"approve": "Approve", "revise": "Request changes", "accept_anyway": "Accept anyway", "stop": "Stop"}   # = DECISION in web/app.js
 SOURCES = {"ui", "chat", "api"}

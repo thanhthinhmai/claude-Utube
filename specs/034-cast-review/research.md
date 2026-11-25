@@ -2,7 +2,7 @@
 
 ## R1. Dựng bảng mẫu bằng đường dựng AE sẵn có
 
-- **Decision**: một comp `SHEET` cho mỗi lượt: mỗi hình tĩnh (góc, biểu cảm, tư thế) chiếm đúng 1 khung, nối tiếp nhau; clip đi bộ 75 khung (2,5 s) ở cuối mỗi nhân vật. AE render ra `master.mp4` như mọi lượt dựng; `tools/ae/sheet.py` đọc `sheet_<proj>.json` (danh sách khung → nhân vật, mã hình) do jsx ghi, rồi dùng ffmpeg tách mỗi khung thành JPEG 720 px và cắt clip đi bộ thành mp4 nhỏ.
+- **Decision**: một comp `SHEET` cho mỗi lượt: mỗi hình tĩnh (góc, biểu cảm, tư thế) chiếm đúng 1 khung, nối tiếp nhau; clip đi bộ 75 khung (2,5 s) ở cuối mỗi nhân vật. AE render ra `master.mp4` như mọi lượt dựng; `tools/ae/sheet.py` lên danh sách khung trước (Python, `data/cast_sheet.json`), AE trả `shots_<proj>.json` và dòng `CHECK missing` như mọi lượt, rồi dùng ffmpeg tách mỗi khung thành JPEG 720 px và cắt clip đi bộ thành mp4 nhỏ.
 - **Rationale**: `local.py` và `remote.py` (cầu nối app) chỉ biết chờ `master.mp4` và tệp kết quả; không cần dạy cầu nối định dạng mới (PNG sequence), giữ nguyên luật "AE tự render qua hàng đợi, không aerender".
 - **Alternatives**: render từng hình thành PNG (cần đổi output module và cầu nối); chụp hình bằng `saveFrameToPng` (không ổn định trên mọi bản AE, chạy trong UI thread).
 

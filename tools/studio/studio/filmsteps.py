@@ -70,7 +70,7 @@ def view(j: dict) -> dict:
     cat = catalog(d)
     has_kit = (d / "kit" / "catalog.json").is_file()
     return {"film": d.name, "steps": steps.status(d, job_step, pending, busy),
-            "points": points.status(d, pending), "impact": {p: steps.impact(p) for p in points.POINTS},
+            "points": points.status(d, pending), "impact": {p: steps.impact(p, d) for p in points.POINTS},
             "busy": {"step": busy["step"], "since": busy["since"]} if busy else None,
             "editable": {"shots": cat is not None,
                          "reason": None if cat is not None else ("no scene table" if has_kit else "style has no kit")},

@@ -39,7 +39,7 @@ Mọi JSON là UTF-8, ghi nguyên tử (ghi tệp tạm rồi đổi tên). Màu
 }
 ```
 
-- `spec` khoá cho phép (rig ball@1): `hoodie`, `pants`, `shoes`, `headColor`, `rimColor`, `hat` (`{kind: beanie|cap|curly|puffs|bun|none, color}`), `stripe` (màu|null), `tie` (màu|null), `hood` (bool), `brows` (bool), `pupils` (số 0.7–1.3), `scale` (số 0.6–1.4). Khoá lạ → lỗi `bad_spec`.
+- `spec` khoá cho phép (rig ball@1): `hoodie`, `pants`, `shoes`, `headColor`, `rimColor`, `hat` (`{kind: beanie|cap|curly|puffs|bun|none, color}`), `stripe` (màu|null), `tie` (màu|null), `hood` (bool), `brows` (`false`|`true`|`"angry"`|`"worried"`), `scale` (số 0.6–1.4). Khoá lạ → lỗi `bad_spec`.
 - `approved`: `{"fingerprint": "<sha256[:16]>", "at": "ISO", "by": "<người>", "source": "ui|chat|library"}`.
 - `from_library`: `{"channel": "default", "id": "hero", "v": 2}`.
 
@@ -50,7 +50,7 @@ Mọi JSON là UTF-8, ghi nguyên tử (ghi tệp tạm rồi đổi tên). Màu
 ## `films/<phim>/cast/sheets/<id>/sheet.json`
 
 ```json
-{"character": "hero", "rig": "ball@1", "built_at": "ISO", "fingerprint": "<sha256[:16]>",
+{"character": "hero", "rig": "ball@1", "built_at": "ISO",
  "frames": [
    {"key": "front", "group": "turn", "label": "Front", "file": "front.jpg"},
    {"key": "34", "group": "turn", "label": "3/4 view", "file": null, "missing_reason": "build error: …"},

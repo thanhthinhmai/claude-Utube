@@ -174,7 +174,7 @@ def normal(ch: dict) -> dict:
     return out
 
 
-REVIEW_POINTS = ("script", "voice", "shots", "mix", "publish")       # specs/026; = filmcheck.points.POINTS
+REVIEW_POINTS = ("script", "cast", "voice", "shots", "mix", "publish")   # specs/026, 034; = filmcheck.points.POINTS
 DEFAULT_REVIEWS = ["script", "shots"]
 
 

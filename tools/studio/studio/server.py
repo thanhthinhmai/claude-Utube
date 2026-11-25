@@ -32,7 +32,7 @@ class DecisionIn(BaseModel):
 
 
 class ActionIn(BaseModel):                     # specs/026 contracts/api.md
-    point: Literal["script", "voice", "shots", "mix", "publish"]
+    point: Literal["script", "cast", "voice", "shots", "mix", "publish"]
     op: str = Field(max_length=30)
     args: dict = Field(default_factory=dict)
     base: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{16}$")
@@ -47,7 +47,7 @@ WRITE_ROLES = {"customer", "admin"}            # a token limited to reading (any
 
 
 class PointsIn(BaseModel):
-    on: list[Literal["script", "voice", "shots", "mix", "publish"]] = Field(max_length=5)
+    on: list[Literal["script", "cast", "voice", "shots", "mix", "publish"]] = Field(max_length=6)
 
 
 class FreshStaticFiles(StaticFiles):

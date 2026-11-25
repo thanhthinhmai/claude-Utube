@@ -138,7 +138,7 @@ def run(film_dir: Path, name: str, args: dict, base: str = None, by: str = "loca
         return res
     finally:
         drop_lock(d, mine["pid"])
-    stale = steps.impact(point) if point in steps.POINT_STEP else []
+    stale = steps.impact(point, d) if point in steps.POINT_STEP else []
     res.update(ok=bool(out.get("ok", True)), code=0 if out.get("ok", True) else 1, ref=out.get("ref"),
                check=out.get("check"), files=out.get("files") or [], stale=stale, fingerprint=points.fingerprint(d, point),
                error=out.get("error"))

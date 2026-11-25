@@ -1154,7 +1154,7 @@ def cmd_point_status(a) -> int:
     from filmcheck import points, steps
     d = film_dir(a.film)
     st, rail = points.status(d), steps.status(d)
-    data = {"film": d.name, "points": st, "steps": rail, "impact": {p: steps.impact(p) for p in points.POINTS}}
+    data = {"film": d.name, "points": st, "steps": rail, "impact": {p: steps.impact(p, d) for p in points.POINTS}}
     lines = [f"{p:8} {'on ' if v['on'] else 'off'} {v['state']}" + (f" · approved {v['approved_at']} ({v['source']})"
                                                                     if v["approved_at"] else "") for p, v in st.items()]
     lines += ["", "  ".join(f"{s['name']}: {s['state']}" for s in rail)]
