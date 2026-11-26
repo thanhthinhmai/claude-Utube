@@ -39,7 +39,8 @@ Tệp chỉ giữ trạng thái `skipped`; đề xuất `new` được tính l�
 |---|---|
 | `draft.mp4` | cả phim, 480×270, giọng tạm (R8) |
 | `draft.prev.mp4` | đúng một bản trước (so trước/sau) |
-| `draft.json` | `{frames, narration_sha, built_at, shots_built: [id], seconds, fps, size}`; bản nháp "hiện hành" khi `frames` và `narration_sha` trùng hiện tại |
+| `draft.json` | `{frames, narration_sha, code_sha, built_at, shots_built: [id], seconds, fps, size, checks, segments: {shot: frames}}`; bản nháp "hiện hành" khi `frames`, `narration_sha` và `code_sha` (băm `ae/*.jsx` + `cast/cast.json`) trùng hiện tại |
+| `shots/S2.mp4` | đoạn 480×270 của từng shot, mã hoá một lần; bản nháp = các đoạn nối liền (copy), nên shot không dựng lại giữ đúng khung (`segments` ghi độ dài lúc dựng; khác `timing.json` thì dựng lại) |
 | `clips/S2.mp4` | clip từng shot (có tiếng) |
 | `frames/S2.jpg` | khung đại diện 50% shot, ≤ 60 KB |
 | `keys.json` | `{shot: [{layer, prop, t0, t1}]}` từ lần dựng gần nhất của shot đó |
@@ -47,7 +48,7 @@ Tệp chỉ giữ trạng thái `skipped`; đề xuất `new` được tính l�
 
 ## Ghi chú shot nháp — `animatic/notes.json`
 
-Cùng mẫu `pins.py` (tách từ `cast-notes.json`, 034): `{version: 1, base_sha, shots: {S2: [note]}}`, note = `{id, text, frame: "clip"|null, x, y, at, state: open|answered, reply, lot}`. `x, y` ∈ [0, 100]; `at` ∈ [0, độ dài shot]; `frame: null` = ghi chú chung. Lô (`lot`) gom mọi ghi chú mở lúc bấm "Send notes to Claude"; ghi chú thêm khi lô đang chạy có `lot: null` và chờ lô sau (FR-022).
+Cùng mẫu `pins.py` (tách từ `cast-notes.json`, 034): `{version: 1, shots: {S2: {notes: [note]}}, lot?, last_lot?, failed_lot?}`, note = `{id, kind: "note", frame: "clip"|null, x, y, at, text, done, by, created, updated, reply}`. `x, y` ∈ [0, 100]; `at` ∈ [0, độ dài shot]; `frame: null` = ghi chú chung (có thể có `at`). Mở = `done: false`. Mọi lần ghi kèm `base` (sha256 16 ký tự của tệp). Lô `lot = {job, notes: [id], since}` gom mọi ghi chú mở lúc bấm "Send notes to Claude"; ghi chú thêm khi lô đang chạy không vào lô, chờ lô sau; lô hỏng → `failed_lot = {job, error, at}`, ghi chú vẫn mở (FR-022).
 
 ## Điểm duyệt `animatic` — `checks.json → reviews`
 
