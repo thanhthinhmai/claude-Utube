@@ -280,3 +280,24 @@ class Cli(unittest.TestCase):
         self.assertEqual(frames(d / "f1.mp4"), 180)
         self.assertGreater(psnr(old, d / "f1.mp4", 0, 2), 40)
         self.assertGreater(psnr(old, d / "f1.mp4", 4, 2), 40)
+
+
+class FakeWork(unittest.TestCase):
+    """specs/035 T051: a fake run (tests) never writes into the real After Effects work folder."""
+
+    def test_env_set_after_import_wins(self):
+        from ae import local
+        with tempfile.TemporaryDirectory() as t:
+            cfg = Path(t) / "ae.json"
+            cfg.write_text(json.dumps({"work": str(Path(t) / "real")}))
+            keep = {k: os.environ.get(k) for k in ("STUDIO_AE_FAKE", "STUDIO_AE_WORK", "STUDIO_AE_CONFIG")}
+            try:
+                os.environ.update(STUDIO_AE_FAKE="1", STUDIO_AE_CONFIG=str(cfg), STUDIO_AE_WORK=str(Path(t) / "w"))
+                self.assertEqual(local.config_path(), cfg)                  # read now, not when the module was imported
+                self.assertEqual(local.settings()["work"], str(Path(t) / "w"))
+            finally:
+                for k, v in keep.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v

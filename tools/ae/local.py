@@ -14,7 +14,9 @@ from pathlib import Path
 
 from ae import bundle
 
-CONFIG = Path(os.environ.get("STUDIO_AE_CONFIG") or Path.home() / ".config" / "claude-utube" / "ae.json")
+def config_path() -> Path:
+    """ae.json, read each time: a test that sets STUDIO_AE_CONFIG after this module was imported gets its own file."""
+    return Path(os.environ.get("STUDIO_AE_CONFIG") or Path.home() / ".config" / "claude-utube" / "ae.json")
 FAKE = Path(__file__).resolve().parents[2] / "desktop" / "test" / "fake-ae.mjs"
 START_TIMEOUT = 240           # a cold After Effects start took ~90 s (2026-11-24)
 SHOT_TIMEOUT = 300
@@ -34,7 +36,7 @@ class AeError(Exception):
 
 def load_config() -> dict:
     try:
-        cfg = json.loads(CONFIG.read_text(encoding="utf-8"))
+        cfg = json.loads(config_path().read_text(encoding="utf-8"))
         return cfg if isinstance(cfg, dict) else {}
     except (OSError, ValueError):
         return {}
@@ -43,10 +45,11 @@ def load_config() -> dict:
 def save_config(changes: dict) -> dict:
     cfg = load_config()
     cfg.update({k: v for k, v in changes.items() if v is not None})
-    CONFIG.parent.mkdir(parents=True, exist_ok=True)
-    tmp = CONFIG.with_suffix(".tmp")
+    cfg_path = config_path()
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = cfg_path.with_suffix(".tmp")
     tmp.write_text(json.dumps(cfg, indent=2, ensure_ascii=False))
-    tmp.replace(CONFIG)
+    tmp.replace(cfg_path)
     return cfg
 
 
@@ -78,7 +81,7 @@ def settings() -> dict:
     if os.environ.get("STUDIO_AE_FAKE") == "1":
         node = shutil.which("node") or "node"
         return {"kind": "fake", "afterfx": [node, str(FAKE), "afterfx"], "aerender": [node, str(FAKE), "aerender"],
-                "work": cfg.get("work") or os.environ.get("STUDIO_AE_WORK") or "",
+                "work": os.environ.get("STUDIO_AE_WORK") or cfg.get("work") or "",   # a fake run never uses the real one
                 "shotTimeoutSec": int(cfg.get("shotTimeoutSec") or os.environ.get("STUDIO_AE_SHOT_TIMEOUT") or SHOT_TIMEOUT),
                 "startTimeoutSec": int(os.environ.get("STUDIO_AE_START_TIMEOUT") or START_TIMEOUT)}
     found = find_ae()

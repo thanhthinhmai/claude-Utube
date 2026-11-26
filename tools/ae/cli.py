@@ -280,7 +280,7 @@ def cmd_status(a) -> int:
         print(f"queue: {st.get('queued', 0)} waiting · {st.get('running', 0)} running")
         return 0
     s = local.settings()
-    print(f"config: {local.CONFIG}")
+    print(f"config: {local.config_path()}")
     for k in ("afterfx", "aerender", "work"):
         v = s[k]
         v = " ".join(v) if isinstance(v, list) else v
