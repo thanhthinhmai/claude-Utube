@@ -85,7 +85,7 @@ description: "Task list for 037-sound-per-shot"
 
 **Checkpoint "trước 035"**: chạy đủ `tests/filmcheck`; trộn được phim thử bằng lệnh với kho thử. Commit. Dừng các task ⟂035 tới khi 035 merge.
 
-- [ ] T028 [US1] ⟂035 Rebase `037-sound-per-shot` lên `origin/main` có 035; sửa xung đột; chạy lại toàn bộ test
+- [X] T028 [US1] ⟂035 Rebase `037-sound-per-shot` lên `origin/main` có 035; sửa xung đột; chạy lại toàn bộ test
 - [X] T029 [US1] ⟂035 `tools/filmcheck/points.py`: với phim AE, `stale("mix")` thêm `sound/plan.json`, `timing.json`, `narration.json`; `fingerprint("mix")` thêm `sound/plan.json` + ghi chú mở trong `sound/notes.json`; `tools/ae/cli.py`: `ae render` gọi `points.gate(d, "mix")` sau cổng animatic; `tools/filmcheck/steps.py`: với phim AE, `impact("mix")` ra đúng Final render (và Self-check, Publish), không ra Script/Cast/Voice/Animatic (FR-029); test trong `tests/filmcheck/test_points.py`, `tests/filmcheck/test_steps.py` và `tests/ae/test_ae.py` (render bị từ chối khi điểm mix bật mà chưa duyệt, FR-028, SC-008)
 - [X] T030 [US1] ⟂035 Bước Sound trong việc làm phim AE: `tools/runner/JOB.md`, `tools/runner/agent.py` (sau Animatic duyệt: đọc `tools/ae/SOUND.md`, `sound cue add …`, `sound mix`, gửi duyệt `mix`; agent không tự duyệt), `.claude/skills/film-make/SKILL.md` (mục Phim After Effects)
 - [ ] T031 [US1] ⟂035 Chạy thật trên `ae-sleepless-test` theo quickstart bước 4: đo SC-001, SC-002, SC-009 và ghi kết quả (đạt / đạt một phần / thất bại) vào `specs/037-sound-per-shot/quickstart.md` mục "Kết quả"
