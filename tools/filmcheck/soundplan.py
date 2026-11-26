@@ -27,7 +27,7 @@ RANK = {"auto": 0, "claude": 1, "user": 2}
 
 
 class PlanError(Exception):
-    """code: changed | bad | missing | not_found."""
+    """code: changed | bad | missing | not_found | off."""
     def __init__(self, code: str, message: str):
         super().__init__(message)
         self.code, self.message = code, message
@@ -71,8 +71,9 @@ def style_sfx(d: Path) -> dict:
 def load(d: Path) -> dict:
     p = _read(plan_file(d))
     if not isinstance(p, dict):
-        p = {"version": 1, "timing_sha": "", "profile": "style" if style_sfx(d) else "default", "cues": [], "silences": []}
+        p = {"version": 1, "timing_sha": "", "profile": "style" if style_sfx(d) else "default", "cues": [], "silences": [], "off": []}
     p.setdefault("cues", [])
+    p.setdefault("off", [])
     p.setdefault("silences", [])
     return p
 
@@ -91,7 +92,7 @@ def _check_base(d: Path, b) -> None:
 
 
 def save(d: Path, plan: dict) -> None:
-    keep = {k: plan[k] for k in ("version", "timing_sha", "profile", "cues", "silences") if k in plan}
+    keep = {k: plan[k] for k in ("version", "timing_sha", "profile", "cues", "silences", "off") if k in plan}
     keep["version"] = 1
     _write(plan_file(d), keep)
 
@@ -155,11 +156,12 @@ def words(d: Path) -> dict:
     return {}
 
 
-def _word_t(ws: list, word: str):
+def _word_t(ws: list, word: str, end: bool = False):
+    """Start (or end) of a word in its line."""
     want = re.sub(r"[^\w']", "", word or "").lower()
     for w in ws or []:
         if re.sub(r"[^\w']", "", str(w[0])).lower() == want:
-            return max(0.0, float(w[1]))
+            return max(0.0, float(w[2] if end and len(w) > 2 else w[1]))
     return None
 
 
@@ -187,7 +189,7 @@ def _anchor_time(c: dict, tm: dict, t0: dict, ks, lines: dict, wds: dict):
             return None, f"line {a['line']} is gone"
         at = float(ln.get("at", 0))
         if a.get("word"):
-            wt = _word_t(wds.get(a["line"]), a["word"])
+            wt = _word_t(wds.get(a["line"]), a["word"], end=a.get("edge") == "end")
             if wt is None:
                 return None, f"word '{a['word']}' is not in line {a['line']} any more"
             at += wt
@@ -229,6 +231,8 @@ def resolve(d: Path, plan: dict = None, save: bool = False) -> dict:
     ks, lines, wds = keys(d), narration(d), words(d)
     sfx = style_sfx(d)
     plan["profile"] = "style" if sfx else "default"
+    plan["off"] = [s for s in tm["shots"] if s in set(plan.get("off") or [])]
+    off = set(plan["off"])
     for c in plan["cues"]:
         c.pop("at", None)
         c.pop("why", None)
@@ -243,7 +247,9 @@ def resolve(d: Path, plan: dict = None, save: bool = False) -> dict:
             c.update(state="dropped", why="after the end of the film")
             continue
         c["at"] = round(round(at * tm["fps"]) / tm["fps"], 4)
-        if not c.get("entry"):
+        if c["shot"] in off:
+            c.update(state="off", why=f"sound off for {c['shot']}")      # kept and timed, back when the shot is on
+        elif not c.get("entry"):
             c.update(state="missing", why=f"no sound found for '{c.get('query', '')}'")
         else:
             c["state"] = "placed"
@@ -251,7 +257,7 @@ def resolve(d: Path, plan: dict = None, save: bool = False) -> dict:
     for s in plan["silences"]:
         s.pop("at", None)
         if s["shot"] in tm["frames"]:
-            fake = {"shot": s["shot"], "anchor": s["anchor"]}
+            fake = {"shot": s["shot"], "anchor": {"edge": "end", **s["anchor"]}}   # a silence follows its word
             at, _ = _anchor_time(fake, tm, t0, ks, lines, wds)
             if at is not None:
                 s["at"] = round(round(at * tm["fps"]) / tm["fps"], 4)
@@ -343,6 +349,8 @@ def add_cue(d: Path, shot: str, action: str, anchor: dict, query: str, cat: str 
     if cut not in CUTS:
         raise PlanError("bad", f"cut: {', '.join(CUTS)}")
     plan = load(d)
+    if shot in (plan.get("off") or []):
+        raise PlanError("off", f"sound is off for {shot}: turn it on first (sound shot on <film> {shot})")
     dur = len_s or (tm["frames"][shot] / tm["fps"] if span else None)
     entry, alts = choose(d, query, cat, dur, scope)
     c = {"id": _next_id(plan), "shot": shot, "action": action.strip()[:120], "anchor": anchor, "query": query.strip()[:200],
@@ -398,6 +406,22 @@ def set_cue(d: Path, cue: str, fields: dict, by: str = "user", base: str = None,
     c["by"] = by if by in BYS else "user"
     r = resolve(d, plan, save=True)
     return next(x for x in r["cues"] if x["id"] == cue)
+
+
+def set_shots(d: Path, shots: list, on: bool, base: str = None) -> dict:
+    """Turn the sound effects of whole shots off or back on. An off shot keeps its cues (state "off", not mixed) and
+    takes no new ones; voice, music and chosen silences are not touched."""
+    d = Path(d)
+    _check_base(d, base)
+    tm = timing(d)
+    bad = [s for s in shots if s not in tm["frames"]]
+    if bad or not shots:
+        raise PlanError("bad", f"no shot {', '.join(bad) or '-'} in this film ({', '.join(tm['shots'])})")
+    plan = load(d)
+    off = set(plan.get("off") or [])
+    off = off - set(shots) if on else off | set(shots)
+    plan["off"] = [s for s in tm["shots"] if s in off]
+    return resolve(d, plan, save=True)
 
 
 def rm_cue(d: Path, cue: str, base: str = None) -> None:

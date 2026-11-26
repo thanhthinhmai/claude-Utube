@@ -55,6 +55,10 @@ def add_parser(sub) -> None:
     s.add_argument("--word"); s.add_argument("--len", type=float, required=True); s.add_argument("--db", type=float, default=-57.0)
     s.add_argument("--dir")
 
+    s = so.add_parser("shot", help="turn a shot's sound effects off or back on")
+    s.add_argument("onoff", choices=["on", "off"]); s.add_argument("film"); s.add_argument("shots", nargs="+")
+    s.add_argument("--base"); s.add_argument("--dir")
+
     s = so.add_parser("plan", help="the sounds by shot, resolved"); s.add_argument("film"); s.add_argument("--json", action="store_true")
     s.add_argument("--dir")
     s = so.add_parser("mix", help="resolve, copy, mix out/mix.wav, stems and CREDITS"); s.add_argument("film")
@@ -140,13 +144,13 @@ def cmd_key(a) -> int:
 # ---------- a film's sounds ----------
 def _plan_err(e) -> int:
     print(f"✗ {e.message}", file=sys.stderr)
-    return {"changed": 4, "bad": 2, "missing": 3}.get(e.code, 1)
+    return {"changed": 4, "bad": 2, "missing": 3, "off": 5}.get(e.code, 1)
 
 
 def cmd_cue(a) -> int:
     from filmcheck import soundplan
     d = _fd(a)
-    by = a.by or ("claude" if os.environ.get("STUDIO_JOB") else "user")
+    by = getattr(a, "by", None) or ("claude" if os.environ.get("STUDIO_JOB") else "user")   # rm has no --by
     try:
         if a.ccmd == "add":
             anchor = ({"motion": a.motion, "edge": a.edge, "offset_f": a.offset_f} if a.motion else
@@ -181,6 +185,16 @@ def cmd_silence(a) -> int:
     return 0
 
 
+def cmd_shot(a) -> int:
+    from filmcheck import soundplan
+    try:
+        p = soundplan.set_shots(_fd(a), a.shots, on=a.onoff == "on", base=a.base)
+    except soundplan.PlanError as e:
+        return _plan_err(e)
+    print(f"✓ sound {a.onoff}: {', '.join(a.shots)}" + (f"  (off now: {', '.join(p['off'])})" if p["off"] else ""))
+    return 0
+
+
 def cmd_plan(a) -> int:
     from filmcheck import soundplan
     d = _fd(a)
@@ -190,7 +204,7 @@ def cmd_plan(a) -> int:
         return _plan_err(e)
     lines = []
     for shot in p["shots"]:
-        lines.append(f"{shot} (t0 {p['t0'][shot]:.2f}s)")
+        lines.append(f"{shot} (t0 {p['t0'][shot]:.2f}s)" + (" · sound off" if shot in p.get("off", []) else ""))
         for c in [c for c in p["cues"] if c["shot"] == shot]:
             at = f"{c['at']:.2f}s" if c.get("at") is not None else "  -  "
             why = f"  ({c['why']})" if c.get("why") else ""
@@ -210,14 +224,15 @@ def cmd_mix(a) -> int:
     except soundplan.PlanError as e:
         return _plan_err(e)
     r["secs"] = round(time.time() - t, 1)
-    _out(a, r, [f"cues {r['placed']} placed · {r['dropped']} dropped · {r['missing']} missing · {r['secs']} s",
+    _out(a, r, [f"cues {r['placed']} placed · {r['dropped']} dropped · {r['missing']} missing · "
+                + (f"{r['off']} off · " if r.get("off") else "") + f"{r['secs']} s",
                 f"  {r['mix']}"])
     return 0
 
 
 def cmd_sound(a) -> int:
     return {"lib": cmd_lib, "key": cmd_key, "cue": cmd_cue, "silence": cmd_silence, "plan": cmd_plan,
-            "mix": cmd_mix}[a.cmd](a)
+            "mix": cmd_mix, "shot": cmd_shot}[a.cmd](a)
 
 
-COMMANDS = {("sound", k): cmd_sound for k in ("lib", "key", "cue", "silence", "plan", "mix")}
+COMMANDS = {("sound", k): cmd_sound for k in ("lib", "key", "cue", "silence", "plan", "mix", "shot")}

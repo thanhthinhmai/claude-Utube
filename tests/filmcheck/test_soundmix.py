@@ -143,6 +143,24 @@ class Mix(unittest.TestCase):
         self.assertRegex(o.getvalue(), r"cues 1 placed · 0 dropped · 0 missing · [\d.]+ s")
         plan = json.loads(o.getvalue().strip().splitlines()[-1])
         self.assertEqual(plan["cues"][0]["by"], "claude")
+        with redirect_stdout(o):
+            code4 = cli.main(["sound", "cue", "rm", "f1", plan["cues"][0]["id"], "--dir", str(self.d)])   # rm has no --by
+        self.assertEqual(code4, 0, o.getvalue())
+        self.assertEqual(soundplan.load(self.d)["cues"], [])
+        o = io.StringIO()
+        with redirect_stdout(o):
+            cli.main(["sound", "cue", "add", "f1", "S2", "--action", "window breaks", "--query", "window shatter",
+                      "--motion", "Window · Scale", "--dir", str(self.d)])
+            code5 = cli.main(["sound", "shot", "off", "f1", "S2", "--dir", str(self.d)])
+            code6 = cli.main(["sound", "mix", "f1", "--dir", str(self.d)])
+            code7 = cli.main(["sound", "plan", "f1", "--dir", str(self.d)])
+        self.assertEqual((code5, code6, code7), (0, 0, 0), o.getvalue())
+        self.assertIn("✓ sound off: S2", o.getvalue())
+        self.assertRegex(o.getvalue(), r"cues 0 placed · 0 dropped · 0 missing · 1 off · [\d.]+ s")
+        self.assertIn("S2 (t0 2.00s) · sound off", o.getvalue())
+        with redirect_stdout(o):
+            self.assertEqual(cli.main(["sound", "shot", "on", "f1", "S2", "--dir", str(self.d)]), 0)
+        self.assertEqual(soundplan.load(self.d)["off"], [])
 
 
 if __name__ == "__main__":

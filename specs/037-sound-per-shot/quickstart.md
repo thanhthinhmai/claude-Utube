@@ -52,3 +52,5 @@ Kỳ vọng: 5/5 sự kiện của `tests/learn/data/voicecheck_expect.json` (k�
 
 ### Kết quả (2026-11-26)
 Chạy thật trên máy (CPU, tách lớp đã có cache, ~14 phút cho 724 sự kiện). SC-003: **2/5, chưa đạt**. Tìm thấy: lặng, bóng. Trượt: kính vỡ (nghe thành tiếng kim loại), bọt nước và đám đông (có nhãn đúng nhưng mốc lệch 0,18 s và 0,54 s ra ngoài cửa sổ). Chi tiết và hướng chỉnh ở research R8.
+
+Sau chỉnh (bỏ "AST thắng", AST nghe đúng lớp, luật lặng mới): voice-check **3/5** (thêm bọt nước). Bài chấm khớp hình bằng 9 tiếng Freesound CC0 trên bản sao `ae-sleepless-test`: ~1,5/9 tiếng (đồng hồ `sure` đúng), 1/2 khoảng lặng (khoảng giữa phim sau "guitar" tìm đúng; khoảng ở S9 nằm sát cuối phim nên không tách được khỏi đoạn im cuối tệp). SC-003 chưa đạt; người dùng chọn hướng A (chỉ `sure` là luật, `likely` là gợi ý; Claude chọn tiếng theo hình).

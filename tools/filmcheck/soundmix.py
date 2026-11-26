@@ -147,7 +147,7 @@ def run(d: Path, mux: bool = True) -> dict:
         raise soundplan.PlanError("bad", "the mix failed: " + (p.stderr or p.stdout).strip()[-400:])
     credits(d, used)
     states = [c["state"] for c in plan["cues"]]
-    r = {"placed": states.count("placed"), "dropped": states.count("dropped"), "missing": states.count("missing"),
+    r = {"placed": states.count("placed"), "dropped": states.count("dropped"), "missing": states.count("missing"), "off": states.count("off"),
          "mix": str(d / "out" / "mix.wav"), "base": soundplan.base(d)}
     if mux:
         r.update(remux(d))

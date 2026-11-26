@@ -20,8 +20,9 @@ Tất cả qua `sh bin/studio`. Mã thoát như 034/035: 0 đạt · 1 chưa đ�
 | `sound cue set <phim> <cue> [--entry id] [--offset-f n] [--gain db] [--cut …] [--len s] [--base sha]` | Sửa một cue; đánh `by: user` khi nguồn là trang hoặc `--by user`. |
 | `sound cue rm <phim> <cue> [--base sha]` | Xoá. |
 | `sound silence add <phim> <shot> (--line l05 [--word w] \| --at x) --len s [--db -57]` | Khoảnh khắc lặng. |
+| `sound shot on\|off <phim> <shot>… [--base sha]` | Bật/tắt tiếng động của shot (FR-005a). `cue add` vào shot đang tắt: mã 5. |
 | `sound plan <phim> [--json]` | In danh sách theo shot, `at` đã resolve, dropped/missing kèm lý do. |
-| `sound mix <phim>` | Resolve + chép cache + trộn `out/mix.wav` + stems + khối CREDITS; ghép lại tiếng vào bản đẹp nếu đã có (không dựng hình). In `cues P placed · D dropped · M missing · <giây> s`. Mã 3 khi animatic bật mà chưa duyệt. |
+| `sound mix <phim>` | Resolve + chép cache + trộn `out/mix.wav` + stems + khối CREDITS; ghép lại tiếng vào bản đẹp nếu đã có (không dựng hình). In `cues P placed · D dropped · M missing · [O off · ]<giây> s`. Mã 3 khi animatic bật mà chưa duyệt. |
 | `sound notes <phim> add <shot> --text "…"` · `delete <shot> <note>` · `show` · `reply <note> --text "…"` | Ghi chú Sound (`pins.py`). |
 
 ## Học tiếng

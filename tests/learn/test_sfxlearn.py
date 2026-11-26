@@ -22,7 +22,7 @@ SOUNDS = {
     3000: ("fx", 3.0, 3.3, [("Shatter", .6), ("Glass", .3), ("Breaking", .2)], ("glass shattering", .7)),  # sure
     500: ("vocals", 6.0, 6.8, [("Cheering", .5), ("Crowd", .4)], ("crowd cheering", .8)),               # vocals off words
     1500: ("fx", 10.0, 10.6, [("Speech", .3), ("Gurgling", .05)], ("water bubbling", .6)),               # likely: support
-    2200: ("fx", 12.0, 12.3, [("Dog", .5), ("Bark", .3)], ("car engine", .6)),                           # unsure: veto
+    2200: ("fx", 12.0, 12.3, [("Dog", .12), ("Bark", .08)], ("car engine", .6)),                         # unsure: weak both
     800: ("fx", 13.2, 14.0, [("Applause", .5), ("Clapping", .3)], ("people applauding", .6)),            # hard at 14.0
     1000: ("fx", 16.5, 17.0, [("Ding", .5)], ("ding", .6)),                                              # fade at 17.0
     1200: ("fx", 19.0, 21.5, [("Whoosh, swoosh, swish", .5)], ("whoosh", .6)),                           # over 20.0
@@ -80,11 +80,19 @@ class Fake:
 
     @staticmethod
     def _freq(clip, sr):
+        clip = clip[int(sx.CLIP_PRE * sr):int((sx.CLIP_PRE + 0.3) * sr)]   # the sound at the onset (AST hears 2.5 s)
         s = np.abs(np.fft.rfft(clip))
         f = np.fft.rfftfreq(len(clip), 1 / sr)[int(s.argmax())]
         return min({**SOUNDS, **BED}, key=lambda k: abs(k - f))
 
+    @staticmethod
+    def _quiet(clip, sr):                   # real AST hears nothing in a near-silent view; the fake would guess
+        c = clip[int(sx.CLIP_PRE * sr):int((sx.CLIP_PRE + 0.3) * sr)]
+        return not len(c) or float(np.sqrt((c.astype(np.float64) ** 2).mean())) < 1e-3
+
     def ast(self, clip, sr):
+        if self._quiet(clip, sr):
+            return []
         return {**SOUNDS, **BED}[self._freq(clip, sr)][3]
 
     def clap(self, clip, sr, labels):
@@ -169,9 +177,11 @@ class SfxLearn(unittest.TestCase):
     def test_summary_numbers_only(self):
         r = dict(self.res, video="v1")
         s = sx.sfx_summary([r])
-        self.assertEqual({a["label"] for a in s["actions"]}, {"glass shattering", "crowd cheering", "water bubbling",
-                                                               "people applauding", "ding", "whoosh", "ball bouncing"})
-        self.assertEqual(next(a for a in s["actions"] if a["label"] == "ball bouncing")["trust"], "likely")
+        labels = {a["label"] for a in s["actions"]} | {a["label"] for a in s["hints"]}
+        self.assertEqual(labels, {"glass shattering", "crowd cheering", "water bubbling",
+                                  "people applauding", "ding", "whoosh", "ball bouncing"})
+        self.assertTrue(all(a["trust"] == "sure" for a in s["actions"]))                     # direction A
+        self.assertEqual(next(a for a in s["hints"] if a["label"] == "ball bouncing")["trust"], "likely")
         glass = next(a for a in s["actions"] if a["label"] == "glass shattering")
         self.assertEqual(glass["trust"], "sure")
         self.assertEqual(glass["action"], "window")
@@ -211,7 +221,7 @@ class SfxLearn(unittest.TestCase):
             md = (d / "STYLE.md").read_text()
             self.assertEqual(md.count("<!-- sfx (learn sfx"), 1)
             self.assertIn("window → glass shattering", md)
-            self.assertIn("(likely)", md)
+            self.assertIn("maybe (one classifier only, check against the picture): ", md)
         finally:
             p.close() if hasattr(p, "close") else None
 
@@ -228,7 +238,58 @@ class Score(unittest.TestCase):
         self.assertEqual([e["found"] for e in sc["events"]], [True, True, False, False, True])
 
 
+class QuietBed(unittest.TestCase):
+    def test_silence_when_the_bed_is_already_quiet(self):
+        """The separated layer sits at −55 dB all along (a quiet bed): it never drops 15 dB, but the whole mix goes
+        silent after the word, and that counts; a short breath (0.4 s) does not."""
+        import numpy as np
+        sr = sx.SR
+        rng = np.random.default_rng(1)
+        layer = (rng.standard_normal(sr * 6) * 10 ** (-55 / 20)).astype(np.float32)
+        mix = (rng.standard_normal(sr * 6) * 10 ** (-25 / 20)).astype(np.float32)
+        mix[int(2.0 * sr):int(2.4 * sr)] = 0                   # a breath
+        mix[int(4.0 * sr):int(4.9 * sr)] = 0                   # the chosen silence
+        words = [{"word": "one", "start": 1.5, "end": 2.0}, {"word": "answer.", "start": 3.5, "end": 4.0}]
+        s = sx.silences(layer, words, mix)
+        self.assertEqual([x["word"] for x in s], ["answer"], s)
+        self.assertAlmostEqual(s[0]["t"], 4.0, delta=0.05)
+        self.assertEqual(sx.silences(layer, words), [])         # without the mix: the old rule, nothing
+
+
+class Answers(unittest.TestCase):
+    def test_cache_skips_models(self):
+        mix, stems, words = build()
+        calls = []
+
+        class Count(Fake):
+            def ast(self, clip, sr):
+                calls.append("a"); return Fake.ast(self, clip, sr)
+
+            def clap(self, clip, sr, labels):
+                calls.append("c"); return Fake.clap(self, clip, sr, labels)
+
+        cache = {}
+        r1 = sx.analyze(mix, stems, words, CUTS, Count(), cache=cache)
+        n1 = len(calls)
+        r2 = sx.analyze(mix, stems, words, CUTS, Count(), cache=cache)
+        self.assertGreater(n1, 0)
+        self.assertEqual(len(calls), n1, "the second run asks the models nothing")
+        self.assertEqual(r1["events"], r2["events"])
+
+
 class Inputs(unittest.TestCase):
+    def test_one_per_sound(self):
+        # a bark at 6.6 also names the onsets 4.5 and 4.9 (AST hears 2.5 s): only the strongest keeps its trust
+        mk = lambda t, lab, p: {"t": t, "agree": True, "trust": "likely", "label": lab, "ast": [[lab, p]]}
+        ev = [mk(4.5, "Bow-wow", .35), mk(4.9, "Bow-wow", .36), mk(6.6, "dog barking", .0), mk(9.5, "Bark", .3),
+              mk(5.0, "Gunshot, gunfire", .2)]
+        ev[2]["ast"] = [["Bow-wow", .40]]
+        ev.sort(key=lambda e: e["t"])
+        sx._one_per_sound(ev)
+        kept = [(e["t"], e["label"]) for e in ev if e["agree"]]
+        self.assertEqual(kept, [(5.0, "Gunshot, gunfire"), (6.6, "dog barking"), (9.5, "Bark")])
+        self.assertEqual({e["t"]: e.get("dup_of") for e in ev}[4.5], 6.6)
+
     def test_words_from_sentences(self):
         w = sx.load_words([{"t": 2.0, "d": 1.0, "text": "the window breaks"}, {"t": 0.0, "d": 0.5, "text": "so"}])
         self.assertEqual([x["word"] for x in w], ["so", "the", "window", "breaks"])
@@ -247,9 +308,9 @@ class Inputs(unittest.TestCase):
         self.assertEqual(A([("Shatter", .5)], ("Chink, clink", .9)), ("sure", "Chink, clink"))      # same group
         self.assertEqual(A([("Liquid", .04)], ("water bubbling", .6)), ("likely", "water bubbling"))
         self.assertEqual(A([("Pant", .1)], ("ball bouncing", .94)), ("likely", "ball bouncing"))
-        self.assertEqual(A([("Pant", .3)], ("ball bouncing", .94)), (None, None))                    # AST veto
+        self.assertEqual(A([("Pant", .3)], ("ball bouncing", .94)), (None, None))                   # a conflict: nothing
         self.assertEqual(A([("Smash, crash", .18)], ("whistle", .3)), ("likely", "Smash, crash"))    # AST alone
-        self.assertEqual(A([("Smash, crash", .18)], ("coins dropping", .84)), (None, None))          # CLAP veto
+        self.assertEqual(A([("Smash, crash", .18)], ("coins dropping", .84)), (None, None))        # a conflict: nothing
         self.assertEqual(A([("Glass", .09)], ("glass shattering", .5)), ("likely", "glass shattering"))   # < AST_MIN
         self.assertEqual(A([("Music", .9)], ("background music", .9)), (None, None))
         self.assertEqual(A([("Speech", .9)], ("a man talking", .99)), (None, None))
