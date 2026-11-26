@@ -23,6 +23,7 @@
 
 - Q: Cắt đuôi shot = câu cuối + 0,45 s không đưa được phim thử từ 32,9% lặng xuống ≤ 20% (chỉ còn 30,3%; lặng nằm ở khoảng hở giữa các câu, cần trung bình ≤ 0,29 s). Đề xuất khớp shot làm gì? → A: Đệm 0,25 s sau từ cuối, và câu đầu của mỗi shot (trừ shot đầu phim) bắt đầu ngay ở đường cắt; câu trong cùng shot giữ khoảng cách với nhau. Phim thử ước tính còn 18,7%.
 - Q: Khớp shot "câu cuối + 0,25 s" làm shot chứa lời cuối của đoạn ngắn hơn 2,5 s (lỗi của `qc final`); và khi giữ 2,5 s thì silence vượt 20%? → A: Đề xuất khớp giữ shot cuối đoạn ≥ 2,5 s; phim kẹt giữa hai luật thì duyệt Animatic bằng "Approve anyway".
+- Q: Bản nháp cả phim chỉ nhanh hơn bản đẹp 2 lần (41 s so với 81 s) vì phần AE dựng shot là chung; giữ mục tiêu 3 lần? → A: Sửa SC-001: bản nháp cả phim ≤ 3 phút; lượt sửa dựng lại vài shot nhanh hơn ≥ 3 lần.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -142,7 +143,7 @@ Bấm vào một shot trong lưới thì phát clip nháp của shot đó kèm g
 
 ### Measurable Outcomes
 
-- **SC-001**: Bản nháp của một phim 30 s sẵn sàng để xem trong ≤ 3 phút sau khi giọng được duyệt (AE đã mở trên máy), nhanh hơn ít nhất 3 lần so với bản đẹp của cùng phim.
+- **SC-001**: Bản nháp của một phim 30 s sẵn sàng để xem trong ≤ 3 phút sau khi giọng được duyệt (AE đã mở trên máy); một lượt sửa dựng lại vài shot (theo ghi chú hoặc sau khi nhận đề xuất khớp) nhanh hơn ít nhất 3 lần so với dựng bản đẹp của cùng phim. (Bản nháp cả phim không cần nhanh hơn 3 lần: phần mở AE, nhận gói và dựng shot giống hệt bản đẹp.)
 - **SC-002**: Với `ae-sleepless-test`, nhận mọi đề xuất khớp shot đưa phần lặng từ 33% xuống ≤ 20% cộng phần lặng do giữ shot cuối đoạn 2,5 s (đo được: 22%, nên duyệt cần "Approve anyway"); mỗi shot có lời kết thúc 0,25 s (± 1 khung) sau câu cuối của nó, trừ shot cuối đoạn kéo lên 2,5 s; `qc final` không còn lỗi shot cuối đoạn.
 - **SC-003**: Phần trăm lặng hiện ở bước Animatic khớp với số đo của bước kiểm phim trên bản đẹp dựng từ cùng thời lượng (sai lệch ≤ 1 điểm phần trăm).
 - **SC-004**: Mốc cắt của bản đẹp trùng mốc cắt đã duyệt ở Animatic cho 100% shot (± 1 khung).

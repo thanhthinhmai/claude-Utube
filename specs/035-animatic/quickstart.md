@@ -52,10 +52,10 @@ Trên trang việc: ghim 1 ghi chú trên S2, 1 ghi chú chung cho S6, "Send not
 
 | Tiêu chí | Đo được | Đạt? |
 |---|---|---|
-| SC-001 thời gian | Bản nháp cả phim 72,7 s (lần đầu, kèm ghi `timing.json`), 50,5 s (dựng lại cả phim); dựng lại một shot (S2) 9,7 s. Bản đẹp 87,7 s (phim 22,97 s, 1920×1080). Cả phim: nhanh hơn 1,2–1,7 lần; một shot: 9 lần | ≤ 3 phút: đạt · ≥ 3 lần: **chưa đạt** với bản nháp cả phim |
-| SC-002 silence | 33% → 19% sau khi nhận mọi đề xuất (khung: S1 69, S2 103, S3 68, S4 38, S5 45, S6 99, S7 119, S8 93, S9 55); dựng lại không còn dòng `CHECK timing` | đạt |
-| SC-003 khớp `qc final` | `qc final` trên bản đẹp: silence 19% (Animatic 19%) | đạt |
-| SC-004 mốc cắt | `shots.json` của bản đẹp trùng `timing.json` đúng từng khung, 9/9 shot, 689 khung = số khung video | đạt |
+| SC-001 thời gian | Sau T049 (ffmpeg từ ~20 s còn ~2,4 s): bản nháp cả phim 40,9 s; dựng lại một shot (S2) 9,7 s. Bản đẹp 80,9 s (phim 24,63 s). Phần AE của bản nháp ~38 s là chung với bản đẹp (mở AE, dựng shot, lưu); thử 10 khung/giây (`STUDIO_AE_DRAFT_FPS=10`): 35,2 s | ≤ 3 phút: đạt · lượt sửa vài shot nhanh hơn 8 lần: đạt (SC-001 đã sửa 2026-11-26) |
+| SC-002 silence | 33% → 22% sau khi nhận mọi đề xuất, có giữ S5 (P02) và S9 (P05) 2,5 s (khung: S1 69, S2 103, S3 68, S4 38, S5 75, S6 99, S7 119, S8 93, S9 75); duyệt bằng "Approve anyway" | đạt (theo SC-002 đã sửa) |
+| SC-003 khớp `qc final` | `qc final` trên bản đẹp: silence 22% (Animatic 22%); không còn lỗi shot cuối đoạn | đạt |
+| SC-004 mốc cắt | `shots.json` của bản đẹp trùng `timing.json` đúng từng khung, 9/9 shot (lần 1: 689 khung; lần 2: 739 khung) | đạt |
 | SC-005 chỉ dựng shot có ghi chú | Dựng lại riêng S2: `shots_built: ["S2"]`, 8 shot còn lại giống hệt (framemd5 từng shot). Chưa chạy một lượt "Send notes to Claude" thật (việc `fix` gọi Claude) | phần dựng: đạt · phần trả lời ghi chú: chỉ có test tự động |
 | SC-006 cổng | `ae render` trước khi duyệt → mã 3 kèm lệnh duyệt | đạt |
 
@@ -64,3 +64,5 @@ Gặp trong lượt chạy:
 - 7 dòng `CHECK camera … exposed frame edge` có cả ở bản đẹp cũ (`out/build.mp4`), không do bản nháp.
 - Bản đẹp kéo dài hơn 240 s mới ghi log (ExtendScript giữ `log.txt` trong bộ nhớ đến khi đóng) → `ae render` báo `ae_scripting_off` và tắt AE. Đã sửa: `CU.say` ghi từng dòng xuống đĩa ngay (`tools/ae/kit/lib.jsx`).
 - Âm thanh bản đẹp: script trộn của phim (`mix.py.orig`) đặt câu theo `narration.json` (vị trí Animatic đã dời), không theo độ lệch cố định.
+- AE bị buộc tắt khi hết hạn chờ → lần mở sau hiện "Crash Repair Options" và chặn mọi script (render kẹt ở `QUEUED`). Đã sửa (T052): không bao giờ buộc tắt AE; thông báo nhắc bấm Continue.
+- Bản nháp mất 2 khung cuối do `-shortest` khi ghép tiếng; đã sửa (T049), test kiểm số khung.
