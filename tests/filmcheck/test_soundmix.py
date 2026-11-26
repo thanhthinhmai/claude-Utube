@@ -103,6 +103,19 @@ class Mix(unittest.TestCase):
         self.assertGreaterEqual(min(diff), lo)
         self.assertLessEqual(max(diff), hi)
 
+    def test_loudness_and_true_peak(self):
+        """The studio delivers at −14 ± 1 LUFS with true peak ≤ −1 dB (runner/worker.py): one gain from voice and bed,
+        then a true-peak limiter at −2.5 dB, so the AAC copy stays under −1 dB too."""
+        soundplan.add_cue(self.d, "S1", "pop", {"shot_at": 0.25}, "cork pop", gain_db=6)
+        soundmix.run(self.d, mux=False)
+        p = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(self.d / "out" / "mix.wav"), "-af", "ebur128=peak=true",
+                            "-f", "null", "-"], capture_output=True, text=True)
+        import re
+        lufs = float(re.findall(r"I:\s+(-?[\d.]+) LUFS", p.stderr)[-1])
+        peak = float(re.findall(r"Peak:\s+(-?[\d.]+) dBFS", p.stderr)[-1])
+        self.assertLessEqual(abs(lufs + 14), 1.0, lufs)
+        self.assertLessEqual(peak, -2.3)
+
     def test_silence(self):
         soundplan.add_silence(self.d, "S2", {"shot_at": 0.6}, 0.5, -57)            # 3.8–4.3 s, no voice there
         soundmix.run(self.d, mux=False)

@@ -23,6 +23,8 @@ sh bin/studio sound lib search "glass shatter" --cat GLASS
 ```
 Kỳ vọng: số mục = số tệp âm thanh đọc được; lần đầu ≤ 15 phút cho 10.000 tệp; `git status` sạch.
 
+Kết quả đo (2026-11-26, kho thật `/mnt/e/SoundLibrary/Sonniss`, ổ E: qua WSL, 956 tệp âm thanh, 0 zip): `index --full` 31,3 s (≈ 33 ms/tệp, suy ra ≈ 5,5 phút cho 10.000 tệp, đạt ≤ 15 phút); `index` lần 2 2,0 s, "0 new" (đạt ≤ 1 phút); `git status` sạch. SC-007 đạt theo suy ra, chưa đo trên đủ 10.000 tệp.
+
 ## 3. Freesound CC0 (US2, SC-004)
 
 ```sh

@@ -6,8 +6,10 @@ Two halves:
   library's Python, write the film's CREDITS block and put the sound back on a rendered film (no new picture);
 - `python soundmix.py <job.json>` (the library's venv: numpy + soundfile; nothing of lib/ is imported): voice lines at
   their times, out/music.wav ducked under the voice (50 ms window), each cue at its time with its gain against the voice,
-  its cut rule at the shot end, the chosen silences, and a stateless soft clip (tanh per sample). Nothing has memory,
-  so changing one cue changes only the samples within [its time − 60 ms, its end + 60 ms] (FR-026, SC-006).
+  its cut rule at the shot end, the chosen silences, one gain for the whole film from the voice and the music only
+  (−14 LUFS, BS.1770), and a true-peak limiter (−2.5 dBTP, 5 ms look-ahead). The gain does not depend on cues or
+  silences and the limiter only reaches 7.5 ms, so changing one cue changes only the samples within
+  [its time − 60 ms, its end + 60 ms] (FR-026, SC-006).
 Writes out/mix.wav (48 kHz stereo), sound/stems/fx.wav and sound/stems/voice.wav."""
 import json
 import os
@@ -21,8 +23,11 @@ HARD = 0.010                     # a hard cut is silent 10 ms after the cut
 TAIL = 0.005
 RAMP = 0.030                     # silence ramps
 DUCK = 0.5                       # music under the voice: −6 dB at most
-CLIP_AT = 0.8
+CEIL_DBTP = -2.5                 # true-peak ceiling (4× oversampled, 5 ms look-ahead); AAC adds ~1 dB on top
+LOOK = 0.005
 END_FADE = 0.8
+TARGET_LUFS = -14.0              # the studio's delivery check: −14 ± 1 LUFS, true peak ≤ −1 dB (runner/worker.py)
+MAX_GAIN_DB = 20.0
 MARK_BEGIN, MARK_END = "# sound effects (studio, 037)", "# end sound effects"
 
 
@@ -215,6 +220,49 @@ def _cue(c: dict, voice_rms: float):
     return a * env[:, None]
 
 
+def lufs(x, sr: int = SR) -> float:
+    """Integrated loudness (ITU-R BS.1770-4: K-weighting, 400 ms blocks, −70 LUFS and −10 LU gates); −inf when silent."""
+    import numpy as np
+    from scipy.signal import lfilter
+    x = np.asarray(x, np.float64)
+    x = x[:, None] if x.ndim == 1 else x
+    b1, a1 = [1.53512485958697, -2.69169618940638, 1.19839281085285], [1.0, -1.69065929318241, 0.73248077421585]
+    b2, a2 = [1.0, -2.0, 1.0], [1.0, -1.99004745483398, 0.99007225036621]
+    y = lfilter(b2, a2, lfilter(b1, a1, x, axis=0), axis=0)
+    blk, hop = int(0.4 * sr), int(0.1 * sr)
+    if len(y) < blk:
+        return float("-inf")
+    c = np.cumsum(np.concatenate([np.zeros((1, y.shape[1])), y ** 2]), axis=0)
+    st = np.arange(0, len(y) - blk + 1, hop)
+    z = ((c[st + blk] - c[st]) / blk).sum(1)
+    with np.errstate(divide="ignore"):
+        lk = -0.691 + 10 * np.log10(z)
+    z = z[lk > -70]
+    if not len(z):
+        return float("-inf")
+    rel = -0.691 + 10 * np.log10(z.mean()) - 10
+    z = z[-0.691 + 10 * np.log10(z) > rel]
+    return float(-0.691 + 10 * np.log10(z.mean())) if len(z) else float("-inf")
+
+
+def limit(x, sr: int = SR, ceil_db: float = CEIL_DBTP):
+    """True-peak limiter: the gain each sample needs (peaks between samples found at 4× oversampling), the smallest of it
+    within LOOK either side, smoothed over LOOK; a peak only pulls down its own few milliseconds. Two passes."""
+    import numpy as np
+    from scipy.ndimage import minimum_filter1d, uniform_filter1d
+    from scipy.signal import resample_poly
+    ceil = 10 ** (ceil_db / 20)
+    w = max(1, int(LOOK * sr))
+    for _ in range(2):
+        tp = np.abs(resample_poly(x, 4, 1, axis=0)).max(1)[:len(x) * 4].reshape(-1, 4).max(1)
+        need = np.minimum(1.0, ceil / np.maximum(tp, 1e-9))
+        if need.min() >= 1.0:
+            break
+        g = uniform_filter1d(minimum_filter1d(need, 2 * w + 1, mode="nearest"), w + 1, mode="nearest")
+        x = x * np.minimum(g, 1.0)[:, None]
+    return x
+
+
 def mix(j: dict) -> None:
     import numpy as np
     import soundfile as sf
@@ -235,6 +283,9 @@ def mix(j: dict) -> None:
     for c in j["cues"]:
         _place(fx, _cue(c, vr), c["at"])
     out = voice + music + fx
+    # one gain for the whole film from the voice and the bed only, so a cue or a silence changes just its own stretch
+    bed = lufs(voice + music)
+    gain = 10 ** (min(MAX_GAIN_DB, TARGET_LUFS - bed) / 20) if np.isfinite(bed) else 1.0
     g = np.ones(n, np.float32)
     for s in j["silences"]:
         lvl = 10 ** (s["db"] / 20)
@@ -251,9 +302,7 @@ def mix(j: dict) -> None:
     k = min(n, int(END_FADE * SR))
     if k:
         out[n - k:] *= np.linspace(1, 0, k)[:, None]
-    mag = np.abs(out)
-    over = mag > CLIP_AT
-    out = np.where(over, np.sign(out) * (CLIP_AT + (1 - CLIP_AT) * np.tanh((mag - CLIP_AT) / (1 - CLIP_AT))), out)
+    out = limit(out * gain)
     Path(j["out"]).parent.mkdir(parents=True, exist_ok=True)
     Path(j["stems"]).mkdir(parents=True, exist_ok=True)
     tmp = j["out"] + ".tmp.wav"
