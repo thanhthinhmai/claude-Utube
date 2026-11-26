@@ -81,7 +81,7 @@ description: "Task list for 037-sound-per-shot"
 - [X] T026 [US1] Viết `tools/ae/SOUND.md`: cách Claude lập danh sách tiếng (đọc `SCRIPT.md`, `animatic/keys.json`, `sound.sfx` của phong cách; mỗi chuyển động có tên đáng nghe → một cue neo `motion`; tiếng nền `span`; khoảnh khắc lặng; từ khoá tiếng Anh kiểu UCS); `mix.py` của phim AE chỉ còn làm nhạc → `out/music.wav`
 - [X] T053 [US1] Bật/tắt tiếng theo shot (FR-005a): `plan.json → off`, cue của shot tắt có `state: "off"` (giữ, không trộn, không tính mật độ), `add_cue` từ chối mã `off`, `soundplan.set_shots`, lệnh `sound shot on|off`; test trong `tests/filmcheck/test_soundplan.py` và `test_soundmix.py`. Trang Sound (T045/T046) thêm op `shot_set` và công tắc trên mỗi shot
 - [X] T054 [US4] Hướng A và chỉnh sau bài chấm CC0 (research R8): `sound.sfx → actions` chỉ `sure`, `hints` cho `likely`; bỏ luật "AST thắng"; AST chỉ nghe lớp của sự kiện; lặng ≥ 0,6 s + nhánh "cả bản trộn im" + dung sai đuôi từ 0,2 s; khoảng lặng neo vào từ bắt đầu khi từ đó **kết thúc** (`soundplan`); `soundlib.find` hỏi Freesound khi kho có < 3 tiếng khớp mạnh; `tools/ae/SOUND.md`; test trong `tests/learn/test_sfxlearn.py`, `tests/filmcheck/test_soundplan.py`, `tests/filmcheck/test_freesound.py`
-- [ ] T027 [US1] (làm cùng T051, cần kho Sonniss thật) Chuyển `films/ae-sleepless-test/mix.py` (ngoài git, chỉ trên máy) sang chỉ làm nhạc `out/music.wav`, lập `sound/plan.json` cho 9 shot bằng `sound cue add`; ghi lại cách làm trong `tools/ae/SOUND.md`
+- [X] T027 [US1] (làm cùng T051, cần kho Sonniss thật) Chuyển `films/ae-sleepless-test/mix.py` (ngoài git, chỉ trên máy) sang chỉ làm nhạc `out/music.wav`, lập `sound/plan.json` cho 9 shot bằng `sound cue add`; ghi lại cách làm trong `tools/ae/SOUND.md`
 
 **Checkpoint "trước 035"**: chạy đủ `tests/filmcheck`; trộn được phim thử bằng lệnh với kho thử. Commit. Dừng các task ⟂035 tới khi 035 merge.
 
@@ -141,9 +141,10 @@ description: "Task list for 037-sound-per-shot"
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T049 [P] Test repo `tests/test_no_media.py` (hoặc thêm vào bộ có sẵn trong `tests/run.sh`): 0 tệp âm thanh mới trong git (kho thử tự tổng hợp lúc chạy test); `desktop/core-build` không gói `sound/` hay `requirements-sound.txt` (SC-005)
-- [ ] T050 [P] Cập nhật `CLAUDE.md` (mục ngắn "Âm thanh theo shot (specs/037)"), `tools/CLAUDE.md` (mô-đun mới), `desktop/core-build/credits-check.py` nếu cần cho dòng CREDITS mới
-- [ ] T051 Kho thật: khi người dùng đã tải Sonniss 2026 + 2024 vào `/mnt/e/SoundLibrary/Sonniss`, giải nén (nếu còn zip), `sound lib add`, đo SC-007, ghi kết quả vào quickstart
+- [X] T055 `tools/filmcheck/soundmix.py`: một gain từ giọng + nhạc về −14 LUFS và limiter true-peak −2,5 dBTP thay soft-clip tanh (phim thật trước đó −19 LUFS, đỉnh +0,8 dBTP, trượt kiểm khi giao −14 ± 1 LUFS, ≤ −1 dB); test `test_loudness_and_true_peak`
+- [X] T049 [P] Test repo `tests/test_no_media.py` (hoặc thêm vào bộ có sẵn trong `tests/run.sh`): 0 tệp âm thanh mới trong git (kho thử tự tổng hợp lúc chạy test); `desktop/core-build` không gói `sound/` hay `requirements-sound.txt` (SC-005)
+- [X] T050 [P] Cập nhật `CLAUDE.md` (mục ngắn "Âm thanh theo shot (specs/037)"), `tools/CLAUDE.md` (mô-đun mới), `desktop/core-build/credits-check.py` nếu cần cho dòng CREDITS mới
+- [X] T051 Kho thật: khi người dùng đã tải Sonniss 2026 + 2024 vào `/mnt/e/SoundLibrary/Sonniss`, giải nén (nếu còn zip), `sound lib add`, đo SC-007, ghi kết quả vào quickstart
 - [ ] T052 Chạy đủ bộ test (`sh tests/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`, `sh tests/ae/run.sh`, `sh tests/render/run.sh`, `sh tests/license/run.sh`) rồi mở PR (không merge)
 
 ---

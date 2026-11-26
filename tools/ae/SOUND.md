@@ -51,6 +51,20 @@ studio never puts a made-up sound in its place. A `dropped` cue says why.
 
 The film's own `mix.py` (if any) only makes the music: `out/music.wav`, 48 kHz stereo, the length of the film, no
 voice and no effects. `sound mix` puts the voice, the music (ducked under the voice) and the effects together.
+The music is not ducked or limited in `mix.py`: `sound mix` does that. It also sets one gain for the whole film
+from the voice and the music (−14 LUFS, the studio's delivery check) and runs a true-peak limiter at −2.5 dB, so
+the AAC copy stays under −1 dB. Do not normalise or limit again in `mix.py`.
+
+### Moving an older film over (done for `ae-sleepless-test`, 2026-11-26)
+
+1. Keep the old full mix: `cp mix.py mix.py.orig`, and copy `out/render.mp4`, `out/mix.wav`, `out/audio.m4a`,
+   `<film>.mp4` and `CREDITS` into a backup folder (`sound mix` puts the new sound back on the rendered film).
+2. Make `mix.py` music only: run `mix.py.orig` up to the end of the bed (before its ducking line), take the bed
+   alone, write `out/music.wav`. Check by ear that no voice or effect is left in it.
+3. Remove the effects from the old mix by not carrying them over: each one becomes a cue (`sound cue add`),
+   anchored to the motion that makes it (`--motion "<layer> · <prop>"`), to a word, or to the shot.
+4. `sound plan <film>`, then `sound mix <film>`; measure the film (`ffmpeg -af ebur128=peak=true`): −14 ± 1 LUFS,
+   true peak ≤ −1 dB. Until the Animatic (035) writes `animatic/keys.json`, it is written by hand from the AE keys.
 
 ## Licences
 
