@@ -46,9 +46,16 @@ def _read(f: Path, default=None):
 
 
 def _write(f: Path, data) -> None:
+    """Writes only when the text changes, so reading a plan (resolve + save) leaves the file and its time alone."""
+    text = json.dumps(data, indent=1, ensure_ascii=False) + "\n"
+    try:
+        if f.read_text(encoding="utf-8") == text:
+            return
+    except OSError:
+        pass
     f.parent.mkdir(parents=True, exist_ok=True)
     tmp = f.with_name(f.name + ".tmp")
-    tmp.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp.write_text(text, encoding="utf-8")
     os.replace(tmp, f)
 
 
@@ -81,9 +88,10 @@ def load(d: Path) -> dict:
 def base(d: Path) -> str:
     """What the page and --base compare: a hash of plan.json as it is on disk."""
     try:
-        return hashlib.sha1(plan_file(d).read_bytes()).hexdigest()[:12]
+        raw = plan_file(d).read_bytes()
     except OSError:
-        return "none"
+        raw = b""
+    return hashlib.sha1(raw).hexdigest()[:16]               # 16 characters, like every base the app sends
 
 
 def _check_base(d: Path, b) -> None:

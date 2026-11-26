@@ -59,6 +59,8 @@ def fingerprint(film_dir: Path, point: str) -> str:
         return cast.fingerprint(d) if cast.exists(d) else ""
     files = {"script": ["SCRIPT.md", "SOURCES.md"], "mix": ["mix.json", "out/mix.wav"],
              "publish": ["publish/pack.json"]}[point]
+    if point == "mix" and is_ae(d):                 # specs/037: the sound plan and its notes are part of the mix point
+        files = files + ["sound/plan.json", "sound/notes.json"]
     return _hash(d, [d / f for f in files])
 
 
@@ -240,9 +242,17 @@ def checks_pass(film_dir: Path, point: str) -> list:
         mix = d / "out" / "mix.wav"
         if not mix.is_file():
             return ["there is no mix yet (out/mix.wav)"]
-        newer = [p for p in [d / "mix.json", d / "narration.json"] + sorted((d / "voices").glob("*.wav"))
+        extra = [d / "sound" / "plan.json", d / "timing.json"] if is_ae(d) else []
+        newer = [p for p in [d / "mix.json", d / "narration.json"] + extra + sorted((d / "voices").glob("*.wav"))
                  if p.is_file() and p.stat().st_mtime > mix.stat().st_mtime]
-        return [f"the mix is older than {newer[0].relative_to(d).as_posix()}: mix again"] if newer else []
+        why = [f"the mix is older than {newer[0].relative_to(d).as_posix()}: mix again"] if newer else []
+        if is_ae(d):                                 # specs/037 US3: open Sound notes wait for Claude's answer
+            from filmcheck import soundnotes
+            try:
+                why += [f"{s}: {n} open sound note(s)" for s, n in soundnotes.open_counts(d).items() if n]
+            except soundnotes.SoundNoteError as e:
+                why.append(e.message)
+        return why
     from filmcheck import publish
     try:
         r = publish.check(d, publish.read_pack(d))

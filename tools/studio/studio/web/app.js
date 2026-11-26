@@ -561,6 +561,7 @@ async function editPanel(body) {
     body.prepend(n);
   }
   if (pt === "cast") { castBar(body); return; }
+  if (pt === "mix" && RAIL.data.sound) { editSound(body); return; }
   const edit = { script: async () => { const sc = body.querySelector(".script"); if (sc) sc.remove(); await editScript(body); },
     voice: async () => { body.querySelectorAll(".tbl, .done-actions").forEach((x) => x.remove()); await editVoice(body); },
     mix: async () => editMix(body),
@@ -773,9 +774,9 @@ function canEdit(pt) {
   if (v.busy && (v.busy.step === POINT_STEP[pt] || (v.impact[pt] || []).includes(v.busy.step))) return false;
   return v.points[pt] && v.points[pt].state !== "skipped";
 }
-/** Send one edit and wait for its result (the page never writes a file itself). @param {string} point @param {string} op @param {any} args */
-async function sendEdit(point, op, args) {
-  const base = RAIL.data.points[point].fingerprint;
+/** Send one edit and wait for its result (the page never writes a file itself). @param {string} point @param {string} op @param {any} args @param {string} [base] another fingerprint (037: the sound plan or its notes) */
+async function sendEdit(point, op, args, base) {
+  base = base || RAIL.data.points[point].fingerprint;
   const a = await post(`/jobs/${encodeURIComponent(DONE.job.id)}/actions`, { point, op, args, base });
   for (let i = 0; i < 1200; i++) {
     await new Promise((r) => setTimeout(r, i < 20 ? 300 : 1000));
@@ -815,6 +816,180 @@ function approveBar(body, pt, blocked) {
     try { await post(`/reviews/${encodeURIComponent(r.id)}/decision`, { value: "revise", note }); route(); }
     catch (err) { msg.className = "fail small"; msg.textContent = err.message; }
   };
+}
+
+// ---------- the Sound panel of an After Effects film (specs/037 US3) ----------
+/** m:ss.s @param {number} t */
+const sndT = (t) => { const m = Math.floor(t / 60), x = t - 60 * m; return `${m}:${x.toFixed(1).padStart(4, "0")}`; };
+const SND_STATE = { placed: ["ok", "Placed"], missing: ["warn", "Not found"], dropped: ["warn", "Dropped"], off: ["", "Off"] };
+/** @type {HTMLAudioElement | null} */ let SND_PREVIEW = null;
+/** Play one library sound (≤ 30 s). @param {string} id */
+function sndPreview(id) {
+  if (SND_PREVIEW) { SND_PREVIEW.pause(); SND_PREVIEW = null; }
+  SND_PREVIEW = new Audio(`${API}/sound/preview/${encodeURIComponent(id)}`);
+  SND_PREVIEW.play().catch(() => { /* not in this mode or not allowed */ });
+}
+/** The Sound panel: shots with their sounds, play a shot, change / move / level / remove a sound, add one, the shot's
+ * sound switch, notes per shot and "Send N notes to Claude".
+ * ctx: {media: url (video, or the mix), video: bool, cues: may change sounds, notes: may write notes,
+ *       edit(op, args, base) → Promise<string> message, noteAdd(shot, text), noteDel(shot, id), msg}
+ * @param {HTMLElement} host @param {any} sb @param {any} ctx */
+function soundPanel(host, sb, ctx) {
+  const box = document.createElement("div");
+  box.className = "sound-panel"; box.id = "sound-panel";
+  const placed = sb.shots.reduce((/** @type {number} */ a, /** @type {any} */ s) => a + s.cues.filter((/** @type {any} */ c) => c.state === "placed").length, 0);
+  const nNotes = sb.shots.reduce((/** @type {number} */ a, /** @type {any} */ s) => a + (s.notes_open || 0), 0);
+  const notes = (sb.notes && sb.notes.shots) || {};
+  const lot = sb.notes && sb.notes.lot, failedLot = sb.notes && sb.notes.failed_lot;
+  const media = ctx.media ? (ctx.video ? `<video class="sound-media" id="snd-media" preload="metadata" controls playsinline src="${ctx.media}"></video>`
+    : `<audio class="sound-media" id="snd-media" preload="metadata" controls src="${ctx.media}"></audio>`) : `<p class="muted">No mix yet.</p>`;
+  box.innerHTML = `<p class="section-title">Sound</p>
+    ${facts([`${b(placed)} sound${placed === 1 ? "" : "s"} on ${b(sb.shots.length)} shots`, sb.missing ? `${b(sb.missing)} not found` : "",
+      sb.dropped ? `${b(sb.dropped)} dropped` : "", sb.library ? `Library ${b(sb.library.entries)}${sb.scope === "cc0" ? " (CC0)" : ""}` : ""])}
+    ${sb.error ? `<p class="notice warn small">${esc(sb.error)}</p>` : ""}
+    ${lot ? `<p class="notice small" id="snd-lot">Claude is answering ${lot.notes.length} sound note${lot.notes.length === 1 ? "" : "s"}. Notes you add now wait for the next round.</p>` : ""}
+    ${failedLot ? `<p class="notice warn small">The last round did not finish: ${esc(failedLot.error)}. The notes are still open: send them again.</p>` : ""}
+    ${media}
+    <p class="msg small" id="snd-msg" role="status">${esc(ctx.msg || "")}</p>
+    <div class="sound-shots">${sb.shots.map((/** @type {any} */ s) => {
+      const ns = notes[s.id] || [];
+      const cueRows = s.cues.map((/** @type {any} */ c) => {
+        const [k, l] = SND_STATE[c.state] || ["", c.state];
+        const at = c.at != null ? `${(c.at - s.t0).toFixed(2)} s` : "—";
+        const tools = ctx.cues && s.on ? `<span class="row sc-tools">
+            ${c.alts && c.alts.length ? `<button class="btn small" data-alt="${esc(c.id)}">Change</button>` : ""}
+            <button class="btn small" data-move="${esc(c.id)}" data-d="-2" title="2 frames earlier">−2f</button>
+            <button class="btn small" data-move="${esc(c.id)}" data-d="2" title="2 frames later">+2f</button>
+            <button class="btn small" data-gain="${esc(c.id)}" data-d="-3" title="3 dB quieter">−3 dB</button>
+            <button class="btn small" data-gain="${esc(c.id)}" data-d="3" title="3 dB louder">+3 dB</button>
+            <button class="btn small danger" data-rm="${esc(c.id)}">Remove</button></span>` : "";
+        const alts = ctx.cues && c.alts && c.alts.length ? `<ul class="plain sound-alts" id="alts-${esc(c.id)}" hidden>${c.alts.map((/** @type {any} */ a) =>
+          `<li class="row"><button class="btn small" data-pre="${esc(a.id)}" aria-label="Listen to ${esc(a.name)}">▶</button>
+            <span>${esc(a.name)} <span class="muted small">${esc(a.credit || "")}</span></span>
+            <button class="btn small" data-use="${esc(c.id)}" data-entry="${esc(a.id)}">Use</button></li>`).join("")}</ul>` : "";
+        return `<li class="sound-cue" data-cue="${esc(c.id)}"><div class="row spread"><span><b>${esc(c.action)}</b>
+            <span class="muted">→ ${c.sound ? esc(c.sound.name) : "nothing found"}</span>
+            ${c.sound ? `<button class="btn small" data-pre="${esc(c.sound.id)}" aria-label="Listen">▶</button>` : ""}
+            <span class="chip small ${k}">${esc(l)}</span> <span class="muted small">at ${at} · ${c.gain_db} dB${c.why ? ` · ${esc(c.why)}` : ""}</span></span>
+            ${tools}</div>${alts}</li>`;
+      }).join("");
+      const noteRows = ns.map((/** @type {any} */ n) => `<li class="sound-note${n.done ? " done" : ""}">${n.done ? "✓ " : ""}${esc(n.text)}
+          ${n.reply ? `<span class="muted small">↳ ${esc(n.reply)}</span>` : ""}
+          ${ctx.notes && !n.done ? `<button class="btn small" data-ndel="${esc(n.id)}" data-shot="${esc(s.id)}">Delete</button>` : ""}</li>`).join("");
+      return `<section class="sound-shot${s.on ? "" : " off"}" data-shot="${esc(s.id)}">
+        <div class="row spread"><span><b>${esc(s.id)}</b> <span class="muted small">${sndT(s.t0)}–${sndT(s.t1)}</span>
+          ${s.notes_open ? ` <span class="chip warn small">${s.notes_open} note${s.notes_open === 1 ? "" : "s"}</span>` : ""}</span>
+          <span class="row">${ctx.media ? `<button class="btn small" data-play="${esc(s.id)}">▶ Play</button>` : ""}
+          ${ctx.cues ? `<label class="small"><input type="checkbox" data-on="${esc(s.id)}" ${s.on ? "checked" : ""}> Sound effects</label>` : (s.on ? "" : `<span class="muted small">Sound effects off</span>`)}</span></div>
+        ${cueRows ? `<ul class="plain sound-cues">${cueRows}</ul>` : `<p class="muted small">${s.on ? "No sound effects." : "Sound effects are off for this shot."}</p>`}
+        ${ctx.cues && s.on ? `<details class="sound-add"><summary class="small">Add a sound</summary>
+          <div class="row"><input data-f="action" placeholder="What happens (door slams)" maxlength="80">
+          <input data-f="query" placeholder="Look for (door slam)" maxlength="120">
+          <input data-f="at" type="number" min="0" step="0.05" placeholder="s into the shot" aria-label="Seconds into the shot">
+          <button class="btn small" data-add="${esc(s.id)}">Add</button></div></details>` : ""}
+        ${noteRows ? `<ul class="plain sound-notes">${noteRows}</ul>` : ""}
+        ${ctx.notes ? `<div class="row sound-note-new"><input data-note="${esc(s.id)}" maxlength="2000" placeholder="A note on the sound of ${esc(s.id)}" aria-label="Note on ${esc(s.id)}">
+          <button class="btn small" data-nadd="${esc(s.id)}">Add note</button></div>` : ""}
+      </section>`;
+    }).join("")}</div>`;
+  host.append(box);
+  const msg = /** @type {HTMLElement} */ (box.querySelector("#snd-msg"));
+  const m = /** @type {HTMLMediaElement | null} */ (box.querySelector("#snd-media"));
+  /** @type {number} */ let stopAt = -1;
+  if (m) m.addEventListener("timeupdate", () => { if (stopAt >= 0 && m.currentTime >= stopAt) { m.pause(); stopAt = -1; } });
+  const run = async (/** @type {HTMLButtonElement} */ btn, /** @type {() => Promise<string>} */ fn) => {
+    box.querySelectorAll("button, input").forEach((x) => { /** @type {HTMLButtonElement} */ (x).disabled = true; });
+    btn.textContent = "…"; msg.className = "msg small"; msg.textContent = "Saving and mixing again…";
+    try { msg.textContent = await fn(); } catch (err) { msg.className = "fail small"; msg.textContent = /** @type {Error} */ (err).message; }
+  };
+  const cue = (/** @type {string} */ id) => sb.shots.flatMap((/** @type {any} */ s) => s.cues).find((/** @type {any} */ c) => c.id === id);
+  box.querySelectorAll("button").forEach((el) => {
+    const bt = /** @type {HTMLButtonElement} */ (el), d = bt.dataset;
+    if (d.play) bt.onclick = () => { const s = sb.shots.find((/** @type {any} */ x) => x.id === d.play); if (!m || !s) return;
+      m.currentTime = s.t0; stopAt = s.t1; m.play().catch(() => {}); };
+    else if (d.pre) bt.onclick = () => sndPreview(/** @type {string} */ (d.pre));
+    else if (d.alt) bt.onclick = () => { const ul = /** @type {HTMLElement} */ (box.querySelector(`#alts-${CSS.escape(d.alt || "")}`)); ul.hidden = !ul.hidden; };
+    else if (d.use) bt.onclick = () => run(bt, () => ctx.edit("cue-set", { cue: d.use, entry: d.entry }, sb.plan_base));
+    else if (d.move) bt.onclick = () => { const c = cue(/** @type {string} */ (d.move));
+      run(bt, () => ctx.edit("cue-set", { cue: d.move, offset_f: ((c.anchor && c.anchor.offset_f) || 0) + Number(d.d) }, sb.plan_base)); };
+    else if (d.gain) bt.onclick = () => { const c = cue(/** @type {string} */ (d.gain));
+      run(bt, () => ctx.edit("cue-set", { cue: d.gain, gain_db: Number(c.gain_db) + Number(d.d) }, sb.plan_base)); };
+    else if (d.rm) bt.onclick = () => { if (confirm(`Remove ${cue(/** @type {string} */ (d.rm)).action}?`)) run(bt, () => ctx.edit("cue-rm", { cue: d.rm }, sb.plan_base)); };
+    else if (d.add) bt.onclick = () => { const row = /** @type {HTMLElement} */ (bt.parentElement);
+      const v = (/** @type {string} */ f) => /** @type {HTMLInputElement} */ (row.querySelector(`[data-f="${f}"]`)).value.trim();
+      if (!v("action") || !v("query")) { msg.className = "fail small"; msg.textContent = "Say what happens and what to look for."; return; }
+      run(bt, () => ctx.edit("cue-add", { shot: d.add, action: v("action"), query: v("query"), ...(v("at") ? { at: v("at") } : {}) }, sb.plan_base)); };
+    else if (d.nadd) bt.onclick = () => { const inp = /** @type {HTMLInputElement} */ (box.querySelector(`[data-note="${CSS.escape(d.nadd || "")}"]`));
+      if (!inp.value.trim()) return; run(bt, () => ctx.noteAdd(d.nadd, inp.value.trim())); };
+    else if (d.ndel) bt.onclick = () => run(bt, () => ctx.noteDel(d.shot, d.ndel));
+  });
+  box.querySelectorAll("input[data-on]").forEach((el) => { const i = /** @type {HTMLInputElement} */ (el);
+    i.onchange = () => run(/** @type {any} */ ({ set textContent(_x) {} }), () => ctx.edit("shot-set", { shot: i.dataset.on, on: i.checked ? "yes" : "no" }, sb.plan_base)); });
+  return { box, nNotes };
+}
+
+/** The job page: the Sound panel in the Mix tab of an AE film (edits through the job's actions). @param {HTMLElement} body */
+function editSound(body) {
+  const sb = RAIL.data.sound;
+  const can = canEdit("mix");
+  const ctx = { media: sb.video ? fileUrl(sb.video) : sb.mix ? fileUrl(sb.mix.url) : "", video: !!sb.video, cues: can, notes: can,
+    msg: RAIL.msg.sound || "",
+    /** @param {string} op @param {any} args @param {string} base */
+    edit: async (op, args, base) => { const x = await sendEdit("mix", op, args, base); RAIL.msg.sound = editMsg(x); DONE.drawn = {}; doneRefresh(true); return RAIL.msg.sound; },
+    /** @param {string} shot @param {string} text */
+    noteAdd: async (shot, text) => ctx.edit("sound-note-add", { shot, text }, sb.notes_base),
+    /** @param {string} shot @param {string} note */
+    noteDel: async (shot, note) => ctx.edit("sound-note-delete", { shot, note }, sb.notes_base) };
+  body.querySelectorAll("audio").forEach((x) => x.remove());          // the panel plays the film itself
+  const { nNotes } = soundPanel(body, sb, ctx);
+  approveBar(body, "mix", nNotes ? `${nNotes} sound note${nNotes === 1 ? "" : "s"} to send: Claude changes those shots' sounds, then you approve.` : "");
+  const bar = body.querySelector(".approve-bar"), r = pendingFor("mix");
+  const ask = bar && /** @type {HTMLElement | null} */ (bar.querySelector("#ask-changes"));
+  if (ask && r && nNotes) {                          // "Request changes…" becomes "Send N notes to Claude"
+    const send = document.createElement("button");
+    send.className = "btn"; send.id = "send-sound-notes";
+    send.textContent = `Send ${nNotes} note${nNotes === 1 ? "" : "s"} to Claude`;
+    send.onclick = async () => {
+      send.disabled = true;
+      const msg = /** @type {HTMLElement} */ (/** @type {HTMLElement} */ (bar).querySelector("#approve-msg"));
+      try { await post(`/reviews/${encodeURIComponent(r.id)}/decision`, { value: "revise", note: "" }); route(); }
+      catch (err) { msg.className = "fail small"; msg.textContent = /** @type {Error} */ (err).message; send.disabled = false; }
+    };
+    ask.replaceWith(send);
+  }
+}
+
+/** The film page of a finished AE film: the Sound panel with notes and "Send notes to Claude" (a fix job, target sound).
+ * @param {string} name */
+async function filmSound(name) {
+  const slot = document.getElementById("sound-slot");
+  if (!slot) return;
+  const path = `/films/${encodeURIComponent(name)}`;
+  let sb;
+  try { sb = await get(`${path}/sound`); } catch { slot.remove(); return; }
+  if (!sb) { slot.remove(); return; }
+  slot.innerHTML = "";
+  const again = async (/** @type {string} */ m) => { await filmSound(name); const x = document.getElementById("snd-msg"); if (x) x.textContent = m; return m; };
+  const can = MODE === "online";
+  const ctx = { media: sb.video ? `${API}${path}/video` : "", video: true, cues: false, notes: can,
+    edit: async () => "",
+    /** @param {string} shot @param {string} text */
+    noteAdd: async (shot, text) => { await post(`${path}/sound/notes`, { shot, text, base: sb.notes_base }); return again("Note saved."); },
+    /** @param {string} shot @param {string} note */
+    noteDel: async (shot, note) => { await send("DELETE", `${path}/sound/notes/${encodeURIComponent(shot)}/${encodeURIComponent(note)}?base=${sb.notes_base}`); return again("Note deleted."); } };
+  const { box, nNotes } = soundPanel(slot, sb, ctx);
+  box.classList.add("panel");
+  if (can && !(sb.notes && sb.notes.lot)) {
+    const row = document.createElement("div"); row.className = "row done-actions";
+    row.innerHTML = `<button class="primary" id="snd-fix" ${nNotes ? "" : "disabled"}>${nNotes ? `Send ${nNotes} note${nNotes === 1 ? "" : "s"} to Claude` : "Send notes to Claude"}</button>
+      <span class="muted small">Claude changes only the sounds of the shots with notes, mixes again and answers each note.</span>`;
+    box.append(row);
+    /** @type {HTMLElement} */ (row.querySelector("#snd-fix")).onclick = async (e) => {
+      const btn = /** @type {HTMLButtonElement} */ (e.currentTarget); btn.disabled = true;
+      try { const r = await post(`${path}/sound/fix`, {}); await again(`Sent: job ${r.job}.`); }
+      catch (err) { const x = document.getElementById("snd-msg"); if (x) { x.className = "fail small"; x.textContent = /** @type {Error} */ (err).message; } btn.disabled = false; }
+    };
+  }
 }
 
 // ---------- the Cast step of an After Effects film (specs/034) ----------
@@ -1778,6 +1953,7 @@ async function pageFilm(name) {
     : `<p class="notice">${f.rendering ? "The film is still rendering: see progress on the Jobs page." : "No film file yet."}</p>
       ${MODE === "online" && !f.rendering ? `<p class="film-actions"><button class="danger" id="del-film">Delete this film</button></p>` : ""}`}
     ${f.has_video ? `<div id="shots-slot"><div class="panel"><p class="section-title">Shots</p><p class="muted">Loading…</p></div></div>` : ""}
+    ${f.engine === "ae" ? `<div id="sound-slot"></div>` : ""}
     ${tiersHtml(f.tiers)}
     ${f.treatment_html ? `<h2>Script (TREATMENT)</h2><div class="panel md">${f.treatment_html}</div>` : ""}
     ${f.credits ? `<h2>Third-party assets (CREDITS)</h2><pre class="log">${esc(f.credits)}</pre>` : ""}</div>
@@ -1785,6 +1961,7 @@ async function pageFilm(name) {
   const acts = document.getElementById("film-actions"), side = document.getElementById("film-side");
   if (acts && side) side.appendChild(acts);
   if (f.has_video) filmShots(name, f);
+  if (f.engine === "ae") filmSound(name);
   const del = document.getElementById("del-film");
   if (del) del.onclick = async () => {
     if (!confirm("Delete this film for good?")) return;

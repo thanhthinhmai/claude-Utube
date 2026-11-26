@@ -12,7 +12,7 @@ from .store import StudioError
 STEPS = [("script", "Script"), ("voice", "Voice"), ("shots", "Shots"), ("mix", "Mix"), ("render", "Render"),
          ("selfcheck", "Self-check"), ("publish", "Publish")]
 ALLOWED = re.compile(r"^(SCRIPT\.md|SOURCES\.md|lines\.json|checks\.json|CHECKS\.md|voices/[lL]\d{2,4}\.wav|voices/dur\.json"
-                     r"|out/mix\.wav|\.check/review-r\d+\.json|\.check/labels\.json"
+                     r"|out/mix\.wav|out/render\.mp4|\.check/review-r\d+\.json|\.check/labels\.json"
                      r"|\.check/shots/(sheet|label-sheet)-\d+\.jpg|\.check/shots/S\d{2,4}(~[A-Za-z0-9._~-]+)?\.jpg"
                      r"|scenes\.json|mix\.json|publish/pack\.json|publish/thumbnail-[123]\.(png|jpg)"
                      r"|cast/sheets/[a-z0-9-]{1,32}(\.prev)?/([a-z0-9-]{1,40}\.jpg|walk\.mp4|sheet\.json)"

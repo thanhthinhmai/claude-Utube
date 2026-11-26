@@ -274,6 +274,27 @@ def loudness(text: str):
     return (num(i[-1]) if i else None), (num(pk[-1]) if pk else None)
 
 
+def merge_sound_replies(lib: Path, wf: Path, job_id: str) -> dict:
+    """Claude's answers (reply, done) on the notes of this job's lot, from the work copy into the customer's notes;
+    notes the customer wrote meanwhile stay as they are (specs/037)."""
+    from filmcheck import soundnotes
+    mine, theirs = soundnotes.load(lib), soundnotes.load(wf)
+    lot = set((mine.get("lot") or {}).get("notes") or []) if (mine.get("lot") or {}).get("job") == job_id else set()
+    answers = {n["id"]: n for _, n in soundnotes.all_notes(theirs)}
+    got = {"replied": 0, "unanswered": 0}
+    for _, n in soundnotes.all_notes(mine):
+        if n["id"] not in lot:
+            continue
+        a = answers.get(n["id"])
+        if a and a.get("reply"):
+            n.update(reply=a["reply"], done=bool(a.get("done")), updated=a.get("updated") or n.get("updated"))
+            got["replied"] += 1
+        else:
+            got["unanswered"] += 1
+    soundnotes._write(lib, mine)
+    return got
+
+
 def quality(runner, work: Path, film: str) -> dict:
     d = work / "films" / film
     mp4 = d / f"{film}.mp4"
@@ -447,6 +468,12 @@ class Worker:
         j = quotas.fail(job_id, error, by)
         if j.get("kind") == "fix" and (j.get("input") or {}).get("target") == "cast":
             pass                         # specs/034: the library is untouched
+        elif j.get("kind") == "fix" and (j.get("input") or {}).get("target") == "sound":
+            try:                         # specs/037: the Sound notes stay open and can be sent again
+                from filmcheck import soundnotes
+                soundnotes.end_lot(store.account_dir(j["owner"]) / "films" / (j.get("input") or {}).get("film", ""), job_id, error)
+            except Exception:            # noqa: BLE001
+                log.exception("job %s: end sound lot", job_id)
         elif j.get("kind") == "fix":     # specs/032: the notes are free again; the video and the notes stay as they were
             try:
                 from filmcheck import shotnotes
@@ -585,8 +612,9 @@ class Worker:
                         except OSError:
                             pass
                     return shutil.copy2(a, b)
-                shutil.copytree(src, dst, copy_function=link_or_copy,
-                                ignore=shutil.ignore_patterns("*.lock", ".shots", "out"))
+                skip = ("*.lock", ".shots") if inp.get("target") == "sound" else ("*.lock", ".shots", "out")
+                shutil.copytree(src, dst, copy_function=link_or_copy,       # 037: a sound fix remixes onto out/render.mp4
+                                ignore=shutil.ignore_patterns(*skip))
             return {}, None
         if j["kind"] != "learn":
             old = inp.get("revise_of")
@@ -765,6 +793,8 @@ class Worker:
         inp = j.get("input") or {}
         if inp.get("target") == "cast":
             return self.finish_cast_fix(j, work, rep, result, rc)
+        if inp.get("target") == "sound":
+            return self.finish_sound_fix(j, work, rep, result, rc)
         film = inp.get("film")
         lib, wf = store.account_dir(j["owner"]) / "films" / film, work / "films" / film
         if rep.get("done") is False or not rep.get("done"):
@@ -795,6 +825,41 @@ class Worker:
         self.notify(j, "job_done")
         shutil.rmtree(work, ignore_errors=True)
         log.info("job %s done (fix)", j["id"])
+
+    def finish_sound_fix(self, j: dict, work: Path, rep: dict, result: dict, rc: int) -> None:
+        """Sound notes answered (specs/037 T047): the plan, the cache, the mix, the remuxed film and CREDITS go back to the
+        customer's film, then Claude's answers on the lot's notes. Failed: nothing changes, the notes stay open."""
+        from filmcheck import soundnotes
+        film = (j.get("input") or {}).get("film")
+        lib, wf = store.account_dir(j["owner"]) / "films" / film, work / "films" / film
+        if not rep.get("done"):
+            self.failed(j["id"], rep.get("error") or result.get("error") or f"The sound fix stopped without finishing (exit code {rc}).",
+                        rep.get("by", "studio"))
+            return
+        try:
+            got = merge_sound_replies(lib, wf, j["id"])
+            for rel in ("sound/plan.json", "out/mix.wav", "out/audio.m4a", "CREDITS"):
+                if (wf / rel).is_file():
+                    (lib / rel).parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(wf / rel, lib / rel)
+            if (wf / "sound" / "cache").is_dir():
+                shutil.copytree(wf / "sound" / "cache", lib / "sound" / "cache", dirs_exist_ok=True)
+            for rel in ("out/render.mp4", f"{film}.mp4"):         # new files (the remux replaced the hard links)
+                if (wf / rel).is_file():
+                    tmp = (lib / rel).with_name((lib / rel).name + ".new")
+                    shutil.copy2(wf / rel, tmp)
+                    os.replace(tmp, lib / rel)
+            soundnotes.end_lot(lib, j["id"])
+        except Exception as e:      # noqa: BLE001 - the old sound stays
+            log.exception("job %s: sound fix result", j["id"])
+            self.failed(j["id"], f"The new sound could not be put in place: {e}")
+            return
+        jobs.update(j["id"], lambda x: x["log"].append(jobs._line(f"{got['replied']} sound notes answered"
+                                                                  + (f", {got['unanswered']} without an answer" if got["unanswered"] else ""))))
+        j = jobs.finish(j["id"], "done", links={"film": film})
+        self.notify(j, "job_done")
+        shutil.rmtree(work, ignore_errors=True)
+        log.info("job %s done (sound fix)", j["id"])
 
     def finish_cast_fix(self, j: dict, work: Path, rep: dict, result: dict, rc: int) -> None:
         """A library character redrawn (specs/034 US4): the sheet goes to v<n>.preview/ (a newer rig) or to a new version

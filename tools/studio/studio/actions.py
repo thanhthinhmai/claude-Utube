@@ -13,7 +13,7 @@ from . import jobs, store
 from .store import StudioError
 
 OPS = {"script": ("script-para",), "cast": ("cast-approve", "cast-voice", "cast-save", "cast-note-add", "cast-note-edit", "cast-note-delete", "cast-view-toggle"), "voice": ("voice-say", "voice-remake", "voice-tone", "voice-set", "voice-speaker"),
-       "shots": ("shot", "shots-check", "except", "accept-style"), "mix": ("mix",), "publish": ("publish",)}
+       "shots": ("shot", "shots-check", "except", "accept-style"), "mix": ("mix", "cue-set", "cue-rm", "cue-add", "shot-set", "sound-note-add", "sound-note-delete"), "publish": ("publish",)}
 STATUS = ("queued", "running", "done", "failed", "invalid", "conflict", "busy")
 BY_CODE = {0: "done", 1: "done", 2: "invalid", 4: "conflict", 5: "busy"}
 PER_MINUTE = 30

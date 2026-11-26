@@ -1,6 +1,7 @@
 """GET /jobs/{id}/steps (specs/026 contracts/api.md): the step rail, the review points, what a change makes run again,
 and the choices the edit panels may offer (catalogue of the film's kit, voices, mix ranges). Read only."""
 import json
+import time
 import zipfile
 from pathlib import Path
 
@@ -181,6 +182,75 @@ def cast_block(d: Path):
             "fingerprint": cast.fingerprint(d), "skip": points.cast_skip_reason(d)}
 
 
+def _sound_meta(d: Path) -> dict:
+    """Names and credits of the sounds the film has seen (sound/cache/index.json + alts.json): text only, no paths."""
+    out = {}
+    for f in ("alts.json", "index.json"):
+        doc = store.read_json(d / "sound" / "cache" / f)
+        if isinstance(doc, dict):
+            out.update({k: v for k, v in doc.items() if isinstance(v, dict)})
+    return out
+
+
+def sound_block(d: Path, scope: str = "all"):
+    """The Sound panel of an AE film (specs/037 contracts/api.md); None for a page film. Shots with their sounds (each with
+    its name, credit and up to 7 other choices), silences, the sound switch, notes and the bases the edits send."""
+    from filmcheck import points, soundnotes, soundplan
+    try:
+        if not points.is_ae(d):
+            return None
+    except Exception:                             # noqa: BLE001 — no film.json: not an AE film
+        return None
+    mix, video = d / "out" / "mix.wav", d / "out" / "render.mp4"
+    out = {"mix": {"url": "out/mix.wav", "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(mix.stat().st_mtime))} if mix.is_file() else None,
+           "video": "out/render.mp4" if video.is_file() else None, "scope": scope, "shots": [], "missing": 0,
+           "dropped": 0, "notes": None, "notes_base": None, "plan_base": None, "error": None, "library": None}
+    try:
+        from filmcheck import soundlib
+        st = soundlib.status()
+        n = sum(st["by_source"].values()) if scope == "all" else st["by_source"].get("freesound", 0)
+        out["library"] = {"ready": n > 0, "entries": n}
+    except Exception:                             # noqa: BLE001 — no library on this machine yet
+        out["library"] = {"ready": False, "entries": 0}
+    try:
+        out["notes"], out["notes_base"] = soundnotes.load(d), soundnotes.base(d)
+    except soundnotes.SoundNoteError as e:
+        out["error"] = e.message
+    try:
+        plan = soundplan.resolve(d)
+    except soundplan.PlanError as e:
+        out["error"] = e.message
+        return out
+    except Exception as e:                        # noqa: BLE001 — no timing: the panel says why
+        out["error"] = f"the sound plan cannot be read yet: {e}"[:300]
+        return out
+    meta = _sound_meta(d)
+
+    def about(eid):
+        m = meta.get(eid) or {}
+        return {"id": eid, "name": m.get("name") or eid, "credit": m.get("credit"), "source": m.get("source"),
+                "duration": m.get("duration")}
+    off = set(plan.get("off") or [])
+    open_n = soundnotes.open_counts(d) if out["notes"] is not None else {}
+    for sid in plan["shots"]:
+        cues = []
+        for c in plan["cues"]:
+            if c["shot"] != sid:
+                continue
+            row = {k: c.get(k) for k in ("id", "action", "anchor", "query", "entry", "at", "len_s", "gain_db", "cut",
+                                         "fade_s", "by", "state", "why")}
+            row["sound"] = about(c["entry"]) if c.get("entry") else None
+            row["alts"] = [about(a) for a in (c.get("alts") or [])][:7]
+            cues.append(row)
+        out["shots"].append({"id": sid, "t0": round(plan["t0"][sid], 3), "t1": round(plan["t1"][sid], 3), "on": sid not in off,
+                             "cues": cues, "silences": [s for s in plan["silences"] if s["shot"] == sid],
+                             "notes_open": open_n.get(sid, 0)})
+    states = [c["state"] for c in plan["cues"]]
+    out.update(missing=states.count("missing"), dropped=states.count("dropped"), plan_base=plan["base"],
+               length=round(plan["length"], 3), timing_source=plan.get("timing_source"))
+    return out
+
+
 def pending_review(j: dict):
     for rid in reversed(j.get("review_ids") or []):
         try:
@@ -190,6 +260,18 @@ def pending_review(j: dict):
         if r["kind"] in reviews.POINT_KINDS:
             return {"id": r["id"], "kind": r["kind"], "decision": r["decision"]}
     return None
+
+
+def sound_scope(j: dict) -> str:
+    """specs/037 FR-013a: Sonniss sounds for the studio owner's films; a customer's job sees CC0 sounds only."""
+    if store.mode() != "online":
+        return "all"
+    try:
+        from . import accounts
+        a = accounts.get(j.get("owner") or "")
+        return "all" if a and a["role"] == "admin" else "cc0"
+    except Exception:                             # noqa: BLE001
+        return "cc0"
 
 
 def view(j: dict) -> dict:
@@ -209,7 +291,8 @@ def view(j: dict) -> dict:
             "editable": {"shots": cat is not None,
                          "reason": None if cat is not None else ("no scene table" if has_kit else "style has no kit")},
             "catalog": cat, "voices": voices() + [v["id"] for v in el_voices()], "voice_rows": voice_rows(),
-            "voice_cost": voice_cost(d), "speakers": speaker_rows(d), "emotions": emotions(d), "narrator_voice": narrator_now(d), "mix_ranges": mix_ranges(d), "review": rv, "cast": cast_block(d)}
+            "voice_cost": voice_cost(d), "speakers": speaker_rows(d), "emotions": emotions(d), "narrator_voice": narrator_now(d), "mix_ranges": mix_ranges(d), "review": rv, "cast": cast_block(d),
+            "sound": sound_block(d, sound_scope(j))}
 
 
 def etag(v: dict) -> str:

@@ -129,9 +129,11 @@ def remux(d: Path) -> dict:
         if p.returncode == 0:
             os.replace(tmp, render)
             final = d / f"{d.name}.mp4"
-            if final.is_file():
+            if final.is_file():                  # a new file, never written in place: a fix job's copy is a hard link
                 import shutil
-                shutil.copyfile(render, final)
+                part = final.with_name(final.name + ".part")
+                shutil.copyfile(render, part)
+                os.replace(part, final)
             out["muxed"] = True
         else:
             out["muxed"] = False

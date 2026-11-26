@@ -32,6 +32,10 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 | `POST /films/{name}/notes/images` multipart `file` | `201 {file}`: ảnh PNG/JPEG/WebP ≤ 10 MB cho ghi chú (029; cũng nhận `multipart/form-data` có `X-Studio: 1`) | `413 too_large` · `415 bad_image` · `403 forbidden` · `404` |
 | `GET /films/{name}/notes/images/{file}` | ảnh đính kèm, `file` dạng `img-<12 hex>.(png\|jpg\|webp)` (029) | `400 bad_name` · `404` |
 | `POST /films/{name}/fix` body `{}` | `201 {job, notes, left}`: việc `fix` "Fix with Claude" trên ≤ 10 ghi chú mở theo thứ tự trong phim (specs/032, chỉ trong app); `GET /films/{name}` của phim AE có thêm `engine`, `lot`, `ae_ready`, `ae_message` | `422 not_ae` · `422 no_open_notes` · `409 in_progress` · `409 ae_unavailable` · `409 ae_missing` · `409 app_only` (chế độ local) |
+| `GET /films/{name}/sound` | khối Sound của phim AE: `{mix, video, shots: [{id, t0, t1, on, cues, notes_open}], notes, notes_base, plan_base, …}` (specs/037) | `422 not_ae` · `404` |
+| `POST /films/{name}/sound/notes` body `{shot, text, base?}` | `201 {note, notes_base}`: ghi chú Sound trên một shot (037) | `409 changed` · `422 bad_shot` · `422 bad_text` · `404` |
+| `DELETE /films/{name}/sound/notes/{shot}/{note}?base=` | `{notes_base}` (037) | `409 changed` · `422 no_note` · `404` |
+| `POST /films/{name}/sound/fix` body `{}` | `201 {job, notes}`: việc `fix` `target: sound` trên các ghi chú Sound mở (037, chỉ trong app) | `422 no_notes` · `409 busy` · `409 app_only` · `422 not_ae` · `404` |
 | `GET /films/{name}/poster` | `image/jpeg` | `404` |
 | `GET /films/{name}/subtitles.vtt` | WebVTT (chuyển từ `.srt`) | `404` |
 | `GET /films/{name}/publish` | gói đăng: `{titles, description, subtitles, files, check}` (specs/011) | `404` |

@@ -43,6 +43,12 @@ class NotesIn(BaseModel):                      # specs/029 contracts/api.md
     doc: dict
 
 
+class SoundNoteIn(BaseModel):                  # specs/037 US3: a Sound note on a finished AE film
+    shot: str = Field(pattern=r"^S\d{1,3}$")
+    text: str = Field(min_length=1, max_length=2000)
+    base: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{16}$")
+
+
 WRITE_ROLES = {"customer", "admin"}            # a token limited to reading (any other role) may not change notes
 
 
@@ -462,6 +468,78 @@ def create_app() -> FastAPI:
             shotnotes.end_lot(d, j["id"])
             raise
         return {"job": j["id"], "notes": lot["lot"]["notes"], "left": lot["left"]}
+
+    def _sound_film(name: str):
+        d = resources.film_dir(name)
+        if not d.is_dir():
+            raise StudioError("not_found", f"không có phim \"{name}\"", 404)
+        from ae import film as aefilm
+        if aefilm.engine(d) != "ae":
+            raise StudioError("not_ae", "only After Effects films have Sound notes", 422)
+        return d
+
+    def _sound_note_call(fn, *a, **kw):
+        from filmcheck import soundnotes
+        try:
+            return fn(*a, **kw)
+        except soundnotes.SoundNoteError as e:
+            raise StudioError(e.code, e.message, 409 if e.code == "changed" else 422) from None
+
+    @app.get(api + "/films/{name}/sound")
+    def film_sound(name: str, request: Request):
+        """The Sound panel of a finished AE film (the same block as a job's steps, specs/037)."""
+        d = _sound_film(name)
+        a = getattr(request.state, "account", None)
+        return filmsteps.sound_block(d, "all" if (a is None or a["role"] == "admin") else "cc0")
+
+    @app.post(api + "/films/{name}/sound/notes", status_code=201)
+    def film_sound_note(name: str, body: SoundNoteIn, request: Request):
+        from filmcheck import soundnotes
+        by = _note_writer(request)
+        d = _sound_film(name)
+        n = _sound_note_call(soundnotes.add, d, body.shot, body.text, by, body.base)
+        return {"note": n, "notes_base": soundnotes.base(d)}
+
+    @app.delete(api + "/films/{name}/sound/notes/{shot}/{note}")
+    def film_sound_note_delete(name: str, shot: str, note: str, request: Request, base: Optional[str] = None):
+        from filmcheck import soundnotes
+        _note_writer(request)
+        d = _sound_film(name)
+        _sound_note_call(soundnotes.delete, d, shot, note, base)
+        return {"notes_base": soundnotes.base(d)}
+
+    @app.post(api + "/films/{name}/sound/fix", status_code=201)
+    def film_sound_fix(name: str, request: Request):
+        """"Send notes to Claude" on a finished AE film's Sound notes (specs/037 US3): a fix job, target "sound"."""
+        _note_writer(request)
+        d = resources.film_dir(name)
+        if not d.is_dir():
+            raise StudioError("not_found", f"không có phim \"{name}\"", 404)
+        from ae import film as aefilm
+        from filmcheck import soundnotes
+        if aefilm.engine(d) != "ae":
+            raise StudioError("not_ae", "only After Effects films have Sound notes", 422)
+        if not online:
+            raise StudioError("app_only", "Send notes to Claude runs in the app (sh bin/studio app start)", 409)
+        try:
+            doc = soundnotes.load(d)
+        except soundnotes.SoundNoteError as e:
+            raise StudioError(e.code, e.message, 422) from None
+        if doc.get("lot") and jobs.is_live(doc["lot"].get("job")):
+            raise StudioError("busy", "Claude is already working on this film's Sound notes", 409)
+        if not soundnotes.open_counts(d):
+            raise StudioError("no_notes", "there are no open Sound notes to send", 422)
+        a = request.state.account
+        j = jobs.build("fix", f"Sound notes of {name}"[:80], {"film": name}, owner=a["id"], status="queued",
+                       extra={"charged": False})
+        lot = soundnotes.start_lot(d, j["id"])
+        j["input"] = {"kind": "fix", "target": "sound", "film": name, "notes": lot["notes"]}
+        try:
+            store.doc_put("job", j["id"], j)
+        except Exception:
+            soundnotes.end_lot(d, j["id"], "the job could not be created")
+            raise
+        return {"job": j["id"], "notes": lot["notes"]}
 
     @app.get(api + "/films/{name}/notes")
     def film_notes(name: str):

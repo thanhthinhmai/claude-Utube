@@ -14,12 +14,21 @@
 - Picture-matched CC0 scoring of learn sfx: ~1.5/9; voice-check 3/5. SC-003 (5/5) not met, written in R8 and quickstart;
   the user chose direction A (Claude picks sounds by the picture; the user reviews per shot).
 
+## Sound review before 035 (branch `037-sound-review`, worktree `~/claude-Utube-037b`, from 037-sound-per-shot)
+- `soundnotes.py` + `sound notes …`; edit ops `cue-set|cue-rm|cue-add|shot-set|sound-note-add|sound-note-delete`;
+  `sound` block in steps; Sound panel (Mix tab + film page); `/films/{film}/sound…` routes; fix job target sound
+  (agent prompt, worker finish/merge); soundmix writes `<film>.mp4` via temp file (hard link trap, T057).
+- Tests: `tests/filmcheck/test_soundnotes.py`, `tests/ui/test_sound_api.py` + `browser_sound.cjs`,
+  `tests/online/test_sound_fix_job.py`. Tasks T041–T045, T047, T057 [X]; T046 partly; T056 (after 035) added.
+
 ## Next
 1. PR #46 open (all 8 suites passed at 2ece081). Never merge it.
-2. ⟂035 tasks (T028–T031, T041–T048) wait for 035 to merge, then rebase.
+2. ⟂035: T028–T031, T046 rest, T048, T056 wait for 035 to merge; then rebase 037-sound-review and wire the animatic gate.
 3. /speckit-converge.
 
 ## Traps
+- A fix job's work copy hard-links the customer's `.mp4` files: never write them in place.
+- Test AE films need `ae/shots.jsx` or `points.is_ae` is False (film.json fails to load).
 - `sound … --dir` is the film folder itself, not its parent.
 - `sound mix` remuxes `out/render.mp4` and `<film>.mp4`: back them up on a real film first.
 - AAC adds ~1 dB true peak over the WAV: hence the −2.5 dBTP ceiling.
