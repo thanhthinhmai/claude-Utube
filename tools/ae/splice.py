@@ -133,3 +133,69 @@ def by_shot(segments: list, out) -> dict:
     if r.returncode:
         raise SpliceError(f"ffmpeg failed: {r.stderr.strip()[-400:]}")
     return {"out": str(out), "shots": [s for s, _ in segments]}
+
+
+def assemble(segments: list, out, fps: int, size, transitions: dict = None, crf: int = 18) -> dict:
+    """specs/038 T016: a mixed film's picture from shot pieces of either engine, frame-exact, in one encode.
+
+    segments: [{"shot", "clip", "start" (seconds into the clip), "frames"}] in film order (AE shots point into the
+    MASTER at their offset, Blender shots into their own S<n>.mp4 at 0). Each piece gives exactly `frames` frames
+    (a short clip holds its last frame). transitions: {shot: "cut"|"fade"|"dip"}, how that shot is entered:
+    dip fades the end of the shot before it to black and the shot in from black; fade dissolves from the last frame of
+    the shot before it. Neither changes a shot's length, so every shot keeps its timing.json frames."""
+    if not segments:
+        raise SpliceError("nothing to assemble")
+    transitions = transitions or {}
+    w, h = int(size[0]), int(size[1])
+    ft = str(int(fps)) if float(fps).is_integer() else str(fps)
+    td = max(2, round(0.4 * float(fps)))                # transition frames
+    clips, parts = {}, []
+    for i, s in enumerate(segments):
+        if not Path(s["clip"]).is_file():
+            raise SpliceError(f"{s['shot']}: clip not found {s['clip']}")
+        ci = clips.setdefault(str(s["clip"]), len(clips))
+        n = int(s["frames"])
+        off = round(float(s.get("start") or 0) * float(fps))
+        chain = (f"[{ci}:v]scale={w}:{h},fps={ft},setsar=1,format=yuv420p,tpad=stop_mode=clone:stop_duration=10,"
+                 f"trim=start_frame={off}:end_frame={off + n},setpts=N/({ft})/TB")
+        nxt = transitions.get(segments[i + 1]["shot"]) if i + 1 < len(segments) else None
+        here = transitions.get(s["shot"]) if i else None
+        k = min(td, max(1, n // 3))
+        if here == "dip":
+            chain += f",fade=t=in:st=0:d={k / float(fps):.4f}"
+        if nxt == "dip":
+            chain += f",fade=t=out:st={(n - k) / float(fps):.4f}:d={k / float(fps):.4f}"
+        parts.append(chain + f"[p{i}]")
+    cur = "p0"
+    total = int(segments[0]["frames"])
+    for i in range(1, len(segments)):
+        n = int(segments[i]["frames"])
+        lab = f"j{i}"
+        if transitions.get(segments[i]["shot"]) == "fade":
+            k = min(td, max(1, n // 3))
+            # the shot before holds its last frame k frames longer and B dissolves over it: xfade's output is
+            # (total + k) + n - k frames, so the film keeps the sum of the shots and B starts on its own frame
+            parts.append(f"[{cur}]tpad=stop_mode=clone:stop={k},fps={ft},settb=1/{ft}[h{i}]")
+            parts.append(f"[p{i}]fps={ft},settb=1/{ft}[q{i}]")
+            parts.append(f"[h{i}][q{i}]xfade=transition=fade:duration={k / float(fps):.4f}:offset={total / float(fps):.4f}"
+                         f"[{lab}]")
+        else:
+            parts.append(f"[{cur}][p{i}]concat=n=2:v=1:a=0,fps={ft}[{lab}]")
+        cur, total = lab, total + n
+    parts.append(f"[{cur}]fps={ft},setpts=N/({ft})/TB[v]")
+    cmd = ["ffmpeg", "-v", "error", "-y"]
+    for c in clips:
+        cmd += ["-i", c]
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    cmd += ["-filter_complex", ";".join(parts), "-map", "[v]", "-frames:v", str(total), "-an", "-c:v", "libx264",
+            "-crf", str(crf), "-preset", "veryfast", "-pix_fmt", "yuv420p", "-r", ft, str(out)]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode:
+        raise SpliceError(f"ffmpeg failed: {r.stderr.strip()[-400:]}")
+    marks, t = [], 0
+    for s in segments:
+        n = int(s["frames"])
+        marks.append([round(t / float(fps), 4), round((t + n) / float(fps), 4), s.get("set") or "", s["shot"]])
+        t += n
+    return {"out": str(out), "frames": total, "duration": round(total / float(fps), 4), "marks": marks}

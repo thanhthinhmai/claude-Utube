@@ -18,6 +18,11 @@ ENV = ("STUDIO_BLENDER_FAKE", "STUDIO_BLENDER_WORK", "FAKE_BLENDER_MODE", "FAKE_
        "STUDIO_BLENDER_SHOT_TIMEOUT", "STUDIO_BLENDER_START_TIMEOUT", "STUDIO_BLENDER_CONFIG")
 
 
+def req(film, shots, quarter=False):
+    return {"kind": "render", "film": film.name, "fps": 24, "size": [320, 180], "quarter": quarter,
+            "shots": [{"id": i, "frames": n, "script": f"blender/{i}.py"} for i, n in shots]}
+
+
 def frames_of(mp4: str) -> int:
     r = subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries",
                         "stream=nb_read_frames", "-of", "csv=p=0", mp4], capture_output=True, text=True)
@@ -45,7 +50,7 @@ class LocalRun(unittest.TestCase):
                 os.environ[k] = v
 
     def build(self, **kw):
-        return local.build(self.film, [{"id": "S2", "frames": 12}], 24, (320, 180), **kw)
+        return local.build(self.film, req(self.film, [("S2", 12)], **kw))
 
     def test_mp4_has_every_frame(self):
         out = self.build()
@@ -104,7 +109,7 @@ class LocalRun(unittest.TestCase):
 
     def test_missing_script_is_bad_plan(self):
         with self.assertRaises(BlenderError) as e:
-            local.build(self.film, [{"id": "S9", "frames": 4}], 24, (320, 180))
+            local.build(self.film, req(self.film, [("S9", 4)]))
         self.assertEqual(e.exception.code, "bad_plan")
 
     def test_quarter_size(self):
@@ -116,7 +121,7 @@ class LocalRun(unittest.TestCase):
 
     def test_progress_counts_frames(self):
         seen = []
-        self.build(progress=seen.append)
+        local.build(self.film, req(self.film, [("S2", 12)]), progress=seen.append)
         self.assertTrue(seen)
         self.assertEqual(seen[-1]["frames"], 12)
 

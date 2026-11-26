@@ -80,6 +80,7 @@ def stage(s: dict, film_dir: Path, req: dict) -> Path:
     log = run / "log.txt"
     if log.exists():
         log.unlink()
+    req["id"] = run.name
     (run / "request.json").write_text(json.dumps(req, indent=1))
     return run
 
@@ -148,23 +149,17 @@ def pack(frames_dir: Path, fps: int, out: Path) -> Path:
     return out
 
 
-def build(film_dir, shots: list, fps: int, size, kind: str = "render", quarter: bool = False, plans: dict = None,
-          progress=None, s: dict = None) -> dict:
-    """shots: [{"id": "S3", "frames": 72, "still": None}]. Returns {"run", "log", "gpu", "version", "shots": {id: path}}."""
+def build(film_dir, req: dict, progress=None, s: dict = None) -> dict:
+    """req: bundle.request(…) (contracts/bridge-api.md). Returns {"run", "log", "gpu", "version", "shots": {id: path}}."""
     d = Path(film_dir)
     s = s or config.settings()
     config.check(s)
-    for sh in shots:
+    for sh in req["shots"]:
         if not SHOT_ID.match(sh["id"]):
             raise BlenderError("bad_plan", f"bad shot id {sh['id']!r}")
-    req = {"kind": kind, "film": d.name, "fps": int(fps), "size": list(size), "quarter": bool(quarter),
-           "shots": [{"id": sh["id"], "frames": int(sh["frames"]), "script": f"blender/{sh['id']}.py",
-                      **({"layers": f"layers/{sh['id']}"} if (d / "layers" / sh["id"]).is_dir() else {}),
-                      **({"still": int(sh["still"])} if sh.get("still") else {}),
-                      **({"plan": (plans or {}).get(sh["id"])} if (plans or {}).get(sh["id"]) else {})}
-                     for sh in shots]}
+    kind, quarter, fps = req["kind"], bool(req.get("quarter")), int(req["fps"])
+    shots = req["shots"]
     run = stage(s, d, req)
-    req["id"] = run.name
     entry, reqp = run / "kit" / "entry.py", run / "request.json"
     argv = s["argv"] + ["-b", "--factory-startup", "--python-exit-code", "1",
                         "-P", config.host_path(s, entry) if s["kind"] != "fake" else str(entry),

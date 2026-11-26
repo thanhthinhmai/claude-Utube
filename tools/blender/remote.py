@@ -90,14 +90,9 @@ def _download(rid: str, name: str, dest: Path) -> Path:
     return dest
 
 
-def build(film_dir, shots: list, fps: int, size, kind: str = "render", quarter: bool = False, plans: dict = None,
-          progress=None) -> dict:
+def build(film_dir, req: dict, progress=None) -> dict:
     d = Path(film_dir)
-    req = {"kind": kind, "film": d.name, "fps": int(fps), "size": list(size), "quarter": bool(quarter),
-           "shots": [{"id": sh["id"], "frames": int(sh["frames"]), "script": f"blender/{sh['id']}.py",
-                      **({"layers": f"layers/{sh['id']}"} if (d / "layers" / sh["id"]).is_dir() else {}),
-                      **({"plan": (plans or {}).get(sh["id"])} if (plans or {}).get(sh["id"]) else {})}
-                     for sh in shots]}
+    kind, quarter, fps = req["kind"], bool(req.get("quarter")), int(req["fps"])
     rid = submit(d.name, [s["id"] for s in req["shots"]], kind, bundle(d, req))
     print(f"Blender request {rid}: waiting for the desktop app", flush=True)
     last, st = None, {}

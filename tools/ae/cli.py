@@ -15,6 +15,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 
 from ae import film as filmdoc, local, rigs, sheet, splice, uses  # noqa: E402
+from blender.config import BlenderError  # noqa: E402
 
 ROOT = Path(os.environ.get("STUDIO_ROOT") or HERE.parents[1])
 
@@ -48,18 +49,26 @@ def film_dirs(name: str, folder=None) -> tuple:
 
 
 def runner():
-    if in_job():
-        from ae import remote
-        return remote.build
-    return local.build
+    """specs/038: mixed.build sends AE shots to the AE runner (bridge in a job, else this machine) and Blender shots to
+    Blender; a film without Blender shots goes to the AE runner unchanged."""
+    from ae import mixed
+    return mixed.build
 
 
 def progress(p: dict) -> None:
+    if "frames" in p:                                  # Blender: frames drawn of the run (a line every 24)
+        if p.get("frame", 0) % 24 and p.get("frame") != p.get("frames"):
+            return
+        print(f"… blender {p.get('shot')} frame {p.get('frame')}/{p.get('frames')}", flush=True)
+        return
     print(f"… {p.get('shot')} ({p.get('index')}/{p.get('total')})", flush=True)
 
 
-def do_build(code: Path, shots, draft: bool = False) -> dict:
-    r = runner()(code, shots, progress=progress, draft=draft) if draft else runner()(code, shots, progress=progress)
+def do_build(code: Path, shots, draft: bool = False, plain: bool = False) -> dict:
+    """plain: AE only (ae fix builds Blender shots itself)."""
+    from ae import mixed
+    run = mixed.ae_runner() if plain else runner()
+    r = run(code, shots, progress=progress, draft=draft) if draft else run(code, shots, progress=progress)
     for c in r["checks"]:
         print(c)
     remember_timing(code, r)
@@ -80,6 +89,12 @@ def remember_timing(code: Path, r: dict) -> None:
 
 
 def fail(e) -> int:
+    from blender.config import BlenderError
+    if isinstance(e, BlenderError):
+        print(f"✗ blender {e.code}: {e.message}", file=sys.stderr)
+        if e.log_tail:
+            print(e.log_tail, file=sys.stderr)
+        return 2 if e.code == "bad_plan" else e.exit_code()
     if isinstance(e, filmdoc.FilmError):
         print(f"✗ {e.message}", file=sys.stderr)
         return 2
@@ -100,16 +115,24 @@ def cmd_build(a) -> int:
         doc = filmdoc.require_ae(code)
         shots = filmdoc.pick_shots(doc, a.shots.split(",") if a.shots else None)
         r = do_build(code, shots)
-    except (filmdoc.FilmError, local.AeError) as e:
+    except (filmdoc.FilmError, local.AeError, splice.SpliceError, BlenderError) as e:
         return fail(e)
     out = code / "out"
     out.mkdir(exist_ok=True)
     shutil.copyfile(r["master"], out / "build.mp4")
-    (out / "build-shots.json").write_text(json.dumps({"version": 1, "video": "build.mp4", "duration": r["duration"],
-                                                      "fps": doc["fps"], "source": "ae", "shots": r["marks"]}))
+    (out / "build-shots.json").write_text(json.dumps(marks_doc(r, "build.mp4", doc)))
     print(f"✓ built {', '.join(shots)} · {r['duration']:.2f} s → {out / 'build.mp4'}"
           + (f" · {len(r['checks'])} CHECK" if r["checks"] else ""))
     return 1 if r["checks"] else 0
+
+
+def marks_doc(r: dict, video: str, doc: dict) -> dict:
+    """build-shots.json / render-shots.json: source "ae", or "mixed" with engines {shot: {engine, version, gpu}}."""
+    m = {"version": 1, "video": video, "duration": r["duration"], "fps": doc["fps"], "source": r.get("source", "ae"),
+         "shots": r["marks"]}
+    if r.get("engines"):
+        m["engines"] = r["engines"]
+    return m
 
 
 def _mux(master: Path, audio, out: Path) -> None:
@@ -129,7 +152,7 @@ def cmd_draft(a) -> int:
         doc = filmdoc.require_ae(code)
         shots = filmdoc.pick_shots(doc, a.shots.split(",")) if a.shots else None
         info = draft.make(code, shots, build=runner(), progress=progress)
-    except (filmdoc.FilmError, local.AeError, splice.SpliceError) as e:
+    except (filmdoc.FilmError, local.AeError, splice.SpliceError, BlenderError) as e:
         return fail(e)
     except draft.DraftError as e:
         print(f"✗ {e.message}", file=sys.stderr)
@@ -157,7 +180,7 @@ def cmd_render(a) -> int:
     try:
         doc = filmdoc.require_ae(code)
         r = do_build(code, None)
-    except (filmdoc.FilmError, local.AeError) as e:
+    except (filmdoc.FilmError, local.AeError, splice.SpliceError, BlenderError) as e:
         return fail(e)
     audio = (code / doc["audio"]) if doc.get("audio") else None
     if audio is not None and not audio.is_file():
@@ -167,8 +190,7 @@ def cmd_render(a) -> int:
     out.mkdir(exist_ok=True)
     full = out / "render.mp4"
     _mux(Path(r["master"]), audio, full)
-    marks = {"version": 1, "video": f"{code.name}.mp4", "duration": r["duration"], "fps": doc["fps"], "source": "ae",
-             "shots": r["marks"]}
+    marks = marks_doc(r, f"{code.name}.mp4", doc)
     (out / "render-shots.json").write_text(json.dumps(marks))
     if in_job():
         shutil.copyfile(full, code / f"{code.name}.mp4")
@@ -190,7 +212,8 @@ def cmd_fix(a) -> int:
             print(f"✗ the film has no video and shots.json yet ({video}); run sh bin/studio ae render {a.film}", file=sys.stderr)
             return 2
         marks = json.loads(marks_file.read_text(encoding="utf-8"))
-        r = do_build(code, shots)
+        from ae import mixed
+        pieces, r = mixed.fix_pieces(code, doc, shots, lambda c, s: do_build(c, s, plain=True), progress=progress)
         film_len = {m[3]: m[1] - m[0] for m in marks["shots"]}
         for m in r["marks"]:
             if m[3] in film_len and abs((m[1] - m[0]) - film_len[m[3]]) > 0.5 / doc["fps"]:
@@ -198,9 +221,17 @@ def cmd_fix(a) -> int:
                       "(cut, or the last frame held); timing of the film is unchanged")
         out = code / "out"
         out.mkdir(exist_ok=True)
-        res = splice.splice(cur, marks["shots"], splice.pieces_from_master(r["master"], r["marks"], shots), out / "fix.mp4")
+        res = splice.splice(cur, marks["shots"], pieces, out / "fix.mp4")
+        bl = filmdoc.blender_shots(doc, shots)
+        if bl:
+            st = mixed.load_state(code, False)
+            marks["source"] = "mixed"
+            eng = marks.setdefault("engines", {})
+            for s in shots:
+                eng[s] = ({"engine": "blender", "version": st[s]["version"], "gpu": st[s].get("gpu", "")} if s in bl
+                          else {"engine": "ae", "version": mixed.ae_version(code)})
         (out / "fix-shots.json").write_text(json.dumps(marks))
-    except (filmdoc.FilmError, local.AeError, splice.SpliceError) as e:
+    except (filmdoc.FilmError, local.AeError, splice.SpliceError, BlenderError) as e:
         return fail(e)
     print(f"✓ rebuilt {', '.join(res['replaced'])} · {res['frames']} frames → {out / 'fix.mp4'}")
     if in_job():
@@ -266,12 +297,36 @@ def cmd_rigs(a) -> int:
 
 def cmd_uses(a) -> int:
     code, _ = film_dirs(a.film, a.dir)
-    found = uses.shots_using(code, a.funcs)
+    from blender import uses as buses
+    found = uses.shots_using(code, a.funcs) + buses.shots_using(code, a.funcs)
+    found = sorted(set(found), key=lambda x: (int("".join(c for c in x if c.isdigit()) or 0), x))
     print(" ".join(found) if found else "(no shot uses " + ", ".join(a.funcs) + ")")
     return 0
 
 
+def film_status(a) -> int:
+    """specs/038 T021: one row per shot with its engine; a Blender shot built with another version must run again."""
+    from ae import mixed
+    code, _ = film_dirs(a.film, a.dir)
+    try:
+        doc = filmdoc.require_ae(code)
+    except filmdoc.FilmError as e:
+        return fail(e)
+    bl = mixed.plan_status(code, doc)
+    for s in doc["shots"]:
+        eng = filmdoc.engine_of(doc, s)
+        if eng == "blender":
+            b = bl.get(s) or {}
+            state = "Must run again" if b.get("stale") else ("built" if b.get("built") else "not built")
+            print(f"{s}\tblender\t{state}" + (f"\t{b['version']}" if b.get("version") else ""))
+        else:
+            print(f"{s}\tae")
+    return 0
+
+
 def cmd_status(a) -> int:
+    if getattr(a, "film", None):
+        return film_status(a)
     if in_job():
         from ae import remote
         st = remote.status()
@@ -343,7 +398,7 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("draft"); s.add_argument("film"); s.add_argument("--shots"); s.add_argument("--dir"); s.set_defaults(fn=cmd_draft)
     s = sub.add_parser("fix"); s.add_argument("film"); s.add_argument("shots", nargs="+"); s.add_argument("--dir"); s.set_defaults(fn=cmd_fix)
     s = sub.add_parser("uses"); s.add_argument("film"); s.add_argument("funcs", nargs="+"); s.add_argument("--dir"); s.set_defaults(fn=cmd_uses)
-    s = sub.add_parser("status"); s.set_defaults(fn=cmd_status)
+    s = sub.add_parser("status"); s.add_argument("film", nargs="?"); s.add_argument("--dir"); s.set_defaults(fn=cmd_status)
     s = sub.add_parser("sheet"); s.add_argument("film"); s.add_argument("--only"); s.add_argument("--dir"); s.set_defaults(fn=cmd_sheet)
     s = sub.add_parser("rigs"); s.add_argument("--check", action="store_true"); s.add_argument("--lock"); s.set_defaults(fn=cmd_rigs)
     s = sub.add_parser("new"); s.add_argument("film"); s.add_argument("--fps", type=int, default=30); s.add_argument("--dir"); s.set_defaults(fn=cmd_new)

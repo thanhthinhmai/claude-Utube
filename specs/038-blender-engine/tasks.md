@@ -81,36 +81,36 @@ description: "Tasks for 038 Blender engine, per-shot engine, depth"
 
 **Independent test**: Quickstart mục 3–4 với shot Blender chưa có nhân vật (bối cảnh, máy).
 
-- [ ] T015 [P] [US1] Viết test `tests/ae/test_assemble.py` cho `splice.assemble()`:
+- [X] T015 [P] [US1] Viết test `tests/ae/test_assemble.py` cho `splice.assemble()`:
   - ghép đoạn AE từ master và tệp shot Blender theo thứ tự phim
   - đúng số khung theo `timing.json`, lệch ±1
   - chuyển cảnh `fade`/`dip` ở chỗ nối giữa hai bộ máy
   - `shots.json` có `source:"mixed"` và `engines` với `version`
-- [ ] T016 [US1] Thêm `assemble(segments, timing, transitions, out)` vào `tools/ae/splice.py`: một filter ffmpeg trim/concat (thêm xfade cho fade/dip), dùng lại `pieces_from_master`.
-- [ ] T017 [P] [US1] Viết test `tests/ae/test_mixed_build.py`:
+- [X] T016 [US1] Thêm `assemble(segments, timing, transitions, out)` vào `tools/ae/splice.py`: một filter ffmpeg trim/concat (thêm xfade cho fade/dip), dùng lại `pieces_from_master`.
+- [X] T017 [P] [US1] Viết test `tests/ae/test_mixed_build.py`:
   - `ae build` phim trộn với AE giả và Blender giả: thứ tự các lượt, bỏ qua shot `done` mà `version` không đổi
   - `ae fix S3` (shot Blender) chỉ dựng lại S3, các khung khác giữ md5
   - `test_old_film_identical`: phim không có `shot_plan` cho `bundle.tar` cùng sha với bản 032 (SC-009)
-- [ ] T018 [US1] Viết `tools/blender/bundle.py`:
+- [X] T018 [US1] Viết `tools/blender/bundle.py`:
   - gói kit, script shot, layers, `timing.json` và `request.json`
   - tính `version` của mỗi shot: sha của script shot, các tệp kit mà shot dùng (qua `uses.py`), layers và sha của rig
-- [ ] T019 [US1] Sửa `tools/ae/cli.py` cho `build`/`draft`/`fix`:
+- [X] T019 [US1] Sửa `tools/ae/cli.py` cho `build`/`draft`/`fix`:
   - tách shot theo `film.engine_of`
   - shot AE đi đường cũ; shot Blender đi qua `tools/blender/local|remote`
   - ghép bằng `assemble`, ghi `build-shots.json` (`engines`)
   - `fix` dùng lại `plan()`/`splice()` cho shot Blender
   - in `estimate: …` trước khi dựng (FR-009, qua `tools/blender/estimate.py`)
-- [ ] T020 [P] [US1] Viết `tools/blender/estimate.py`: số khung × `secPerFrame` (tính riêng `--quarter`), kèm ước tính phần AE từ `shotTimeoutSec` và lịch sử. Có test trong `tests/blender/test_estimate.py`.
-- [ ] T021 [US1] Mở rộng `ae status` trong `tools/ae/cli.py`: thêm cột bộ máy, và shot có `version` khác mốc thì ghi "Must run again".
-- [ ] T022 [US1] (làm trước T018) Viết `tools/blender/uses.py` (regex `k.<hàm>(` và `k.set("<tên>")` trên `blender/S*.py`, cộng đồ thị gọi trong kit), nối vào `ae uses` (FR-006). Có test `tests/blender/test_uses.py`.
-- [ ] T023 [P] [US1] Viết `tools/blender/kit/toon.py`, viết lại từ bản thử: vật liệu hai tông (ColorRamp constant), viền inverted hull (Solidify flip + vật liệu đen backface), `mat(color)`, `outline(obj, w)`.
-- [ ] T024 [P] [US1] Viết `tools/blender/kit/mesh.py`: hộp, trụ, bo cạnh, mặt phẳng, `join`, gán vật liệu theo mặt.
-- [ ] T025 [P] [US1] Viết `tools/blender/kit/camera.py`:
+- [X] T020 [P] [US1] Viết `tools/blender/estimate.py`: số khung × `secPerFrame` (tính riêng `--quarter`), kèm ước tính phần AE từ `shotTimeoutSec` và lịch sử. Có test trong `tests/blender/test_estimate.py`.
+- [X] T021 [US1] Mở rộng `ae status` trong `tools/ae/cli.py`: thêm cột bộ máy, và shot có `version` khác mốc thì ghi "Must run again".
+- [X] T022 [US1] (làm trước T018) Viết `tools/blender/uses.py` (regex `k.<hàm>(` và `k.set("<tên>")` trên `blender/S*.py`, cộng đồ thị gọi trong kit), nối vào `ae uses` (FR-006). Có test `tests/blender/test_uses.py`.
+- [X] T023 [P] [US1] Viết `tools/blender/kit/toon.py`, viết lại từ bản thử: vật liệu hai tông (ColorRamp constant), viền inverted hull (Solidify flip + vật liệu đen backface), `mat(color)`, `outline(obj, w)`.
+- [X] T024 [P] [US1] Viết `tools/blender/kit/mesh.py`: hộp, trụ, bo cạnh, mặt phẳng, `join`, gán vật liệu theo mặt.
+- [X] T025 [P] [US1] Viết `tools/blender/kit/camera.py`:
   - `cam(size,height,lens,move,frm,to,look)`: lens wide/normal/long = 18/35/85 mm; độ cao low/eye/high/top
   - move theo key với ease
   - DOF tuỳ chọn
-- [ ] T026 [US1] Viết các bối cảnh `tools/blender/kit/sets/classroom.py`, `hallway.py`, `auditorium.py` (viết lại từ bản thử, mỗi bối cảnh có đủ lớp fg/mid/bg/far và tham số `light`), cùng `tools/blender/kit/fx.py` (confetti). Đối tượng `k` trong `entry.py` có các hàm `k.set`, `k.cam`, `k.fg`, `k.fx` theo `contracts/blender-kit.md`.
-- [ ] T027 [US1] Viết `tools/blender/cli.py` và nối vào `bin/studio`:
+- [X] T026 [US1] Viết các bối cảnh `tools/blender/kit/sets/classroom.py`, `hallway.py`, `auditorium.py` (viết lại từ bản thử, mỗi bối cảnh có đủ lớp fg/mid/bg/far và tham số `light`), cùng `tools/blender/kit/fx.py` (confetti). Đối tượng `k` trong `entry.py` có các hàm `k.set`, `k.cam`, `k.fg`, `k.fx` theo `contracts/blender-kit.md`.
+- [X] T027 [US1] Viết `tools/blender/cli.py` và nối vào `bin/studio`:
   - `blender build <phim> S3 [--still F] [--quarter]`
   - `blender config [--exe] [--work] [--timeout]`
 - [ ] T028 [US1] Kiểm thật (quickstart mục 3–4) trên phim thử `films/film30` (AE + ít nhất 3 shot Blender chưa có nhân vật):

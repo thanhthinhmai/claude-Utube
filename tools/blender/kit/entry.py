@@ -125,6 +125,8 @@ def main(argv: list) -> None:
         os.makedirs(out, exist_ok=True)
         path = os.path.join(run_dir, s["script"])
         core.clear_scene()
+        if "kit.toon" in sys.modules:
+            sys.modules["kit.toon"].reset()
         core.setup_scene(req.get("fps") or 24, req.get("size") or (1920, 1080), s["frames"], quarter=bool(req.get("quarter")))
         k = K(run_dir, req, s)
         try:
