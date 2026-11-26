@@ -139,6 +139,44 @@ class AnimaticApi(unittest.TestCase):
             self.assertEqual(len(actions.queued(self.jid)), 1)
         self.assertEqual(self.steps()["animatic"]["building"], {"shots": ["all"], "running": False})
 
+    def test_notes_and_send_to_claude(self):
+        """T041: note_add/note_delete with notes_base, revise fills "N notes on: …" and starts the round, the next
+        animatic review request ends it; the fix endpoint is app-only."""
+        animfilm.fake_draft(self.film)
+        v = self.steps()["animatic"]
+        a = self.act("animatic-note-add", {"shot": "S6", "text": "slower", "at": "1.0", "x": "40", "y": "30"}, v["notes_base"])
+        self.assertEqual(a["status"], "done", a)
+        a = self.act("animatic-note-add", {"shot": "S2", "text": "the cup"}, self.steps()["animatic"]["notes_base"])
+        self.assertEqual(a["status"], "done", a)
+        a = self.act("animatic-note-add", {"shot": "S2", "text": "x"}, "0" * 16)
+        self.assertEqual(a["status"], "conflict", a)
+        v = self.steps()["animatic"]
+        self.assertEqual([s["notes_open"] for s in v["shots"] if s["notes_open"]], [1, 1])
+        pin = v["notes"]["shots"]["S6"]["notes"][0]
+        self.assertEqual((pin["x"], pin["y"], pin["at"], pin["frame"]), (40.0, 30.0, 1.0, "clip"))
+        summary = self.p.dir / "s.md"
+        summary.write_text("Animatic ready")
+        self.assertEqual(self.p.cli("review", "request", self.jid, "--kind", "animatic", "--film", "anim",
+                                    "--summary", str(summary)).returncode, 0)
+        rid = next(r["id"] for r in self.c.get("/api/v1/reviews?status=pending").json()["reviews"] if r["kind"] == "animatic")
+        r = self.c.post(f"/api/v1/reviews/{rid}/decision", headers=W, json={"value": "revise"})
+        self.assertEqual(r.status_code, 201, r.text)
+        self.assertEqual(r.json()["note"], "2 notes on: S2, S6")
+        from filmcheck import animatic
+        lot = animatic.notes_load(self.film)["lot"]
+        self.assertEqual((lot["job"], len(lot["notes"])), (self.jid, 2))
+        self.assertEqual(self.p.cli("review", "request", self.jid, "--kind", "animatic", "--film", "anim",
+                                    "--summary", str(summary)).returncode, 0)
+        doc = animatic.notes_load(self.film)
+        self.assertNotIn("lot", doc)
+        self.assertEqual(len(doc["last_lot"]["notes"]), 2)
+        nid = doc["shots"]["S2"]["notes"][0]["id"]
+        a = self.act("animatic-note-delete", {"shot": "S2", "note": nid}, self.steps()["animatic"]["notes_base"])
+        self.assertEqual(a["status"], "done", a)
+        self.assertEqual(animatic.open_notes(self.film), {"S6": 1})
+        r = self.c.post("/api/v1/films/anim/animatic/fix", headers=W, json={})
+        self.assertEqual((r.status_code, r.json()["error"]["code"]), (409, "app_only"), r.text)
+
     def test_in_browser(self):
         env = {**os.environ, "STUDIO_ROOT": str(self.p.dir)}
         for k in ("STUDIO_JOB", "STUDIO_PROXY"):

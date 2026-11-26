@@ -99,8 +99,8 @@
 
 - [X] T039 [US3] Trước khi làm, nhắn session 034 (ListAgents/SendMessage) để chắc `castnotes.py` không còn đang sửa. Tách phần ghim của `tools/filmcheck/castnotes.py` thành `tools/filmcheck/pins.py` (R9), `castnotes.py` gọi lại không đổi hành vi
 - [X] T040 [US3] Sổ ghi chú animatic trong `tools/filmcheck/animatic.py` dùng `pins.py`; lệnh `animatic notes add|delete|show|reply` trong `tools/filmcheck/cli.py` (contracts/cli.md)
-- [ ] T041 [US3] API: `op: note_add|note_delete` với `notes_base`; quyết định `revise` kind `animatic` (note tự điền "N notes on: S2, S6"); `POST /films/{film}/animatic/fix` tạo việc `fix` `input.target="animatic"`, `input.shots` (409 `ae_unavailable`) trong `tools/studio/studio/actions.py`, `reviews.py`, `server.py`
-- [ ] T042 [US3] Việc `fix` `target: "animatic"` và quyết định `revise` trong `tools/runner/agent.py`, `tools/runner/JOB.md`: sửa mã các shot có ghi chú, `ae draft --shots …`, trả lời từng ghi chú, không duyệt; xong → Animatic `waiting`
+- [X] T041 [US3] API: `op: note_add|note_delete` với `notes_base`; quyết định `revise` kind `animatic` (note tự điền "N notes on: S2, S6"); `POST /films/{film}/animatic/fix` tạo việc `fix` `input.target="animatic"`, `input.shots` (409 `ae_unavailable`) trong `tools/studio/studio/actions.py`, `reviews.py`, `server.py`
+- [X] T042 [US3] Việc `fix` `target: "animatic"` và quyết định `revise` trong `tools/runner/agent.py`, `tools/runner/JOB.md`: sửa mã các shot có ghi chú, `ae draft --shots …`, trả lời từng ghi chú, không duyệt; xong → Animatic `waiting`
 - [ ] T043 [US3] Giao diện trong `tools/studio/studio/web/app.js`, `style.css`: bấm shot phát `clips/S*.mp4`; dừng ở khung rồi bấm → ghim có số (phần trăm + mốc giây), ô ghi chú chung, xoá; "Send notes to Claude"; trạng thái việc sửa đang chạy; tự tải lại bản nháp và câu trả lời khi xong; lỗi + "Send again" khi lượt thất bại
 - [ ] T044 [P] [US3] Test trình duyệt `tests/ui/browser_animatic.cjs`: ghim lệch ≤ 2% chiều rộng khung ở 1280 px và 400 px (SC-007); gửi ghi chú tạo đúng một yêu cầu với đúng các shot
 

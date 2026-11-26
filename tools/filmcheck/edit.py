@@ -825,6 +825,33 @@ def animatic_fit_undo(d: Path, a: dict) -> dict:
             "rebuild": _changed(before, after), "silence": r["silence"]}
 
 
+def _anim_notes_base(d: Path) -> str:
+    from filmcheck import animatic
+    return animatic.notes_base(d)
+
+
+@op("animatic-note-add", "animatic", _anim_notes_base)
+def animatic_note_add(d: Path, a: dict) -> dict:
+    """A note on a shot of the draft: shot, text, at? (s), x?, y? (%) — no x/y: a general note on the shot."""
+    from filmcheck import animatic
+    shot = a.get("shot") or (a.get("ref") or [None])[0]
+    if not shot:
+        raise EditError("animatic-note-add: shot=S2")
+    num = lambda k: None if a.get(k) in (None, "") else a.get(k)
+    n = _anim_call(animatic.note_add, d, shot, _note_text(a), num("at"), num("x"), num("y"), by=a.get("by") or "owner")
+    return {"ok": True, "ref": n["id"], "new": n["text"], "files": ["animatic/notes.json"], "no_stale": True}
+
+
+@op("animatic-note-delete", "animatic", _anim_notes_base)
+def animatic_note_delete(d: Path, a: dict) -> dict:
+    from filmcheck import animatic
+    shot = a.get("shot") or (a.get("ref") or [None])[0]
+    if not shot or not a.get("note"):
+        raise EditError("animatic-note-delete: shot=S2 note=<id>")
+    _anim_call(animatic.note_delete, d, shot, a["note"])
+    return {"ok": True, "ref": a["note"], "files": ["animatic/notes.json"], "no_stale": True}
+
+
 @op("animatic-draft", "animatic", _timing_base)
 def animatic_draft(d: Path, a: dict) -> dict:
     """Build the draft again (shots=S2,S6: those and every shot whose length changed; none: the whole film)."""

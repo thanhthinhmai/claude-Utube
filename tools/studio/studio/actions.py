@@ -12,7 +12,7 @@ from pathlib import Path
 from . import jobs, store
 from .store import StudioError
 
-OPS = {"script": ("script-para",), "cast": ("cast-approve", "cast-voice", "cast-save", "cast-note-add", "cast-note-edit", "cast-note-delete", "cast-view-toggle"), "animatic": ("animatic-fit-accept", "animatic-fit-skip", "animatic-fit-undo", "animatic-draft"), "voice": ("voice-say", "voice-remake", "voice-tone", "voice-set", "voice-speaker"),
+OPS = {"script": ("script-para",), "cast": ("cast-approve", "cast-voice", "cast-save", "cast-note-add", "cast-note-edit", "cast-note-delete", "cast-view-toggle"), "animatic": ("animatic-fit-accept", "animatic-fit-skip", "animatic-fit-undo", "animatic-draft", "animatic-note-add", "animatic-note-delete"), "voice": ("voice-say", "voice-remake", "voice-tone", "voice-set", "voice-speaker"),
        "shots": ("shot", "shots-check", "except", "accept-style"), "mix": ("mix",), "publish": ("publish",)}
 STATUS = ("queued", "running", "done", "failed", "invalid", "conflict", "busy")
 BY_CODE = {0: "done", 1: "done", 2: "invalid", 4: "conflict", 5: "busy"}

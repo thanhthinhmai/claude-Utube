@@ -62,6 +62,8 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
     store.doc_put("review", r["id"], r)
     if kind == "cast":                               # specs/034: Claude sends the cast again, the redraw lot is over
         _cast_notes(lambda cn, d: cn.end_lot(d), job)
+    if kind == "animatic":                           # specs/035: the draft is back for review, the notes round is over
+        _anim_notes(lambda an, d: an.notes_end(d), job)
 
     def f(j):
         if j["status"] in jobs.FINAL:
@@ -87,6 +89,18 @@ def _cast_notes(fn, job: dict):
         return None
 
 
+def _anim_notes(fn, job: dict):
+    """Run fn(animatic, film folder); a broken notes file never blocks the review itself."""
+    d = film_folder(job)
+    if d is None:
+        return None
+    try:
+        from filmcheck import animatic
+        return fn(animatic, d)
+    except Exception:                                # noqa: BLE001
+        return None
+
+
 def film_folder(job: dict):
     from . import donesofar
     return donesofar.film_dir(job)
@@ -94,16 +108,7 @@ def film_folder(job: dict):
 
 def animatic_summary(job: dict) -> str:
     """"N notes on: S2, S6" for "Send notes to Claude" at the Animatic (specs/035)."""
-    d = film_folder(job)
-    if d is None:
-        return ""
-    try:
-        from filmcheck import animatic
-        c = animatic.open_notes(d)
-    except Exception:                                # noqa: BLE001
-        return ""
-    n = sum(c.values())
-    return f"{n} note{'s' if n != 1 else ''} on: {', '.join(sorted(c, key=lambda s: int(s[1:])))}" if n else ""
+    return _anim_notes(lambda an, d: an.notes_summary(d), job) or ""
 
 
 def point_decision(r: dict, value: str, note: str, source: str, base, by, anyway: bool = False) -> None:
@@ -159,6 +164,8 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str
         point_decision(r, value, note, source, base, by, anyway)
         if r["kind"] == "cast" and value == "revise":
             _cast_notes(lambda cn, d: cn.start_lot(d, r["job_id"]), jobs.load(r["job_id"]))
+        if r["kind"] == "animatic" and value == "revise":
+            _anim_notes(lambda an, d: an.notes_start(d, r["job_id"]), jobs.load(r["job_id"]))
     d = {"value": value, "note": note, "source": source, "at": store.now_iso()}
     if not store.doc_create("decision", rid, {**d, "owner": r.get("owner", "local")}):
         raise StudioError("already_decided", "yêu cầu này đã được duyệt", 409)
