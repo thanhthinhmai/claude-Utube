@@ -47,3 +47,25 @@ shot lengths that build measured; `origin` is that state. Then make the film rea
    ```
 
 The files before this change are kept next to them as `*.pre035`.
+
+## The draft, the fit and the review
+
+1. `sh bin/studio animatic start <film>` (writes timing.json from film.json when the film has none), then
+   `sh bin/studio ae draft <film> [--shots S2,S6]`: AE builds the shots at quarter size with draft settings, each
+   shot becomes `animatic/shots/S#.mp4`, and the draft is those segments back to back with the voice laid on from
+   narration.json. `--shots` builds those shots and every shot whose length changed; the others keep their frames.
+   It refuses (exit 3) until the voice is approved.
+2. `sh bin/studio animatic fit <film>`: the silence of the narration (limit 20%) and one suggestion per shot: the shot
+   ends 0.25 s after its last word and its first line starts at the cut (not the film's first shot). `animatic accept
+   <film> S2 S6 | --all --base <b>`, `skip <film> S9 --base <b>`, `undo <film> --base <b>` change timing.json (with up
+   to 50 steps of history) and move the line starts in narration.json; then build the changed shots again.
+3. With the animatic point on, `review request --kind animatic`: the customer watches the draft, accepts suggestions
+   and approves on the job page. Over the silence limit, only the customer may approve "anyway" (a tick on the page);
+   a film job never passes `--anyway` and never approves the animatic itself.
+
+## After the approval
+
+- `ae render` waits for the approval and builds every shot from timing.json, so the final film has the draft's
+  lengths (shots.json within one frame of `timing.bounds`).
+- The mix reads narration.json as it is now (the line starts moved with their shots): never keep the old starts in a
+  film's own mix script.

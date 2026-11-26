@@ -53,7 +53,7 @@
 - [X] T022 [US1] API: `GET /jobs/{id}/steps` thêm khối `animatic` (contracts/api.md, chưa có `fit`/`notes`), cho phép `files/animatic/{draft.mp4,draft.prev.mp4,clips/*,frames/*}` có `Range`, quyết định `approve` kind `animatic` với `anyway` (422 `needs_anyway`) trong `tools/studio/studio/filmsteps.py`, `server.py`, `reviews.py`
 - [X] T023 [US1] Khung Animatic trong `tools/studio/studio/web/app.js` và `style.css` theo bản mẫu: dải thời gian (hàng shot theo thời lượng, hàng câu, chú giải), nhãn "Silence x% · limit 20%" (màu cảnh báo khi vượt, đánh dấu khoảng lặng dài nhất), tổng thời lượng, trình phát `draft.mp4`, lưới shot (khung, tên, thời lượng, lời), cột "How Animatic works" và "If you change this" (Sound, Final render), nút Approve và hộp "Approve anyway"; thanh bước dùng `label` của bước (phim AE: "Sound", "Final render")
 - [X] T024 [P] [US1] Test `tests/ui/test_animatic_api.py`: khối `animatic` của `/jobs/{id}/steps`, tải tệp bản nháp có `Range`, `approve` cần `anyway` khi silence > 0,20
-- [ ] T025 [US1] Bước Animatic trong việc làm phim AE: `tools/runner/agent.py` và `tools/runner/JOB.md` (sau Voice: `animatic start`, `ae draft`, gửi yêu cầu duyệt kind `animatic`, chờ; khi điểm Animatic tắt: vẫn `ae draft` và báo phần trăm lặng nhưng không dừng chờ; **cấm** dùng `--anyway` hay tự duyệt); `.claude/skills/film-make/SKILL.md` mục "Phim After Effects" và `tools/ae/ANIMATIC.md` (mới)
+- [X] T025 [US1] Bước Animatic trong việc làm phim AE: `tools/runner/agent.py` và `tools/runner/JOB.md` (sau Voice: `animatic start`, `ae draft`, gửi yêu cầu duyệt kind `animatic`, chờ; khi điểm Animatic tắt: vẫn `ae draft` và báo phần trăm lặng nhưng không dừng chờ; **cấm** dùng `--anyway` hay tự duyệt); `.claude/skills/film-make/SKILL.md` mục "Phim After Effects" và `tools/ae/ANIMATIC.md` (mới)
 
 **Checkpoint**: US1 chạy độc lập; quickstart mục 2 và 5 đạt.
 
@@ -78,7 +78,7 @@
 - [X] T033 [US2] API `POST /jobs/{id}/actions` `point: "animatic"`, `op: fit_accept|fit_skip|fit_undo|draft_rebuild` với `timing_base` (409 `changed`), sau `fit_*` xếp `ae draft --shots <shot đổi>`; khối `animatic` thêm `fit`, `can_undo`, `building` trong `tools/studio/studio/actions.py`, `filmsteps.py`
 - [X] T034 [US2] Giao diện đề xuất trong `tools/studio/studio/web/app.js`: mỗi shot một dòng "S2: −1,1 s → lines start at the cut, ends 0.25 s after its last line" với Accept/Skip, "Accept all", dòng kết quả "Each shot now ends 0.25 s after its last line." kèm Undo, cảnh báo "very short shot", danh sách chuyển động bị mất/dồn và câu "Accepting cuts the motion; pin a note to have Claude retime it" (R5 ghi chú, FR-014: nhận không tự dồn); dải thời gian, nhãn lặng, tổng thời lượng cập nhật ngay; trạng thái "Rebuilding S2, S6…"
 - [X] T035 [P] [US2] Test `tests/ui/test_animatic_api.py` (tiếp): `fit_accept`, `fit_skip`, `fit_undo`, base lệch → 409, xếp dựng lại đúng các shot đổi
-- [ ] T036 [US2] Bản đẹp dùng cùng thời lượng: `ae render` dựng theo `timing.json`; test `tests/ae/test_keys.py` (tiếp): `shots.json` của bản đẹp (từ `shots_<proj>.json` mẫu) trùng `timing.bounds` ± 1 khung (FR-017, SC-004); Mix đọc `narration.json` đã dời (ghi rõ trong `tools/ae/ANIMATIC.md`)
+- [X] T036 [US2] Bản đẹp dùng cùng thời lượng: `ae render` dựng theo `timing.json`; test `tests/ae/test_keys.py` (tiếp): `shots.json` của bản đẹp (từ `shots_<proj>.json` mẫu) trùng `timing.bounds` ± 1 khung (FR-017, SC-004); Mix đọc `narration.json` đã dời (ghi rõ trong `tools/ae/ANIMATIC.md`)
 
 **Checkpoint**: US1 + US2 = MVP; quickstart mục 3 đạt.
 

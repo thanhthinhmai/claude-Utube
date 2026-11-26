@@ -84,6 +84,22 @@ class Build(unittest.TestCase):
         self.assertEqual([round(m[1] - m[0], 3) for m in r["marks"]], [1.5, 1.0, 3.0])
         self.assertEqual(r["keys"]["S2"], [{"layer": "Hero", "prop": "Position", "t0": 0.2, "t1": 0.8}])
 
+    def test_final_render_keeps_the_animatic_lengths(self):
+        """T036 FR-017, SC-004: the final render's shot marks match timing.json to one frame."""
+        from filmcheck import timing
+        t = {"version": 1, "fps": 30, "frames": {"S1": 45, "S2": 30, "S3": 90}, "history": []}
+        (self.d / "timing.json").write_text(json.dumps(t))
+        from filmcheck import points
+        points.set_on(self.d, ["script", "voice", "cast"])                    # the animatic point off: render may run
+        r = self.ae("render", "f1")
+        self.assertIn(r.returncode, (0, 1), r.stdout + r.stderr)
+        marks = json.loads((self.d / "out" / "render-shots.json").read_text())["shots"]
+        want = timing.bounds(t)
+        self.assertEqual([m[3] for m in marks], [b["id"] for b in want])
+        for m, b in zip(marks, want):
+            self.assertLessEqual(abs(m[0] - b["t0"]), 1 / 30 + 1e-6, m)
+            self.assertLessEqual(abs(m[1] - b["t1"]), 1 / 30 + 1e-6, m)
+
 
 if __name__ == "__main__":
     unittest.main()

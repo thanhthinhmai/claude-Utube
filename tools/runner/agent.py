@@ -191,7 +191,15 @@ no `qc shots`). For the picture:
    into the film. List the shots and files in film.json ("shots", "ae_files").
 4. Test a few shots: `sh {st}/bin/studio ae build {film} --shots S1,S2`; every CHECK line must be fixed. Look at
    out/build.mp4 frames (ffmpeg) before going on.
-5. If the shots point is on, send it for review with SHOTS.md as the summary before the full build.
+   Read every shot length with `CU.shotFrames("S<n>")` ({st}/tools/ae/ANIMATIC.md), never a list of your own.
+5. Animatic (specs/035), after the voice and before the sound: `sh {st}/bin/studio animatic start {film}`, then
+   `sh {st}/bin/studio job run {job} --step Animatic -- sh {st}/bin/studio ae draft {film}` (quarter size with the real
+   voice; exit 3: After Effects is not ready or the voice is not approved, say so in the log and wait). Read
+   `sh {st}/bin/studio animatic fit {film}`: it says how much of the film is silent and which shots to shorten or
+   lengthen. When the animatic point is on, send `review request --kind animatic --film {film}` with a short summary
+   (silence, the suggestions) and end your turn: the customer accepts suggestions and approves on the page. When it is
+   off, still make the draft and write the silence in the log, then go on. Never pass `--anyway` and never approve the
+   animatic yourself. The final render uses the lengths in timing.json, so the mix must read narration.json as it is now.
 6. After the mix, set film.json "audio" to the mixed sound file, then
    `sh {st}/bin/studio job run {job} --step Render -- sh {st}/bin/studio ae render {film}`: it builds every shot in
    After Effects (through the desktop app; it may wait for its turn), adds the sound and writes {film}.mp4 and
