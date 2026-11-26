@@ -90,6 +90,9 @@ class SoundApi(unittest.TestCase):
         sb = self.steps()["sound"]
         cue = sb["shots"][1]["cues"][0]
         self.assertEqual((cue["action"], cue["anchor"]), ("window breaks", {"shot_at": 0.5}))
+        r = self.c.get(f"/api/v1/sound/preview/{cue['entry']}")                      # the ▶ of a sound, project UI
+        self.assertEqual((r.status_code, r.headers["content-type"][:6]), (200, "audio/"))
+        self.assertEqual(self.c.get("/api/v1/sound/preview/s:nothing").json()["error"]["code"], "sound_not_found")
         a = self.act("cue-set", {"cue": cue["id"], "gain_db": -3}, sb["plan_base"])
         self.assertEqual(a["status"], "done", a)
         a = self.act("cue-set", {"cue": cue["id"], "gain_db": 0}, sb["plan_base"])   # the old base

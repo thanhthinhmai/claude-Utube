@@ -356,3 +356,25 @@ def view(j: dict) -> dict:
 
 def etag(v: dict) -> str:
     return '"' + str(abs(hash(json.dumps(v, sort_keys=True, ensure_ascii=False)))) + '"'
+
+
+def sound_preview_file(entry: str, scope: str):
+    """The file and media type to play one library sound, at most 30 s (specs/037 FR-013a: a Sonniss sound only in
+    scope "all"). Shared by the app (owner or customer) and the project UI (the owner, scope "all")."""
+    import subprocess
+    from filmcheck import soundlib
+    try:
+        row = soundlib.get(entry, scope)
+    except soundlib.LibraryError as e:
+        raise StudioError("sound_" + e.code, e.message, 403 if e.code == "scope" else 404) from None
+    src = Path(row["path"])
+    if not row["ok"] or not src.is_file() or soundlib.forbidden(src):
+        raise StudioError("sound_not_found", "the file of this sound is gone", 404)
+    if (row["duration"] or 0) <= 30:
+        return src, {".ogg": "audio/ogg", ".mp3": "audio/mpeg", ".flac": "audio/flac"}.get(src.suffix.lower(), "audio/wav")
+    out = soundlib.sound_root() / "preview" / f"{soundlib.safe(entry)}.wav"
+    if not out.is_file():
+        out.parent.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-t", "30", "-ar", "48000", str(out)],
+                       check=False, timeout=60)
+    return out, "audio/wav"

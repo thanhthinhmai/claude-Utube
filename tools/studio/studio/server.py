@@ -749,6 +749,13 @@ def create_app() -> FastAPI:
     from . import castapi                                   # the channel's cast library (specs/034 US3)
     app.include_router(castapi.router)
 
+    if not online:
+        @app.get(api + "/sound/preview/{entry}")
+        def sound_preview_local(entry: str):
+            """Play one library sound in the project UI: the person at this machine owns the studio (specs/037)."""
+            src, kind = filmsteps.sound_preview_file(entry, "all")
+            return FileResponse(src, media_type=kind)
+
     if online:
         from . import api_online, db
         (db.data_dir() / "tmp").mkdir(exist_ok=True)        # TMPDIR of the web container (uploads)

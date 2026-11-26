@@ -1147,24 +1147,10 @@ def delete_freesound_key(request: Request):
 @router.get("/sound/preview/{entry}")
 def sound_preview(entry: str, request: Request):
     """Play one library sound, at most 30 s. A Sonniss sound only for the studio owner (FR-013a)."""
-    from filmcheck import soundlib
+    from .filmsteps import sound_preview_file
     a = me(request)
-    try:
-        row = soundlib.get(entry, "all" if a["role"] == "admin" else "cc0")
-    except soundlib.LibraryError as e:
-        raise StudioError("sound_" + e.code, e.message, 403 if e.code == "scope" else 404) from None
-    src = Path(row["path"])
-    if not row["ok"] or not src.is_file() or soundlib.forbidden(src):
-        raise StudioError("sound_not_found", "the file of this sound is gone", 404)
-    if (row["duration"] or 0) <= 30:
-        kind = {".ogg": "audio/ogg", ".mp3": "audio/mpeg", ".flac": "audio/flac"}.get(src.suffix.lower(), "audio/wav")
-        return FileResponse(src, media_type=kind)
-    out = soundlib.sound_root() / "preview" / f"{soundlib.safe(entry)}.wav"
-    if not out.is_file():
-        out.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-t", "30", "-ar", "48000", str(out)],
-                       check=False, timeout=60)
-    return FileResponse(out, media_type="audio/wav")
+    src, kind = sound_preview_file(entry, "all" if a["role"] == "admin" else "cc0")
+    return FileResponse(src, media_type=kind)
 
 
 @router.put("/admin/settings")
