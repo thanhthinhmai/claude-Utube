@@ -188,3 +188,134 @@ def problems(d: Path) -> list:
         why.append(f"there is no current draft (run: sh bin/studio ae draft {d.name})")
     why += [f"{s}: {n} open note(s)" for s, n in open_notes(d).items()]
     return why
+
+
+# ---------- fit suggestions (US2, research R3, R5) ----------
+def _fit_doc(d: Path) -> dict:
+    return _read(adir(d) / "fit.json", {}) or {}
+
+
+def _shot_sha(doc: dict, rows: list, shot: str) -> str:
+    """What a skip was about: the shot's length and the starts of its lines (FR-013)."""
+    ats = [(r["id"], r["at"]) for r in rows if r["shot"] == shot]
+    return _sha(json.dumps([doc["frames"][shot], ats]).encode())
+
+
+def motions(keys: list, end_new: float) -> list:
+    """The shot's keyframed motions a shorter shot ending at end_new (seconds in the shot) drops or squeezes (R5)."""
+    out = []
+    for k in keys or []:
+        t0, t1 = float(k.get("t0", 0)), float(k.get("t1", 0))
+        name = f"{k.get('layer', '?')} · {k.get('prop', '?')}"
+        if t0 >= end_new - 1e-6:
+            out.append({"layer": k.get("layer"), "prop": k.get("prop"), "name": name, "t0": t0, "t1": t1, "effect": "drop"})
+        elif t1 > end_new + 1e-6:
+            ratio = round((t1 - t0) / max(end_new - t0, 1e-6), 2)
+            out.append({"layer": k.get("layer"), "prop": k.get("prop"), "name": name, "t0": t0, "t1": t1,
+                        "effect": "clip" if ratio > SQUEEZE_MAX else "squeeze", "ratio": ratio})
+    return out
+
+
+@_wrap
+def fit(d: Path, all_states: bool = False) -> list:
+    """Per-shot suggestions: the shot ends PAD after its last word and its first line starts at the cut (head dropped;
+    the film's first shot keeps its head). [{shot, frames, frames_new, delta_s, end_new, head, very_short, motions,
+    state}] for shots with lines whose end moves more than one frame or whose head is longer than one frame.
+    Skipped suggestions are left out unless all_states (they come back when the shot's length or lines change)."""
+    doc = timing.require(d)
+    fps = float(doc["fps"])
+    rows = timing.lines(d, doc)
+    keys = _read(adir(d) / "keys.json", {}) or {}
+    skipped = _fit_doc(d).get("skipped") or {}
+    out = []
+    for i, b in enumerate(timing.bounds(doc, exact=True)):
+        mine = [r for r in rows if r["shot"] == b["id"]]
+        if not mine:
+            continue
+        first = min(r["first_word_at"] for r in mine) - b["t0"]
+        last = max(r["last_word_end"] for r in mine) - b["t0"]
+        head = 0.0 if i == 0 else max(0.0, first)
+        need = last - head                                     # the last word may never be cut
+        n_new = max(timing.MIN_FRAMES, int(round((need + PAD) * fps)))
+        while n_new / fps < need - 1e-6:
+            n_new += 1
+        n = doc["frames"][b["id"]]
+        if abs(n_new - n) <= 1 and head * fps <= 1:
+            continue
+        sha = _shot_sha(doc, rows, b["id"])
+        state = "skipped" if skipped.get(b["id"]) == sha else "new"
+        if state == "skipped" and not all_states:
+            continue
+        end_new = n_new / fps
+        out.append({"shot": b["id"], "frames": n, "frames_new": n_new, "delta_s": round((n_new - n) / fps, 3),
+                    "end_new": round(end_new, 3), "head": round(head, 3), "very_short": end_new < VERY_SHORT,
+                    "motions": motions(keys.get(b["id"]), end_new) if n_new - n < 0 else [], "state": state})
+    return out
+
+
+def _check_base(d: Path, expect) -> None:
+    if expect is not None and expect != timing.base(d):
+        raise AnimaticError("changed", "the shot lengths changed since you looked: reload and try again")
+
+
+@_wrap
+def accept(d: Path, shots, by: str = "claude", expect: str = None) -> dict:
+    """Accept the suggestions of these shots ("all" = every open one): one history entry (Undo gives it all back).
+    Returns {accepted: [shot], silence}."""
+    _check_base(d, expect)
+    sug = {s["shot"]: s for s in fit(d, all_states=True)}
+    if shots == "all":
+        pick = [s for s, x in sug.items() if x["state"] == "new"]
+    else:
+        pick = [str(s).upper() for s in shots]
+        bad = [s for s in pick if s not in sug]
+        if bad:
+            raise AnimaticError("bad_shot", f"no suggestion for {', '.join(bad)}")
+    if not pick:
+        raise AnimaticError("bad_shot", "no open suggestion to accept")
+    timing.shift(d, {s: sug[s]["frames_new"] for s in pick}, head={s: sug[s]["head"] for s in pick}, by=by,
+                 why="fit " + ",".join(pick), expect=expect)
+    f = _fit_doc(d)
+    for s in pick:
+        (f.get("skipped") or {}).pop(s, None)
+    _write_fit(d, f)
+    return {"accepted": pick, "silence": silence(d)}
+
+
+def _write_fit(d: Path, f: dict) -> None:
+    from filmcheck import shotnotes
+    shotnotes.write_atomic(adir(d) / "fit.json", (json.dumps({"skipped": f.get("skipped") or {}}, indent=1) + "\n").encode())
+
+
+@_wrap
+def skip(d: Path, shot: str, expect: str = None) -> dict:
+    """Leave this shot as it is; its suggestion comes back when its length or lines change (FR-013)."""
+    shot = str(shot).upper()
+    with timing.lock(d):
+        _check_base(d, expect)
+        doc = timing.require(d)
+        if shot not in doc["frames"]:
+            raise AnimaticError("bad_shot", f"not a shot of this film: {shot}")
+        rows = timing.lines(d, doc)
+        f = _fit_doc(d)
+        f.setdefault("skipped", {})[shot] = _shot_sha(doc, rows, shot)
+        _write_fit(d, f)
+    return {"skipped": shot}
+
+
+@_wrap
+def undo(d: Path, expect: str = None) -> dict:
+    """Give back the lengths from before the last accepted change (refused at the origin, FR-015)."""
+    try:
+        timing.undo(d, expect=expect)
+    except timing.TimingError as e:
+        raise AnimaticError(e.code, e.message) from None
+    return {"silence": silence(d)}
+
+
+def can_undo(d: Path) -> bool:
+    try:
+        doc = timing.load(d)
+    except timing.TimingError:
+        return False
+    return bool(doc and doc.get("history"))

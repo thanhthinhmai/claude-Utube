@@ -8,7 +8,7 @@ from pathlib import Path
 DATA = Path(__file__).resolve().parent / "data" / "animatic-sleepless"
 
 
-def make(d: Path, timing: bool = True, wavs: bool = False, ae: bool = True) -> Path:
+def make(d: Path, timing: bool = True, wavs: bool = False, ae: bool = True, tones: bool = False) -> Path:
     d = Path(d)
     shutil.copytree(DATA, d)
     if ae:
@@ -21,8 +21,9 @@ def make(d: Path, timing: bool = True, wavs: bool = False, ae: bool = True) -> P
         tm.from_marks(d, d / "out" / "build-shots.json")
     if wavs:
         for lid, sec in json.loads((d / "voices" / "dur.json").read_text()).items():
-            subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "anullsrc=r=24000:cl=mono", "-t",
-                            str(sec), str(d / "voices" / f"{lid}.wav")], check=True)
+            src = "sine=frequency=330:sample_rate=24000" if tones else "anullsrc=r=24000:cl=mono"
+            subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", src, "-t", str(sec), "-ac", "1",
+                            str(d / "voices" / f"{lid}.wav")], check=True)
     return d
 
 

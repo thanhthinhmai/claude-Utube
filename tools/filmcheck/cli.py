@@ -1600,6 +1600,108 @@ def cmd_point_approve(a) -> int:
     return code
 
 
+# ---------- the Animatic of an AE film (specs/035) ----------
+def animatic_view(d: Path) -> dict:
+    from filmcheck import animatic, rhythm, timing
+    t = animatic.timeline(d)
+    sil = animatic.silence(d)
+    return {"film": d.name, **t, "silence": sil, "limit": rhythm.SILENCE_MAX, "gaps": animatic.longest_gaps(d) if sil > rhythm.SILENCE_MAX else [],
+            "draft": {"current": animatic.draft_current(d), "info": animatic.draft_info(d)}, "fit": animatic.fit(d),
+            "can_undo": animatic.can_undo(d), "notes_open": animatic.open_notes(d), "timing_base": timing.base(d)}
+
+
+def _anim(a, fn) -> int:
+    from filmcheck import animatic
+    d = film_dir(a.film)
+    try:
+        return fn(d)
+    except animatic.AnimaticError as e:
+        print(f"✗ {e.message}", file=sys.stderr)
+        return e.exit_code()
+
+
+def _sil_line(d: Path) -> str:
+    from filmcheck import animatic, rhythm, timing
+    doc = timing.require(d)
+    return (f"silence {round(animatic.silence(d) * 100)}% (limit {round(rhythm.SILENCE_MAX * 100)}%) · "
+            f"{timing.duration(doc):.2f} s")
+
+
+def cmd_animatic_status(a) -> int:
+    def go(d):
+        v = animatic_view(d)
+        lines = [f"{s['id']:4} {s['t0']:6.2f}–{s['t1']:6.2f} s  {s['frames']:4} fr  " + " ".join(x["id"] for x in s["lines"])
+                 for s in v["shots"]]
+        lines += [f"silence {round(v['silence'] * 100)}% (limit {round(v['limit'] * 100)}%) · {v['duration']:.2f} s · draft "
+                  + ("current" if v["draft"]["current"] else ("old" if v["draft"]["info"] else "none"))]
+        lines += [f"fit {x['shot']}: {x['delta_s']:+.2f} s" + (f" (head {x['head']:.2f} s)" if x["head"] else "") for x in v["fit"]]
+        out(a, v, lines)
+        return 0
+    return _anim(a, go)
+
+
+def cmd_animatic_start(a) -> int:
+    from filmcheck import timing
+
+    def go(d):
+        try:
+            doc = timing.start(d)
+        except timing.TimingError as e:
+            print(f"✗ {e.message}", file=sys.stderr)
+            return e.exit_code()
+        print(f"✓ animatic started · origin {doc['origin']['at']} · {_sil_line(d)}")
+        return 0
+    return _anim(a, go)
+
+
+def cmd_animatic_fit(a) -> int:
+    from filmcheck import animatic
+
+    def go(d):
+        f = animatic.fit(d)
+        out(a, {"fit": f}, [f"{x['shot']}: {x['delta_s']:+.2f} s → ends {animatic.PAD} s after its last line"
+                            + (f", lines start at the cut (−{x['head']:.2f} s)" if x["head"] else "")
+                            + (" · very short shot" if x["very_short"] else "")
+                            + "".join(f"\n    {m['name']}: {m['effect']}" + (f" ×{m['ratio']}" if m.get("ratio") else "")
+                                      for m in x["motions"]) for x in f] or ["no suggestion"])
+        return 0
+    return _anim(a, go)
+
+
+def cmd_animatic_accept(a) -> int:
+    from filmcheck import animatic
+
+    def go(d):
+        shots = "all" if a.all else [x for x in (a.shots or "").split(",") if x]
+        if not shots:
+            print("✗ give the shots (S2,S6) or --all", file=sys.stderr)
+            return 2
+        r = animatic.accept(d, shots, by=os.environ.get("STUDIO_USER") or "claude", expect=a.base)
+        print(f"✓ accepted {', '.join(r['accepted'])} · {_sil_line(d)}")
+        return 0
+    return _anim(a, go)
+
+
+def cmd_animatic_skip(a) -> int:
+    from filmcheck import animatic
+
+    def go(d):
+        animatic.skip(d, a.shot, expect=a.base)
+        print(f"✓ {a.shot.upper()} stays as it is · {_sil_line(d)}")
+        return 0
+    return _anim(a, go)
+
+
+def cmd_animatic_undo(a) -> int:
+    from filmcheck import animatic
+
+    def go(d):
+        animatic.undo(d, expect=a.base)
+        print(f"✓ undone · {_sil_line(d)}")
+        return 0
+    return _anim(a, go)
+
+
 def cmd_point_gate(a) -> int:
     from filmcheck import points
     try:
@@ -2089,6 +2191,23 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("film")
     s.add_argument("point")
 
+    an = sub.add_parser("animatic", help="the Animatic of an AE film (specs/035)").add_subparsers(dest="cmd", required=True)
+    for name in ("status", "start", "fit", "undo"):
+        s = an.add_parser(name)
+        s.add_argument("film")
+        s.add_argument("--json", action="store_true")
+        if name == "undo":
+            s.add_argument("--base")
+    s = an.add_parser("accept")
+    s.add_argument("film")
+    s.add_argument("shots", nargs="?", help="S2,S6")
+    s.add_argument("--all", action="store_true")
+    s.add_argument("--base")
+    s = an.add_parser("skip")
+    s.add_argument("film")
+    s.add_argument("shot")
+    s.add_argument("--base")
+
     s = sub.add_parser("edit", help="change one part of a film from the job page, the chat or the API (specs/026)")
     s.add_argument("film")
     s.add_argument("op")
@@ -2276,7 +2395,10 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("qc-limits", "qc-limits"): cmd_qc_limits,
             ("render-done", "render-done"): cmd_render_done,
             ("point", "status"): cmd_point_status, ("point", "set"): cmd_point_set, ("point", "approve"): cmd_point_approve,
-            ("point", "gate"): cmd_point_gate, ("edit", "edit"): cmd_edit,
+            ("point", "gate"): cmd_point_gate,
+            ("animatic", "status"): cmd_animatic_status, ("animatic", "start"): cmd_animatic_start,
+            ("animatic", "fit"): cmd_animatic_fit, ("animatic", "accept"): cmd_animatic_accept,
+            ("animatic", "skip"): cmd_animatic_skip, ("animatic", "undo"): cmd_animatic_undo, ("edit", "edit"): cmd_edit,
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach, ("kit", "use"): cmd_kit_use,
