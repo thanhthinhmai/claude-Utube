@@ -110,7 +110,7 @@
 
 - [ ] T045 Chạy đủ `sh tests/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ae/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`; ghi kết quả
 - [ ] T046 Lượt AE thật trên `ae-sleepless-test` theo `quickstart.md` mục 2–5: ghi thời gian bản nháp so với bản đẹp (SC-001), silence trước/sau (SC-002), silence của `qc final` (SC-003), mốc cắt bản đẹp (SC-004), so điểm ảnh sau một lượt ghi chú (SC-005); ghi vào `specs/035-animatic/quickstart.md` mục "Kết quả"
-- [ ] T047 [P] Cập nhật `tools/CLAUDE.md` (lệnh `ae draft`, `animatic …`), `CLAUDE.md` gốc mục "Phim After Effects" (một dòng: bước Animatic), `tools/ae/ANIMATIC.md`
+- [X] T047 [P] Cập nhật `tools/CLAUDE.md` (lệnh `ae draft`, `animatic …`), `CLAUDE.md` gốc mục "Phim After Effects" (một dòng: bước Animatic), `tools/ae/ANIMATIC.md`
 
 ## Dependencies & Execution Order
 
