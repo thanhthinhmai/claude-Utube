@@ -15,7 +15,7 @@
   the user chose direction A (Claude picks sounds by the picture; the user reviews per shot).
 
 ## Next
-1. T052: all 8 suites, then commit named files, push, open the PR (never merge).
+1. PR #46 open (all 8 suites passed at 2ece081). Never merge it.
 2. ⟂035 tasks (T028–T031, T041–T048) wait for 035 to merge, then rebase.
 3. /speckit-converge.
 

@@ -145,7 +145,7 @@ description: "Task list for 037-sound-per-shot"
 - [X] T049 [P] Test repo `tests/test_no_media.py` (hoặc thêm vào bộ có sẵn trong `tests/run.sh`): 0 tệp âm thanh mới trong git (kho thử tự tổng hợp lúc chạy test); `desktop/core-build` không gói `sound/` hay `requirements-sound.txt` (SC-005)
 - [X] T050 [P] Cập nhật `CLAUDE.md` (mục ngắn "Âm thanh theo shot (specs/037)"), `tools/CLAUDE.md` (mô-đun mới), `desktop/core-build/credits-check.py` nếu cần cho dòng CREDITS mới
 - [X] T051 Kho thật: khi người dùng đã tải Sonniss 2026 + 2024 vào `/mnt/e/SoundLibrary/Sonniss`, giải nén (nếu còn zip), `sound lib add`, đo SC-007, ghi kết quả vào quickstart
-- [ ] T052 Chạy đủ bộ test (`sh tests/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`, `sh tests/ae/run.sh`, `sh tests/render/run.sh`, `sh tests/license/run.sh`) rồi mở PR (không merge)
+- [X] T052 Chạy đủ bộ test (`sh tests/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/learn/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`, `sh tests/ae/run.sh`, `sh tests/render/run.sh`, `sh tests/license/run.sh`) rồi mở PR (không merge)
 
 ---
 
