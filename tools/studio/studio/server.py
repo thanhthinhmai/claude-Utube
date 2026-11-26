@@ -29,10 +29,11 @@ class DecisionIn(BaseModel):
     value: Literal["approve", "revise", "accept_anyway", "stop"]
     note: Optional[str] = Field(default=None, max_length=4000)
     base: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{16}$")      # review points: the content shown (026)
+    anyway: bool = False                                                      # specs/035: approve the animatic over the silence limit
 
 
 class ActionIn(BaseModel):                     # specs/026 contracts/api.md
-    point: Literal["script", "cast", "voice", "shots", "mix", "publish"]
+    point: Literal["script", "cast", "voice", "animatic", "shots", "mix", "publish"]
     op: str = Field(max_length=30)
     args: dict = Field(default_factory=dict)
     base: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{16}$")
@@ -47,7 +48,7 @@ WRITE_ROLES = {"customer", "admin"}            # a token limited to reading (any
 
 
 class PointsIn(BaseModel):
-    on: list[Literal["script", "cast", "voice", "shots", "mix", "publish"]] = Field(max_length=6)
+    on: list[Literal["script", "cast", "voice", "animatic", "shots", "mix", "publish"]] = Field(max_length=7)
 
 
 class FreshStaticFiles(StaticFiles):
@@ -317,7 +318,8 @@ def create_app() -> FastAPI:
         via_token = getattr(request.state, "token", None) is not None      # specs/009: an API token or MCP
         if r["kind"] in reviews.POINT_KINDS and body.value == "approve" and not body.base and not via_token:
             raise StudioError("invalid", "approving a review point needs base (the fingerprint shown)", 422)
-        return reviews.decide(rid, body.value, body.note, "api" if via_token else "ui", body.base, owner(request) or "local")
+        return reviews.decide(rid, body.value, body.note, "api" if via_token else "ui", body.base, owner(request) or "local",
+                              anyway=body.anyway and not via_token)
 
     # ---------- films ----------
     # ---------- After Effects bridge: the desktop app pulls build requests (specs/032 contracts/bridge-api.md) ----------
@@ -462,6 +464,42 @@ def create_app() -> FastAPI:
             shotnotes.end_lot(d, j["id"])
             raise
         return {"job": j["id"], "notes": lot["lot"]["notes"], "left": lot["left"]}
+
+    @app.post(api + "/films/{name}/animatic/fix", status_code=201)
+    def film_animatic_fix(name: str, request: Request):
+        """specs/035 US3: "Send notes to Claude" on the Animatic outside a waiting film job: a fix job on the draft's
+        open notes (input.target "animatic", input.shots)."""
+        _note_writer(request)
+        d = resources.film_dir(name)
+        if not d.is_dir():
+            raise StudioError("not_found", f"không có phim \"{name}\"", 404)
+        from ae import aequeue, film as aefilm
+        from filmcheck import animatic
+        if aefilm.engine(d) != "ae":
+            raise StudioError("not_ae", "only After Effects films have an animatic", 422)
+        if not online:
+            raise StudioError("app_only", "Send notes to Claude runs in the app (sh bin/studio app start)", 409)
+        st = aequeue.bridge_status()
+        if not st["ready"]:
+            raise StudioError("ae_unavailable", st["message"], 409)
+        a = request.state.account
+        busy = [j for j in store.doc_list("job", a["id"]) if j.get("kind") == "fix" and j["status"] not in jobs.FINAL
+                and (j.get("input") or {}).get("target") == "animatic" and j["input"].get("film") == name]
+        if busy:
+            raise StudioError("in_progress", f"the animatic of {name} is being fixed ({busy[0]['id']})", 409)
+        shots = [s for s in animatic.open_notes(d)]
+        if not shots:
+            raise StudioError("no_notes", "there are no open notes on the draft", 422)
+        j = jobs.build("fix", f"Fix the animatic of {name}"[:80], {"film": name}, owner=a["id"], status="queued",
+                       extra={"charged": False})
+        lot = animatic.notes_start(d, j["id"])
+        j["input"] = {"kind": "fix", "target": "animatic", "film": name, "shots": shots, "notes": lot["notes"]}
+        try:
+            store.doc_put("job", j["id"], j)
+        except Exception:
+            animatic.notes_end(d, j["id"])
+            raise
+        return {"job": j["id"], "shots": shots, "notes": lot["notes"]}
 
     @app.get(api + "/films/{name}/notes")
     def film_notes(name: str):

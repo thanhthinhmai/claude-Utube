@@ -13,7 +13,9 @@ CU.SW = 4.5;           // outline width at 1080p
 CU.FONT = "InkFree";   // handwriting font on this machine
 CU.log = null;
 
-CU.say = function (s) { if (CU.log) { CU.log.writeln(s); } };
+// Each line reaches the disk at once (close + reopen to append): ExtendScript keeps writes in memory until close, and
+// the waiting side reads log.txt to know After Effects started (a long full-size build showed an empty log for > 240 s).
+CU.say = function (s) { if (CU.log) { CU.log.writeln(s); CU.log.close(); CU.log.encoding = "UTF-8"; CU.log.open("a"); } };
 
 CU.hex = function (h) {
   if (h === null || h === undefined) { return null; }
@@ -503,6 +505,48 @@ CU.sofa = function (comp, name, o) {
 CU.readJSON = function (path) { var f = new File(path); f.open("r"); var s = f.read(); f.close(); return eval("(" + s + ")"); };
 CU.WORK = CU.WORK || "";   // set by entry.jsx (tools/ae/bundle.py)
 CU.MOTION = "";            // CU.WORK + "/data/motion/", set by entry.jsx
+// specs/035: shot lengths come from the film's timing.json (bundled as data/timing.json). A film writes
+// `var n = CU.shotFrames("S2") || 117;` so it still builds before it has a timing.json.
+CU.TIMING = null;
+CU.DRAFT = CU.DRAFT || false;  // set by entry.jsx for `ae draft`: quarter resolution, draft quality
+CU.shotFrames = function (id) {
+  if (CU.TIMING === null) {
+    var f = new File(CU.WORK + "/data/timing.json");
+    try { CU.TIMING = f.exists ? CU.readJSON(f.fsName) : {}; } catch (e) { CU.TIMING = {}; }
+  }
+  var fr = CU.TIMING && CU.TIMING.frames;
+  return (fr && fr[id] && fr[id] >= 1) ? fr[id] : undefined;
+};
+// CU.keyScan(comp): every property with 2 or more keyframes in the comp's layers (and in the precomps they hold),
+// as [{layer, prop, t0, t1}] in seconds of this comp (specs/035 R5: which motions a shorter shot drops or squeezes).
+CU.keyScan = function (comp) {
+  var out = [];
+  function walk(g, lname, off, depth) {
+    var k, p;
+    for (k = 1; k <= g.numProperties; k++) {
+      try { p = g.property(k); } catch (e) { p = null; }
+      if (!p) { continue; }
+      if (p.propertyType === PropertyType.PROPERTY) {
+        if (p.numKeys >= 2) {
+          out.push({ layer: lname, prop: p.name, t0: Math.max(0, p.keyTime(1) + off), t1: Math.min(comp.duration, p.keyTime(p.numKeys) + off) });
+        }
+      } else if (depth < 12) { walk(p, lname, off, depth + 1); }
+    }
+  }
+  function scan(c, off, level) {
+    var i, L;
+    for (i = 1; i <= c.numLayers; i++) {
+      L = c.layer(i);
+      walk(L, L.name, off, 0);
+      if (level < 3 && L.source && L.source instanceof CompItem) { scan(L.source, off + L.startTime, level + 1); }
+    }
+  }
+  scan(comp, 0, 0);
+  return out;
+};
+CU.jstr = function (s) {
+  return "\"" + String(s).replace(/\\/g, "\\\\").replace(/"/g, "\\\"").replace(/[\u0000-\u001f]/g, " ") + "\"";
+};
 CU.camFromMotion = function (comp, motion, f0, z0) {
   var k, fr;
   for (k = 0; k < 25; k++) { fr = CU._camFromMotion(comp, motion, f0, z0); if (CU.camInside(comp, fr)) { return fr; } z0 *= 1.02; }

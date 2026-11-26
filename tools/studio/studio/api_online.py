@@ -173,7 +173,7 @@ class JobIn(BaseModel):
     idea: Optional[str] = Field(default=None, min_length=3, max_length=2000)
     seconds: Optional[int] = Field(default=None, ge=1, le=3600)
     review_treatment: bool = False
-    reviews: Optional[List[Literal["script", "cast", "voice", "shots", "mix", "publish"]]] = Field(default=None, max_length=6)   # 026
+    reviews: Optional[List[Literal["script", "cast", "voice", "animatic", "shots", "mix", "publish"]]] = Field(default=None, max_length=7)   # 026
     engine: Optional[Literal["page", "ae"]] = None     # specs/032: who draws the picture (After Effects needs the desktop app)
     revise_of: Optional[str] = Field(default=None, max_length=60)
     note: Optional[str] = Field(default=None, max_length=2000)
@@ -380,7 +380,7 @@ class ChannelIn(BaseModel):
     title_max: Optional[int] = None
     hashtags: Optional[List[str]] = Field(default=None, max_length=5)
     banned: Optional[List[str]] = Field(default=None, max_length=50)
-    reviews: Optional[List[Literal["script", "cast", "voice", "shots", "mix", "publish"]]] = Field(default=None, max_length=6)   # 026
+    reviews: Optional[List[Literal["script", "cast", "voice", "animatic", "shots", "mix", "publish"]]] = Field(default=None, max_length=7)   # 026
 
 
 class DecisionIn(BaseModel):
@@ -414,7 +414,7 @@ def new_channel(body: ChannelIn, request: Request):
     me(request)
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     if "reviews" in data:
-        data["cast_chosen"] = True                      # specs/034 FR-002: Cast left out on purpose stays off
+        data["cast_chosen"] = data["animatic_chosen"] = True     # specs/034, 035: left out on purpose stays off
     return _ch(lambda: channels.save(store.root(), data, resources.lib_dir(), new=True))
 
 
@@ -431,7 +431,7 @@ def put_channel(slug: str, body: ChannelIn, request: Request):
     ch = channel_or_404(slug)
     ch.update({k: v for k, v in body.model_dump(exclude_unset=True).items() if k != "slug"})
     if "reviews" in body.model_fields_set:
-        ch["cast_chosen"] = True                        # specs/034 FR-002: Cast left out on purpose stays off
+        ch["cast_chosen"] = ch["animatic_chosen"] = True         # specs/034, 035: left out on purpose stays off
     return _ch(lambda: channels.save(store.root(), ch, resources.lib_dir()))
 
 

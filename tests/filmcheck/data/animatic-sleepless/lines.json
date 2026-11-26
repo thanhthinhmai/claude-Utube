@@ -1,0 +1,100 @@
+[
+ {
+  "id": "l01",
+  "para": "P01",
+  "text": "What if you never needed sleep again?",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l02",
+  "para": "P01",
+  "text": "It's three in the morning.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l03",
+  "para": "P01",
+  "text": "You're wide awake, and you feel amazing.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l04",
+  "para": "P02",
+  "text": "So you get up.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l05",
+  "para": "P02",
+  "text": "You clean your room.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l06",
+  "para": "P02",
+  "text": "You finish your homework.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l07",
+  "para": "P02",
+  "text": "You even learn the guitar.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l08",
+  "para": "P03",
+  "text": "By sunrise, you're at the bus stop.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l09",
+  "para": "P03",
+  "text": "Two hours early.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l10",
+  "para": "P04",
+  "text": "At school, everyone is yawning.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l11",
+  "para": "P04",
+  "text": "You raise your hand for every question.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l12",
+  "para": "P05",
+  "text": "Then your best friend leans over.",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l13",
+  "para": "P05",
+  "text": "\"Wait. When do you dream?\"",
+  "voice": "am_michael",
+  "speed": 1.1
+ },
+ {
+  "id": "l14",
+  "para": "P05",
+  "text": "And for once, you have no answer.",
+  "voice": "am_michael",
+  "speed": 1.1
+ }
+]

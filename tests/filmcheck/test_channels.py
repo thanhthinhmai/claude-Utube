@@ -190,7 +190,11 @@ class Snapshot(unittest.TestCase):
         channels.save(self.root, ch)
         self.assertTrue(channels.load(self.root, "honey-facts")["cast_chosen"])
         channels.attach(self.root, self.film, "honey-facts")
-        self.assertEqual(report.load(self.film)["reviews"]["off"], ["cast"])
+        self.assertEqual(report.load(self.film)["reviews"]["off"], ["cast"])     # saved before 035: animatic stays on
+        ch["animatic_chosen"] = True                            # specs/035: saved knowing the Animatic point
+        channels.save(self.root, ch)
+        channels.attach(self.root, self.film, "honey-facts")
+        self.assertEqual(report.load(self.film)["reviews"]["off"], ["cast", "animatic"])
 
     def test_missing_style_is_refused(self):
         with self.assertRaises(channels.ChannelError):

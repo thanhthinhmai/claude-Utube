@@ -8,15 +8,17 @@ CU.build = function (list) {
   CU.log = new File(CU.WORK + "/log.txt"); CU.log.encoding = "UTF-8"; CU.log.open("w"); CU.say("START");
   try {
     app.newProject();
-    var shots = [], total = 0, i;
+    var shots = [], total = 0, i, keys = [];
     for (i = 0; i < list.length; i++) {
       var t0 = new Date().getTime();
       CU.CUR_SHOT = list[i];
       try { var sc = CU["shot" + list[i]](); shots.push(sc); total += sc.duration; CU.say("shot " + list[i] + " ok " + (new Date().getTime() - t0) + " ms");
+        try { keys.push(CU.keysRow("S" + list[i], CU.keyScan(sc))); } catch (e6) { CU.say("keys S" + list[i] + ": " + e6.toString()); }
         if (CU.SC) { try { CU.sceneCheck(); } catch (e3) { CU.say("ERR check " + list[i] + ": " + e3.toString() + " line " + e3.line); CU.SC = null; } } }
       catch (e) { CU.say("ERR shot " + list[i] + ": " + e.toString() + " line " + e.line); }
     }
     var M = CU.comp("MASTER", total), t = 0;
+    if (CU.DRAFT) { try { M.resolutionFactor = [4, 4]; } catch (e7) { } }   // specs/035 R6: a quarter-size draft
     for (i = 0; i < shots.length; i++) {
       var L = M.layers.add(shots[i]); L.startTime = t; t += shots[i].duration;
     }
@@ -27,6 +29,9 @@ CU.build = function (list) {
     sj.encoding = "UTF-8"; sj.open("w");
     sj.write("{\"version\": 1, \"video\": \"\", \"duration\": " + tt.toFixed(4) + ", \"fps\": " + CU.FPS + ", \"source\": \"ae\", \"shots\": [" + rows.join(", ") + "]}");
     sj.close();
+    // keyframed motions of each shot (specs/035 R5): {"S2": [{layer, prop, t0, t1}], …} in seconds of the shot
+    var kj = new File(CU.WORK + "/keys_" + (CU.PROJ || "build.aep").replace(/\.aep$/, "") + ".json");
+    kj.encoding = "UTF-8"; kj.open("w"); kj.write("{" + keys.join(", ") + "}"); kj.close();
     // person precomps: collapse transformations so vectors stay sharp when scaled
     for (i = 1; i <= app.project.numItems; i++) {
       var it = app.project.item(i);
@@ -51,17 +56,39 @@ CU.build = function (list) {
 // Render MASTER inside After Effects with its render queue (specs/032): no aerender, so After Effects never has to be
 // closed between builds (a forced close leaves it on a start-up dialog, and a cold start takes 1.5-4 minutes).
 CU.OM_TEMPLATE = "H.264 - Match Render Settings - 40 Mbps";
+CU.keysRow = function (id, ks) {
+  var a = [], i;
+  for (i = 0; i < ks.length; i++) {
+    a.push("{\"layer\": " + CU.jstr(ks[i].layer) + ", \"prop\": " + CU.jstr(ks[i].prop) + ", \"t0\": " + ks[i].t0.toFixed(3) + ", \"t1\": " + ks[i].t1.toFixed(3) + "}");
+  }
+  return CU.jstr(id) + ": [" + a.join(", ") + "]";
+};
+// Draft render settings (specs/035 R6): draft quality, quarter resolution, no motion blur; the effects stay on.
+CU.draftSettings = function (it) {
+  var tries = [{ "Quality": "Draft", "Resolution": "Quarter", "Motion Blur": "Off for All Layers" },
+               { "Quality": "Draft", "Resolution": [4, 4] }], k;
+  if (CU.DRAFT_FPS) {                                      // fewer frames rendered; the segments repeat them (SC-001)
+    // setting "Use this frame rate" switches "Frame Rate" too (AE 2027 refuses "Frame Rate" itself)
+    for (k = 0; k < tries.length; k++) { tries[k]["Use this frame rate"] = String(CU.DRAFT_FPS); }
+  }
+  for (k = 0; k < tries.length; k++) { try { it.setSettings(tries[k]); CU.say("draft settings " + (k + 1)); return; } catch (e) { } }
+  try { it.applyTemplate("Draft Settings"); CU.say("draft settings: template"); } catch (e2) { CU.say("draft settings: none"); }
+};
 CU.renderMaster = function (M, name) {
   var rq = app.project.renderQueue, i;
   for (i = rq.numItems; i >= 1; i--) { rq.item(i).remove(); }
   var it = rq.items.add(M);
-  try { it.applyTemplate("Best Settings"); } catch (e1) { }
+  if (CU.DRAFT) { CU.draftSettings(it); } else { try { it.applyTemplate("Best Settings"); } catch (e1) { } }
   var om = it.outputModule(1);
   om.applyTemplate(CU.OM_TEMPLATE);
   om.file = new File(CU.WORK + "/" + name);
   CU.say("render " + name);
   var t0 = new Date().getTime();
   rq.render();
-  if (!om.file.exists) { CU.say("ERR render: After Effects wrote no " + name); return; }
+  if (!om.file.exists) {                                   // say why: the queue item's status and where it wrote
+    var st = "?"; try { st = String(it.status); } catch (e2) { }
+    var to = "?"; try { to = om.file.fsName; } catch (e3) { }
+    CU.say("ERR render: After Effects wrote no " + name + " (status " + st + ", to " + to + ")"); return;
+  }
   CU.say("rendered " + (new Date().getTime() - t0) + " ms");
 };

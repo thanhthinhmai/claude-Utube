@@ -174,11 +174,18 @@ def normal(ch: dict) -> dict:
         out["reviews"] = list(ch["reviews"])
         if ch.get("cast_chosen") is True:      # the list was saved knowing the Cast point (specs/034); older lists were not
             out["cast_chosen"] = True
+        if ch.get("animatic_chosen") is True:  # … and knowing the Animatic point (specs/035)
+            out["animatic_chosen"] = True
     return out
 
 
-REVIEW_POINTS = ("script", "cast", "voice", "shots", "mix", "publish")   # specs/026, 034; = filmcheck.points.POINTS
+REVIEW_POINTS = ("script", "cast", "voice", "animatic", "shots", "mix", "publish")   # specs/026, 034, 035; = points.POINTS
 DEFAULT_REVIEWS = ["script", "shots"]
+
+
+def chosen_of(ch: dict) -> set:
+    """The points of points.AE_ON this channel's saved list chose about (specs/034, 035)."""
+    return {p for p, k in (("cast", "cast_chosen"), ("animatic", "animatic_chosen")) if ch.get(k) is True}
 
 
 def reviews_of(ch: dict) -> list:
@@ -473,7 +480,7 @@ def attach(root: Path, film_dir: Path, slug: str, shared_path: Path = None, lib:
     from filmcheck import points, report                            # specs/026: the film's review points (checks.json)
     if (report.load(film_dir).get("reviews") or {}).get("from") != "this film":   # chosen for this film: kept
         try:
-            points.set_on(film_dir, reviews_of(ch), origin=f"channel {slug}", chosen=ch.get("cast_chosen") is True)
+            points.set_on(film_dir, reviews_of(ch), origin=f"channel {slug}", chosen=chosen_of(ch))
         except points.PointError:
             pass                                                    # a point already approved or waiting keeps its state
     warn = f"{left} lessons did not fit in CHANNEL_BRIEF.md ({BRIEF_MAX} characters): merge or retire some" if left else None

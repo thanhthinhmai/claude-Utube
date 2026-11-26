@@ -14,7 +14,9 @@ from pathlib import Path
 
 from ae import bundle
 
-CONFIG = Path(os.environ.get("STUDIO_AE_CONFIG") or Path.home() / ".config" / "claude-utube" / "ae.json")
+def config_path() -> Path:
+    """ae.json, read each time: a test that sets STUDIO_AE_CONFIG after this module was imported gets its own file."""
+    return Path(os.environ.get("STUDIO_AE_CONFIG") or Path.home() / ".config" / "claude-utube" / "ae.json")
 FAKE = Path(__file__).resolve().parents[2] / "desktop" / "test" / "fake-ae.mjs"
 START_TIMEOUT = 240           # a cold After Effects start took ~90 s (2026-11-24)
 SHOT_TIMEOUT = 300
@@ -34,7 +36,7 @@ class AeError(Exception):
 
 def load_config() -> dict:
     try:
-        cfg = json.loads(CONFIG.read_text(encoding="utf-8"))
+        cfg = json.loads(config_path().read_text(encoding="utf-8"))
         return cfg if isinstance(cfg, dict) else {}
     except (OSError, ValueError):
         return {}
@@ -43,10 +45,11 @@ def load_config() -> dict:
 def save_config(changes: dict) -> dict:
     cfg = load_config()
     cfg.update({k: v for k, v in changes.items() if v is not None})
-    CONFIG.parent.mkdir(parents=True, exist_ok=True)
-    tmp = CONFIG.with_suffix(".tmp")
+    cfg_path = config_path()
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = cfg_path.with_suffix(".tmp")
     tmp.write_text(json.dumps(cfg, indent=2, ensure_ascii=False))
-    tmp.replace(CONFIG)
+    tmp.replace(cfg_path)
     return cfg
 
 
@@ -78,7 +81,7 @@ def settings() -> dict:
     if os.environ.get("STUDIO_AE_FAKE") == "1":
         node = shutil.which("node") or "node"
         return {"kind": "fake", "afterfx": [node, str(FAKE), "afterfx"], "aerender": [node, str(FAKE), "aerender"],
-                "work": cfg.get("work") or os.environ.get("STUDIO_AE_WORK") or "",
+                "work": os.environ.get("STUDIO_AE_WORK") or cfg.get("work") or "",   # a fake run never uses the real one
                 "shotTimeoutSec": int(cfg.get("shotTimeoutSec") or os.environ.get("STUDIO_AE_SHOT_TIMEOUT") or SHOT_TIMEOUT),
                 "startTimeoutSec": int(os.environ.get("STUDIO_AE_START_TIMEOUT") or START_TIMEOUT)}
     found = find_ae()
@@ -112,13 +115,19 @@ def free_bytes(folder) -> int:
     return shutil.disk_usage(folder).free
 
 
-def _kill(s: dict, procs=()) -> None:
-    for p in procs:
-        if p and p.poll() is None:
-            p.kill()
-    if s["kind"] == "windows":
-        for im in ("AfterFX.exe", "AfterFX.com", "aerender.exe"):
-            subprocess.run(["/mnt/c/Windows/System32/taskkill.exe", "/IM", im, "/F"], capture_output=True)
+REPAIR = ("If After Effects shows \"Crash Repair Options\", click Continue (not Safe Mode or Reset Preferences: "
+          "those stop the studio's scripts).")
+
+
+def _kill(s: dict, procs=(), aerender: bool = False) -> None:
+    """Stop what this run started, but never After Effects itself: it stays open (specs/031), and a forced close makes
+    it ask "Crash Repair Options" at the next start, which stops every script until someone clicks Continue."""
+    if s["kind"] != "windows":
+        for p in procs:
+            if p and p.poll() is None:
+                p.kill()
+    elif aerender:                                    # a manual aerender run is its own program: only that one
+        subprocess.run(["/mnt/c/Windows/System32/taskkill.exe", "/IM", "aerender.exe", "/F"], capture_output=True)
 
 
 def _path(s: dict, p) -> str:
@@ -164,12 +173,13 @@ def wait_log(s: dict, log: Path, shots: list, proc, progress=None, sleep=0.25) -
         if not lines and now - t0 > s["startTimeoutSec"]:
             _kill(s, [proc])
             raise AeError("ae_scripting_off", "After Effects did not start the script in "
-                          f"{s['startTimeoutSec']} s. Open After Effects once (a dialog may be waiting) and turn on "
+                          f"{s['startTimeoutSec']} s (it was left open). A dialog may be waiting: " + REPAIR + " Check "
                           "Edit > Preferences > Scripting & Expressions > \"Allow Scripts to Write Files and Access Network\".")
         allow = s["shotTimeoutSec"] * (max(1, len(shots)) if lines and lines[-1].startswith("render ") else 1)   # render phase
         if lines and now - last > allow:
             _kill(s, [proc])
-            raise AeError("ae_stalled", f"After Effects made no progress for {int(allow)} s", _tail(text))
+            raise AeError("ae_stalled", f"After Effects made no progress for {int(allow)} s (it was left open). "
+                          + REPAIR, _tail(text))
         time.sleep(sleep)
 
 
@@ -179,12 +189,12 @@ def render(s: dict, aep: Path, out: Path, timeout: float) -> str:     # aerender
     try:
         r = subprocess.run(cmd, cwd=aep.parent, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired as e:
-        _kill(s)
+        _kill(s, aerender=True)
         raise AeError("shot_timeout", f"aerender ran longer than {int(timeout)} s", _tail(str(e.stdout or "")))
     return (r.stdout or "") + (r.stderr or "")
 
 
-def build(film_dir, shots=None, progress=None, s: dict = None, sheet: dict = None) -> dict:
+def build(film_dir, shots=None, progress=None, s: dict = None, sheet: dict = None, draft: bool = False) -> dict:
     """Build and render these shots on this machine; returns {master, marks, checks, log, dir}."""
     s = s or settings()
     check(s)
@@ -196,7 +206,7 @@ def build(film_dir, shots=None, progress=None, s: dict = None, sheet: dict = Non
         raise AeError("disk_low", f"the work folder {work} has less than 2 GB free")
     rid = time.strftime("ae-%Y%m%d-%H%M%S-") + secrets.token_hex(2)
     folder = work / rid
-    b = bundle.make(film_dir, shots, folder.with_suffix(".tar"), sheet=sheet)
+    b = bundle.make(film_dir, shots, folder.with_suffix(".tar"), sheet=sheet, draft=draft)
     bundle.extract(b["path"], folder)
     Path(b["path"]).unlink()
     return run_folder(s, folder, b["shots"], b["proj"], progress)
@@ -222,5 +232,12 @@ def run_folder(s: dict, folder: Path, shots: list, proj: str, progress=None) -> 
     if not out.exists() or out.stat().st_size == 0:
         raise AeError("render_error", "After Effects rendered no video", _tail(text))
     marks = json.loads(marks_file.read_text(encoding="utf-8"))
+    keys = {}
+    kf = folder / f"keys_{proj[:-4]}.json"                    # specs/035 R5: keyframed motions per shot
+    if kf.is_file():
+        try:
+            keys = json.loads(kf.read_text(encoding="utf-8"))
+        except ValueError:
+            keys = {}
     return {"master": str(out), "marks": marks["shots"], "duration": marks["duration"], "checks": checks,
-            "log": text, "dir": str(folder)}
+            "log": text, "dir": str(folder), "keys": keys}

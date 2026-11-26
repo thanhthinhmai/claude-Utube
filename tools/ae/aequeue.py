@@ -225,7 +225,8 @@ def finish(rid: str, body: dict) -> dict:
             if not r["results"]:
                 raise QueueError("invalid", "finish ok without any result", 422)
             r.update(state="done", checks=[str(c)[:500] for c in (body.get("checks") or [])][:200],
-                     marks=body.get("marks"), duration=body.get("duration"))
+                     marks=body.get("marks"), duration=body.get("duration"),
+                     keys=body.get("keys") if isinstance(body.get("keys"), dict) and len(json.dumps(body["keys"])) < 2_000_000 else None)
         else:
             e = body.get("error") or {}
             r.update(state="failed", error={"code": str(e.get("code") or "build_error")[:40],

@@ -92,3 +92,44 @@ def pieces_from_master(master, master_marks: list, shots: list) -> dict:
     if lost:
         raise SpliceError(f"the build did not make: {', '.join(lost)}")
     return {s: (str(master), by[s][0]) for s in shots}
+
+
+
+def segment(clip, start_s: float, frames: int, out, size=(480, 270), fps_text: str = None, crf: int = 23) -> Path:
+    """specs/035 R7: one shot of a built clip as its own video segment (no sound), encoded once, so a draft made of
+    segments copies a shot that was not rebuilt bit for bit."""
+    src = probe(clip)
+    ft = fps_text or src["fps_text"]
+    o = round(start_s * src["fps"])
+    w, h = size
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    part = out.with_name(out.stem + ".part.mp4")
+    seek = max(0.0, (o - 0.5) / src["fps"])        # start decoding at the shot (half a frame early: frame o is the first)
+    cmd = ["ffmpeg", "-v", "error", "-y", "-ss", f"{seek:.6f}", "-i", str(clip), "-vf",
+           f"scale={w}:{h},fps={ft},setsar=1,tpad=stop_mode=clone:stop_duration=10,trim=end_frame={frames},"
+           f"setpts=N/({ft})/TB", "-an", "-c:v", "libx264", "-crf", str(crf), "-preset", "veryfast", "-pix_fmt", "yuv420p",
+           "-r", ft, "-video_track_timescale", "15360", str(part)]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode:
+        raise SpliceError(f"ffmpeg failed: {r.stderr.strip()[-400:]}")
+    part.replace(out)
+    return out
+
+
+def by_shot(segments: list, out) -> dict:
+    """specs/035 R7: the draft's picture as the shot segments back to back, copied (no new encode): a shot that was
+    not rebuilt keeps its exact frames even when an earlier shot changed length. segments: [(shot, path)] in order."""
+    missing = [s for s, p in segments if not Path(p).is_file()]
+    if missing:
+        raise SpliceError(f"no segment for {', '.join(missing)}: rebuild those shots")
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    lst = out.with_name(out.stem + ".list.txt")
+    lst.write_text("".join(f"file '{Path(p).resolve().as_posix()}'\n" for _, p in segments))
+    r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy",
+                        "-an", str(out)], capture_output=True, text=True)
+    lst.unlink(missing_ok=True)
+    if r.returncode:
+        raise SpliceError(f"ffmpeg failed: {r.stderr.strip()[-400:]}")
+    return {"out": str(out), "shots": [s for s, _ in segments]}

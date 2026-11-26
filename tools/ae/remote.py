@@ -56,10 +56,10 @@ def submit(film: str, shots: list, tar: bytes) -> str:
         return json.loads(r.read())["id"]
 
 
-def build(film_dir, shots=None, progress=None, sheet: dict = None) -> dict:
+def build(film_dir, shots=None, progress=None, sheet: dict = None, draft: bool = False) -> dict:
     d = Path(film_dir)
     with tempfile.TemporaryDirectory() as tmp:
-        b = bundle.make(d, shots, Path(tmp) / "bundle.tar", sheet=sheet)
+        b = bundle.make(d, shots, Path(tmp) / "bundle.tar", sheet=sheet, draft=draft)
         rid = submit(d.name, b["shots"], Path(b["path"]).read_bytes())
     print(f"AE request {rid}: waiting for the desktop app", flush=True)
     last = None
@@ -89,4 +89,5 @@ def build(film_dir, shots=None, progress=None, sheet: dict = None) -> dict:
                 break
             f.write(c)
     return {"master": str(master), "marks": st.get("marks") or [], "duration": st.get("duration") or 0,
-            "checks": [c for c in st.get("checks") or [] if c.startswith("CHECK ")], "log": "", "dir": str(out)}
+            "checks": [c for c in st.get("checks") or [] if c.startswith("CHECK ")], "log": "", "dir": str(out),
+            "keys": st.get("keys") or {}}

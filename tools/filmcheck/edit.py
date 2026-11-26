@@ -144,6 +144,7 @@ def run(film_dir: Path, name: str, args: dict, base: str = None, by: str = "loca
                check=out.get("check"), files=out.get("files") or [], stale=stale,
                fingerprint=spec["fp"](d) if spec.get("fp") else points.fingerprint(d, point),
                error=out.get("error"))
+    res.update({k: out[k] for k in ("rebuild", "silence") if k in out})       # specs/035: what the draft builds again
     log_edit(d, {"at": now(), "by": by, "source": source, "op": name, "point": point, "ref": out.get("ref"),
                  "old": out.get("old"), "new": out.get("new"), "result": "ok" if res["ok"] else "check_failed",
                  "stale": stale})
@@ -771,6 +772,103 @@ def cast_view_toggle(d: Path, a: dict) -> dict:
     n = _note_call(castnotes.toggle_view, d, a["character"], a["frame"])
     return {"ok": True, "ref": n["id"] if n else a["frame"], "new": "requested" if n else "undone",
             "files": ["cast-notes.json"], "no_stale": True}
+
+# ---------- the Animatic of an AE film (specs/035) ----------
+def _timing_base(d: Path) -> str:
+    from filmcheck import timing
+    return timing.base(d)
+
+
+def _anim_call(fn, *args, **kw):
+    from filmcheck import animatic
+    try:
+        return fn(*args, **kw)
+    except animatic.AnimaticError as e:
+        raise EditError(f"{e.code}: {e.message}") from None
+
+
+def _changed(before: dict, after: dict) -> list:
+    return [s for s in after if before.get(s) != after.get(s)]
+
+
+@op("animatic-fit-accept", "animatic", _timing_base)
+def animatic_fit_accept(d: Path, a: dict) -> dict:
+    """Accept fit suggestions: shots=S2,S6 or all. The result's `rebuild` lists the shots the draft must build again."""
+    from filmcheck import animatic, timing
+    want = a.get("shots") or ",".join(a.get("ref") or [])
+    if not want:
+        raise EditError("animatic-fit-accept: shots=S2,S6 or shots=all")
+    before = dict(timing.require(d)["frames"])
+    r = _anim_call(animatic.accept, d, "all" if want == "all" else [x for x in want.split(",") if x], by=a.get("by") or "local")
+    return {"ok": True, "ref": ",".join(r["accepted"]), "old": before, "new": timing.load(d)["frames"],
+            "files": ["timing.json", "narration.json"], "rebuild": _changed(before, timing.load(d)["frames"]),
+            "silence": r["silence"]}
+
+
+@op("animatic-fit-skip", "animatic", _timing_base)
+def animatic_fit_skip(d: Path, a: dict) -> dict:
+    from filmcheck import animatic
+    shot = a.get("shot") or (a.get("ref") or [None])[0]
+    if not shot:
+        raise EditError("animatic-fit-skip: shot=S2")
+    _anim_call(animatic.skip, d, shot)
+    return {"ok": True, "ref": shot.upper(), "new": "skipped", "files": ["animatic/fit.json"], "no_stale": True}
+
+
+@op("animatic-fit-undo", "animatic", _timing_base)
+def animatic_fit_undo(d: Path, a: dict) -> dict:
+    from filmcheck import animatic, timing
+    before = dict(timing.require(d)["frames"])
+    r = _anim_call(animatic.undo, d)
+    after = timing.load(d)["frames"]
+    return {"ok": True, "ref": "undo", "old": before, "new": after, "files": ["timing.json", "narration.json"],
+            "rebuild": _changed(before, after), "silence": r["silence"]}
+
+
+def _anim_notes_base(d: Path) -> str:
+    from filmcheck import animatic
+    return animatic.notes_base(d)
+
+
+@op("animatic-note-add", "animatic", _anim_notes_base)
+def animatic_note_add(d: Path, a: dict) -> dict:
+    """A note on a shot of the draft: shot, text, at? (s), x?, y? (%) — no x/y: a general note on the shot."""
+    from filmcheck import animatic
+    shot = a.get("shot") or (a.get("ref") or [None])[0]
+    if not shot:
+        raise EditError("animatic-note-add: shot=S2")
+    num = lambda k: None if a.get(k) in (None, "") else a.get(k)
+    n = _anim_call(animatic.note_add, d, shot, _note_text(a), num("at"), num("x"), num("y"), by=a.get("by") or "owner")
+    return {"ok": True, "ref": n["id"], "new": n["text"], "files": ["animatic/notes.json"], "no_stale": True}
+
+
+@op("animatic-note-delete", "animatic", _anim_notes_base)
+def animatic_note_delete(d: Path, a: dict) -> dict:
+    from filmcheck import animatic
+    shot = a.get("shot") or (a.get("ref") or [None])[0]
+    if not shot or not a.get("note"):
+        raise EditError("animatic-note-delete: shot=S2 note=<id>")
+    _anim_call(animatic.note_delete, d, shot, a["note"])
+    return {"ok": True, "ref": a["note"], "files": ["animatic/notes.json"], "no_stale": True}
+
+
+@op("animatic-draft", "animatic", _timing_base)
+def animatic_draft(d: Path, a: dict) -> dict:
+    """Build the draft again (shots=S2,S6: those and every shot whose length changed; none: the whole film)."""
+    import subprocess
+    cmd = ["sh", str(Path(__file__).resolve().parents[2] / "bin" / "studio"), "ae", "draft", d.name, "--dir", str(d)]
+    shots = a.get("shots") or ",".join(a.get("ref") or [])
+    if shots:
+        cmd += ["--shots", shots]
+    from filmcheck import animatic
+    before = (animatic.draft_info(d) or {}).get("built_at")
+    p = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+    after = animatic.draft_info(d) or {}
+    if p.returncode not in (0, 1) or not after or after.get("built_at") == before and p.returncode:
+        raise EditError((p.stderr or p.stdout).strip()[-300:] or f"ae draft ended with {p.returncode}")
+    return {"ok": True, "ref": shots or "all", "new": (p.stdout.strip().splitlines() or [""])[-1],
+            "files": ["animatic/draft.mp4"], "no_stale": True}
+
 
 # ---------- publish (US5) ----------
 @op("publish", "publish")

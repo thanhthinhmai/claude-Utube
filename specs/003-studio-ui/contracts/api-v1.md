@@ -32,6 +32,7 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 | `POST /films/{name}/notes/images` multipart `file` | `201 {file}`: ảnh PNG/JPEG/WebP ≤ 10 MB cho ghi chú (029; cũng nhận `multipart/form-data` có `X-Studio: 1`) | `413 too_large` · `415 bad_image` · `403 forbidden` · `404` |
 | `GET /films/{name}/notes/images/{file}` | ảnh đính kèm, `file` dạng `img-<12 hex>.(png\|jpg\|webp)` (029) | `400 bad_name` · `404` |
 | `POST /films/{name}/fix` body `{}` | `201 {job, notes, left}`: việc `fix` "Fix with Claude" trên ≤ 10 ghi chú mở theo thứ tự trong phim (specs/032, chỉ trong app); `GET /films/{name}` của phim AE có thêm `engine`, `lot`, `ae_ready`, `ae_message` | `422 not_ae` · `422 no_open_notes` · `409 in_progress` · `409 ae_unavailable` · `409 ae_missing` · `409 app_only` (chế độ local) |
+| `POST /films/{name}/animatic/fix` body `{}` | `201 {job, shots, notes}`: việc `fix` (`target: animatic`) trên các ghi chú mở của bản nháp Animatic khi không có việc làm phim nào đang chờ duyệt (specs/035, chỉ trong app) | `422 not_ae` · `422 no_notes` · `409 in_progress` · `409 ae_unavailable` · `409 app_only` · `404` |
 | `GET /films/{name}/poster` | `image/jpeg` | `404` |
 | `GET /films/{name}/subtitles.vtt` | WebVTT (chuyển từ `.srt`) | `404` |
 | `GET /films/{name}/publish` | gói đăng: `{titles, description, subtitles, files, check}` (specs/011) | `404` |

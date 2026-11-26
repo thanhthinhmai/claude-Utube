@@ -233,6 +233,9 @@ def _end_cast_round(j: dict, error: str) -> None:
         if d is not None and (d / "cast-notes.json").is_file():
             from filmcheck import castnotes
             castnotes.end_lot(d, j["id"], f"The job {'stopped' if j.get('status') == 'stopped' else 'failed'}: {error}")
+        if d is not None and (d / "animatic" / "notes.json").is_file():          # specs/035 FR-022: same for the draft
+            from filmcheck import animatic
+            animatic.notes_end(d, j["id"], f"The job {'stopped' if j.get('status') == 'stopped' else 'failed'}: {error}")
     except Exception:                                   # noqa: BLE001 — never blocks ending the job
         pass
 

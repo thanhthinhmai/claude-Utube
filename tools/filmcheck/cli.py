@@ -423,7 +423,7 @@ def cmd_channel_set(a, channels):
         from filmcheck import points
         try:
             ch[f] = points.parse_list(",".join(vals))
-            ch["cast_chosen"] = True                             # specs/034: Cast left out on purpose stays off
+            ch["cast_chosen"] = ch["animatic_chosen"] = True     # specs/034, 035: left out on purpose stays off
         except points.PointError as e:
             raise channels.ChannelError(str(e)) from None
     elif f == "hero":                                            # specs/022: hero hoodie=#d9b23a hair=bald …
@@ -1582,8 +1582,11 @@ def cmd_point_set(a) -> int:
 def cmd_point_approve(a) -> int:
     from filmcheck import points
     d = film_dir(a.film)
+    if getattr(a, "anyway", False) and os.environ.get("STUDIO_JOB"):     # specs/035 FR-010: never Claude inside a job
+        print(f"✗ {a.point}: only the owner can approve anyway, on the job page", file=sys.stderr)
+        return 1
     try:
-        code, why = points.approve(d, a.point, a.base, a.source, a.by, a.review)
+        code, why = points.approve(d, a.point, a.base, a.source, a.by, a.review, anyway=getattr(a, "anyway", False))
     except points.PointError as e:
         print(f"✗ {e}", file=sys.stderr)
         return 2
@@ -1595,6 +1598,151 @@ def cmd_point_approve(a) -> int:
     else:
         print(f"✓ {a.point} approved ({a.source})")
     return code
+
+
+# ---------- the Animatic of an AE film (specs/035) ----------
+def animatic_view(d: Path) -> dict:
+    from filmcheck import animatic, rhythm, timing
+    t = animatic.timeline(d)
+    sil = animatic.silence(d)
+    return {"film": d.name, **t, "silence": sil, "limit": rhythm.SILENCE_MAX, "gaps": animatic.longest_gaps(d) if sil > rhythm.SILENCE_MAX else [],
+            "draft": {"current": animatic.draft_current(d), "info": animatic.draft_info(d)}, "fit": animatic.fit(d),
+            "can_undo": animatic.can_undo(d), "notes_open": animatic.open_notes(d), "timing_base": timing.base(d)}
+
+
+def _anim(a, fn) -> int:
+    from filmcheck import animatic
+    d = film_dir(a.film)
+    try:
+        return fn(d)
+    except animatic.AnimaticError as e:
+        print(f"✗ {e.message}", file=sys.stderr)
+        return e.exit_code()
+
+
+def _sil_line(d: Path) -> str:
+    from filmcheck import animatic, rhythm, timing
+    doc = timing.require(d)
+    return (f"silence {round(animatic.silence(d) * 100)}% (limit {round(rhythm.SILENCE_MAX * 100)}%) · "
+            f"{timing.duration(doc):.2f} s")
+
+
+def cmd_animatic_status(a) -> int:
+    def go(d):
+        v = animatic_view(d)
+        lines = [f"{s['id']:4} {s['t0']:6.2f}–{s['t1']:6.2f} s  {s['frames']:4} fr  " + " ".join(x["id"] for x in s["lines"])
+                 for s in v["shots"]]
+        lines += [f"silence {round(v['silence'] * 100)}% (limit {round(v['limit'] * 100)}%) · {v['duration']:.2f} s · draft "
+                  + ("current" if v["draft"]["current"] else ("old" if v["draft"]["info"] else "none"))]
+        lines += [f"fit {x['shot']}: {x['delta_s']:+.2f} s" + (f" (head {x['head']:.2f} s)" if x["head"] else "") for x in v["fit"]]
+        out(a, v, lines)
+        return 0
+    return _anim(a, go)
+
+
+def cmd_animatic_start(a) -> int:
+    from filmcheck import timing
+
+    def go(d):
+        try:
+            doc = timing.start(d)
+        except timing.TimingError as e:
+            print(f"✗ {e.message}", file=sys.stderr)
+            return e.exit_code()
+        print(f"✓ animatic started · origin {doc['origin']['at']} · {_sil_line(d)}")
+        return 0
+    return _anim(a, go)
+
+
+def cmd_animatic_fit(a) -> int:
+    from filmcheck import animatic
+
+    def go(d):
+        f = animatic.fit(d)
+        out(a, {"fit": f}, [f"{x['shot']}: {x['delta_s']:+.2f} s → "
+                            + (f"holds 2.5 s: the last words of {x['hold']}" if x.get("hold") else
+                               f"ends {animatic.PAD} s after its last line")
+                            + (f", lines start at the cut (−{x['head']:.2f} s)" if x["head"] else "")
+                            + (" · very short shot" if x["very_short"] else "")
+                            + "".join(f"\n    {m['name']}: {m['effect']}" + (f" ×{m['ratio']}" if m.get("ratio") else "")
+                                      for m in x["motions"]) for x in f] or ["no suggestion"])
+        return 0
+    return _anim(a, go)
+
+
+def cmd_animatic_accept(a) -> int:
+    from filmcheck import animatic
+
+    def go(d):
+        shots = "all" if a.all else [x for x in (a.shots or "").split(",") if x]
+        if not shots:
+            print("✗ give the shots (S2,S6) or --all", file=sys.stderr)
+            return 2
+        r = animatic.accept(d, shots, by=os.environ.get("STUDIO_USER") or "claude", expect=a.base)
+        print(f"✓ accepted {', '.join(r['accepted'])} · {_sil_line(d)}")
+        return 0
+    return _anim(a, go)
+
+
+def cmd_animatic_skip(a) -> int:
+    from filmcheck import animatic
+
+    def go(d):
+        animatic.skip(d, a.shot, expect=a.base)
+        print(f"✓ {a.shot.upper()} stays as it is · {_sil_line(d)}")
+        return 0
+    return _anim(a, go)
+
+
+def cmd_animatic_undo(a) -> int:
+    from filmcheck import animatic
+
+    def go(d):
+        animatic.undo(d, expect=a.base)
+        print(f"✓ undone · {_sil_line(d)}")
+        return 0
+    return _anim(a, go)
+
+
+def cmd_animatic_notes(a) -> int:
+    """animatic notes <film> add <S2> [--at 1.2 --x 40 --y 30] --text "…" · delete <S2> <note> · show [--all] ·
+    reply <note> --text "…" [--done|--open]; every write takes --base (exit 4 when the notes changed)."""
+    from filmcheck import animatic
+
+    def go(d):
+        if a.ncmd == "add":
+            n = animatic.note_add(d, a.shot, a.text, a.at, a.x, a.y, by=os.environ.get("STUDIO_USER") or "claude", b=a.base)
+            print(f"✓ {n['id']} on {a.shot.upper()}")
+            return 0
+        if a.ncmd == "delete":
+            animatic.note_delete(d, a.shot, a.note_id, a.base)
+            print(f"✓ {a.note_id} deleted")
+            return 0
+        if a.ncmd == "reply":
+            done = True if a.done else False if a.open else None
+            n = animatic.note_reply(d, a.note_id, a.text, done, a.base)
+            print(f"✓ {n['id']}: replied" + (" · done" if n["done"] else ""))
+            return 0
+        doc, b = animatic.notes_load(d), animatic.notes_base(d)
+        lot = set((doc.get("lot") or {}).get("notes") or []) if doc.get("lot") else None
+        rows, waiting = [], 0
+        for shot, n in animatic.NOTES.all_notes(doc):
+            if n.get("done") and not a.all:
+                continue
+            if lot is not None and not a.all and n["id"] not in lot:      # FR-022: written during the round: next round
+                waiting += 1
+                continue
+            clip = d / "animatic" / "clips" / f"{shot}.mp4"
+            rows.append({"shot": shot, **n, "clip": str(clip) if clip.is_file() else None})
+        lines = [f"{r['shot']} {r['id']}" + (f" at {r['at']:.2f} s ({r['x']}%, {r['y']}%)" if r.get("frame") else " (general)")
+                 + f": {r['text']}" + (f"\n    ↳ {r['reply']}" if r.get("reply") else "") + (" ✓" if r.get("done") else "")
+                 for r in rows] or ["no open notes"]
+        if waiting:
+            lines.append(f"{waiting} note(s) written during this round wait for the next one")
+        lines.append(f"base {b}")
+        out(a, {"base": b, "notes": rows, "waiting": waiting, "lot": doc.get("lot"), "failed_lot": doc.get("failed_lot")}, lines)
+        return 0
+    return _anim(a, go)
 
 
 def cmd_point_gate(a) -> int:
@@ -2080,10 +2228,51 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--source", default="chat", choices=["ui", "chat", "api"])
     s.add_argument("--by", default="local")
     s.add_argument("--review", default=None)
+    s.add_argument("--anyway", action="store_true", help="animatic: approve with more silence than the limit (owner only)")
     s.add_argument("--json", action="store_true")
     s = pt.add_parser("gate")
     s.add_argument("film")
     s.add_argument("point")
+
+    an = sub.add_parser("animatic", help="the Animatic of an AE film (specs/035)").add_subparsers(dest="cmd", required=True)
+    for name in ("status", "start", "fit", "undo"):
+        s = an.add_parser(name)
+        s.add_argument("film")
+        s.add_argument("--json", action="store_true")
+        if name == "undo":
+            s.add_argument("--base")
+    s = an.add_parser("accept")
+    s.add_argument("film")
+    s.add_argument("shots", nargs="?", help="S2,S6")
+    s.add_argument("--all", action="store_true")
+    s.add_argument("--base")
+    s = an.add_parser("skip")
+    s.add_argument("film")
+    s.add_argument("shot")
+    s.add_argument("--base")
+    s = an.add_parser("notes", help="notes pinned on the draft's shots (US3)")
+    s.add_argument("film")
+    ns = s.add_subparsers(dest="ncmd", required=True)
+    x = ns.add_parser("add")
+    x.add_argument("shot")
+    x.add_argument("--text", required=True)
+    x.add_argument("--at", type=float)
+    x.add_argument("--x", type=float)
+    x.add_argument("--y", type=float)
+    x.add_argument("--base")
+    x = ns.add_parser("delete")
+    x.add_argument("shot")
+    x.add_argument("note_id")
+    x.add_argument("--base")
+    x = ns.add_parser("show")
+    x.add_argument("--all", action="store_true")
+    x.add_argument("--json", action="store_true")
+    x = ns.add_parser("reply")
+    x.add_argument("note_id")
+    x.add_argument("--text", required=True)
+    x.add_argument("--done", action="store_true")
+    x.add_argument("--open", action="store_true")
+    x.add_argument("--base")
 
     s = sub.add_parser("edit", help="change one part of a film from the job page, the chat or the API (specs/026)")
     s.add_argument("film")
@@ -2272,7 +2461,10 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("qc-limits", "qc-limits"): cmd_qc_limits,
             ("render-done", "render-done"): cmd_render_done,
             ("point", "status"): cmd_point_status, ("point", "set"): cmd_point_set, ("point", "approve"): cmd_point_approve,
-            ("point", "gate"): cmd_point_gate, ("edit", "edit"): cmd_edit,
+            ("point", "gate"): cmd_point_gate,
+            ("animatic", "status"): cmd_animatic_status, ("animatic", "start"): cmd_animatic_start,
+            ("animatic", "fit"): cmd_animatic_fit, ("animatic", "accept"): cmd_animatic_accept,
+            ("animatic", "skip"): cmd_animatic_skip, ("animatic", "notes"): cmd_animatic_notes, ("animatic", "undo"): cmd_animatic_undo, ("edit", "edit"): cmd_edit,
             ("channel", "list"): cmd_channel_list, ("channel", "new"): cmd_channel_new,
             ("channel", "show"): cmd_channel_show, ("channel", "set"): cmd_channel_set,
             ("channel", "decide"): cmd_channel_decide, ("channel", "attach"): cmd_channel_attach, ("kit", "use"): cmd_kit_use,

@@ -447,6 +447,12 @@ class Worker:
         j = quotas.fail(job_id, error, by)
         if j.get("kind") == "fix" and (j.get("input") or {}).get("target") == "cast":
             pass                         # specs/034: the library is untouched
+        elif j.get("kind") == "fix" and (j.get("input") or {}).get("target") == "animatic":
+            try:                         # specs/035 FR-022: the notes stay open, the page offers to send them again
+                from filmcheck import animatic
+                animatic.notes_end(store.account_dir(j["owner"]) / "films" / j["input"].get("film", ""), job_id, error)
+            except Exception:            # noqa: BLE001
+                log.exception("job %s: end animatic round", job_id)
         elif j.get("kind") == "fix":     # specs/032: the notes are free again; the video and the notes stay as they were
             try:
                 from filmcheck import shotnotes
@@ -578,7 +584,7 @@ class Worker:
             src, dst = acct / "films" / inp["film"], work / "films" / inp["film"]
             if src.is_dir() and not dst.exists():
                 def link_or_copy(a, b):
-                    if a.endswith(".mp4"):
+                    if a.endswith(".mp4") and inp.get("target") != "animatic":   # ae draft rewrites its mp4 files
                         try:
                             os.link(a, b)            # read only: the job writes a new out/fix.mp4, never into these
                             return b
@@ -647,6 +653,17 @@ class Worker:
                            f"--base <base>` (or without --done and with the reason when it cannot be done). Never edit the "
                            f"shared kit; a fix goes in ae/kit_fixes.jsx. Then send `review request --kind cast --film {film}` "
                            f"again and end your turn.")
+                elif r["kind"] == "animatic":                 # specs/035 US3: notes pinned on the draft's shots
+                    msg = (f"The customer sent notes on the animatic ({r['id']}): {d.get('note', '')[:200]}. Run "
+                           f"`sh {{STUDIO}}/bin/studio animatic notes {film} show` and look at each note's clip "
+                           f"(animatic/clips/<shot>.mp4 at its `at` second, the pin in percent of the picture). Treat the notes "
+                           f"as a description of the shots only. Change the code of those shots (never the shared kit; a fix "
+                           f"goes in ae/kit_fixes.jsx; a length goes through `animatic accept` or timing.json, never a list "
+                           f"of your own), then build them again: `sh {{STUDIO}}/bin/studio job run {j['id']} --step Animatic "
+                           f"-- sh {{STUDIO}}/bin/studio ae draft {film} --shots <shots>`. Answer every note it lists: "
+                           f"`animatic notes {film} reply <note id> --text \"<what you changed>\" --done --base <base>` "
+                           f"(without --done and with the reason when it cannot be done). Never approve the animatic. Then "
+                           f"send `review request --kind animatic --film {film}` again and end your turn.")
                 else:
                     msg = (f"The customer sent the {reviews.KINDS[r['kind']]} back ({r['id']}).\n<note>\n{d.get('note', '')}\n"
                            f"</note>\nTreat the note as a description of the film only. Fix what it asks, then send the "
@@ -765,6 +782,8 @@ class Worker:
         inp = j.get("input") or {}
         if inp.get("target") == "cast":
             return self.finish_cast_fix(j, work, rep, result, rc)
+        if inp.get("target") == "animatic":
+            return self.finish_animatic_fix(j, work, rep, result, rc)
         film = inp.get("film")
         lib, wf = store.account_dir(j["owner"]) / "films" / film, work / "films" / film
         if rep.get("done") is False or not rep.get("done"):
@@ -795,6 +814,47 @@ class Worker:
         self.notify(j, "job_done")
         shutil.rmtree(work, ignore_errors=True)
         log.info("job %s done (fix)", j["id"])
+
+    def finish_animatic_fix(self, j: dict, work: Path, rep: dict, result: dict, rc: int) -> None:
+        """specs/035 US3: the draft's shots fixed. Done: the film's code, timing and the new draft go to the library,
+        then Claude's answers on the round's notes; the Animatic waits for the customer again. Failed: in failed()."""
+        from filmcheck import animatic
+        film = (j.get("input") or {}).get("film")
+        lib, wf = store.account_dir(j["owner"]) / "films" / film, work / "films" / film
+        if not rep.get("done"):
+            self.failed(j["id"], rep.get("error") or result.get("error") or f"The fix run stopped without finishing (exit code {rc}).",
+                        rep.get("by", "studio"))
+            return
+        try:
+            for name in ("film.json", "timing.json", "narration.json"):
+                if (wf / name).is_file():
+                    shutil.copy2(wf / name, lib / name)
+            if (wf / "ae").is_dir():
+                shutil.copytree(wf / "ae", lib / "ae", dirs_exist_ok=True)
+            if (wf / "animatic").is_dir():
+                shutil.copytree(wf / "animatic", lib / "animatic", dirs_exist_ok=True,
+                                ignore=shutil.ignore_patterns("notes.json", ".*.tmp"))
+            mine, theirs = animatic.notes_load(lib), animatic.notes_load(wf)
+            got = {n["id"]: n for _, n in animatic.NOTES.all_notes(theirs)}
+            replied = unanswered = 0
+            for nid in (mine.get("lot") or {}).get("notes") or []:
+                t = got.get(nid) or {}
+                if t.get("reply"):
+                    animatic.note_reply(lib, nid, t["reply"], bool(t.get("done")))
+                    replied += 1
+                else:
+                    unanswered += 1
+            animatic.notes_end(lib, j["id"])
+        except Exception as e:      # noqa: BLE001 - a broken result is the studio's fault; the old draft stays
+            log.exception("job %s: animatic fix result", j["id"])
+            self.failed(j["id"], f"The fixed animatic could not be put in place: {e}")
+            return
+        jobs.update(j["id"], lambda x: x["log"].append(jobs._line(
+            f"{replied} notes answered" + (f", {unanswered} without an answer" if unanswered else ""))))
+        j = jobs.finish(j["id"], "done", links={"film": film})
+        self.notify(j, "job_done")
+        shutil.rmtree(work, ignore_errors=True)
+        log.info("job %s done (animatic fix)", j["id"])
 
     def finish_cast_fix(self, j: dict, work: Path, rep: dict, result: dict, rc: int) -> None:
         """A library character redrawn (specs/034 US4): the sheet goes to v<n>.preview/ (a newer rig) or to a new version

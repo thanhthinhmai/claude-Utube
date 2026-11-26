@@ -597,7 +597,7 @@ case ${1:-} in
   ae) shift; cmd_ae "$@" ;;
   config) if [ "${2:-}" = ae ]; then shift 2; cmd_ae config "$@"; else cmd_filmcheck "$@"; fi ;;
   ui | job | review | admin | app) cmd_studio "$@" ;;
-  script | web | qc | publish | eleven | channel | lesson | topics | kit | point | edit | people | shots | notes | film | cast) cmd_filmcheck "$@" ;;
+  script | web | qc | publish | eleven | channel | lesson | topics | kit | point | edit | people | shots | notes | film | cast | animatic) cmd_filmcheck "$@" ;;
   help | -h | --help) usage ;;
   '') usage >&2; exit 2 ;;
   *) echo "✗ lệnh lạ: $1" >&2; usage >&2; exit 2 ;;

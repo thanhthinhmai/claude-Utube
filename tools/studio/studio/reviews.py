@@ -10,9 +10,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))     # tools/: filmc
 
 # job log text is English (005); question and treatment are for online film jobs (007 FR-014)
 KINDS = {"style-1": "review 1", "style-2": "review 2", "question": "question", "treatment": "treatment review",
-         "script": "script review", "cast": "cast review", "voice": "voice review", "shots": "shots review", "mix": "mix review",
+         "script": "script review", "cast": "cast review", "voice": "voice review", "animatic": "animatic review", "shots": "shots review", "mix": "mix review",
          "publish": "publish review"}
-POINT_KINDS = ("script", "cast", "voice", "shots", "mix", "publish")     # review points of a film (specs/026, 034)
+POINT_KINDS = ("script", "cast", "voice", "animatic", "shots", "mix", "publish")   # review points of a film (specs/026, 034, 035)
 VALUES = {"approve", "revise", "accept_anyway", "stop"}
 LABEL = {"approve": "Approve", "revise": "Request changes", "accept_anyway": "Accept anyway", "stop": "Stop"}   # = DECISION in web/app.js
 SOURCES = {"ui", "chat", "api"}
@@ -62,6 +62,8 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
     store.doc_put("review", r["id"], r)
     if kind == "cast":                               # specs/034: Claude sends the cast again, the redraw lot is over
         _cast_notes(lambda cn, d: cn.end_lot(d), job)
+    if kind == "animatic":                           # specs/035: the draft is back for review, the notes round is over
+        _anim_notes(lambda an, d: an.notes_end(d), job)
 
     def f(j):
         if j["status"] in jobs.FINAL:
@@ -87,12 +89,29 @@ def _cast_notes(fn, job: dict):
         return None
 
 
+def _anim_notes(fn, job: dict):
+    """Run fn(animatic, film folder); a broken notes file never blocks the review itself."""
+    d = film_folder(job)
+    if d is None:
+        return None
+    try:
+        from filmcheck import animatic
+        return fn(animatic, d)
+    except Exception:                                # noqa: BLE001
+        return None
+
+
 def film_folder(job: dict):
     from . import donesofar
     return donesofar.film_dir(job)
 
 
-def point_decision(r: dict, value: str, note: str, source: str, base, by) -> None:
+def animatic_summary(job: dict) -> str:
+    """"N notes on: S2, S6" for "Send notes to Claude" at the Animatic (specs/035)."""
+    return _anim_notes(lambda an, d: an.notes_summary(d), job) or ""
+
+
+def point_decision(r: dict, value: str, note: str, source: str, base, by, anyway: bool = False) -> None:
     """A review point (specs/026 R3): approve records the approval in the film's checks.json, on the content shown
     (base) and only when the point's checks pass; revise records the rejection. Raises StudioError otherwise."""
     from filmcheck import points
@@ -102,7 +121,10 @@ def point_decision(r: dict, value: str, note: str, source: str, base, by) -> Non
     if value == "revise":
         points.reject(d, r["kind"], note, by or r.get("owner") or "local")
         return
-    code, why = points.approve(d, r["kind"], base, "api" if source == "api" else source, by or r.get("owner") or "local", r["id"])
+    code, why = points.approve(d, r["kind"], base, "api" if source == "api" else source, by or r.get("owner") or "local", r["id"],
+                               anyway=anyway and source == "ui")
+    if code == 1 and r["kind"] == "animatic" and any("approve anyway?" in w for w in why):
+        raise StudioError("needs_anyway", "; ".join(why), 422)    # FR-010: only the owner, from the page, approves anyway
     if code == 4:
         raise StudioError("changed", "the film changed since you opened it: reload the page", 409)
     if code:
@@ -112,7 +134,8 @@ def point_decision(r: dict, value: str, note: str, source: str, base, by) -> Non
         castlib.save_if_wanted(d, None, by or r.get("owner"))
 
 
-def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str = None, by: str = None) -> dict:
+def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str = None, by: str = None,
+           anyway: bool = False) -> dict:
     r = load(rid)
     note = (note or "").strip()
     if value not in VALUES:
@@ -129,6 +152,8 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str
         raise StudioError("note_required", "hãy ghi câu trả lời", 422)
     if r["kind"] == "cast" and value == "revise" and not note:     # "Send notes to Claude" (specs/034 FR-011)
         note = _cast_notes(lambda cn, d: cn.summary(d), jobs.load(r["job_id"])) or ""
+    if r["kind"] == "animatic" and value == "revise" and not note:  # "Send notes to Claude" (specs/035 FR-019)
+        note = animatic_summary(jobs.load(r["job_id"]))
     if value == "revise" and len(note) < 3:
         raise StudioError("note_required", "hãy ghi góp ý (ít nhất 3 ký tự) khi yêu cầu sửa", 422)
     if len(note) > 4000:
@@ -136,9 +161,11 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str
     if r["kind"] in POINT_KINDS:
         if store.doc_get("decision", rid):
             raise StudioError("already_decided", "yêu cầu này đã được duyệt", 409)
-        point_decision(r, value, note, source, base, by)
+        point_decision(r, value, note, source, base, by, anyway)
         if r["kind"] == "cast" and value == "revise":
             _cast_notes(lambda cn, d: cn.start_lot(d, r["job_id"]), jobs.load(r["job_id"]))
+        if r["kind"] == "animatic" and value == "revise":
+            _anim_notes(lambda an, d: an.notes_start(d, r["job_id"]), jobs.load(r["job_id"]))
     d = {"value": value, "note": note, "source": source, "at": store.now_iso()}
     if not store.doc_create("decision", rid, {**d, "owner": r.get("owner", "local")}):
         raise StudioError("already_decided", "yêu cầu này đã được duyệt", 409)

@@ -58,11 +58,25 @@ def progress(p: dict) -> None:
     print(f"… {p.get('shot')} ({p.get('index')}/{p.get('total')})", flush=True)
 
 
-def do_build(code: Path, shots) -> dict:
-    r = runner()(code, shots, progress=progress)
+def do_build(code: Path, shots, draft: bool = False) -> dict:
+    r = runner()(code, shots, progress=progress, draft=draft) if draft else runner()(code, shots, progress=progress)
     for c in r["checks"]:
         print(c)
+    remember_timing(code, r)
     return r
+
+
+def remember_timing(code: Path, r: dict) -> None:
+    """specs/035: a film without timing.json gets one from the real lengths of its first whole build (old films)."""
+    from filmcheck import timing
+    try:
+        if timing.load(code) is None and r.get("marks"):
+            have = {str(m[3]) for m in r["marks"] if len(m) > 3}
+            if set(timing.film(code)["shots"]) <= have:
+                timing.from_marks(code, r["marks"])
+                print(f"✓ timing.json written from this build's shot lengths", flush=True)
+    except timing.TimingError as e:
+        print(f"timing.json: {e.message}", file=sys.stderr)
 
 
 def fail(e) -> int:
@@ -106,8 +120,39 @@ def _mux(master: Path, audio, out: Path) -> None:
     subprocess.run(cmd, check=True, capture_output=True)
 
 
+def cmd_draft(a) -> int:
+    """specs/035: the Animatic's quarter-size draft with the real voice."""
+    from ae import draft
+    from filmcheck import animatic, rhythm
+    code, _ = film_dirs(a.film, a.dir)
+    try:
+        doc = filmdoc.require_ae(code)
+        shots = filmdoc.pick_shots(doc, a.shots.split(",")) if a.shots else None
+        info = draft.make(code, shots, build=runner(), progress=progress)
+    except (filmdoc.FilmError, local.AeError, splice.SpliceError) as e:
+        return fail(e)
+    except draft.DraftError as e:
+        print(f"✗ {e.message}", file=sys.stderr)
+        return e.exit_code()
+    for c in info.get("checks") or []:
+        print(c)
+    try:
+        sil = f"{round(animatic.silence(code) * 100)}% (limit {round(rhythm.SILENCE_MAX * 100)}%)"
+    except animatic.AnimaticError as e:
+        sil = f"not measured ({e.message})"
+    print(f"✓ draft of {', '.join(info['shots_built'])} → {code / 'animatic' / 'draft.mp4'}")
+    print(f"draft: {info['seconds']:.1f} s · silence {sil}")
+    return 1 if info.get("checks") else 0
+
+
 def cmd_render(a) -> int:
     code, video = film_dirs(a.film, a.dir)
+    from filmcheck import points
+    why = points.gate(code, "animatic")                    # specs/035 FR-003: the final render waits for the animatic
+    if why:
+        for w in why:
+            print(f"✗ {w}", file=sys.stderr)
+        return 3
     try:
         doc = filmdoc.require_ae(code)
         r = do_build(code, None)
@@ -235,7 +280,7 @@ def cmd_status(a) -> int:
         print(f"queue: {st.get('queued', 0)} waiting · {st.get('running', 0)} running")
         return 0
     s = local.settings()
-    print(f"config: {local.CONFIG}")
+    print(f"config: {local.config_path()}")
     for k in ("afterfx", "aerender", "work"):
         v = s[k]
         v = " ".join(v) if isinstance(v, list) else v
@@ -251,8 +296,9 @@ def cmd_status(a) -> int:
 
 SHOTS_TEMPLATE = """// shots.jsx: this film's own shots (specs/032). One function per shot id of film.json, returning its comp.
 // The shared kit (tools/ae/kit: lib, chars, scene, persp, build_core) is loaded first: use CU.comp, CU.person, …
+// Shot lengths come from the film's timing.json (the Animatic, specs/035): CU.shotFrames("S1") || <frames before it>.
 CU.shot1 = function () {
-  var c = CU.comp("S01 title", 3);
+  var c = CU.comp("S01 title", (CU.shotFrames("S1") || 90) / CU.FPS);
   return c;
 };
 """
@@ -293,6 +339,7 @@ def parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("build"); s.add_argument("film"); s.add_argument("--shots"); s.add_argument("--dir"); s.set_defaults(fn=cmd_build)
     s = sub.add_parser("render"); s.add_argument("film"); s.add_argument("--dir"); s.set_defaults(fn=cmd_render)
+    s = sub.add_parser("draft"); s.add_argument("film"); s.add_argument("--shots"); s.add_argument("--dir"); s.set_defaults(fn=cmd_draft)
     s = sub.add_parser("fix"); s.add_argument("film"); s.add_argument("shots", nargs="+"); s.add_argument("--dir"); s.set_defaults(fn=cmd_fix)
     s = sub.add_parser("uses"); s.add_argument("film"); s.add_argument("funcs", nargs="+"); s.add_argument("--dir"); s.set_defaults(fn=cmd_uses)
     s = sub.add_parser("status"); s.set_defaults(fn=cmd_status)
