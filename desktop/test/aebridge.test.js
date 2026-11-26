@@ -110,8 +110,6 @@ test("commands per system", () => {
   assert.match(mac.args[1], /DoScriptFile "\/w\/x\/entry.jsx"/);
   const w = ae.scriptCommand("win32", ae.settings({ afterfx: "C:\\AE\\AfterFX.exe" }, null), "E:\\w\\entry.jsx");
   assert.deepEqual([w.file, ...w.args], ["C:\\AE\\AfterFX.exe", "-r", "E:\\w\\entry.jsx"]);
-  assert.equal(ae.killCommands("win32", ae.settings({ afterfx: "C:\\AE\\AfterFX.exe" }, null)).length, 3);
-  assert.equal(ae.killCommands("darwin", s).length, 0);
   assert.deepEqual(ae.renderCommand(s, "a.aep", "o.mp4").args.slice(0, 4), ["-project", "a.aep", "-comp", "MASTER"]);
 });
 

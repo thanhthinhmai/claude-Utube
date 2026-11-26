@@ -106,13 +106,6 @@ function renderCommand(s, aep, out) {
   return { file: a[0], args: [...a.slice(1), "-project", aep, "-comp", "MASTER", "-OMtemplate", OM_TEMPLATE, "-output", out] };
 }
 
-/** Commands that close After Effects so aerender can open the project (Windows: a GUI holding it makes aerender
- *  fail with "connection forcibly closed" or hang). @param {string} platform @param {ReturnType<typeof settings>} s */
-function killCommands(platform, s) {
-  if (platform !== "win32" || isFake(s.afterfx)) return [];
-  return ["AfterFX.exe", "AfterFX.com", "aerender.exe"].map((im) => ({ file: "taskkill.exe", args: ["/IM", im, "/F"] }));
-}
-
 // ---------- the bundle (a plain tar from tools/ae/bundle.py) ----------
 /** Files of a tar archive; refuses absolute paths, "..", and links. @param {Buffer} buf @returns {{name: string, data: Buffer|null}[]} */
 function untar(buf) {
@@ -280,10 +273,6 @@ class Bridge {
     });
   }
 
-  async killAE() {
-    for (const k of killCommands(this.o.platform, this.settings())) await this.run(k, { timeoutMs: 15_000 });
-  }
-
   /** Build one claimed request end to end; always finishes it (ok or error). @param {any} req */
   async build(req) {
     const s = this.settings();
@@ -384,17 +373,18 @@ class Bridge {
         // the crash / Safe Mode dialog at the next start (T031). On Windows the child may be After Effects itself.
         if (this.o.platform !== "win32" || isFake(s.afterfx)) for (const c of this.children) { try { c.kill(); } catch { /* gone */ } }
         throw new BridgeError("ae_scripting_off", `After Effects did not start the script in ${s.startTimeoutSec} s. Open After Effects once ` +
-          `(a dialog may be waiting: answer it, and do not choose Safe Mode) and turn on Preferences > Scripting & Expressions > "Allow Scripts to Write Files and Access Network".`);
+          `(a dialog may be waiting: if it is "Crash Repair Options", click Continue, not Safe Mode or Reset Preferences) and turn on Preferences > Scripting & Expressions > "Allow Scripts to Write Files and Access Network".`);
       }
       if (n && now - last > allow * 1000) {
-        await this.killAE();
-        for (const c of this.children) { try { c.kill(); } catch { /* gone */ } }
-        throw new BridgeError("ae_stalled", `After Effects made no progress for ${allow} s`, parseLog(text).tail);
+        // as above: After Effects stays open (a forced close brings "Crash Repair Options" back at the next start)
+        if (this.o.platform !== "win32" || isFake(s.afterfx)) for (const c of this.children) { try { c.kill(); } catch { /* gone */ } }
+        throw new BridgeError("ae_stalled", `After Effects made no progress for ${allow} s (it was left open). If it shows ` +
+          `"Crash Repair Options", click Continue (not Safe Mode or Reset Preferences).`, parseLog(text).tail);
       }
       await new Promise((res) => setTimeout(res, 250));
     }
   }
 }
 
-module.exports = { Bridge, BridgeError, findAE, settings, workProblem, scriptCommand, renderCommand, killCommands, untar, extract, parseLog, aeYear,
+module.exports = { Bridge, BridgeError, findAE, settings, workProblem, scriptCommand, renderCommand, untar, extract, parseLog, aeYear,
   IDLE_POLL_MS, BUSY_POLL_MS, MIN_FREE };

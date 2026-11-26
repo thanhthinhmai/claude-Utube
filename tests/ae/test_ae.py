@@ -301,3 +301,22 @@ class FakeWork(unittest.TestCase):
                         os.environ.pop(k, None)
                     else:
                         os.environ[k] = v
+
+
+class NeverCloseAE(unittest.TestCase):
+    """specs/035 T052: a timeout never force-closes After Effects (a forced close brings "Crash Repair Options" back)."""
+
+    def test_windows_timeout_leaves_after_effects_open(self):
+        from unittest import mock
+        from ae import local
+        proc = mock.Mock()
+        proc.poll.return_value = None
+        with mock.patch.object(local.subprocess, "run") as run:
+            local._kill({"kind": "windows"}, [proc])
+            self.assertFalse(run.called)
+            proc.kill.assert_not_called()                                    # on Windows the child may be AE itself
+            local._kill({"kind": "windows"}, aerender=True)
+            self.assertEqual(run.call_args[0][0][-3:], ["/IM", "aerender.exe", "/F"])
+        local._kill({"kind": "fake"}, [proc])
+        proc.kill.assert_called_once()
+        self.assertIn("click Continue", local.REPAIR)

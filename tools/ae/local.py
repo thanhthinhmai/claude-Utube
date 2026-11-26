@@ -115,13 +115,19 @@ def free_bytes(folder) -> int:
     return shutil.disk_usage(folder).free
 
 
-def _kill(s: dict, procs=()) -> None:
-    for p in procs:
-        if p and p.poll() is None:
-            p.kill()
-    if s["kind"] == "windows":
-        for im in ("AfterFX.exe", "AfterFX.com", "aerender.exe"):
-            subprocess.run(["/mnt/c/Windows/System32/taskkill.exe", "/IM", im, "/F"], capture_output=True)
+REPAIR = ("If After Effects shows \"Crash Repair Options\", click Continue (not Safe Mode or Reset Preferences: "
+          "those stop the studio's scripts).")
+
+
+def _kill(s: dict, procs=(), aerender: bool = False) -> None:
+    """Stop what this run started, but never After Effects itself: it stays open (specs/031), and a forced close makes
+    it ask "Crash Repair Options" at the next start, which stops every script until someone clicks Continue."""
+    if s["kind"] != "windows":
+        for p in procs:
+            if p and p.poll() is None:
+                p.kill()
+    elif aerender:                                    # a manual aerender run is its own program: only that one
+        subprocess.run(["/mnt/c/Windows/System32/taskkill.exe", "/IM", "aerender.exe", "/F"], capture_output=True)
 
 
 def _path(s: dict, p) -> str:
@@ -167,12 +173,13 @@ def wait_log(s: dict, log: Path, shots: list, proc, progress=None, sleep=0.25) -
         if not lines and now - t0 > s["startTimeoutSec"]:
             _kill(s, [proc])
             raise AeError("ae_scripting_off", "After Effects did not start the script in "
-                          f"{s['startTimeoutSec']} s. Open After Effects once (a dialog may be waiting) and turn on "
+                          f"{s['startTimeoutSec']} s (it was left open). A dialog may be waiting: " + REPAIR + " Check "
                           "Edit > Preferences > Scripting & Expressions > \"Allow Scripts to Write Files and Access Network\".")
         allow = s["shotTimeoutSec"] * (max(1, len(shots)) if lines and lines[-1].startswith("render ") else 1)   # render phase
         if lines and now - last > allow:
             _kill(s, [proc])
-            raise AeError("ae_stalled", f"After Effects made no progress for {int(allow)} s", _tail(text))
+            raise AeError("ae_stalled", f"After Effects made no progress for {int(allow)} s (it was left open). "
+                          + REPAIR, _tail(text))
         time.sleep(sleep)
 
 
@@ -182,7 +189,7 @@ def render(s: dict, aep: Path, out: Path, timeout: float) -> str:     # aerender
     try:
         r = subprocess.run(cmd, cwd=aep.parent, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired as e:
-        _kill(s)
+        _kill(s, aerender=True)
         raise AeError("shot_timeout", f"aerender ran longer than {int(timeout)} s", _tail(str(e.stdout or "")))
     return (r.stdout or "") + (r.stderr or "")
 
