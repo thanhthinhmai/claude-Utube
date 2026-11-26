@@ -13,7 +13,9 @@ CU.SW = 4.5;           // outline width at 1080p
 CU.FONT = "InkFree";   // handwriting font on this machine
 CU.log = null;
 
-CU.say = function (s) { if (CU.log) { CU.log.writeln(s); } };
+// Each line reaches the disk at once (close + reopen to append): ExtendScript keeps writes in memory until close, and
+// the waiting side reads log.txt to know After Effects started (a long full-size build showed an empty log for > 240 s).
+CU.say = function (s) { if (CU.log) { CU.log.writeln(s); CU.log.close(); CU.log.encoding = "UTF-8"; CU.log.open("a"); } };
 
 CU.hex = function (h) {
   if (h === null || h === undefined) { return null; }
