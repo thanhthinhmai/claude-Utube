@@ -125,17 +125,19 @@ description: "Task list for 037-sound-per-shot"
 
 ### Tests
 
-- [ ] T041 [P] [US3] ⟂035 `tests/ui/test_sound_api.py`: khối `sound` của `GET /jobs/{id}/steps` đúng `contracts/api.md`; `POST /jobs/{id}/actions` op `cue_set|cue_rm|cue_add|shot_set|note_add|note_delete` với `base` (409 `changed` khi lệch), sửa đánh `by: user`; `mix.wav` phát được với `Range`; `POST /films/{film}/sound/fix` tạo việc `fix` `target: "sound"`
-- [ ] T042 [P] [US3] ⟂035 `tests/ui/browser_sound.cjs`: mở bước Sound, bấm một shot phát clip (video câm + bản trộn từ `t0`), đổi tiếng (≥ 3 gợi ý, nghe thử), dời, xoá; đo thời gian trộn lại ≤ 30 s; ghi chú + "Send notes to Claude"
+- [X] T041 [P] [US3] ⟂035 `tests/ui/test_sound_api.py`: khối `sound` của `GET /jobs/{id}/steps` đúng `contracts/api.md`; `POST /jobs/{id}/actions` op `cue_set|cue_rm|cue_add|shot_set|note_add|note_delete` với `base` (409 `changed` khi lệch), sửa đánh `by: user`; `mix.wav` phát được với `Range`; `POST /films/{film}/sound/fix` tạo việc `fix` `target: "sound"` — xong trước 035 (nhánh `037-sound-review`): op tên có gạch (`cue-set`…, `sound-note-add`), mix ở `out/mix.wav`; `sound/fix` thử ở `tests/online/test_sound_fix_job.py` (chế độ trên máy trả 409 `app_only`)
+- [X] T042 [P] [US3] ⟂035 `tests/ui/browser_sound.cjs`: mở bước Sound, bấm một shot phát clip (video câm + bản trộn từ `t0`), đổi tiếng (≥ 3 gợi ý, nghe thử), dời, xoá; đo thời gian trộn lại ≤ 30 s; ghi chú + "Send notes to Claude" — xong trước 035: shot, ghi chú, "Send 1 note to Claude", nút duyệt bị khoá, trang phim chỉ có ghi chú, không cuộn ngang ở 400 px. Còn lại khi có 035: clip nháp câm, đo thời gian trộn lại
 
 ### Implementation
 
-- [ ] T043 [US3] ⟂035 `tools/filmcheck/edit.py`: op `cue-set`, `cue-rm`, `cue-add`, `sound-note-add`, `sound-note-delete` cho điểm `mix` của phim AE (gọi `soundplan`, rồi `soundmix`; ghi `log_edit`)
-- [ ] T044 [US3] ⟂035 `tools/filmcheck/soundplan.py` + `tools/filmcheck/pins.py` (của 035): `sound/notes.json` (`{version, base_sha, shots: {S2: [{id, text, state, reply, lot}]}}`), lệnh `sound notes add|delete|show|reply`
-- [ ] T045 [US3] ⟂035 `tools/studio/studio/filmsteps.py`, `actions.py`, `reviews.py`, `server.py`: khối `sound`, các op, `files/sound/mix.wav` (Range), quyết định `revise` của duyệt `mix` cho phim AE, `POST /films/{film}/sound/fix`
-- [ ] T046 [US3] ⟂035 `tools/studio/studio/web/app.js`, `style.css`: khung Sound (dải thời gian shot/câu/khối tiếng có nhãn, lưới shot, danh sách tiếng của shot, công tắc tiếng bật/tắt trên mỗi shot (T053), đổi tiếng với nghe thử, dời theo khung, độ lớn, xoá, thêm, ghi chú, "Send notes to Claude", cột "If you change this" → Final render), dùng lại thành phần dải thời gian của Animatic
-- [ ] T047 [US3] ⟂035 Việc `fix` `target: "sound"` trong `tools/runner/agent.py`/`JOB.md`: Claude chỉ sửa cue của shot có ghi chú, `sound mix`, trả lời từng ghi chú, không duyệt; bước Sound về chưa duyệt
+- [X] T043 [US3] ⟂035 `tools/filmcheck/edit.py`: op `cue-set`, `cue-rm`, `cue-add`, `sound-note-add`, `sound-note-delete` cho điểm `mix` của phim AE (gọi `soundplan`, rồi `soundmix`; ghi `log_edit`) — xong trước 035, thêm `shot-set`; `at` (giây) đổi ra phần của shot
+- [X] T044 [US3] ⟂035 `tools/filmcheck/soundplan.py` + `tools/filmcheck/pins.py` (của 035): `sound/notes.json` (`{version, base_sha, shots: {S2: [{id, text, state, reply, lot}]}}`), lệnh `sound notes add|delete|show|reply` — xong trước 035 bằng `tools/filmcheck/soundnotes.py` (không dùng `pins.py`); dạng tệp ở data-model
+- [X] T045 [US3] ⟂035 `tools/studio/studio/filmsteps.py`, `actions.py`, `reviews.py`, `server.py`: khối `sound`, các op, `files/sound/mix.wav` (Range), quyết định `revise` của duyệt `mix` cho phim AE, `POST /films/{film}/sound/fix` — xong trước 035; thêm `GET/POST/DELETE /films/{film}/sound…` cho trang phim
+- [ ] T046 [US3] ⟂035 `tools/studio/studio/web/app.js`, `style.css`: khung Sound (dải thời gian shot/câu/khối tiếng có nhãn, lưới shot, danh sách tiếng của shot, công tắc tiếng bật/tắt trên mỗi shot (T053), đổi tiếng với nghe thử, dời theo khung, độ lớn, xoá, thêm, ghi chú, "Send notes to Claude", cột "If you change this" → Final render), dùng lại thành phần dải thời gian của Animatic — phần trước 035 xong (lưới shot, phát shot, danh sách tiếng, công tắc, đổi/nghe thử, ±2 khung, ±3 dB, xoá, thêm, ghi chú, "Send notes to Claude"); còn dải thời gian dùng chung với Animatic và cột "If you change this" → T056
+- [X] T047 [US3] ⟂035 Việc `fix` `target: "sound"` trong `tools/runner/agent.py`/`JOB.md`: Claude chỉ sửa cue của shot có ghi chú, `sound mix`, trả lời từng ghi chú, không duyệt; bước Sound về chưa duyệt — xong trước 035: `sound_fix_prompt`, `finish_sound_fix`, `merge_sound_replies`; bước 7 Sound sau bản dựng trong AE_PICTURE
 - [ ] T048 [US3] ⟂035 Chạy thật quickstart bước 5 trong app trên `ae-sleepless-test`; đo SC-006 và ghi kết quả
+- [ ] T056 [US3] ⟂035 Sau khi rebase lên 035: khung Sound dùng dải thời gian của Animatic (shot/câu/khối tiếng có nhãn) và `clip_url`; cột "If you change this"; cổng animatic trước bước Sound; `ae render` gọi `points.gate(d, "mix")` (T029)
+- [X] T057 [US3] Ghi đè `<phim>.mp4` khi trộn lại bằng tệp tạm + `os.replace` (`tools/filmcheck/soundmix.py`): bản làm việc của việc `fix` là hard link tới phim của khách, ghi tại chỗ sẽ đổi phim của khách trước khi việc xong
 
 ---
 

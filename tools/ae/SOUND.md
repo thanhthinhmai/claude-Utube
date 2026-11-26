@@ -66,6 +66,15 @@ the AAC copy stays under −1 dB. Do not normalise or limit again in `mix.py`.
 4. `sound plan <film>`, then `sound mix <film>`; measure the film (`ffmpeg -af ebur128=peak=true`): −14 ± 1 LUFS,
    true peak ≤ −1 dB. Until the Animatic (035) writes `animatic/keys.json`, it is written by hand from the AE keys.
 
+## Sound notes
+
+The owner writes notes per shot (Sound panel in the Mix tab, or the film page). When a fix job or a revise of the
+`mix` review sends them to you:
+1. `sh STUDIO/bin/studio sound notes show <film>`: the open notes, by shot.
+2. Change only the cues of those shots (`sound cue set|rm|add`, `sound shot on|off`), then `sound mix <film>`.
+3. Answer every note: `sound notes reply <film> <note> --text "<what you changed>" --done` (or `--open` with the
+   reason when you cannot do it). Never approve the mix yourself.
+
 ## Licences
 
 Library sounds are Sonniss GDC (the studio owner's films only) or Freesound CC0. The mix writes one CREDITS line

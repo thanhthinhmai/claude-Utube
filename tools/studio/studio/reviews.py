@@ -64,6 +64,8 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
         _cast_notes(lambda cn, d: cn.end_lot(d), job)
     if kind == "animatic":                           # specs/035: the draft is back for review, the notes round is over
         _anim_notes(lambda an, d: an.notes_end(d), job)
+    if kind == "mix":                                # specs/037: Claude sends the mix again, the sound-notes lot is over
+        _sound_notes(lambda sn, d: sn.end_lot(d), job)
 
     def f(j):
         if j["status"] in jobs.FINAL:
@@ -97,6 +99,18 @@ def _anim_notes(fn, job: dict):
     try:
         from filmcheck import animatic
         return fn(animatic, d)
+    except Exception:                                # noqa: BLE001
+        return None
+
+
+def _sound_notes(fn, job: dict):
+    """Run fn(soundnotes, film folder) for an AE film's Sound notes (specs/037); never blocks the review itself."""
+    d = film_folder(job)
+    if d is None or not (d / "sound" / "notes.json").is_file():
+        return None
+    try:
+        from filmcheck import soundnotes
+        return fn(soundnotes, d)
     except Exception:                                # noqa: BLE001
         return None
 
@@ -154,6 +168,8 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str
         note = _cast_notes(lambda cn, d: cn.summary(d), jobs.load(r["job_id"])) or ""
     if r["kind"] == "animatic" and value == "revise" and not note:  # "Send notes to Claude" (specs/035 FR-019)
         note = animatic_summary(jobs.load(r["job_id"]))
+    if r["kind"] == "mix" and value == "revise" and not note:      # "Send notes to Claude" on the Sound panel (037)
+        note = _sound_notes(lambda sn, d: sn.summary(d), jobs.load(r["job_id"])) or ""
     if value == "revise" and len(note) < 3:
         raise StudioError("note_required", "hãy ghi góp ý (ít nhất 3 ký tự) khi yêu cầu sửa", 422)
     if len(note) > 4000:
@@ -166,6 +182,8 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str
             _cast_notes(lambda cn, d: cn.start_lot(d, r["job_id"]), jobs.load(r["job_id"]))
         if r["kind"] == "animatic" and value == "revise":
             _anim_notes(lambda an, d: an.notes_start(d, r["job_id"]), jobs.load(r["job_id"]))
+        if r["kind"] == "mix" and value == "revise":
+            _sound_notes(lambda sn, d: sn.start_lot(d, r["job_id"]), jobs.load(r["job_id"]))
     d = {"value": value, "note": note, "source": source, "at": store.now_iso()}
     if not store.doc_create("decision", rid, {**d, "owner": r.get("owner", "local")}):
         raise StudioError("already_decided", "yêu cầu này đã được duyệt", 409)

@@ -70,7 +70,10 @@ Bản sao tiếng đã chọn (R5), ngoài git.
 Lớp của lần trộn gần nhất (tính khác biệt, phát thử).
 
 ### `notes.json`
-Mẫu `pins.py` (035): `{version, base_sha, shots: {S2: [{id, text, state, reply, lot}]}}` (ghi chú chung, không ghim x/y).
+`{version, shots: {S2: [{id, text, done, by, created, updated, reply}]}, lot?, last_lot?, failed_lot?}` (ghi chú chung theo shot, không ghim x/y; giống ghi chú Cast của 034 nhưng tự làm, chưa dùng `pins.py` của 035).
+- Base = sha256 của tệp (16 ký tự hex); ghi với base lệch bị từ chối (`changed`).
+- `lot = {job, notes:[id], since}`: các ghi chú mở lúc bấm "Send notes to Claude"; ghi chú viết sau chờ lượt sau. Xong: `last_lot`; việc hỏng: `failed_lot = {job, error, at}`, ghi chú vẫn mở.
+- Ghi chú mở làm điểm `mix` chưa qua ("S3: 1 open sound note(s)").
 
 ### `CREDITS` của phim
 Khối được thay mỗi lần trộn, giữa `# sound effects (studio, 037)` và `# end sound effects`: một dòng mỗi mục kho đã dùng: `<credit> · <tên tiếng> — <license>[ — <url>]` (FR-016).

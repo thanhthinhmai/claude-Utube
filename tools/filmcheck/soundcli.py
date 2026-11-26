@@ -64,6 +64,16 @@ def add_parser(sub) -> None:
     s = so.add_parser("mix", help="resolve, copy, mix out/mix.wav, stems and CREDITS"); s.add_argument("film")
     s.add_argument("--json", action="store_true"); s.add_argument("--dir")
 
+    no = so.add_parser("notes", help="Sound notes, one list per shot").add_subparsers(dest="ncmd", required=True)
+    s = no.add_parser("add"); s.add_argument("film"); s.add_argument("shot"); s.add_argument("--text", required=True)
+    s.add_argument("--base"); s.add_argument("--dir")
+    s = no.add_parser("delete"); s.add_argument("film"); s.add_argument("shot"); s.add_argument("note")
+    s.add_argument("--base"); s.add_argument("--dir")
+    s = no.add_parser("show"); s.add_argument("film"); s.add_argument("--json", action="store_true"); s.add_argument("--dir")
+    s = no.add_parser("reply"); s.add_argument("film"); s.add_argument("note"); s.add_argument("--text", required=True)
+    g = s.add_mutually_exclusive_group(); g.add_argument("--done", action="store_true"); g.add_argument("--open", action="store_true")
+    s.add_argument("--base"); s.add_argument("--dir")
+
 
 def _fd(a):
     from filmcheck import cli
@@ -230,9 +240,32 @@ def cmd_mix(a) -> int:
     return 0
 
 
+def cmd_notes(a) -> int:
+    from filmcheck import soundnotes as sn
+    d = _fd(a)
+    try:
+        if a.ncmd == "add":
+            n = sn.add(d, a.shot, a.text, by="claude" if os.environ.get("STUDIO_JOB") else "owner", b=a.base)
+            print(f"✓ note {n['id']} on {n['shot']}")
+        elif a.ncmd == "delete":
+            sn.delete(d, a.shot, a.note, b=a.base)
+            print(f"✓ note {a.note} deleted")
+        elif a.ncmd == "reply":
+            n = sn.reply(d, a.note, a.text, True if a.done else False if a.open else None, b=a.base)
+            print(f"✓ {n['id']} on {n['shot']}: {'done' if n['done'] else 'open'}")
+        elif getattr(a, "json", False):
+            print(json.dumps({"base": sn.base(d), **sn.load(d)}, ensure_ascii=False))
+        else:
+            print(sn.show(d))
+    except sn.SoundNoteError as e:
+        print(f"✗ {e.code}: {e.message}", file=sys.stderr)
+        return e.exit_code()
+    return 0
+
+
 def cmd_sound(a) -> int:
     return {"lib": cmd_lib, "key": cmd_key, "cue": cmd_cue, "silence": cmd_silence, "plan": cmd_plan,
-            "mix": cmd_mix, "shot": cmd_shot}[a.cmd](a)
+            "mix": cmd_mix, "shot": cmd_shot, "notes": cmd_notes}[a.cmd](a)
 
 
-COMMANDS = {("sound", k): cmd_sound for k in ("lib", "key", "cue", "silence", "plan", "mix", "shot")}
+COMMANDS = {("sound", k): cmd_sound for k in ("lib", "key", "cue", "silence", "plan", "mix", "shot", "notes")}
