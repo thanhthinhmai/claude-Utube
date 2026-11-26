@@ -832,13 +832,123 @@ const animUrl = (u) => { const [p, q] = u.split("?"); return fileUrl(p) + (q ? `
 const secs = (/** @type {number} */ x) => `${x < 0 ? "−" : "+"}${Math.abs(x).toFixed(2).replace(/0$/, "")} s`;
 /** One fit edit (base: the shot lengths shown). @param {string} op @param {any} args */
 async function animEdit(op, args) {
-  const a = await post(`/jobs/${encodeURIComponent(DONE.job.id)}/actions`, { point: "animatic", op, args, base: RAIL.data.animatic.timing_base });
+  const notes = op.startsWith("animatic-note-");        // notes ride on the notes' base, the rest on the shot lengths
+  const base = notes ? RAIL.data.animatic.notes_base || undefined : RAIL.data.animatic.timing_base;
+  const a = await post(`/jobs/${encodeURIComponent(DONE.job.id)}/actions`, { point: "animatic", op, args, base });
   for (let i = 0; i < 600; i++) {
     await new Promise((r) => setTimeout(r, i < 20 ? 250 : 1000));
     const x = await get(`/jobs/${encodeURIComponent(DONE.job.id)}/actions/${a.id}`);
     if (!["queued", "running"].includes(x.status)) { await railRefresh(); return x; }
   }
   throw new Error("The edit is taking long; its result will show in the log.");
+}
+/** All notes of one shot, in order (open first numbering: 1, 2, … as pinned). @param {any} a @param {string} id */
+const animNotes = (a, id) => ((a.notes && a.notes.shots && a.notes.shots[id] && a.notes.shots[id].notes) || []);
+/** The note box of the chosen shot: its clip, pins at the paused frame, the shot's notes and a general note. @param {any} a @param {boolean} can */
+function animNoteBox(a, can) {
+  const s = a.shots.find((/** @type {any} */ x) => x.id === DONE.animShot);
+  if (!s) return `<p class="muted small" id="anim-note-hint">Click a shot to watch it and pin notes on it.</p>`;
+  const len = s.t1 - s.t0, lot = new Set(((a.notes && a.notes.lot) || {}).notes || []);
+  const open = animNotes(a, s.id).filter((/** @type {any} */ n) => !n.done), done = animNotes(a, s.id).filter((/** @type {any} */ n) => n.done && n.reply);
+  const pin = DONE.animPin && DONE.animPin.shot === s.id ? DONE.animPin : null;
+  const pins = open.map((/** @type {any} */ n, /** @type {number} */ i) => n.frame === "clip" && n.x != null
+    ? `<i class="pin" data-at="${n.at}" style="left:${n.x}%;top:${n.y}%">${i + 1}</i>` : "").join("")
+    + (pin ? `<i class="pin new" data-at="${pin.at}" style="left:${pin.x}%;top:${pin.y}%">${open.length + 1}</i>` : "");
+  const li = (/** @type {any} */ n, /** @type {number} */ i) => `<li data-note="${esc(n.id)}"${n.at != null ? ` data-seek="${n.at}"` : ""}>
+      <span><b>${n.done ? "✓" : i + 1}.</b> ${esc(n.text)} <span class="muted small">${n.frame === "clip" ? `at ${Number(n.at).toFixed(2)} s` : n.at != null ? `around ${Number(n.at).toFixed(2)} s` : "the whole shot"}${lot.has(n.id) ? " · sent to Claude" : ""}</span>
+      ${n.reply ? `<br><span class="small reply">↳ ${esc(n.reply)}</span>` : ""}</span>
+      ${can && !n.done && !lot.has(n.id) ? `<button class="btn small" data-ndel="${esc(n.id)}" aria-label="Delete note ${i + 1}">Delete</button>` : ""}</li>`;
+  return `<div class="anim-note" id="anim-note" data-shot="${esc(s.id)}">
+    <div class="row spread"><b>${esc(s.id)} · ${len.toFixed(1)} s</b><button class="btn small" id="anim-note-close">Close</button></div>
+    <div class="clipwrap" id="anim-clipwrap">${s.clip_url ? `<video class="anim-clip" src="${animUrl(s.clip_url)}" playsinline preload="auto" autoplay></video>` : `<div class="anim-none muted">No clip yet: build the draft.</div>`}${pins}</div>
+    <div class="row clipbar"><button class="btn small" id="anim-play">Pause</button>
+      <input type="range" id="anim-seek" min="0" max="${len.toFixed(2)}" step="0.01" value="0" aria-label="Time in the shot">
+      <span class="tabnum small" id="anim-time">0.00 s</span></div>
+    <p class="muted small">${can ? "Pause on a frame, then click the picture to pin a note there." : "Notes can be added while the animatic waits for your review."}</p>
+    ${pin ? `<div class="pinform"><label class="small" for="anim-pin-note">Note ${open.length + 1} at ${pin.at.toFixed(2)} s</label>
+      <textarea id="anim-pin-note" rows="2" maxlength="2000" placeholder="What should change here?">${esc(pin.text || "")}</textarea>
+      <div class="row"><button class="btn small accent" id="anim-pin-save">Save note</button><button class="btn small" id="anim-pin-cancel">Cancel</button></div>
+      <p class="small fail" id="anim-pin-msg" role="status"></p></div>` : ""}
+    ${open.length || done.length ? `<ol class="anim-notes">${open.map(li).join("")}${done.map(li).join("")}</ol>` : ""}
+    ${can ? `<div class="row"><textarea id="anim-gen" rows="1" maxlength="2000" placeholder="A note on the whole shot"></textarea><button class="btn small" id="anim-gen-add">Add note</button></div>
+      <p class="small fail" id="anim-gen-msg" role="status"></p>` : ""}</div>`;
+}
+/** Wire the note box. @param {HTMLElement} body @param {any} a @param {() => void} redraw */
+function animNoteWire(body, a, redraw) {
+  const box = /** @type {HTMLElement | null} */ (body.querySelector("#anim-note"));
+  if (!box) return;
+  const shot = /** @type {string} */ (box.dataset.shot);
+  const v = /** @type {HTMLVideoElement | null} */ (box.querySelector("video.anim-clip"));
+  const play = /** @type {HTMLButtonElement} */ (box.querySelector("#anim-play"));
+  const seek = /** @type {HTMLInputElement} */ (box.querySelector("#anim-seek")), time = /** @type {HTMLElement} */ (box.querySelector("#anim-time"));
+  const showPins = () => {
+    const t = v ? v.currentTime : 0, still = !v || v.paused;
+    box.querySelectorAll(".clipwrap .pin").forEach((p) => {
+      const el = /** @type {HTMLElement} */ (p);
+      el.hidden = !(el.classList.contains("new") || (still && Math.abs(Number(el.dataset.at) - t) <= 0.3));
+    });
+  };
+  if (v) {
+    stopAudio();
+    const still = DONE.animPin && DONE.animPin.shot === shot ? DONE.animPin.at : DONE.animAt;   // a redraw keeps the paused frame
+    if (still != null) { v.autoplay = false; v.addEventListener("loadedmetadata", () => { v.currentTime = still; }, { once: true }); }
+    v.addEventListener("timeupdate", () => { seek.value = String(v.currentTime); time.textContent = `${v.currentTime.toFixed(2)} s`; showPins(); });
+    v.addEventListener("play", () => { DONE.animAt = null; play.textContent = "Pause"; showPins(); });
+    v.addEventListener("pause", () => { DONE.animAt = v.currentTime; play.textContent = "Play"; showPins(); });
+    v.addEventListener("seeked", () => { if (v.paused) DONE.animAt = v.currentTime; showPins(); });
+    if (still != null) play.textContent = "Play";
+    play.onclick = () => { if (v.paused) v.play().catch(() => {}); else v.pause(); };
+    seek.oninput = () => { v.pause(); v.currentTime = Number(seek.value); };
+  } else play.disabled = true;
+  showPins();
+  const wrap = /** @type {HTMLElement} */ (box.querySelector("#anim-clipwrap"));
+  wrap.onclick = (e) => {
+    if (!v) return;
+    if (!v.paused) { v.pause(); return; }
+    if (!canEdit("animatic")) return;
+    const r = v.getBoundingClientRect();
+    const x = Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100)), y = Math.min(100, Math.max(0, ((e.clientY - r.top) / r.height) * 100));
+    const old = /** @type {HTMLTextAreaElement | null} */ (box.querySelector("#anim-pin-note"));
+    DONE.animPin = { shot, at: Math.round(v.currentTime * 100) / 100, x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, text: old ? old.value : "" };
+    redraw();
+    /** @type {HTMLElement | null} */ (body.querySelector("#anim-pin-note"))?.focus();
+  };
+  box.querySelectorAll("[data-seek]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = (e) => {
+    if (!v || /** @type {HTMLElement} */ (e.target).closest("button")) return;
+    v.pause(); v.currentTime = Number(/** @type {HTMLElement} */ (el).dataset.seek);
+  }; });
+  /** @type {HTMLElement} */ (box.querySelector("#anim-note-close")).onclick = () => { DONE.animShot = null; DONE.animPin = null; DONE.animAt = null; redraw(); };
+  const cancel = /** @type {HTMLElement | null} */ (box.querySelector("#anim-pin-cancel"));
+  if (cancel) cancel.onclick = () => { DONE.animPin = null; redraw(); };
+  /** @param {HTMLButtonElement} btn @param {HTMLElement} m @param {any} args @param {() => void} [after] */
+  const add = async (btn, m, args, after) => {
+    btn.disabled = true;
+    try {
+      const x = await animEdit("animatic-note-add", { shot, ...args });
+      if (x.status !== "done") { m.textContent = editMsg(x); btn.disabled = false; return; }
+      if (after) after();
+      redraw();
+    } catch (err) { m.textContent = /** @type {Error} */ (err).message; btn.disabled = false; }
+  };
+  const save = /** @type {HTMLButtonElement | null} */ (box.querySelector("#anim-pin-save"));
+  if (save) save.onclick = () => {
+    const text = /** @type {HTMLTextAreaElement} */ (box.querySelector("#anim-pin-note")).value.trim(), m = /** @type {HTMLElement} */ (box.querySelector("#anim-pin-msg"));
+    if (!text) { m.textContent = "Write what should change."; return; }
+    const p = DONE.animPin;
+    add(save, m, { text, at: p.at, x: p.x, y: p.y }, () => { DONE.animPin = null; });
+  };
+  const gen = /** @type {HTMLButtonElement | null} */ (box.querySelector("#anim-gen-add"));
+  if (gen) gen.onclick = () => {
+    const text = /** @type {HTMLTextAreaElement} */ (box.querySelector("#anim-gen")).value.trim(), m = /** @type {HTMLElement} */ (box.querySelector("#anim-gen-msg"));
+    if (!text) { m.textContent = "Write the note first."; return; }
+    add(gen, m, { text });
+  };
+  box.querySelectorAll("[data-ndel]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = async () => {
+    /** @type {HTMLButtonElement} */ (el).disabled = true;
+    try { const x = await animEdit("animatic-note-delete", { shot, note: /** @type {HTMLElement} */ (el).dataset.ndel }); if (x.status !== "done") alert(editMsg(x)); }
+    catch (err) { alert(/** @type {Error} */ (err).message); }
+    redraw();
+  }; });
 }
 /** @param {HTMLElement} body @param {any} _s */
 async function doneAnimatic(body, _s) {
@@ -876,15 +986,17 @@ async function doneAnimatic(body, _s) {
         ${can && a.can_undo ? `<button class="btn small" id="anim-undo">Undo</button>` : ""}</span></div>
       ${!sugg.length ? `<p class="muted small">Each shot now ends ${ANIM_PAD} s after its last line.</p>` : ""}
       <ul class="anim-sugg">${sugg.map(fitRow).join("")}</ul><p class="msg small" id="anim-msg" role="status"></p></div>` : ""}
+    ${animNoteBox(a, can)}
     <div class="shot-grid">${a.shots.map((/** @type {any} */ s) => {
       const long = s.fit && s.fit.delta_s < -1;
-      return `<figure class="shot${long ? " long" : ""}" data-clip="${s.clip_url ? esc(s.clip_url) : ""}">
+      return `<figure class="shot${long ? " long" : ""}${s.id === DONE.animShot ? " on" : ""}" data-pick="${esc(s.id)}" tabindex="0">
         ${s.frame_url ? `<img src="${animUrl(s.frame_url)}" alt="${esc(s.id)}" loading="lazy">` : `<div class="shot-none muted">${esc(s.id)}</div>`}
         <figcaption><span class="row spread"><b>${esc(s.id)}</b><span class="tabnum muted">${(s.t1 - s.t0).toFixed(1)} s${s.notes_open ? ` · <span class="chip warn">${s.notes_open} note${s.notes_open === 1 ? "" : "s"}</span>` : ""}</span></span>
           <span class="muted">${s.lines.map((/** @type {any} */ l) => esc(l.text)).join(" ")}</span>
           ${long ? `<span class="warnt">${(-s.fit.delta_s).toFixed(1)} s with no voice</span>` : ""}</figcaption></figure>`; }).join("")}</div>
     <div class="how"><strong>How Animatic works</strong>A quick quarter-size cut with the real voice. Every shot is timed to its lines, so check framing and rhythm here before the slow final build.
-      Accepting a fit changes only that shot's length; later shots and their lines move with it, and only the changed shots are built again.</div></div>`;
+      Accepting a fit changes only that shot's length; later shots and their lines move with it, and only the changed shots are built again.
+      Click a shot to watch it, pause and click the picture to pin a note; "Send notes to Claude" fixes only the shots with notes.</div></div>`;
   const msg = () => /** @type {HTMLElement} */ (body.querySelector("#anim-msg"));
   /** @param {string} op @param {any} args */
   const go = async (op, args) => {
@@ -906,15 +1018,15 @@ async function doneAnimatic(body, _s) {
     catch (err) { alert(/** @type {Error} */ (err).message); }
     DONE.drawn = {}; doneRefresh(true);
   };
-  body.querySelectorAll(".shot[data-clip]").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = () => {
-    const f = /** @type {HTMLElement} */ (el), url = f.dataset.clip;
-    if (!url || f.querySelector("video")) return;
-    stopAudio();
-    body.querySelectorAll(".shot video").forEach((v) => { const p = /** @type {HTMLElement} */ (v.parentElement); v.replaceWith(/** @type {any} */ (p)._img); });
-    const img = f.querySelector("img, .shot-none"), v = document.createElement("video");
-    v.src = animUrl(url); v.autoplay = true; v.controls = true; v.playsInline = true;
-    /** @type {any} */ (f)._img = img; if (img) img.replaceWith(v); else f.prepend(v);
-  }; });
+  const redraw = () => { DONE.drawn = {}; doneRefresh(true); };
+  body.querySelectorAll(".shot[data-pick]").forEach((el) => {
+    const pick = () => { DONE.animShot = /** @type {HTMLElement} */ (el).dataset.pick; DONE.animPin = null; DONE.animAt = null; redraw(); };
+    /** @type {HTMLElement} */ (el).onclick = pick;
+    /** @type {HTMLElement} */ (el).onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
+  });
+  animNoteWire(body, a, redraw);
+  const notesLot = a.notes && a.notes.lot;
+  if (notesLot && !b) setTimeout(() => { if (DONE.tab === "animatic" && !DONE.animPin) { railRefresh().then(() => { DONE.drawn = {}; doneRefresh(); }); } }, 5000);
   if (b) setTimeout(() => { if (DONE.tab === "animatic") { railRefresh().then(() => { DONE.drawn = {}; doneRefresh(); }); } }, 4000);
 }
 /** The approve bar of the Animatic: open notes and a missing draft block it; over the silence limit asks "Approve anyway". @param {HTMLElement} body */
@@ -932,6 +1044,48 @@ function animaticBar(body) {
     btn.disabled = true;
     /** @type {HTMLInputElement} */ (lab.querySelector("input")).onchange = (e) => { btn.disabled = !/** @type {HTMLInputElement} */ (e.target).checked; };
     bar.append(lab);
+  }
+  const nNotes = a.shots.reduce((/** @type {number} */ k, /** @type {any} */ s) => k + (s.notes_open || 0), 0);
+  const label = nNotes ? `Send ${nNotes} note${nNotes === 1 ? "" : "s"} to Claude` : "Send notes to Claude";
+  const lot = a.notes && a.notes.lot, failed = !lot && a.notes && a.notes.failed_lot;
+  const r = pendingFor("animatic");
+  const ask = bar && /** @type {HTMLElement | null} */ (bar.querySelector("#ask-changes"));
+  /** Send the open notes: the waiting review goes back (revise), or, with no film job waiting, a fix job (app only). */
+  const send = async (/** @type {HTMLButtonElement} */ btn, /** @type {HTMLElement | null} */ msg) => {
+    btn.disabled = true;
+    try {
+      if (r) await post(`/reviews/${encodeURIComponent(r.id)}/decision`, { value: "revise", note: "" });
+      else await post(`/films/${encodeURIComponent(RAIL.data.film)}/animatic/fix`, {});
+      route();
+    } catch (err) { if (msg) { msg.className = "fail small"; msg.textContent = /** @type {Error} */ (err).message; } btn.disabled = false; }
+  };
+  if (r && ask) {                                   // "Request changes…" becomes "Send N notes to Claude"
+    const b = document.createElement("button");
+    b.className = "btn"; b.id = "anim-send"; b.disabled = !nNotes; b.textContent = label;
+    b.onclick = () => send(b, bar.querySelector("#approve-msg"));
+    ask.replaceWith(b);
+  } else if (!r && !lot && nNotes && MODE === "online") {
+    const p = document.createElement("div"); p.className = "row anim-sendrow";
+    p.innerHTML = `<button class="btn" id="anim-send">${label}</button><span class="small fail" id="anim-send-msg" role="status"></span>`;
+    const b = /** @type {HTMLButtonElement} */ (p.querySelector("button"));
+    b.onclick = () => send(b, p.querySelector("#anim-send-msg"));
+    body.append(p);
+  }
+  const anim = body.querySelector(".anim");
+  if (lot && anim) {
+    const p = document.createElement("p"); p.className = "notice small"; p.id = "anim-lot";
+    p.textContent = `Claude is fixing the shots with notes (${lot.notes.length} note${lot.notes.length === 1 ? "" : "s"}). The draft and the answers show here when it is done; notes you add now wait for the next round.`;
+    anim.prepend(p);
+  }
+  if (failed && anim) {
+    const p = document.createElement("p"); p.className = "notice warn small"; p.id = "anim-failed";
+    p.textContent = `The last fix did not finish (${failed.error}). Your notes are still open. `;
+    if (nNotes && (r || MODE === "online")) {
+      const b = document.createElement("button"); b.className = "btn small"; b.textContent = "Send again";
+      b.onclick = () => send(b, p);
+      p.append(b);
+    }
+    anim.prepend(p);
   }
 }
 

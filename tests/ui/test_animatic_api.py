@@ -214,6 +214,22 @@ class AnimaticApi(unittest.TestCase):
         self.assertEqual(o["afterAccept"]["undo"], 1)
         self.assertIn("animatic/clips/S2.mp4", o["clip"])
         self.assertTrue(o["narrow"])
+        for k in ("pin1280", "pin400"):                                      # SC-007: within 2% of the frame width
+            self.assertLessEqual(o[k]["dx"], 0.02, o)
+            self.assertLessEqual(o[k]["dy"], 0.02, o)
+        self.assertFalse(o["pin1280"]["hidden"])
+        self.assertEqual(o["notesOpen"], 1)
+        self.assertEqual((o["sendLabel"], o["sendLabel2"]), ("Send 1 note to Claude", "Send 2 notes to Claude"))
+        self.assertTrue(o["narrowAfter"])
+        from filmcheck import animatic
+        from studio import store
+        revs = [r for r in store.doc_list("review") if r["kind"] == "animatic"]
+        decided = [store.doc_get("decision", r["id"]) for r in revs]
+        self.assertEqual([(d or {}).get("note") for d in decided], ["2 notes on: S2, S6"])     # exactly one request
+        doc = animatic.notes_load(self.film)
+        self.assertEqual(len(doc["lot"]["notes"]), 2)
+        s2 = doc["shots"]["S2"]["notes"][0]
+        self.assertEqual((s2["frame"], s2["at"]), ("clip", 1.0))
         from filmcheck import animatic
         self.assertTrue(animatic.draft_current(self.film))                  # the page rebuilt S2
         self.assertEqual(json.loads((self.film / "animatic" / "draft.json").read_text())["shots_built"], ["S2"])

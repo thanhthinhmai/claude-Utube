@@ -37,12 +37,46 @@ const [base, jid, shot] = process.argv.slice(2);
   await p.waitForSelector("#anim-undo", { timeout: 120000 });                // the rebuild of S2 ends, edits open again
   out.afterAccept = { suggestions: await p.locator(".anim-sugg li").count(), undo: await p.locator("#anim-undo").count(),
     total: await p.locator("#anim-total").textContent() };
-  await p.click(".anim .shot-grid .shot >> nth=1");                          // a shot plays its clip
-  await p.waitForSelector(".anim .shot-grid .shot video", { timeout: 10000 });
-  out.clip = await p.$eval(".anim .shot-grid .shot video", (v) => v.getAttribute("src"));
+  // pin a note on S2's clip: pause, click at 25% / 40% of the picture (SC-007: within 2% of the frame width)
+  const pinAt = async (page, shotId, fx, fy, text) => {
+    await page.click(`.anim .shot-grid .shot[data-pick='${shotId}']`);
+    await page.waitForSelector("#anim-note video.anim-clip", { timeout: 10000 });
+    const src = await page.$eval("#anim-note video.anim-clip", (v) => v.getAttribute("src"));
+    await page.$eval("#anim-note video.anim-clip", (v) => new Promise((ok) => {
+      const go = () => { v.pause(); v.currentTime = 1; v.addEventListener("seeked", () => ok(), { once: true }); };
+      if (v.readyState >= 1) go(); else v.addEventListener("loadedmetadata", go, { once: true });
+    }));
+    const box = await page.locator("#anim-note video.anim-clip").boundingBox();
+    await page.mouse.click(box.x + box.width * fx, box.y + box.height * fy);
+    await page.waitForSelector("#anim-pin-note", { timeout: 5000 });
+    await page.fill("#anim-pin-note", text);
+    await page.click("#anim-pin-save");
+    await page.waitForFunction((t) => [...document.querySelectorAll(".anim-notes li")].some((x) => x.textContent.includes(t)), text, { timeout: 30000 });
+    await page.waitForFunction(() => { const el = document.querySelector("#anim-clipwrap .pin"); return el && !el.hidden; }, null, { timeout: 10000 });
+    const pin = await page.$eval("#anim-clipwrap .pin", (el) => {
+      const w = el.parentElement.querySelector("video").getBoundingClientRect(), r = el.getBoundingClientRect();
+      return { dx: (r.left + r.width / 2 - w.left) / w.width, dy: (r.top + r.height / 2 - w.top) / w.height, hidden: el.hidden };
+    });
+    return { src, pin };
+  };
+  const one = await pinAt(p, "S2", 0.25, 0.4, "the cup falls too early");
+  out.clip = one.src;
+  out.pin1280 = { dx: Math.abs(one.pin.dx - 0.25), dy: Math.abs(one.pin.dy - 0.4), hidden: one.pin.hidden };
+  out.notesOpen = await p.locator(".anim .shot-grid .shot[data-pick='S2'] .chip.warn").count();
+  out.sendLabel = await p.locator("#anim-send").textContent().catch(() => null);
   const m = await open(400);
   out.narrow = await m.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+  const two = await pinAt(m, "S6", 0.7, 0.6, "slower walk");
+  const pins = await m.$$eval("#anim-clipwrap .pin", (els) => els.map((el) => {
+    const w = el.parentElement.querySelector("video").getBoundingClientRect(), r = el.getBoundingClientRect();
+    return { dx: (r.left + r.width / 2 - w.left) / w.width, dy: (r.top + r.height / 2 - w.top) / w.height };
+  }));
+  out.pin400 = { dx: Math.abs(pins[0].dx - 0.7), dy: Math.abs(pins[0].dy - 0.6) };
+  out.narrowAfter = await m.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
   if (shot) await m.screenshot({ path: `${shot}-400.png`, fullPage: true });
+  out.sendLabel2 = await m.locator("#anim-send").textContent();
+  await m.click("#anim-send");                                              // one request with S2 and S6
+  await m.waitForFunction(() => !document.querySelector("#anim-send") || document.querySelector("#anim-lot"), null, { timeout: 30000 });
   await browser.close();
   console.log(JSON.stringify(out));
 })().catch((e) => { console.error(e); process.exit(1); });
