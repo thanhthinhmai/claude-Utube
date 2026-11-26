@@ -61,11 +61,11 @@
 
 **Goal**: đề xuất cắt/kéo theo từng shot, nhận/bỏ/nhận hết, Undo, báo chuyển động bị ảnh hưởng, dựng lại chỉ shot đổi.
 
-**Independent Test**: với dữ liệu `ae-sleepless-test`, nhận hết → silence ≤ 0,20 và mỗi shot có lời kết thúc 0,45 s ± 1 khung sau từ cuối; bỏ S9 thì S9 giữ nguyên; Undo trả về đúng byte.
+**Independent Test**: với dữ liệu `ae-sleepless-test`, nhận hết → silence ≤ 0,20 và mỗi shot có lời kết thúc 0,25 s ± 1 khung sau từ cuối, câu đầu ở đường cắt; bỏ S9 thì S9 giữ nguyên; Undo trả về đúng byte.
 
 ### Tests
 
-- [ ] T026 [P] [US2] Test `tests/filmcheck/test_animatic.py` (tiếp, R3): `fit(d)` cho shot có câu với |end_đích − end_hiện| > 1 khung (`end_đích` = từ cuối + 0,45 s, làm tròn khung); shot không câu → không đề xuất; shot ngắn hơn câu → `delta_s` dương; shot mới < 1 s → `very_short`; không đề xuất nào cắt trước từ cuối của shot
+- [ ] T026 [P] [US2] Test `tests/filmcheck/test_animatic.py` (tiếp, R3): `fit(d)` cho shot có câu với |end_đích − end_hiện| > 1 khung (`end_đích` = từ cuối − head + 0,25 s, làm tròn khung; head > 1 khung cũng là một đề xuất); shot không câu → không đề xuất; shot ngắn hơn câu → `delta_s` dương; shot mới < 1 s → `very_short`; không đề xuất nào cắt trước từ cuối của shot
 - [ ] T027 [P] [US2] Test `tests/filmcheck/test_animatic.py` (tiếp): `accept(d, ["S2"])` chỉ đổi S2, shot sau dời, câu dời theo (R2), một mục `history`; `accept(d, "all")` → silence ≤ 0,20 trên dữ liệu thử (SC-002); `skip(d, "S9")` ghi `skipped_for`, đề xuất S9 hết hiện, hiện lại khi lời hoặc thời lượng S9 đổi (FR-013); `undo(d)` trả `timing.json` và `narration.json` về đúng byte; undo tại `origin` → lỗi mã 1 (FR-015); `--base` lệch → mã 4
 - [ ] T028 [P] [US2] Test `tests/filmcheck/test_animatic.py` (tiếp, R5): với `keys.json` mẫu, bớt làm chuyển động `t0 ≥ end_mới` → `drop`; `t0 < end_mới < t1` → `squeeze` kèm `ratio` = (t1 − t0)/(end_mới − t0), `clip` khi tỉ lệ > 2; tên hiện "layer · prop"
 - [ ] T029 [P] [US2] Test `tests/ae/test_draft.py` (tiếp, R7): `splice.by_shot()` ghép shot dựng lại vào bản nháp khi thời lượng shot trước đã đổi; khung các shot không dựng lại giống hệt bản cũ (`framemd5` theo shot)
@@ -76,7 +76,7 @@
 - [ ] T031 [US2] `splice.by_shot(old_video, old_bounds, new_bounds, pieces)` trong `tools/ae/splice.py`; `tools/ae/draft.py` dùng nó khi có `--shots`, và tự thêm vào danh sách dựng mọi shot đổi thời lượng (FR-016)
 - [ ] T032 [US2] Lệnh `animatic fit|accept|skip|undo` trong `tools/filmcheck/cli.py` (contracts/cli.md, `--base`, `--json`, in silence mới sau mỗi lệnh)
 - [ ] T033 [US2] API `POST /jobs/{id}/actions` `point: "animatic"`, `op: fit_accept|fit_skip|fit_undo|draft_rebuild` với `timing_base` (409 `changed`), sau `fit_*` xếp `ae draft --shots <shot đổi>`; khối `animatic` thêm `fit`, `can_undo`, `building` trong `tools/studio/studio/actions.py`, `filmsteps.py`
-- [ ] T034 [US2] Giao diện đề xuất trong `tools/studio/studio/web/app.js`: mỗi shot một dòng "S2: −1,1 s → ends 0,45 s after its last line" với Accept/Skip, "Accept all", dòng kết quả "Each shot now ends 0.45 s after its last line." kèm Undo, cảnh báo "very short shot", danh sách chuyển động bị mất/dồn và câu "Accepting cuts the motion; pin a note to have Claude retime it" (R5 ghi chú, FR-014: nhận không tự dồn); dải thời gian, nhãn lặng, tổng thời lượng cập nhật ngay; trạng thái "Rebuilding S2, S6…"
+- [ ] T034 [US2] Giao diện đề xuất trong `tools/studio/studio/web/app.js`: mỗi shot một dòng "S2: −1,1 s → lines start at the cut, ends 0.25 s after its last line" với Accept/Skip, "Accept all", dòng kết quả "Each shot now ends 0.25 s after its last line." kèm Undo, cảnh báo "very short shot", danh sách chuyển động bị mất/dồn và câu "Accepting cuts the motion; pin a note to have Claude retime it" (R5 ghi chú, FR-014: nhận không tự dồn); dải thời gian, nhãn lặng, tổng thời lượng cập nhật ngay; trạng thái "Rebuilding S2, S6…"
 - [ ] T035 [P] [US2] Test `tests/ui/test_animatic_api.py` (tiếp): `fit_accept`, `fit_skip`, `fit_undo`, base lệch → 409, xếp dựng lại đúng các shot đổi
 - [ ] T036 [US2] Bản đẹp dùng cùng thời lượng: `ae render` dựng theo `timing.json`; test `tests/ae/test_keys.py` (tiếp): `shots.json` của bản đẹp (từ `shots_<proj>.json` mẫu) trùng `timing.bounds` ± 1 khung (FR-017, SC-004); Mix đọc `narration.json` đã dời (ghi rõ trong `tools/ae/ANIMATIC.md`)
 

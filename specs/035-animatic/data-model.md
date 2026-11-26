@@ -24,7 +24,8 @@ Chuyển trạng thái: `accept(shot)` → đẩy `{frames, narration_at}` vào 
 |---|---|---|
 | `shot` | id | shot có ít nhất một câu |
 | `delta_s` | số | âm = bớt, dương = thêm; |delta| > 1 khung |
-| `end_new` | số | giây trong shot = câu cuối + 0,45 s, làm tròn khung |
+| `end_new` | số | giây trong shot = từ cuối − `head` + 0,25 s, làm tròn khung |
+| `head` | số | giây từ đường cắt tới câu đầu, bị bỏ khi nhận (0 với shot đầu phim) |
 | `very_short` | bool | shot mới < 1 s |
 | `motions` | `[{layer, prop, t0, t1, effect: drop\|squeeze\|clip, ratio?}]` | từ `animatic/keys.json` (R5) |
 | `state` | `new\|accepted\|skipped` | |

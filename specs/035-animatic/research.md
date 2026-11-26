@@ -8,14 +8,14 @@
 
 ## R2. Mốc câu khi đổi thời lượng
 
-- **Decision**: mỗi câu thuộc shot chứa phần lớn thời lượng câu (theo mốc `narration.json → lines[].at` và độ dài trong `voices/dur.json`). Khi shot đổi thời lượng, câu giữ khoảng cách tới đầu shot của nó: `at_mới = t0_mới(shot) + (at_cũ − t0_cũ(shot))`. `narration.json` được ghi lại cùng lúc với `timing.json`, nguyên tử, dưới một khoá tệp.
+- **Decision**: mỗi câu thuộc shot chứa phần lớn thời lượng câu (theo mốc `narration.json → lines[].at` và độ dài trong `voices/dur.json`). Khi shot đổi thời lượng, câu giữ khoảng cách tới đầu shot của nó: `at_mới = t0_mới(shot) + (at_cũ − t0_cũ(shot))`. Riêng shot được nhận đề xuất (R3): câu của nó dời thêm `−head` (head = khoảng từ đường cắt tới câu đầu; shot đầu phim giữ head). `narration.json` được ghi lại cùng lúc với `timing.json`, nguyên tử, dưới một khoá tệp.
 - **Rationale**: lời và hình dời cùng nhau; không cần đọc lại giọng; `qc.py` và `rhythm.py` đọc `narration.json` như cũ.
 - **Alternatives**: gắn câu vào khung tuyệt đối (vỡ khi shot trước đổi); để Sound tự đặt lại (Sound sau Animatic, quá muộn cho phần trăm lặng).
 
 ## R3. Đề xuất khớp shot
 
-- **Decision**: với shot có câu, `end_đích = cuối câu cuối (từ cuối cùng của words.json, nếu không có thì at + dur) + 0,45 s`, làm tròn tới khung. Đề xuất khi |end_đích − end_hiện| > 1 khung: bớt (âm) hoặc thêm (dương). Câu kéo qua đường cắt thuộc shot chứa phần lớn của nó, và không đề xuất nào cắt trước khi câu cuối của shot kết thúc. Shot không có câu: không đề xuất. Shot mới < 1 s: cờ `very_short`. Đề xuất bị bỏ ghi `skipped_for` = băm (thời lượng shot + mốc câu của shot); hiện lại khi băm đổi (FR-013).
-- **Rationale**: đúng hành vi đã duyệt trên bản mẫu ("Each shot now ends 0.45 s after its last line"); dùng từ cuối thay vì cuối tệp âm thanh để bỏ đuôi lặng trong tệp giọng.
+- **Decision**: với shot có câu, `head` = câu đầu − đầu shot (0 cho shot đầu phim, giữ nguyên); `end_đích = cuối câu cuối (từ cuối cùng của words.json, nếu không có thì at + dur) − head + 0,25 s`, làm tròn tới khung. Đề xuất khi |end_đích − end_hiện| > 1 khung hoặc head > 1 khung: bớt (âm) hoặc thêm (dương). Câu kéo qua đường cắt thuộc shot chứa phần lớn của nó, và không đề xuất nào cắt trước khi câu cuối của shot kết thúc. Shot không có câu: không đề xuất. Shot mới < 1 s: cờ `very_short`. Đề xuất bị bỏ ghi `skipped_for` = băm (thời lượng shot + mốc câu của shot); hiện lại khi băm đổi (FR-013).
+- **Rationale**: bản mẫu ghi 0,45 s, nhưng bước kiểm phim tính lặng trên mọi khoảng hở giữa các từ: với phim thử, đệm 0,45 s chỉ đưa 32,9% xuống 30,3% (mọi khoảng hở 0,45 s vẫn 26,8%). Đệm 0,25 s và câu vào ngay ở đường cắt cho 18,7% (người dùng chọn 2026-11-26). Dùng từ cuối thay vì cuối tệp âm thanh để bỏ đuôi lặng trong tệp giọng.
 - **Alternatives**: một nút áp cả phim (người dùng đã bỏ); tối ưu toàn cục theo phần trăm lặng (khó giải thích từng thay đổi).
 
 ## R4. Phần trăm lặng giống bước kiểm phim

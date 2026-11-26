@@ -36,7 +36,7 @@ sh bin/studio ae draft ae-sleepless-test --shots <các shot đổi>   # app tự
 sh bin/studio animatic status ae-sleepless-test --json
 ```
 
-Kỳ vọng: silence ≤ 20%; mỗi shot có lời kết thúc 0,45 s ± 1 khung sau từ cuối. Rồi `point approve ae-sleepless-test animatic --source chat`, `ae render`, `qc final`: silence của bước kiểm phim lệch ≤ 1 điểm phần trăm (SC-003); `shots.json` của bản đẹp trùng `timing.json` ± 1 khung (SC-004).
+Kỳ vọng: silence ≤ 20%; mỗi shot có lời kết thúc 0,25 s ± 1 khung sau từ cuối, câu đầu của shot ở đường cắt. Rồi `point approve ae-sleepless-test animatic --source chat`, `ae render`, `qc final`: silence của bước kiểm phim lệch ≤ 1 điểm phần trăm (SC-003); `shots.json` của bản đẹp trùng `timing.json` ± 1 khung (SC-004).
 
 ## 4. Ghi chú và sửa nền (SC-005)
 
