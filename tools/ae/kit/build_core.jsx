@@ -67,6 +67,10 @@ CU.keysRow = function (id, ks) {
 CU.draftSettings = function (it) {
   var tries = [{ "Quality": "Draft", "Resolution": "Quarter", "Motion Blur": "Off for All Layers" },
                { "Quality": "Draft", "Resolution": [4, 4] }], k;
+  if (CU.DRAFT_FPS) {                                      // fewer frames rendered; the segments repeat them (SC-001)
+    // setting "Use this frame rate" switches "Frame Rate" too (AE 2027 refuses "Frame Rate" itself)
+    for (k = 0; k < tries.length; k++) { tries[k]["Use this frame rate"] = String(CU.DRAFT_FPS); }
+  }
   for (k = 0; k < tries.length; k++) { try { it.setSettings(tries[k]); CU.say("draft settings " + (k + 1)); return; } catch (e) { } }
   try { it.applyTemplate("Draft Settings"); CU.say("draft settings: template"); } catch (e2) { CU.say("draft settings: none"); }
 };

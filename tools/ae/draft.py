@@ -12,12 +12,14 @@ import shutil
 import subprocess
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from ae import splice
 
 SIZE = (480, 270)
 FRAME_MAX = 60 * 1024
+WORKERS = max(2, min(8, (os.cpu_count() or 4) // 2))   # ffmpeg runs side by side (SC-001)
 
 
 class DraftError(Exception):
@@ -81,9 +83,13 @@ def cut(code: Path, voice: Path, frames: dict, fps: float) -> None:
     a = adir(code)
     for sub in ("clips", "frames"):
         (a / sub).mkdir(parents=True, exist_ok=True)
-    t = 0
+    starts, t = {}, 0
     for s, n in frames.items():
-        t0, t1 = t / fps, (t + n) / fps
+        starts[s], t = t, t + n
+
+    def one(s):
+        n = frames[s]
+        t0, t1 = starts[s] / fps, (starts[s] + n) / fps
         part = a / "clips" / f"{s}.part.mp4"
         _ff(["-i", str(seg_path(code, s)), "-i", str(voice), "-map", "0:v", "-map", "1:a", "-c:v", "copy",
              "-af", f"atrim=start={t0:.4f}:end={t1:.4f},asetpts=PTS-STARTPTS", "-c:a", "aac", "-b:a", "96k",
@@ -95,7 +101,9 @@ def cut(code: Path, voice: Path, frames: dict, fps: float) -> None:
                  str(jpg)], f"frame {s}")
             if jpg.stat().st_size <= FRAME_MAX:
                 break
-        t += n
+
+    with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+        list(pool.map(one, frames))
 
 
 def make(code: Path, shots=None, build=None, progress=None, say=print) -> dict:
@@ -120,7 +128,15 @@ def make(code: Path, shots=None, build=None, progress=None, say=print) -> dict:
     else:
         want = list(all_shots)
     t_start = time.time()
+    steps, tick = {}, [t_start]
+
+    def step(name):                                   # how long each part took (draft.json "steps", SC-001)
+        now = time.time()
+        steps[name] = round(now - tick[0], 2)
+        tick[0] = now
+
     r = build(code, want, progress=progress, draft=True)
+    step("ae")
     if doc is None:                                   # an old film: the first whole build measures its shots
         doc = timing.from_marks(code, r["marks"])
     fps = float(doc["fps"])
@@ -132,24 +148,30 @@ def make(code: Path, shots=None, build=None, progress=None, say=print) -> dict:
             f"read CU.shotFrames(\"{s}\") (tools/ae/ANIMATIC.md)")
     frames = dict(doc["frames"])
     master = splice.probe(r["master"])
-    for m in r["marks"]:
-        sid = str(m[3])
-        if sid in want:
-            splice.segment(r["master"], float(m[0]), frames[sid], seg_path(code, sid), SIZE, master["fps_text"])
-            segs[sid] = frames[sid]
+    todo = [(str(m[3]), float(m[0])) for m in r["marks"] if str(m[3]) in want]
+    with ThreadPoolExecutor(max_workers=WORKERS) as pool:   # each shot decodes only its own part of the master
+        list(pool.map(lambda x: splice.segment(r["master"], x[1], frames[x[0]], seg_path(code, x[0]), SIZE,
+                                               master["fps_text"]), todo))
+    for sid, _ in todo:
+        segs[sid] = frames[sid]
+    step("segments")
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
         silent = tmp / "video.mp4"
         splice.by_shot([(s, seg_path(code, s)) for s in all_shots], silent)
+        step("join")
         seconds = sum(frames.values()) / fps
         voice = voice_track(code, seconds, tmp / "voice.wav")
+        step("voice")
         out = tmp / "draft.mp4"
         _ff(["-i", str(silent), "-i", str(voice), "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", "-b:a",
-             "128k", "-shortest", str(out)], "draft mux")
+             "128k", str(out)], "draft mux")     # no -shortest: AAC ends a little early and would drop the last frames
         if (a / "draft.mp4").is_file():
             os.replace(a / "draft.mp4", a / "draft.prev.mp4")
         shutil.move(str(out), a / "draft.mp4")
+        step("mux")
         cut(code, voice, frames, fps)
+        step("cut")
     keys = {}
     try:
         keys = json.loads((a / "keys.json").read_text(encoding="utf-8"))
@@ -160,6 +182,6 @@ def make(code: Path, shots=None, build=None, progress=None, say=print) -> dict:
     info = {"frames": frames, "narration_sha": animatic.narration_sha(code), "code_sha": animatic.code_sha(code),
             "built_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "shots_built": want,
             "seconds": round(time.time() - t_start, 1), "fps": doc["fps"], "size": list(SIZE),
-            "checks": list(r.get("checks") or []), "segments": {k: segs[k] for k in all_shots if k in segs}}
+            "checks": list(r.get("checks") or []), "steps": steps, "segments": {k: segs[k] for k in all_shots if k in segs}}
     (a / "draft.json").write_text(json.dumps(info, ensure_ascii=False, indent=1))
     return info

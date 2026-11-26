@@ -105,8 +105,9 @@ def segment(clip, start_s: float, frames: int, out, size=(480, 270), fps_text: s
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     part = out.with_name(out.stem + ".part.mp4")
-    cmd = ["ffmpeg", "-v", "error", "-y", "-i", str(clip), "-vf",
-           f"scale={w}:{h},fps={ft},setsar=1,tpad=stop_mode=clone:stop_duration=10,trim=start_frame={o}:end_frame={o + frames},"
+    seek = max(0.0, (o - 0.5) / src["fps"])        # start decoding at the shot (half a frame early: frame o is the first)
+    cmd = ["ffmpeg", "-v", "error", "-y", "-ss", f"{seek:.6f}", "-i", str(clip), "-vf",
+           f"scale={w}:{h},fps={ft},setsar=1,tpad=stop_mode=clone:stop_duration=10,trim=end_frame={frames},"
            f"setpts=N/({ft})/TB", "-an", "-c:v", "libx264", "-crf", str(crf), "-preset", "veryfast", "-pix_fmt", "yuv420p",
            "-r", ft, "-video_track_timescale", "15360", str(part)]
     r = subprocess.run(cmd, capture_output=True, text=True)

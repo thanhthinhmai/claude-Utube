@@ -64,6 +64,8 @@ class Draft(unittest.TestCase):
         self.assertLess(level(a / "draft.mp4", 6.10, 6.70), -60)             # the gap after l03 is silent
         info = json.loads((a / "draft.json").read_text())
         self.assertEqual(info["frames"]["S2"], 117)
+        self.assertEqual(int(v["nb_frames"]), sum(info["frames"].values()))   # every frame, none cut by the sound
+        self.assertEqual(set(info["steps"]), {"ae", "segments", "join", "voice", "mux", "cut"})
         for k in ("narration_sha", "built_at", "shots_built", "seconds", "fps", "size"):
             self.assertIn(k, info)
         self.assertEqual(len(list((a / "clips").glob("S*.mp4"))), 9)

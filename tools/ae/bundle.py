@@ -10,6 +10,7 @@ shot always draws a character with the rig version and spec that were approved. 
 (kit/castsheet.jsx) instead of the film's shots."""
 import io
 import json
+import os
 import tarfile
 from pathlib import Path
 
@@ -94,7 +95,8 @@ def entry_text(doc: dict, shots: list, film_name: str, proj: str = PROJ, rig_lis
                   f'CU.build(CU.castSheet(CU.readJSON(CU.WORK + "/{SHEET_DATA}")));', ""]
         return "\n".join(lines)
     if draft:
-        lines += ["CU.DRAFT = true;   // ae draft (specs/035): quarter resolution, draft quality"]
+        lines += ["CU.DRAFT = true;   // ae draft (specs/035): quarter resolution, draft quality",
+                  f"CU.DRAFT_FPS = {int(os.environ.get('STUDIO_AE_DRAFT_FPS') or 0)};   // 0: the film's own rate"]
     lines += [f'#include "ae/{f}"' for f in doc["ae_files"]]
     lines += [f"CU.PROJ = {json.dumps(proj)};", 'CU.RENDER = "master.mp4";   // rendered inside After Effects (no aerender)',
               f"CU.build([{ids}]);", ""]
