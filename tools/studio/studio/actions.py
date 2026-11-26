@@ -12,7 +12,7 @@ from pathlib import Path
 from . import jobs, store
 from .store import StudioError
 
-OPS = {"script": ("script-para",), "cast": ("cast-approve", "cast-voice", "cast-save", "cast-note-add", "cast-note-edit", "cast-note-delete", "cast-view-toggle"), "voice": ("voice-say", "voice-remake", "voice-tone", "voice-set", "voice-speaker"),
+OPS = {"script": ("script-para",), "cast": ("cast-approve", "cast-voice", "cast-save", "cast-note-add", "cast-note-edit", "cast-note-delete", "cast-view-toggle"), "animatic": ("animatic-fit-accept", "animatic-fit-skip", "animatic-fit-undo", "animatic-draft"), "voice": ("voice-say", "voice-remake", "voice-tone", "voice-set", "voice-speaker"),
        "shots": ("shot", "shots-check", "except", "accept-style"), "mix": ("mix",), "publish": ("publish",)}
 STATUS = ("queued", "running", "done", "failed", "invalid", "conflict", "busy")
 BY_CODE = {0: "done", 1: "done", 2: "invalid", 4: "conflict", 5: "busy"}
@@ -57,6 +57,15 @@ def create(job: dict, point: str, op: str, args: dict, base: str, by: str) -> di
               and store.age_seconds(a["created_at"]) < 60]
     if len(recent) >= PER_MINUTE:
         raise StudioError("too_many", f"at most {PER_MINUTE} edits a minute for one job", 429)
+    if op == "animatic-draft":                        # one rebuild waits at a time: a new one joins it (FR-016)
+        for q in queued(job["id"]):
+            if q["op"] == "animatic-draft":
+                old, new = q["args"].get("shots", ""), args.get("shots", "")
+                both = "" if not old or not new else ",".join(dict.fromkeys(old.split(",") + new.split(",")))
+
+                def join(x):
+                    x["args"]["shots"] = both
+                return store.doc_update("action", q["id"], join) or q
     a = {"id": jobs.new_id("a"), "job_id": job["id"], "owner": job.get("owner", "local"), "point": point, "op": op,
          "args": args, "base": base, "by": by or job.get("owner") or "local", "status": "queued", "result": None,
          "created_at": store.now_iso(), "started_at": None, "ended_at": None}
@@ -118,6 +127,11 @@ def finish(a: dict, code: int, out: str) -> dict:
                  ended_at=store.now_iso())
     a = store.doc_update("action", a["id"], f) or a
     r = a["result"] or {}
+    if status == "done" and r.get("rebuild"):          # specs/035: a fit change builds the changed shots again
+        try:
+            create(jobs.load(a["job_id"]), "animatic", "animatic-draft", {"shots": ",".join(r["rebuild"])}, None, a["by"])
+        except StudioError as e:
+            jobs.log(a["job_id"], f"Draft rebuild not queued: {e}")
     what = f"Edit {a['op']} {r.get('ref') or ''}".rstrip()
     if status == "done":
         chk = r.get("check") or {}

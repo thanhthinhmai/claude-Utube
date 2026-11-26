@@ -173,7 +173,7 @@ class JobIn(BaseModel):
     idea: Optional[str] = Field(default=None, min_length=3, max_length=2000)
     seconds: Optional[int] = Field(default=None, ge=1, le=3600)
     review_treatment: bool = False
-    reviews: Optional[List[Literal["script", "cast", "voice", "shots", "mix", "publish"]]] = Field(default=None, max_length=6)   # 026
+    reviews: Optional[List[Literal["script", "cast", "voice", "animatic", "shots", "mix", "publish"]]] = Field(default=None, max_length=7)   # 026
     engine: Optional[Literal["page", "ae"]] = None     # specs/032: who draws the picture (After Effects needs the desktop app)
     revise_of: Optional[str] = Field(default=None, max_length=60)
     note: Optional[str] = Field(default=None, max_length=2000)
@@ -380,7 +380,7 @@ class ChannelIn(BaseModel):
     title_max: Optional[int] = None
     hashtags: Optional[List[str]] = Field(default=None, max_length=5)
     banned: Optional[List[str]] = Field(default=None, max_length=50)
-    reviews: Optional[List[Literal["script", "cast", "voice", "shots", "mix", "publish"]]] = Field(default=None, max_length=6)   # 026
+    reviews: Optional[List[Literal["script", "cast", "voice", "animatic", "shots", "mix", "publish"]]] = Field(default=None, max_length=7)   # 026
 
 
 class DecisionIn(BaseModel):

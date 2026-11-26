@@ -181,6 +181,54 @@ def cast_block(d: Path):
             "fingerprint": cast.fingerprint(d), "skip": points.cast_skip_reason(d)}
 
 
+def animatic_block(d: Path, j: dict = None):
+    """The Animatic panel (specs/035 contracts/api.md); None for a film without the animatic point (page film)."""
+    from filmcheck import animatic, cast, points, rhythm, timing
+    if not cast.is_ae(d):
+        return None
+    building = None
+    if j:
+        mine = [a for a in store.doc_list("action") if a["job_id"] == j["id"] and a["op"] == "animatic-draft"
+                and a["status"] in ("queued", "running")]
+        if mine:
+            sh = [x for a in mine for x in (a["args"].get("shots") or "").split(",") if x]
+            building = {"shots": list(dict.fromkeys(sh)) or ["all"], "running": any(a["status"] == "running" for a in mine)}
+    notes, notes_base = None, None
+    try:
+        if hasattr(animatic, "notes_load"):
+            notes, notes_base = animatic.notes_load(d), animatic.notes_base(d)
+    except Exception:                             # noqa: BLE001 — a broken notes file still shows the animatic
+        notes = None
+    base = {"started": False, "draft": None, "shots": [], "notes": notes, "notes_base": notes_base, "building": building,
+            "skip": points.skip_reason(d, "animatic"), "limit": rhythm.SILENCE_MAX}
+    try:
+        t = animatic.timeline(d)
+    except animatic.AnimaticError as e:
+        return {**base, "error": None if e.code == "missing" else e.message}
+    try:
+        sil = animatic.silence(d)
+    except animatic.AnimaticError:
+        sil = None
+    info = animatic.draft_info(d)
+    fit = {x["shot"]: x for x in animatic.fit(d, all_states=True)}
+    counts = animatic.open_notes(d)
+    a = d / "animatic"
+    v = (info or {}).get("built_at", "")
+    shots = []
+    for sh in t["shots"]:
+        f = fit.get(sh["id"])
+        shots.append({**sh, "frame_url": f"animatic/frames/{sh['id']}.jpg?v={v}" if (a / "frames" / f"{sh['id']}.jpg").is_file() else None,
+                      "clip_url": f"animatic/clips/{sh['id']}.mp4?v={v}" if (a / "clips" / f"{sh['id']}.mp4").is_file() else None,
+                      "fit": {k: f[k] for k in ("frames_new", "delta_s", "end_new", "head", "very_short", "motions", "state")}
+                      if f else None, "notes_open": counts.get(sh["id"], 0)})
+    return {**base, "started": True, "duration": t["duration"], "fps": t["fps"], "silence": sil, "shots": shots,
+            "gaps": animatic.longest_gaps(d) if sil is not None and sil > rhythm.SILENCE_MAX else [],
+            "draft": {"url": f"animatic/draft.mp4?v={v}", "current": animatic.draft_current(d), "built_at": info.get("built_at"),
+                      "seconds": info.get("seconds"), "prev": (a / "draft.prev.mp4").is_file()}
+            if info and (a / "draft.mp4").is_file() else None,
+            "timing_base": timing.base(d), "can_undo": animatic.can_undo(d), "problems": animatic.problems(d)}
+
+
 def pending_review(j: dict):
     for rid in reversed(j.get("review_ids") or []):
         try:
@@ -209,7 +257,8 @@ def view(j: dict) -> dict:
             "editable": {"shots": cat is not None,
                          "reason": None if cat is not None else ("no scene table" if has_kit else "style has no kit")},
             "catalog": cat, "voices": voices() + [v["id"] for v in el_voices()], "voice_rows": voice_rows(),
-            "voice_cost": voice_cost(d), "speakers": speaker_rows(d), "emotions": emotions(d), "narrator_voice": narrator_now(d), "mix_ranges": mix_ranges(d), "review": rv, "cast": cast_block(d)}
+            "voice_cost": voice_cost(d), "speakers": speaker_rows(d), "emotions": emotions(d), "narrator_voice": narrator_now(d), "mix_ranges": mix_ranges(d), "review": rv, "cast": cast_block(d),
+            "animatic": animatic_block(d, j)}
 
 
 def etag(v: dict) -> str:

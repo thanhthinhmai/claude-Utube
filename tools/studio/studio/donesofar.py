@@ -16,12 +16,13 @@ ALLOWED = re.compile(r"^(SCRIPT\.md|SOURCES\.md|lines\.json|checks\.json|CHECKS\
                      r"|\.check/shots/(sheet|label-sheet)-\d+\.jpg|\.check/shots/S\d{2,4}(~[A-Za-z0-9._~-]+)?\.jpg"
                      r"|scenes\.json|mix\.json|publish/pack\.json|publish/thumbnail-[123]\.(png|jpg)"
                      r"|cast/sheets/[a-z0-9-]{1,32}(\.prev)?/([a-z0-9-]{1,40}\.jpg|walk\.mp4|sheet\.json)"
-                     r"|cast/voices/[a-z0-9-]{1,32}/[123]\.wav)$")   # 036: voice samples of a character   # 034: cast sheets       # 026: scene table, mix settings, publish pack
+                     r"|cast/voices/[a-z0-9-]{1,32}/[123]\.wav"
+                     r"|animatic/(draft(\.prev)?\.mp4|clips/S\d{1,4}\.mp4|frames/S\d{1,4}\.jpg))$")   # 035: the animatic   # 036: voice samples of a character   # 034: cast sheets       # 026: scene table, mix settings, publish pack
 # Never listed nor served, even if the allow list grows (specs/029 contracts/files.md): shot notes' pictures, the
 # small-picture cache, the previous video and its shot marks
 EXCLUDED = re.compile(r"^(shot-notes/|\.shots/|shots\.prev\.json$|[^/]*\.prev\.mp4$)")
 TYPES = {".md": "text/markdown; charset=utf-8", ".json": "application/json", ".wav": "audio/wav", ".jpg": "image/jpeg",
-         ".png": "image/png"}
+         ".png": "image/png", ".mp4": "video/mp4"}
 SHOT = re.compile(r"^S\d{2,4}\.jpg$")
 EXTRA = re.compile(r"^S\d{2,4}~.+\.jpg$")
 SHEET = re.compile(r"^sheet-(\d+)\.jpg$")
@@ -254,6 +255,22 @@ def summary(job: dict) -> dict:
                                 + ":" + ",".join(f"{k}={v}" for k, v in sorted(cast.open_notes(d).items())),
                                 "characters": len(cst), "approved": sum(1 for v in cst.values() if v == "approved")}
     except Exception:                              # noqa: BLE001 — a broken cast.json shows on the Cast panel
+        pass
+    try:                                           # specs/035: an AE film's animatic, after Voice; no Shots step
+        from filmcheck import cast, timing
+        if cast.is_ae(d):
+            order = [(k, {"mix": "Sound", "render": "Final render"}.get(k, l)) for k, l in order if k != "shots"]
+            if timing.load(d) is not None:
+                import hashlib
+                a = d / "animatic"
+                h = hashlib.sha256(timing.base(d).encode())
+                for f in ("draft.json", "fit.json", "notes.json"):
+                    h.update((a / f).read_bytes() if (a / f).is_file() else b"-")
+                st["animatic"] = "done" if (a / "draft.mp4").is_file() else \
+                    "running" if "Animatic" in running_steps else "waiting"
+                order.insert([k for k, _ in order].index("voice") + 1, ("animatic", "Animatic"))
+                sections["animatic"] = {"version": h.hexdigest()[:16]}
+    except Exception:                              # noqa: BLE001 — a broken timing.json shows on the Animatic panel
         pass
     steps = []
     for key, label in order:

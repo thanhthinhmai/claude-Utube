@@ -29,10 +29,11 @@ class DecisionIn(BaseModel):
     value: Literal["approve", "revise", "accept_anyway", "stop"]
     note: Optional[str] = Field(default=None, max_length=4000)
     base: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{16}$")      # review points: the content shown (026)
+    anyway: bool = False                                                      # specs/035: approve the animatic over the silence limit
 
 
 class ActionIn(BaseModel):                     # specs/026 contracts/api.md
-    point: Literal["script", "cast", "voice", "shots", "mix", "publish"]
+    point: Literal["script", "cast", "voice", "animatic", "shots", "mix", "publish"]
     op: str = Field(max_length=30)
     args: dict = Field(default_factory=dict)
     base: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{16}$")
@@ -47,7 +48,7 @@ WRITE_ROLES = {"customer", "admin"}            # a token limited to reading (any
 
 
 class PointsIn(BaseModel):
-    on: list[Literal["script", "cast", "voice", "shots", "mix", "publish"]] = Field(max_length=6)
+    on: list[Literal["script", "cast", "voice", "animatic", "shots", "mix", "publish"]] = Field(max_length=7)
 
 
 class FreshStaticFiles(StaticFiles):
@@ -317,7 +318,8 @@ def create_app() -> FastAPI:
         via_token = getattr(request.state, "token", None) is not None      # specs/009: an API token or MCP
         if r["kind"] in reviews.POINT_KINDS and body.value == "approve" and not body.base and not via_token:
             raise StudioError("invalid", "approving a review point needs base (the fingerprint shown)", 422)
-        return reviews.decide(rid, body.value, body.note, "api" if via_token else "ui", body.base, owner(request) or "local")
+        return reviews.decide(rid, body.value, body.note, "api" if via_token else "ui", body.base, owner(request) or "local",
+                              anyway=body.anyway and not via_token)
 
     # ---------- films ----------
     # ---------- After Effects bridge: the desktop app pulls build requests (specs/032 contracts/bridge-api.md) ----------
