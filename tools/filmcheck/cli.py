@@ -1659,7 +1659,9 @@ def cmd_animatic_fit(a) -> int:
 
     def go(d):
         f = animatic.fit(d)
-        out(a, {"fit": f}, [f"{x['shot']}: {x['delta_s']:+.2f} s → ends {animatic.PAD} s after its last line"
+        out(a, {"fit": f}, [f"{x['shot']}: {x['delta_s']:+.2f} s → "
+                            + (f"holds 2.5 s: the last words of {x['hold']}" if x.get("hold") else
+                               f"ends {animatic.PAD} s after its last line")
                             + (f", lines start at the cut (−{x['head']:.2f} s)" if x["head"] else "")
                             + (" · very short shot" if x["very_short"] else "")
                             + "".join(f"\n    {m['name']}: {m['effect']}" + (f" ×{m['ratio']}" if m.get("ratio") else "")

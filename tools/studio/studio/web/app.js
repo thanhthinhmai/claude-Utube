@@ -965,7 +965,7 @@ async function doneAnimatic(body, _s) {
   const gaps = (a.gaps || []).map((/** @type {any} */ g) => `<div class="gap" style="left:${pct(g.t0)};width:${pct(g.length)}" title="${g.length.toFixed(2)} s silent in ${esc(g.shot)}"></div>`).join("");
   const sugg = a.shots.filter((/** @type {any} */ s) => s.fit && s.fit.state === "new");
   const fitRow = (/** @type {any} */ s) => { const f = s.fit;
-    return `<li data-shot="${esc(s.id)}"><span><b>${esc(s.id)}:</b> ${secs(f.delta_s)} → ${f.head ? "lines start at the cut, " : ""}ends ${ANIM_PAD} s after its last line${f.very_short ? ` <span class="chip warn">very short shot</span>` : ""}
+    return `<li data-shot="${esc(s.id)}"><span><b>${esc(s.id)}:</b> ${secs(f.delta_s)} → ${f.head ? "lines start at the cut, " : ""}${f.hold ? `holds 2.5 s: the last words of ${esc(f.hold)}` : `ends ${ANIM_PAD} s after its last line`}${f.very_short ? ` <span class="chip warn">very short shot</span>` : ""}
       ${f.motions.length ? `<span class="motions">${f.motions.map((/** @type {any} */ m) => `<span class="chip ${m.effect === "squeeze" ? "acc" : "warn"}">${esc(m.name)}: ${m.effect === "drop" ? "lost" : m.effect === "clip" ? "cut short" : `squeezed ×${m.ratio}`}</span>`).join(" ")}
         <span class="muted small">Accepting cuts the motion; pin a note to have Claude retime it.</span></span>` : ""}</span>
       ${can ? `<span class="row"><button class="btn small" data-acc="${esc(s.id)}">Accept</button><button class="btn small" data-skip="${esc(s.id)}">Skip</button></span>` : ""}</li>`; };

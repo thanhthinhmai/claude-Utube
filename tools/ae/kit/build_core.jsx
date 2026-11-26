@@ -81,6 +81,10 @@ CU.renderMaster = function (M, name) {
   CU.say("render " + name);
   var t0 = new Date().getTime();
   rq.render();
-  if (!om.file.exists) { CU.say("ERR render: After Effects wrote no " + name); return; }
+  if (!om.file.exists) {                                   // say why: the queue item's status and where it wrote
+    var st = "?"; try { st = String(it.status); } catch (e2) { }
+    var to = "?"; try { to = om.file.fsName; } catch (e3) { }
+    CU.say("ERR render: After Effects wrote no " + name + " (status " + st + ", to " + to + ")"); return;
+  }
   CU.say("rendered " + (new Date().getTime() - t0) + " ms");
 };

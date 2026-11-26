@@ -219,7 +219,7 @@ def animatic_block(d: Path, j: dict = None):
         f = fit.get(sh["id"])
         shots.append({**sh, "frame_url": f"animatic/frames/{sh['id']}.jpg?v={v}" if (a / "frames" / f"{sh['id']}.jpg").is_file() else None,
                       "clip_url": f"animatic/clips/{sh['id']}.mp4?v={v}" if (a / "clips" / f"{sh['id']}.mp4").is_file() else None,
-                      "fit": {k: f[k] for k in ("frames_new", "delta_s", "end_new", "head", "very_short", "motions", "state")}
+                      "fit": {k: f[k] for k in ("frames_new", "delta_s", "end_new", "head", "very_short", "hold", "motions", "state")}
                       if f else None, "notes_open": counts.get(sh["id"], 0)})
     return {**base, "started": True, "duration": t["duration"], "fps": t["fps"], "silence": sil, "shots": shots,
             "gaps": animatic.longest_gaps(d) if sil is not None and sil > rhythm.SILENCE_MAX else [],

@@ -130,3 +130,10 @@
 - **MVP = US1 + US2**: đủ để sửa lỗi lặng của phim thử trước bản đẹp. Dừng kiểm theo quickstart mục 2, 3, 5 trước khi làm US3.
 - US3 làm khi 034 đã commit phần ghim; nếu 034 còn đổi `castnotes.py`, giữ T039 ở cuối.
 - Merge sau 034 và 036; rebase lại trước PR.
+
+## Phase 7: Convergence
+
+- [X] T048 Đề xuất khớp shot không rút shot chứa lời cuối của một đoạn xuống dưới `rhythm.KEY_SHOT` (2,5 s, cùng hằng số với `qc final`); phần dư thành lặng cuối đoạn, ghi lý do trong đề xuất; sửa `tools/filmcheck/animatic.py` (`fit`), câu chữ FR-011/SC-002 trong `specs/035-animatic/spec.md` (quyết định người dùng 2026-11-26), test trong `tests/filmcheck/test_animatic.py`; chạy lại khớp trên `ae-sleepless-test` và xác nhận `qc final` không còn lỗi shot cuối đoạn per FR-011, SC-002 (partial)
+- [ ] T049 Đo từng bước của `ae draft` (AE dựng, `splice.segment`, `splice.by_shot`, `voice_track`, mux, `cut` clip và ảnh) rồi bỏ việc mã hoá thừa, chạy song song phần cắt clip/ảnh trong `tools/ae/draft.py` (và `tools/ae/splice.py` nếu cần), giữ nguyên kết quả (framemd5 từng shot) để bản nháp cả phim nhanh hơn ≥ 3 lần bản đẹp trên `ae-sleepless-test` (bản đẹp 87,7 s); ghi số đo mới vào `quickstart.md` mục "Kết quả" per SC-001 (partial)
+- [ ] T050 Chạy một lượt "Send notes to Claude" thật trên `ae-sleepless-test` (app chạy, việc `fix` target `animatic`, Opus 5.5; hỏi người dùng trước vì tốn tiền): 100% ghi chú có câu trả lời, chỉ shot có ghi chú được dựng lại; ghi vào `quickstart.md` mục "Kết quả" per SC-005 (partial)
+- [ ] T051 Tìm bài trong `sh tests/ae/run.sh` đã tạo thư mục `ae-…` của phim giả `f1` trong thư mục làm việc AE thật (`/mnt/e/claude-utube-ae/work`, 2026-11-26 09:57) dù đặt `STUDIO_AE_WORK`; cho mọi test dùng thư mục tạm per Constitution (test không đụng dữ liệu người dùng) (contradicts)

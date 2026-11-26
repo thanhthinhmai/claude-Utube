@@ -16,7 +16,8 @@ sys.path.insert(0, str(HERE))
 import animfilm  # noqa: E402
 from filmcheck import animatic, points, qc, rhythm, timing  # noqa: E402
 
-FIT = {"S1": 69, "S2": 103, "S3": 68, "S4": 38, "S5": 45, "S6": 99, "S7": 119, "S8": 93, "S9": 55}
+FIT = {"S1": 69, "S2": 103, "S3": 68, "S4": 38, "S5": 75, "S6": 99, "S7": 119, "S8": 93, "S9": 75}
+HOLD = {"S5": "P02", "S9": "P05"}   # the shots with a paragraph's last words keep rhythm.KEY_SHOT (2.5 s), not word + PAD
 
 
 class Base(unittest.TestCase):
@@ -131,13 +132,16 @@ class Fit(Base):
         self.assertEqual({s: x["frames_new"] for s, x in f.items()}, FIT)
         self.assertEqual(f["S1"]["head"], 0)                                # the film's first shot keeps its head
         self.assertGreater(f["S3"]["head"], 0.3)
+        self.assertEqual({k: x["hold"] for k, x in f.items() if x["hold"]}, HOLD)
         self.assertTrue(all(x["state"] == "new" for x in f.values()))
 
     def test_accept_all_brings_silence_under_the_limit(self):
         self.assertGreater(animatic.silence(self.d), rhythm.SILENCE_MAX)
         r = animatic.accept(self.d, "all", by="test")
         self.assertEqual(sorted(r["accepted"]), sorted(FIT))
-        self.assertLessEqual(r["silence"], rhythm.SILENCE_MAX)
+        # this film's paragraph-end lines are short: holding them 2.5 s leaves 22% silence, over the limit, so its
+        # approval needs "approve anyway" (user decision 2026-11-26); without the holds it would be 19%
+        self.assertAlmostEqual(r["silence"], 0.222, delta=0.005)
         self.assertEqual(timing.load(self.d)["frames"], FIT)
         self.assertEqual(animatic.fit(self.d), [])                          # nothing left to suggest
         doc = timing.load(self.d)
@@ -201,7 +205,7 @@ class Fit(Base):
                                   capture_output=True, text=True)
         r = run("accept", "--all")
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("silence 19% (limit 20%)", r.stdout)
+        self.assertIn("silence 22% (limit 20%)", r.stdout)
         v = json.loads(run("status", "--json").stdout)
         self.assertEqual((v["fit"], v["can_undo"]), ([], True))
         self.assertEqual(run("undo", "--base", "0" * 16).returncode, 4)

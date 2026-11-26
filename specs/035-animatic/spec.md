@@ -22,6 +22,7 @@
 ### Session 2026-11-26
 
 - Q: Cắt đuôi shot = câu cuối + 0,45 s không đưa được phim thử từ 32,9% lặng xuống ≤ 20% (chỉ còn 30,3%; lặng nằm ở khoảng hở giữa các câu, cần trung bình ≤ 0,29 s). Đề xuất khớp shot làm gì? → A: Đệm 0,25 s sau từ cuối, và câu đầu của mỗi shot (trừ shot đầu phim) bắt đầu ngay ở đường cắt; câu trong cùng shot giữ khoảng cách với nhau. Phim thử ước tính còn 18,7%.
+- Q: Khớp shot "câu cuối + 0,25 s" làm shot chứa lời cuối của đoạn ngắn hơn 2,5 s (lỗi của `qc final`); và khi giữ 2,5 s thì silence vượt 20%? → A: Đề xuất khớp giữ shot cuối đoạn ≥ 2,5 s; phim kẹt giữa hai luật thì duyệt Animatic bằng "Approve anyway".
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -111,7 +112,7 @@ Bấm vào một shot trong lưới thì phát clip nháp của shot đó kèm g
 - **FR-010**: Duyệt Animatic khi phần lặng > 20% MUST cần người dùng xác nhận "Approve anyway"; lựa chọn và phần trăm lặng MUST được ghi lại. Agent MUST NOT tự duyệt hay tự xác nhận ngoại lệ này; lệnh xác nhận ngoại lệ MUST bị từ chối khi chạy bên trong một việc của app.
 
 **Khớp shot theo lời**
-- **FR-011**: Với mỗi shot có câu thoại mà mốc kết thúc khác "từ cuối + 0,25 s" quá 1 khung, hoặc câu đầu bắt đầu sau đường cắt quá 1 khung (trừ shot đầu phim), trang MUST đưa một đề xuất riêng cho shot đó, ghi số giây bớt hoặc thêm và mốc kết thúc mới. Nhận đề xuất đưa câu đầu của shot về đường cắt (câu trong shot giữ khoảng cách với nhau) và đặt đuôi shot ở từ cuối + 0,25 s.
+- **FR-011**: Với mỗi shot có câu thoại mà mốc kết thúc khác "từ cuối + 0,25 s" quá 1 khung, hoặc câu đầu bắt đầu sau đường cắt quá 1 khung (trừ shot đầu phim), trang MUST đưa một đề xuất riêng cho shot đó, ghi số giây bớt hoặc thêm và mốc kết thúc mới. Nhận đề xuất đưa câu đầu của shot về đường cắt (câu trong shot giữ khoảng cách với nhau) và đặt đuôi shot ở từ cuối + 0,25 s; riêng shot chứa lời cuối của một đoạn giữ tối thiểu 2,5 s (mức của bước kiểm phim), phần dư thành khoảng lặng cuối đoạn, và đề xuất ghi rõ lý do giữ.
 - **FR-012**: Người dùng MUST nhận hoặc bỏ được từng đề xuất, và nhận được tất cả trong một lần bấm. Nhận một đề xuất MUST chỉ đổi thời lượng shot đó; các shot sau dời theo.
 - **FR-013**: Đề xuất bị bỏ MUST không hiện lại cho tới khi lời hoặc thời lượng của shot đó thay đổi.
 - **FR-014**: Đề xuất làm mất một chuyển động (bắt đầu sau mốc kết thúc mới) hoặc cắt dở một chuyển động MUST ghi tên chuyển động và hậu quả (mất, hoặc cắt dở kèm tỉ lệ phải dồn để giữ trọn). Nhận đề xuất MUST NOT tự dồn chuyển động; việc dồn đi qua ghi chú (FR-019, FR-020).
@@ -142,7 +143,7 @@ Bấm vào một shot trong lưới thì phát clip nháp của shot đó kèm g
 ### Measurable Outcomes
 
 - **SC-001**: Bản nháp của một phim 30 s sẵn sàng để xem trong ≤ 3 phút sau khi giọng được duyệt (AE đã mở trên máy), nhanh hơn ít nhất 3 lần so với bản đẹp của cùng phim.
-- **SC-002**: Với `ae-sleepless-test`, nhận mọi đề xuất khớp shot đưa phần lặng từ 25–33% xuống ≤ 20%, và mỗi shot có lời kết thúc 0,25 s (± 1 khung) sau câu cuối của nó.
+- **SC-002**: Với `ae-sleepless-test`, nhận mọi đề xuất khớp shot đưa phần lặng từ 33% xuống ≤ 20% cộng phần lặng do giữ shot cuối đoạn 2,5 s (đo được: 22%, nên duyệt cần "Approve anyway"); mỗi shot có lời kết thúc 0,25 s (± 1 khung) sau câu cuối của nó, trừ shot cuối đoạn kéo lên 2,5 s; `qc final` không còn lỗi shot cuối đoạn.
 - **SC-003**: Phần trăm lặng hiện ở bước Animatic khớp với số đo của bước kiểm phim trên bản đẹp dựng từ cùng thời lượng (sai lệch ≤ 1 điểm phần trăm).
 - **SC-004**: Mốc cắt của bản đẹp trùng mốc cắt đã duyệt ở Animatic cho 100% shot (± 1 khung).
 - **SC-005**: Một lượt "Send notes to Claude" chỉ dựng lại các shot có ghi chú: các shot khác của bản nháp giống hệt trước (so từng điểm ảnh), và 100% ghi chú có câu trả lời.

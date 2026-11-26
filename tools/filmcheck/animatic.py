@@ -5,6 +5,7 @@ Files: timing.json (filmcheck.timing), animatic/draft.json, animatic/keys.json, 
 suggestions only), animatic/notes.json (pins, US3)."""
 import hashlib
 import json
+import math
 from pathlib import Path
 
 from filmcheck import rhythm, timing
@@ -299,13 +300,21 @@ def motions(keys: list, end_new: float) -> list:
 def fit(d: Path, all_states: bool = False) -> list:
     """Per-shot suggestions: the shot ends PAD after its last word and its first line starts at the cut (head dropped;
     the film's first shot keeps its head). [{shot, frames, frames_new, delta_s, end_new, head, very_short, motions,
-    state}] for shots with lines whose end moves more than one frame or whose head is longer than one frame.
+    hold, state}] for shots with lines whose end moves more than one frame or whose head is longer than one frame.
+    hold: the paragraph whose last words the shot holds when it keeps rhythm.KEY_SHOT (2.5 s) instead of last word + PAD.
     Skipped suggestions are left out unless all_states (they come back when the shot's length or lines change)."""
     doc = timing.require(d)
     fps = float(doc["fps"])
     rows = timing.lines(d, doc)
     keys = _read(adir(d) / "keys.json", {}) or {}
     skipped = _fit_doc(d).get("skipped") or {}
+    from filmcheck.rhythm import KEY_SHOT                 # the shot with a paragraph's last words holds ≥ 2.5 s (qc final)
+    ends = {}
+    for r in rows:
+        if r["para"] not in ends or r["last_word_end"] > ends[r["para"]]["last_word_end"]:
+            ends[r["para"]] = r
+    key_shots = {r["shot"]: p for p, r in ends.items()}
+    key_min = int(math.ceil(KEY_SHOT * fps - 1e-6))
     out = []
     for i, b in enumerate(timing.bounds(doc, exact=True)):
         mine = [r for r in rows if r["shot"] == b["id"]]
@@ -318,6 +327,9 @@ def fit(d: Path, all_states: bool = False) -> list:
         n_new = max(timing.MIN_FRAMES, int(round((need + PAD) * fps)))
         while n_new / fps < need - 1e-6:
             n_new += 1
+        hold = None
+        if b["id"] in key_shots and n_new < key_min:      # the rest is the pause at the paragraph's end (2026-11-26)
+            n_new, hold = key_min, key_shots[b["id"]]
         n = doc["frames"][b["id"]]
         if abs(n_new - n) <= 1 and head * fps <= 1:
             continue
@@ -327,7 +339,7 @@ def fit(d: Path, all_states: bool = False) -> list:
             continue
         end_new = n_new / fps
         out.append({"shot": b["id"], "frames": n, "frames_new": n_new, "delta_s": round((n_new - n) / fps, 3),
-                    "end_new": round(end_new, 3), "head": round(head, 3), "very_short": end_new < VERY_SHORT,
+                    "end_new": round(end_new, 3), "head": round(head, 3), "very_short": end_new < VERY_SHORT, "hold": hold,
                     "motions": motions(keys.get(b["id"]), end_new) if n_new - n < 0 else [], "state": state})
     return out
 
