@@ -79,6 +79,8 @@ description: "Task list for 037-sound-per-shot"
 - [X] T024 [US1] `tools/filmcheck/soundmix.py` (chạy bằng python venv thư viện, không import `lib/`): giọng theo `narration.json`, `out/music.wav` nếu có, cue từ `sound/cache/` (chép bằng `soundlib`/proxy fetch nếu thiếu), đổi 48 kHz stereo, fade vào 5 ms, luật cắt, ducking nhạc cửa sổ 50 ms, lặng dốc 30 ms, soft-clip tanh không trạng thái; ghi `out/mix.wav`, `sound/stems/fx.wav`, `sound/stems/voice.wav`; thay khối `# sound effects (studio, 037)` … `# end sound effects` trong `CREDITS` của phim
 - [X] T025 [US1] Lệnh `sound cue add|set|rm`, `sound silence add`, `sound plan`, `sound mix` trong `tools/filmcheck/cli.py` theo `contracts/cli.md`; `sound mix` ghép lại tiếng vào bản đẹp nếu đã có (không dựng hình, như `edit.mix_edit`)
 - [X] T026 [US1] Viết `tools/ae/SOUND.md`: cách Claude lập danh sách tiếng (đọc `SCRIPT.md`, `animatic/keys.json`, `sound.sfx` của phong cách; mỗi chuyển động có tên đáng nghe → một cue neo `motion`; tiếng nền `span`; khoảnh khắc lặng; từ khoá tiếng Anh kiểu UCS); `mix.py` của phim AE chỉ còn làm nhạc → `out/music.wav`
+- [X] T053 [US1] Bật/tắt tiếng theo shot (FR-005a): `plan.json → off`, cue của shot tắt có `state: "off"` (giữ, không trộn, không tính mật độ), `add_cue` từ chối mã `off`, `soundplan.set_shots`, lệnh `sound shot on|off`; test trong `tests/filmcheck/test_soundplan.py` và `test_soundmix.py`. Trang Sound (T045/T046) thêm op `shot_set` và công tắc trên mỗi shot
+- [X] T054 [US4] Hướng A và chỉnh sau bài chấm CC0 (research R8): `sound.sfx → actions` chỉ `sure`, `hints` cho `likely`; bỏ luật "AST thắng"; AST chỉ nghe lớp của sự kiện; lặng ≥ 0,6 s + nhánh "cả bản trộn im" + dung sai đuôi từ 0,2 s; khoảng lặng neo vào từ bắt đầu khi từ đó **kết thúc** (`soundplan`); `soundlib.find` hỏi Freesound khi kho có < 3 tiếng khớp mạnh; `tools/ae/SOUND.md`; test trong `tests/learn/test_sfxlearn.py`, `tests/filmcheck/test_soundplan.py`, `tests/filmcheck/test_freesound.py`
 - [ ] T027 [US1] (làm cùng T051, cần kho Sonniss thật) Chuyển `films/ae-sleepless-test/mix.py` (ngoài git, chỉ trên máy) sang chỉ làm nhạc `out/music.wav`, lập `sound/plan.json` cho 9 shot bằng `sound cue add`; ghi lại cách làm trong `tools/ae/SOUND.md`
 
 **Checkpoint "trước 035"**: chạy đủ `tests/filmcheck`; trộn được phim thử bằng lệnh với kho thử. Commit. Dừng các task ⟂035 tới khi 035 merge.
@@ -109,7 +111,7 @@ description: "Task list for 037-sound-per-shot"
 - [X] T037 [US4] Lệnh `learn sfx <set> [--only]` và `learn sfx --file <wav> --words <json> [--shots <json>]` trong `tools/style-learn/learn.py` (mã 3 khi thiếu `deps sound`/`words.json`); xoá `stems/` cùng video khi dọn hoặc ở dịch vụ online (theo luật xoá hiện có của style-learn)
 - [X] T038 [US4] `.claude/skills/style-learn/SKILL.md`: bước `learn sfx` tự chạy sau `learn sound` cho phong cách mới; cách chạy riêng cho phong cách đã có
 - [X] T039 [US4] Cài `sh bin/studio deps sound`, kiểm thẻ giấy phép của htdemucs, AST, CLAP và ghi vào `CREDITS` (PyTorch BSD-3, Demucs MIT, Transformers Apache-2.0, AST, CLAP, AudioSet CC BY 4.0)
-- [ ] T040 [US4] Chạy thật quickstart bước 6 trên `references/voice-check/a.wav`; đo SC-003 so với `voicecheck_expect.json`; chỉnh ngưỡng nếu cần (ghi lý do vào research R8); ghi kết quả vào quickstart "Kết quả"
+- [X] T040 [US4] Chạy thật quickstart bước 6 trên `references/voice-check/a.wav`; đo SC-003 so với `voicecheck_expect.json`; chỉnh ngưỡng nếu cần (ghi lý do vào research R8); ghi kết quả vào quickstart "Kết quả"
 
 **Checkpoint**: `tests/learn` xanh; commit.
 
@@ -123,7 +125,7 @@ description: "Task list for 037-sound-per-shot"
 
 ### Tests
 
-- [ ] T041 [P] [US3] ⟂035 `tests/ui/test_sound_api.py`: khối `sound` của `GET /jobs/{id}/steps` đúng `contracts/api.md`; `POST /jobs/{id}/actions` op `cue_set|cue_rm|cue_add|note_add|note_delete` với `base` (409 `changed` khi lệch), sửa đánh `by: user`; `mix.wav` phát được với `Range`; `POST /films/{film}/sound/fix` tạo việc `fix` `target: "sound"`
+- [ ] T041 [P] [US3] ⟂035 `tests/ui/test_sound_api.py`: khối `sound` của `GET /jobs/{id}/steps` đúng `contracts/api.md`; `POST /jobs/{id}/actions` op `cue_set|cue_rm|cue_add|shot_set|note_add|note_delete` với `base` (409 `changed` khi lệch), sửa đánh `by: user`; `mix.wav` phát được với `Range`; `POST /films/{film}/sound/fix` tạo việc `fix` `target: "sound"`
 - [ ] T042 [P] [US3] ⟂035 `tests/ui/browser_sound.cjs`: mở bước Sound, bấm một shot phát clip (video câm + bản trộn từ `t0`), đổi tiếng (≥ 3 gợi ý, nghe thử), dời, xoá; đo thời gian trộn lại ≤ 30 s; ghi chú + "Send notes to Claude"
 
 ### Implementation
@@ -131,7 +133,7 @@ description: "Task list for 037-sound-per-shot"
 - [ ] T043 [US3] ⟂035 `tools/filmcheck/edit.py`: op `cue-set`, `cue-rm`, `cue-add`, `sound-note-add`, `sound-note-delete` cho điểm `mix` của phim AE (gọi `soundplan`, rồi `soundmix`; ghi `log_edit`)
 - [ ] T044 [US3] ⟂035 `tools/filmcheck/soundplan.py` + `tools/filmcheck/pins.py` (của 035): `sound/notes.json` (`{version, base_sha, shots: {S2: [{id, text, state, reply, lot}]}}`), lệnh `sound notes add|delete|show|reply`
 - [ ] T045 [US3] ⟂035 `tools/studio/studio/filmsteps.py`, `actions.py`, `reviews.py`, `server.py`: khối `sound`, các op, `files/sound/mix.wav` (Range), quyết định `revise` của duyệt `mix` cho phim AE, `POST /films/{film}/sound/fix`
-- [ ] T046 [US3] ⟂035 `tools/studio/studio/web/app.js`, `style.css`: khung Sound (dải thời gian shot/câu/khối tiếng có nhãn, lưới shot, danh sách tiếng của shot, đổi tiếng với nghe thử, dời theo khung, độ lớn, xoá, thêm, ghi chú, "Send notes to Claude", cột "If you change this" → Final render), dùng lại thành phần dải thời gian của Animatic
+- [ ] T046 [US3] ⟂035 `tools/studio/studio/web/app.js`, `style.css`: khung Sound (dải thời gian shot/câu/khối tiếng có nhãn, lưới shot, danh sách tiếng của shot, công tắc tiếng bật/tắt trên mỗi shot (T053), đổi tiếng với nghe thử, dời theo khung, độ lớn, xoá, thêm, ghi chú, "Send notes to Claude", cột "If you change this" → Final render), dùng lại thành phần dải thời gian của Animatic
 - [ ] T047 [US3] ⟂035 Việc `fix` `target: "sound"` trong `tools/runner/agent.py`/`JOB.md`: Claude chỉ sửa cue của shot có ghi chú, `sound mix`, trả lời từng ghi chú, không duyệt; bước Sound về chưa duyệt
 - [ ] T048 [US3] ⟂035 Chạy thật quickstart bước 5 trong app trên `ae-sleepless-test`; đo SC-006 và ghi kết quả
 

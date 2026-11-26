@@ -104,6 +104,32 @@ class Anchors(PlanCase):
         soundplan.resolve(self.d, save=True)
         self.assertEqual(soundplan.load(self.d)["cues"][0]["by"], "user")
 
+    def test_shot_sound_off_and_on(self):
+        a = self.add("S2", {"motion": "Window · Scale"}, by="claude")
+        p = soundplan.set_shots(self.d, ["S2"], on=False)
+        self.assertEqual(p["off"], ["S2"])
+        c = next(x for x in p["cues"] if x["id"] == a["id"])
+        self.assertEqual((c["state"], c["why"]), ("off", "sound off for S2"))
+        self.assertAlmostEqual(c["at"], a["at"], delta=F)              # still timed, kept for when it comes back
+        with self.assertRaises(soundplan.PlanError) as e:               # nothing new lands on a shot turned off
+            self.add("S2", {"shot_at": 0.5}, query="cork pop")
+        self.assertEqual(e.exception.code, "off")
+        self.add("S1", {"shot_at": 0.5}, query="cork pop")             # other shots are untouched
+        with self.assertRaises(soundplan.PlanError) as e:
+            soundplan.set_shots(self.d, ["S9"], on=False)
+        self.assertEqual(e.exception.code, "bad")
+        self.assertEqual(soundplan.load(self.d)["off"], ["S2"])         # saved
+        p = soundplan.set_shots(self.d, ["S2"], on=True)
+        self.assertEqual(p["off"], [])
+        self.assertEqual(next(x for x in p["cues"] if x["id"] == a["id"])["state"], "placed")
+
+    def test_silence_follows_its_word(self):
+        soundplan.add_silence(self.d, "S1", {"line": "l01", "word": "window"}, 0.5)
+        s = soundplan.resolve(self.d)["silences"][0]
+        self.assertAlmostEqual(s["at"], 0.3 + 0.5, delta=F)            # "window" ends at 0.5 in its line
+        c = self.add("S1", {"line": "l01", "word": "window", "offset_f": 0}, query="bottle smash")
+        self.assertAlmostEqual(c["at"], 0.3 + 0.1, delta=F)            # a sound still lands on the word's start
+
     def test_density(self):
         a = self.add("S1", {"shot_at": 0.50}, query="cork pop", by="claude")
         b = self.add("S1", {"shot_at": 0.53}, query="button click", by="auto")        # 0.06 s later

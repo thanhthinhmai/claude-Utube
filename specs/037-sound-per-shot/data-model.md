@@ -39,6 +39,7 @@ Bản xem trước HQ của tiếng CC0 (R4).
 | `timing_sha` | text | băm `timing.json → frames` lúc resolve |
 | `profile` | `style\|default` | phần tiếng của phong cách hay luật mặc định (Edge case) |
 | `cues` | `[cue]` | |
+| `off` | `[shot]` | shot tắt tiếng động (FR-005a); theo thứ tự shot, shot không còn thì bỏ |
 
 `cue`:
 
@@ -55,7 +56,7 @@ Bản xem trước HQ của tiếng CC0 (R4).
 | `gain_db` | số | so với mức giọng, trong khoảng `sfx_db` của phong cách |
 | `cut` | `hard\|fade\|over` | + `fade_s` khi `fade` |
 | `by` | `auto\|user\|claude` | `user` = sửa của người dùng, giữ qua các lần chạy lại (FR-025) |
-| `state` | `placed\|dropped\|missing` | + `why` |
+| `state` | `placed\|dropped\|missing\|off` | + `why`; `off` = shot đang tắt tiếng, cue vẫn được tính mốc nhưng không trộn |
 | `at` | số | mốc tuyệt đối (giây) sau resolve; chỉ để đọc |
 
 `silences`: `[{shot, anchor, len_s, db}]` — khoảnh khắc lặng có chủ ý (FR-006).
@@ -87,7 +88,7 @@ Khối được thay mỗi lần trộn, giữa `# sound effects (studio, 037)` 
 
 ### `my-styles/<style>/template.json → sound.sfx` (phim đọc qua `kit/template.json` của phim hoặc `film.json → style`)
 
-`{per_min, gain_db: [p25, p50, p75], actions: [{action, label, n, trust, n_sure, evidence: [[v, t]]}], silences: {db, len_s, evidence}, cut: {kind, fade_s, evidence}, unsure_n}` — chỉ số đo, nhãn và mốc (FR-022).
+`{per_min, gain_db: [p25, p50, p75], actions: [{action, label, n, trust: "sure", n_sure, evidence: [[v, t]]}], hints: [{… trust: "likely"}] (≤ 10, hướng A: chỉ là gợi ý), silences: {db, len_s, evidence}, cut: {kind, fade_s, evidence}, unsure_n}` — chỉ số đo, nhãn và mốc (FR-022).
 
 ## Điểm duyệt `mix` (phim AE) — `checks.json → reviews`
 

@@ -10,8 +10,11 @@ keyframes and mixes `out/mix.wav`. When a shot's length changes at the Animatic,
 - `animatic/keys.json`: the motions of each shot, `{shot: [{layer, prop, t0, t1}]}` in seconds within the shot. A
   motion is named `Layer · Prop`, for example `Hand R · Rotation`.
 - the style's `sound.sfx` (from `learn sfx`; read from the film's `kit/template.json` or `my-styles/<film.json → style>/template.json`): sounds per minute, gain against the
-  voice, which actions get a sound, chosen silences, how sounds end at a cut. Follow it. Without it the defaults are
-  12 sounds a minute at most, −6 dB against the voice, point sounds fade at the cut, whole-shot sounds stop hard.
+  voice, which actions get a sound, chosen silences, how sounds end at a cut. Follow its numbers. `actions` are sounds
+  both classifiers heard in the style's videos; `hints` only one did, and are often wrong: use a hint only when the
+  picture has that sound. Either way the picture decides what sounds: a sound the style uses but the shot does not
+  show is left out. Without `sound.sfx` the defaults are 12 sounds a minute at most, −6 dB against the voice, point
+  sounds fade at the cut, whole-shot sounds stop hard.
 
 ## One cue per sound
 
@@ -29,9 +32,13 @@ sh bin/studio sound silence add <film> S4 --line l05 --word silent --len 0.6 --d
 - `--line/--word` for a sound tied to what the narrator says ("the window breaks"); `--at` only when no motion or
   word fits; `--span` for a background that lasts the whole shot (it stops at the cut).
 - A chosen silence is a moment where everything drops away (the narrator says "…goes silent"); the voice stays.
+  `sound silence add --line l05 --word w` starts it when that word ends.
 - Queries are short English words the way sound libraries name files: material + action (`glass shatter`,
   `sneaker step gym`, `crowd cheer small`, `paper scribble pencil`). `--cat` is a UCS category (GLASS, WATER,
   FOOTSTEPS, CROWDS, WHOOSHES, CARTOON, UI, PAPER…).
+- A shot the user turned off (`sound shot off <film> S5`; `sound plan` shows `· sound off`) gets no sound effects:
+  `cue add` there is refused (code 5). Leave it off unless the user turns it back on (`sound shot on`). Its old
+  cues stay as `off` and come back when it is on. Voice, music and silences are not touched.
 - Do not stack sounds closer than 0.2 s; the studio drops the extra ones ("too dense").
 - `--gain` (dB against the voice) only when the style asks for it; `--cut hard|fade|over [--fade s]` when a sound must
   end differently at the cut (hard: stops dead on the cut, like a crowd cut off).

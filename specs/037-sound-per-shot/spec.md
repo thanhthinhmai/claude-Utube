@@ -128,6 +128,7 @@ Khi học phong cách mới, việc học tiếng tự chạy như một phần 
 - **FR-003**: Mốc của tiếng MUST được tính từ mốc chuyển động của shot và thời lượng shot hiện hành (nguồn duy nhất của 035), không phải mốc tuyệt đối gõ tay.
 - **FR-004**: Khi thời lượng shot đổi, chạy lại Sound MUST tính lại mọi mốc; tiếng của chuyển động bị cắt mất MUST bị bỏ kèm lý do hiện trên trang.
 - **FR-005**: Tiếng kéo dài chạm điểm cắt MUST kết thúc theo luật của phong cách (hoặc mặc định), trừ khi được đánh dấu kéo qua cắt.
+- **FR-005a**: Người dùng MUST bật hoặc tắt tiếng động cho từng shot. Shot bị tắt MUST không có tiếng động nào trong bản trộn và MUST NOT nhận tiếng mới (kể cả tiếng Claude tự đặt). Các tiếng đã có của shot đó MUST được giữ lại (hiện "sound off") và trở lại khi bật shot. Giọng, nhạc và khoảnh khắc lặng không bị ảnh hưởng.
 - **FR-006**: Khoảnh khắc lặng có chủ ý MUST hạ mọi lớp (kể cả nhạc) về mức lặng của phong cách trong khoảng đó.
 - **FR-007**: Hành động không tìm được tiếng (cả kho trên máy lẫn Freesound) MUST để trống và được ghi "missing sound" kèm từ khoá đã tìm; MUST NOT thay bằng tiếng tổng hợp; bước Sound MUST chạy xong cho các tiếng còn lại.
 - **FR-008**: Bản trộn Sound MUST gồm giọng, nhạc hiện có của phim và các tiếng theo shot; độ lớn và phần trăm lặng của bản trộn MUST được bước kiểm phim hiện có đo như với mọi bản trộn.

@@ -62,6 +62,14 @@ class Freesound(unittest.TestCase):
         self.assertEqual(hits[0]["license"], "cc0-1.0")
         self.assertTrue(all(h["source"] == "freesound" for h in hits))
 
+    def test_one_loose_local_match_does_not_keep_freesound_away(self):
+        freesound.fetch(dict(self.fake.sounds[0], previews={"preview-hq-ogg": self.fake.url + "/previews/101-hq.ogg"}))
+        self.assertEqual([h["id"] for h in soundlib.search("aquarium bubbles")], ["fs:101"])   # one strong hit here
+        n = len(self.fake.calls)
+        hits = soundlib.find("aquarium bubbles", dur=2.0)
+        self.assertTrue(any(c[0] == "/apiv2/search/text/" for c in self.fake.calls[n:]))       # asked anyway
+        self.assertIn("fs:103", [h["id"] for h in hits])
+
     def test_key_never_shows(self):
         self.fake.key = "something-else-entirely-0000"
         logs = []

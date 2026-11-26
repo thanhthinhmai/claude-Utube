@@ -27,6 +27,8 @@ SOURCES = ("sonniss", "freesound", "user")
 LICENSES = {"sonniss": "sonniss-gdc-2.0", "freesound": "cc0-1.0"}
 SCOPES = ("all", "cc0")
 WEAK = 0.5                  # a top hit covering fewer query words than this sends find() to Freesound (FR-013)
+STRONG_MIN = 3              # … and so do fewer than 3 strong hits: one loose match (a cuckoo clock for "bell ding")
+                            # must not keep Freesound away
 
 
 class LibraryError(Exception):
@@ -519,12 +521,12 @@ def _proxy(path: str, body: dict) -> dict:
 
 def find(query: str, cat: str = None, dur: float = None, scope: str = "all", n: int = 8, online: bool = True,
          key: str = None) -> list:
-    """Search here; when the best hit is weak (or there is none) and a Freesound key is at hand, fetch CC0 sounds and
-    search again (FR-013, automatic). Inside an app job everything goes through the proxy with the job's scope."""
+    """Search here; when the best hit is weak, there are fewer than STRONG_MIN strong hits, or none, and a Freesound key
+    is at hand, fetch CC0 sounds and search again (FR-013, automatic). Inside an app job everything goes through the proxy with the job's scope."""
     if via_proxy():
         return _proxy("/internal/sound/search", {"query": query, "cat": cat, "dur": dur})["results"]
     hits = search(query, cat, dur, scope, n)
-    if online and (not hits or hits[0]["cover"] < WEAK):
+    if online and sum(h["cover"] >= WEAK for h in hits) < STRONG_MIN:
         from filmcheck import freesound
         try:
             got = freesound.fill(query, dur, key)
