@@ -282,12 +282,17 @@ async function pageChannels() {
   });
 }
 
-const POINTS = [["script", "Script"], ["cast", "Cast (After Effects films)"], ["voice", "Voice"], ["shots", "Shots (before render)"], ["mix", "Mix"], ["publish", "Publish"]];
+const POINTS = [["script", "Script"], ["cast", "Cast (After Effects films)"], ["voice", "Voice"], ["animatic", "Animatic (After Effects films)"], ["shots", "Shots (before render)"], ["mix", "Mix"], ["publish", "Publish"]];
 /** Five boxes: where a film stops for this person's review (specs/026). @param {string} id @param {string[]} on */
 const pointBoxes = (id, on) => `<fieldset class="points" id="${id}"><legend>Stop for my review at <span class="hint">You can change and approve each one on the job page</span></legend>
   ${POINTS.map(([k, l]) => `<label class="check"><input type="checkbox" value="${k}" ${on.includes(k) ? "checked" : ""}> <span>${l}</span></label>`).join("")}</fieldset>`;
-/** a channel's review points; a list saved before specs/034 never chose about Cast, so Cast shows ticked @param {any} c */
-const reviewsOf = (c) => !c.reviews ? ["script", "cast", "shots"] : c.cast_chosen || c.reviews.includes("cast") ? c.reviews : [...c.reviews, "cast"];
+/** a channel's review points; a list saved before specs/034 (035) never chose about Cast (Animatic), so it shows ticked
+ * @param {any} c */
+const reviewsOf = (c) => {
+  if (!c.reviews) return ["script", "cast", "animatic", "shots"];
+  const r = c.cast_chosen || c.reviews.includes("cast") ? c.reviews : [...c.reviews, "cast"];
+  return c.animatic_chosen || r.includes("animatic") ? r : [...r, "animatic"];
+};
 const pointsOf = (/** @type {string} */ id) => Array.from(document.querySelectorAll(`#${id} input:checked`)).map((x) => /** @type {HTMLInputElement} */ (x).value);
 
 async function pageChannel(slug) {
@@ -737,7 +742,7 @@ async function railRefresh() {
           : s.note || STATE_LABEL[s.state] || s.state)}</span></button></li>`).join("")}</ol>
     <div id="impact"></div>
     <div class="point-toggles" id="point-toggles"><span class="muted small">Stop for my review at:</span>
-      ${POINTS.filter(([k]) => v.points[k] && !(k === "cast" && v.points[k].state === "skipped")).map(([k, l]) => {
+      ${POINTS.filter(([k]) => v.points[k] && !(["cast", "animatic", "shots"].includes(k) && v.points[k].state === "skipped")).map(([k, l]) => {
         const pt = v.points[k], locked = ["approved", "waiting", "skipped"].includes(pt.state) || ["done", "failed", "stopped"].includes(DONE.job.status);
         return `<label class="check small" title="${locked ? esc(`${l}: ${pt.state}`) : ""}"><input type="checkbox" value="${k}" ${pt.on ? "checked" : ""} ${locked ? "disabled" : ""}> <span>${esc(l.replace(" (before render)", "").replace(" (After Effects films)", ""))}</span></label>`;
       }).join("")}<span class="msg small" id="points-msg"></span></div>`;
@@ -2748,7 +2753,7 @@ async function pageNew() {
       <label>Length in seconds <span class="hint">Up to ${max} seconds.</span>
         <input id="seconds" type="number" min="5" max="${max}" value="${Math.min(30, max)}" required></label>
       <label class="check"><input id="treat" type="checkbox"> <span>Let me review the treatment (the written plan) before the picture is made</span></label>
-      ${pointBoxes("f-reviews", ["script", "cast", "shots"])}
+      ${pointBoxes("f-reviews", ["script", "cast", "animatic", "shots"])}
       <div><button class="primary" type="submit" ${left === 0 || !ME.verified ? "disabled" : ""}>Make the film (uses 1 credit)</button></div>
     </form><p id="msg" class="muted" role="status"></p>`;
   $app.querySelector("input[name=style]:checked")?.closest("label")?.scrollIntoView({ block: "nearest" });

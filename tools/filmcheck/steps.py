@@ -5,17 +5,29 @@ from pathlib import Path
 
 from filmcheck import points, report, tiers
 
-STEPS = ["Treatment", "Script", "Cast", "Voice", "Look", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"]
-GRAPH = {"Script": ["Cast", "Voice"], "Cast": ["Picture"], "Voice": ["Picture", "Mix"], "Look": ["Picture"], "Picture": ["Shots"],
-         "Shots": ["Render"], "Mix": ["Self-check"], "Render": ["Self-check"], "Self-check": ["Publish"], "Publish": []}
-POINT_STEP = {"script": "Script", "cast": "Cast", "voice": "Voice", "shots": "Shots", "mix": "Mix", "publish": "Publish"}
+STEPS = ["Treatment", "Script", "Cast", "Voice", "Animatic", "Look", "Picture", "Shots", "Mix", "Render", "Self-check",
+         "Publish"]
+GRAPH = {"Script": ["Cast", "Voice"], "Cast": ["Picture", "Animatic"], "Voice": ["Animatic", "Picture", "Mix"],
+         "Animatic": ["Mix", "Render"], "Look": ["Picture"], "Picture": ["Shots"], "Shots": ["Render"], "Mix": ["Self-check"],
+         "Render": ["Self-check"], "Self-check": ["Publish"], "Publish": []}
+POINT_STEP = {"script": "Script", "cast": "Cast", "voice": "Voice", "animatic": "Animatic", "shots": "Shots", "mix": "Mix",
+              "publish": "Publish"}
 STEP_POINT = {v: k for k, v in POINT_STEP.items()}
+AE_ONLY = ("Cast", "Animatic")                      # web page films have neither (specs/034, 035)
+WEB_ONLY = ("Look", "Picture", "Shots")             # AE films draw in After Effects and review the animatic
+AE_LABEL = {"Mix": "Sound", "Render": "Final render"}
+
+
+def hidden(film_dir) -> tuple:
+    """The steps this film does not have."""
+    return WEB_ONLY if points.is_ae(Path(film_dir)) else AE_ONLY
 
 
 def after(step: str, film_dir=None) -> list:
-    """Every step that depends on this one, in film order (the Cast step only for AE films when film_dir is given)."""
-    if film_dir is not None and not points.is_ae(Path(film_dir)):
-        return [s for s in after(step) if s != "Cast"]
+    """Every step that depends on this one, in film order (only the film's own steps when film_dir is given)."""
+    if film_dir is not None:
+        hide = hidden(film_dir)
+        return [s for s in after(step) if s not in hide]
     seen, todo = set(), list(GRAPH.get(step, []))
     while todo:
         s = todo.pop()
@@ -89,6 +101,13 @@ def cast_state(d: Path) -> tuple:
     return ("todo", f"no sheet: {', '.join(missing)}") if missing else ("done", "")
 
 
+def animatic_state(d: Path) -> tuple:
+    """Animatic step (AE films, specs/035): todo (no current draft) · done · stale (the draft is older than the shot
+    lengths, the narration or the film's code)."""
+    from filmcheck import animatic
+    return animatic.step_state(d)
+
+
 def base_states(film_dir: Path) -> dict:
     """{step: (state, note)} from the film's files only: done · todo · stale · skipped."""
     d = Path(film_dir)
@@ -107,6 +126,7 @@ def base_states(film_dir: Path) -> dict:
         else:
             out["Voice"] = ("todo", "")
     out["Cast"] = cast_state(d)
+    out["Animatic"] = animatic_state(d) if points.is_ae(d) else ("skipped", "not an After Effects film")
     out["Look"] = ("done", "") if (d / "index.html").is_file() else ("todo", "")
     out["Picture"] = (_tier_state(d, "plan", fp) or "todo", "")
     out["Shots"] = (_tier_state(d, "shots", fp) or "todo", "")
@@ -151,9 +171,10 @@ def status(film_dir: Path, job_step: str = None, pending: set = frozenset(), bus
     pst = points.status(d, pending)
     out = []
     ae = points.is_ae(d)
+    hide = WEB_ONLY if ae else AE_ONLY
     for name in STEPS:
-        if name == "Cast" and not ae:
-            continue                     # web page films have no Cast step (specs/034)
+        if name in hide:
+            continue                     # each kind of film shows only its own steps (specs/034, 035)
         state, note = base[name]
         pt = STEP_POINT.get(name)
         info = pst.get(pt) if pt else None
@@ -168,7 +189,7 @@ def status(film_dir: Path, job_step: str = None, pending: set = frozenset(), bus
             state, note = "running", "Busy"
         elif job_step and job_step == name and state != "waiting":
             state = "running"
-        out.append({"name": name, "state": state, "base": base[name][0], "note": note, "point": pt,
+        out.append({"name": name, "label": AE_LABEL.get(name, name) if ae else name, "state": state, "base": base[name][0], "note": note, "point": pt,
                     "review_on": bool(info and info["on"]),
                     "approved_at": info["approved_at"] if info and info["state"] == "approved" else None})
     return out

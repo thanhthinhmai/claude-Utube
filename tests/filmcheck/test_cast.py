@@ -150,7 +150,8 @@ class Point(unittest.TestCase):
 
     def test_cast_change_makes_picture_stale_not_voice(self):
         hit = steps.impact("cast", self.d)
-        self.assertIn("Shots", hit)
+        self.assertIn("Animatic", hit)                  # specs/035: AE films review the animatic, not Shots
+        self.assertNotIn("Shots", hit)
         self.assertIn("Render", hit)
         self.assertNotIn("Voice", hit)
 

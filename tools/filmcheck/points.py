@@ -7,10 +7,13 @@ from pathlib import Path
 
 from filmcheck import report, tiers
 
-POINTS = ("script", "cast", "voice", "shots", "mix", "publish")
+POINTS = ("script", "cast", "voice", "animatic", "shots", "mix", "publish")
 DEFAULT_ON = ["script", "shots"]
-AE_ON = ("cast",)                       # on by default for After Effects films unless turned off (specs/034)
-STEP = {"script": "Script", "cast": "Cast", "voice": "Voice", "shots": "Shots", "mix": "Mix", "publish": "Publish"}
+AE_ON = ("cast", "animatic")            # on by default for After Effects films unless turned off (specs/034, 035)
+STEP = {"script": "Script", "cast": "Cast", "voice": "Voice", "animatic": "Animatic", "shots": "Shots", "mix": "Mix",
+        "publish": "Publish"}
+AE_ONLY = ("cast", "animatic")          # skipped for web page films
+WEB_ONLY = ("shots",)                   # skipped for AE films: they review the animatic (specs/035 R10)
 LOCKED = {"approved", "waiting"}            # a point in these states cannot be turned on or off (data-model)
 
 
@@ -57,9 +60,31 @@ def fingerprint(film_dir: Path, point: str) -> str:
     if point == "cast":
         from filmcheck import cast
         return cast.fingerprint(d) if cast.exists(d) else ""
+    if point == "animatic":
+        return animatic_fingerprint(d)
     files = {"script": ["SCRIPT.md", "SOURCES.md"], "mix": ["mix.json", "out/mix.wav"],
              "publish": ["publish/pack.json"]}[point]
     return _hash(d, [d / f for f in files])
+
+
+def animatic_fingerprint(d: Path) -> str:
+    """specs/035 R11: the shot lengths, narration.json, the open draft notes and the film's code (ae/*.jsx, cast.json)."""
+    h = hashlib.sha256()
+    try:
+        t = json.loads((d / "timing.json").read_text(encoding="utf-8"))
+        h.update(json.dumps(t.get("frames"), sort_keys=True).encode())
+    except (OSError, ValueError):
+        h.update(b"no timing")
+    h.update(b"\0")
+    try:
+        notes = json.loads((d / "animatic" / "notes.json").read_text(encoding="utf-8"))
+        opn = {s: [n for n in ns if n.get("state", "open") == "open"] for s, ns in (notes.get("shots") or {}).items()}
+        h.update(json.dumps({s: ns for s, ns in opn.items() if ns}, sort_keys=True).encode())
+    except (OSError, ValueError, AttributeError):
+        pass
+    h.update(b"\0")
+    h.update(_hash(d, [d / "narration.json", d / "cast" / "cast.json", *sorted((d / "ae").glob("*.jsx"))]).encode())
+    return h.hexdigest()[:16]
 
 
 # ---------- state ----------
@@ -112,7 +137,15 @@ def reached(film_dir: Path, point: str) -> bool:
             "shots": tiers.load_tier(d, "shots") is not None,
             "mix": (d / "out" / "mix.wav").is_file(),
             "publish": (d / "publish" / "pack.json").is_file(),
-            "cast": _cast_reached(d)}[point]
+            "cast": _cast_reached(d),
+            "animatic": point == "animatic" and _animatic_reached(d)}[point]
+
+
+def _animatic_reached(d: Path) -> bool:
+    """The voice is approved, or not reviewed (off/skipped), and the voice exists (specs/035 data-model)."""
+    if narrated(d) and not ((d / "voices").is_dir() and any((d / "voices").glob("*.wav"))):
+        return False
+    return state(d, "voice") in ("approved", "off", "skipped")
 
 
 def _cast_reached(d: Path) -> bool:
@@ -121,6 +154,17 @@ def _cast_reached(d: Path) -> bool:
         return cast.exists(d) and bool(cast.load(d)["characters"])
     except cast.CastError:
         return True             # a broken cast.json must be fixed, not skipped
+
+
+def skip_reason(film_dir: Path, point: str):
+    """Why a point does not apply to this film, or None."""
+    if point == "cast":
+        return cast_skip_reason(film_dir)
+    if point == "animatic" and not is_ae(film_dir):
+        return "not an After Effects film"
+    if point in WEB_ONLY and is_ae(film_dir):
+        return "AE films review the animatic"
+    return None
 
 
 def cast_skip_reason(film_dir: Path):
@@ -143,7 +187,7 @@ def state(film_dir: Path, point: str, pending: bool = False) -> str:
     rv = load(d)
     if point in ("script", "voice") and not narrated(d):
         return "skipped"
-    if point == "cast" and cast_skip_reason(d):
+    if skip_reason(d, point):
         return "skipped"
     if point not in rv["on"]:
         return "off"
@@ -183,7 +227,8 @@ def status(film_dir: Path, pending: set = frozenset()) -> dict:
 def set_on(film_dir: Path, points, origin: str = None, pending: set = frozenset(), chosen: bool = False) -> list:
     """Turn points on or off for this film; a point that is approved (still valid) or waiting cannot change.
     chosen: the list was picked by a person (new-job form, a channel's saved list), so a point of AE_ON missing
-    from it stays off even when the film becomes an AE film later (FR-002)."""
+    from it stays off even when the film becomes an AE film later (FR-002). True = the chooser saw every point; a set
+    = the AE_ON points the chooser saw (a channel list saved before specs/035 never chose about the animatic)."""
     d = Path(film_dir)
     want = parse_list(points)
     cur = load(d)["on"]
@@ -194,7 +239,9 @@ def set_on(film_dir: Path, points, origin: str = None, pending: set = frozenset(
 
     def f(rv):
         rv["on"] = want
-        rv["off"] = [p for p in AE_ON if p not in want] if chosen or is_ae(d) else list(rv.get("off") or [])
+        known = set(AE_ON) if chosen is True or is_ae(d) else set(chosen or ())
+        prev = list(rv.get("off") or [])
+        rv["off"] = [p for p in AE_ON if p not in want and (p in known or p in prev)]
         if origin:
             rv["from"] = origin
     return _save(d, f)["on"]
@@ -236,6 +283,9 @@ def checks_pass(film_dir: Path, point: str) -> list:
         why = [f"{c['id']}: no cast sheet yet" for c in doc["characters"] if not cast.has_sheet(d, c["id"])]
         why += [f"{cid}: {n} open note(s)" for cid, n in notes.items() if n]
         return why
+    if point == "animatic":
+        from filmcheck import animatic
+        return animatic.problems(d)
     if point == "mix":
         mix = d / "out" / "mix.wav"
         if not mix.is_file():
@@ -252,8 +302,9 @@ def checks_pass(film_dir: Path, point: str) -> list:
 
 
 def approve(film_dir: Path, point: str, base: str = None, source: str = "chat", by: str = "local",
-            review_id: str = None) -> tuple:
-    """(code, reasons): 0 approved · 1 checks do not pass · 4 base is not the current fingerprint."""
+            review_id: str = None, anyway: bool = False) -> tuple:
+    """(code, reasons): 0 approved · 1 checks do not pass · 4 base is not the current fingerprint.
+    anyway: approve the animatic with more silence than the limit (only the owner, FR-010)."""
     d = Path(film_dir)
     check_point(point)
     if source not in ("ui", "chat", "api"):
@@ -270,10 +321,18 @@ def approve(film_dir: Path, point: str, base: str = None, source: str = "chat", 
         why = cast.approve(d, [c["id"] for c in doc["characters"]], "chat" if source == "chat" else "ui", by)
         if why:
             return 1, why
+    extra = {}
+    if point == "animatic":
+        from filmcheck import animatic, rhythm
+        sil = animatic.silence(d)
+        if sil > rhythm.SILENCE_MAX:
+            if not anyway:
+                return 1, [f"silence {round(sil * 100)}% > {round(rhythm.SILENCE_MAX * 100)}%: approve anyway?"]
+            extra = {"anyway": True, "silence": round(sil, 4)}
 
     def f(rv):
         rv["approved"][point] = {"fingerprint": fp, "at": now(), "by": by or "local", "source": source,
-                                 "review_id": review_id}
+                                 "review_id": review_id, **extra}
         rv["rejected"].pop(point, None)
     _save(d, f)
     return 0, []

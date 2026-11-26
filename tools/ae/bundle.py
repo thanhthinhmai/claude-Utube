@@ -77,7 +77,7 @@ CU.char = function (id, o) {
 
 
 def entry_text(doc: dict, shots: list, film_name: str, proj: str = PROJ, rig_list=(), cast: dict = None,
-               sheet: bool = False) -> str:
+               sheet: bool = False, draft: bool = False) -> str:
     ids = ", ".join(json.dumps(s[1:]) for s in shots)
     w, h = doc["size"]
     lines = [f"// entry.jsx (tools/ae/bundle.py): builds {', '.join(shots)} of {film_name} into {proj}.",
@@ -93,6 +93,8 @@ def entry_text(doc: dict, shots: list, film_name: str, proj: str = PROJ, rig_lis
                   'CU.RENDER = "master.mp4";   // rendered inside After Effects (no aerender)',
                   f'CU.build(CU.castSheet(CU.readJSON(CU.WORK + "/{SHEET_DATA}")));', ""]
         return "\n".join(lines)
+    if draft:
+        lines += ["CU.DRAFT = true;   // ae draft (specs/035): quarter resolution, draft quality"]
     lines += [f'#include "ae/{f}"' for f in doc["ae_files"]]
     lines += [f"CU.PROJ = {json.dumps(proj)};", 'CU.RENDER = "master.mp4";   // rendered inside After Effects (no aerender)',
               f"CU.build([{ids}]);", ""]
@@ -105,9 +107,10 @@ def _add(tar: tarfile.TarFile, name: str, data: bytes) -> None:
     tar.addfile(ti, io.BytesIO(data))
 
 
-def make(film_dir, shots=None, out=None, proj: str = PROJ, sheet: dict = None) -> dict:
+def make(film_dir, shots=None, out=None, proj: str = PROJ, sheet: dict = None, draft: bool = False) -> dict:
     """Write bundle.tar for these shots (default: all); returns {path, shots, proj, files}.
-    sheet: the cast sheet plan of tools/ae/sheet.py ({frames:[…], …}); the bundle then draws one shot per frame."""
+    sheet: the cast sheet plan of tools/ae/sheet.py ({frames:[…], …}); the bundle then draws one shot per frame.
+    draft: `ae draft` (specs/035): CU.DRAFT = true. The film's timing.json goes in as data/timing.json."""
     d = Path(film_dir)
     doc = filmdoc.require_ae(d)
     cast = sheet.get("cast") if sheet else cast_doc(d)
@@ -141,12 +144,15 @@ def make(film_dir, shots=None, out=None, proj: str = PROJ, sheet: dict = None) -
                         raise filmdoc.FilmError("bundle_too_big", "ae/data is larger than 50 MB")
                     rel = "data/" + p.relative_to(data).as_posix()
                     _add(tar, rel, p.read_bytes()); files.append(rel)
+        tj = d / "timing.json"
+        if tj.is_file() and not sheet:                       # specs/035: CU.shotFrames reads it
+            _add(tar, "data/timing.json", tj.read_bytes()); files.append("data/timing.json")
         ti = tarfile.TarInfo("data/heads"); ti.type, ti.mode, ti.mtime = tarfile.DIRTYPE, 0o755, 0
         tar.addfile(ti)
         meta = {"film": d.name, "shots": shots, "proj": proj, "fps": doc["fps"], "size": doc["size"], "rigs": rig_list,
-                "kind": "sheet" if sheet else "film"}
+                "kind": "sheet" if sheet else ("draft" if draft else "film")}
         _add(tar, "bundle.json", json.dumps(meta, ensure_ascii=False).encode())
-        _add(tar, "entry.jsx", entry_text(doc, shots, d.name, proj, rig_list, cast, bool(sheet)).encode())
+        _add(tar, "entry.jsx", entry_text(doc, shots, d.name, proj, rig_list, cast, bool(sheet), draft).encode())
         files += ["bundle.json", "entry.jsx"]
     return {"path": str(out), "shots": shots, "proj": proj, "files": files}
 

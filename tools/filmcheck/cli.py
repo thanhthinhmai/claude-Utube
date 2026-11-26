@@ -423,7 +423,7 @@ def cmd_channel_set(a, channels):
         from filmcheck import points
         try:
             ch[f] = points.parse_list(",".join(vals))
-            ch["cast_chosen"] = True                             # specs/034: Cast left out on purpose stays off
+            ch["cast_chosen"] = ch["animatic_chosen"] = True     # specs/034, 035: left out on purpose stays off
         except points.PointError as e:
             raise channels.ChannelError(str(e)) from None
     elif f == "hero":                                            # specs/022: hero hoodie=#d9b23a hair=bald …
@@ -1582,8 +1582,11 @@ def cmd_point_set(a) -> int:
 def cmd_point_approve(a) -> int:
     from filmcheck import points
     d = film_dir(a.film)
+    if getattr(a, "anyway", False) and os.environ.get("STUDIO_JOB"):     # specs/035 FR-010: never Claude inside a job
+        print(f"✗ {a.point}: only the owner can approve anyway, on the job page", file=sys.stderr)
+        return 1
     try:
-        code, why = points.approve(d, a.point, a.base, a.source, a.by, a.review)
+        code, why = points.approve(d, a.point, a.base, a.source, a.by, a.review, anyway=getattr(a, "anyway", False))
     except points.PointError as e:
         print(f"✗ {e}", file=sys.stderr)
         return 2
@@ -2080,6 +2083,7 @@ def parser() -> argparse.ArgumentParser:
     s.add_argument("--source", default="chat", choices=["ui", "chat", "api"])
     s.add_argument("--by", default="local")
     s.add_argument("--review", default=None)
+    s.add_argument("--anyway", action="store_true", help="animatic: approve with more silence than the limit (owner only)")
     s.add_argument("--json", action="store_true")
     s = pt.add_parser("gate")
     s.add_argument("film")

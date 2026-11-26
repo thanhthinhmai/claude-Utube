@@ -28,10 +28,12 @@ class Steps(unittest.TestCase):
         self.assertEqual([s["name"] for s in steps.status(self.d)],
                          ["Treatment", "Script", "Voice", "Look", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
         self.assertEqual(steps.impact("script", self.d), ["Voice", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
-        # specs/034: AE films have a Cast step between Script and Voice; a cast change re-runs the picture, not the voice
-        self.assertEqual(steps.impact("script"), ["Cast", "Voice", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
-        self.assertEqual(steps.impact("cast"), ["Picture", "Shots", "Render", "Self-check", "Publish"])
-        self.assertEqual(steps.impact("voice"), ["Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
+        # specs/034, 035: without a film, every step of either kind of film
+        self.assertEqual(steps.impact("script"), ["Cast", "Voice", "Animatic", "Picture", "Shots", "Mix", "Render", "Self-check",
+                                                  "Publish"])
+        self.assertEqual(steps.impact("cast"), ["Animatic", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
+        self.assertEqual(steps.impact("voice"), ["Animatic", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
+        self.assertEqual(steps.impact("voice", self.d), ["Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
         self.assertEqual(steps.impact("shots"), ["Render", "Self-check", "Publish"])
         self.assertEqual(steps.impact("mix"), ["Self-check", "Publish"])
         self.assertEqual(steps.impact("publish"), [])
@@ -71,6 +73,44 @@ class Steps(unittest.TestCase):
         self.assertEqual(self.state("Script", pending={"script"})["state"], "waiting")
         self.assertEqual(self.state("Voice", busy={"step": "Voice"})["state"], "running")
         self.assertEqual(self.state("Voice")["note"], "Not reviewed")        # voice is off by default
+
+
+class AeSteps(unittest.TestCase):
+    """specs/035 T009: AE films show Script, Cast, Voice, Animatic, Sound, Final render; a voice, script or cast change
+    makes the Animatic run again."""
+    def setUp(self):
+        import animfilm
+        self.tmp = tempfile.TemporaryDirectory()
+        self.d = animfilm.make(Path(self.tmp.name) / "f1", wavs=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_order_labels_and_impact(self):
+        rail = steps.status(self.d)
+        self.assertEqual([s["name"] for s in rail], ["Treatment", "Script", "Cast", "Voice", "Animatic", "Mix", "Render",
+                                                     "Self-check", "Publish"])
+        self.assertEqual([s["label"] for s in rail][5:7], ["Sound", "Final render"])
+        self.assertEqual(next(s for s in rail if s["name"] == "Animatic")["point"], "animatic")
+        self.assertEqual(steps.impact("animatic", self.d), ["Mix", "Render", "Self-check", "Publish"])   # FR-004
+        for p in ("script", "voice", "cast"):
+            self.assertIn("Animatic", steps.impact(p, self.d))                                         # FR-005
+
+    def test_animatic_step_state(self):
+        from filmcheck import animatic
+        st = lambda: next(s for s in steps.status(self.d) if s["name"] == "Animatic")      # noqa: E731
+        self.assertEqual(st()["state"], "todo")
+        import animfilm
+        animfilm.fake_draft(self.d)
+        self.assertEqual(st()["state"], "done")
+        p = self.d / "ae" / "shots.jsx"
+        p.write_text("// changed\n")
+        self.assertEqual((st()["state"], st()["note"]), ("stale", "the film's code changed"))
+        animfilm.fake_draft(self.d)
+        n = self.d / "narration.json"
+        n.write_text(n.read_text().replace('"at": 0.3', '"at": 0.4'))
+        self.assertEqual((st()["state"], st()["note"]), ("stale", "the voice changed"))
+        self.assertFalse(animatic.draft_current(self.d))
 
 
 if __name__ == "__main__":

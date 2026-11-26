@@ -414,7 +414,7 @@ def new_channel(body: ChannelIn, request: Request):
     me(request)
     data = {k: v for k, v in body.model_dump().items() if v is not None}
     if "reviews" in data:
-        data["cast_chosen"] = True                      # specs/034 FR-002: Cast left out on purpose stays off
+        data["cast_chosen"] = data["animatic_chosen"] = True     # specs/034, 035: left out on purpose stays off
     return _ch(lambda: channels.save(store.root(), data, resources.lib_dir(), new=True))
 
 
@@ -431,7 +431,7 @@ def put_channel(slug: str, body: ChannelIn, request: Request):
     ch = channel_or_404(slug)
     ch.update({k: v for k, v in body.model_dump(exclude_unset=True).items() if k != "slug"})
     if "reviews" in body.model_fields_set:
-        ch["cast_chosen"] = True                        # specs/034 FR-002: Cast left out on purpose stays off
+        ch["cast_chosen"] = ch["animatic_chosen"] = True         # specs/034, 035: left out on purpose stays off
     return _ch(lambda: channels.save(store.root(), ch, resources.lib_dir()))
 
 

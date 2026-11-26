@@ -58,11 +58,25 @@ def progress(p: dict) -> None:
     print(f"… {p.get('shot')} ({p.get('index')}/{p.get('total')})", flush=True)
 
 
-def do_build(code: Path, shots) -> dict:
-    r = runner()(code, shots, progress=progress)
+def do_build(code: Path, shots, draft: bool = False) -> dict:
+    r = runner()(code, shots, progress=progress, draft=draft) if draft else runner()(code, shots, progress=progress)
     for c in r["checks"]:
         print(c)
+    remember_timing(code, r)
     return r
+
+
+def remember_timing(code: Path, r: dict) -> None:
+    """specs/035: a film without timing.json gets one from the real lengths of its first whole build (old films)."""
+    from filmcheck import timing
+    try:
+        if timing.load(code) is None and r.get("marks"):
+            have = {str(m[3]) for m in r["marks"] if len(m) > 3}
+            if set(timing.film(code)["shots"]) <= have:
+                timing.from_marks(code, r["marks"])
+                print(f"✓ timing.json written from this build's shot lengths", flush=True)
+    except timing.TimingError as e:
+        print(f"timing.json: {e.message}", file=sys.stderr)
 
 
 def fail(e) -> int:

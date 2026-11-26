@@ -46,12 +46,22 @@ if (tool === "afterfx") {
     log.push("START");
     const rows = [];
     let t = 0;
-    for (const s of meta.shots) { rows.push([t, t + 2, "", s]); t += 2; log.push(`shot ${s.slice(1)} ok 5 ms`); }
+    // specs/035: shot lengths from data/timing.json when the bundle has one (else 2 s), and keys_<proj>.json with one
+    // made-up motion per shot (0.2 s to 80% of the shot)
+    let frames = {};
+    try { frames = JSON.parse(fs.readFileSync(path.join(dir, "data", "timing.json"), "utf8")).frames || {}; } catch { frames = {}; }
+    const keys = {};
+    for (const s of meta.shots) {
+      const len = frames[s] ? Math.round(frames[s] / (meta.fps || 30) * 10000) / 10000 : 2;
+      rows.push([t, t + len, "", s]); t += len; log.push(`shot ${s.slice(1)} ok 5 ms`);
+      keys[s] = [{ layer: "Hero", prop: "Position", t0: 0.2, t1: Math.round(len * 0.8 * 1000) / 1000 }];
+    }
     if (mode === "err") log.push("ERR shot " + meta.shots[0].slice(1) + ": ReferenceError: CU.nothing is undefined line 3");
     if (mode === "check") log.push("CHECK floor " + meta.shots[0] + ": person floats 12 px above the floor");
     const proj = meta.proj || "build.aep";
     fs.writeFileSync(path.join(dir, `shots_${proj.replace(/\.aep$/, "")}.json`),
       JSON.stringify({ version: 1, video: "", duration: t, fps: meta.fps || 30, source: "ae", shots: rows }));
+    fs.writeFileSync(path.join(dir, `keys_${proj.replace(/\.aep$/, "")}.json`), JSON.stringify(keys));
     fs.writeFileSync(path.join(dir, proj), "fake aep");
     sleep(Number(process.env.FAKE_AE_BUILD_MS || 50));
     log.push(`master ${t.toFixed(3)} s`);

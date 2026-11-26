@@ -318,7 +318,10 @@ class Bridge {
       const up = await this.call(`${req.id}/result/MASTER`, { method: "PUT", headers: { "content-type": "video/mp4" }, body: fs.readFileSync(out) });
       if (up.status !== 201) throw new BridgeError("upload", `the studio did not take the clip (${up.status})`);
       const marks = JSON.parse(fs.readFileSync(marksFile, "utf8"));
-      await this.post(`${req.id}/finish`, { ok: true, checks: lg.checks, marks: marks.shots, duration: marks.duration });
+      const keysFile = path.join(dir, `keys_${proj.replace(/\.aep$/, "")}.json`);       // specs/035 R5
+      let keys = null;
+      try { keys = fs.existsSync(keysFile) ? JSON.parse(fs.readFileSync(keysFile, "utf8")) : null; } catch { keys = null; }
+      await this.post(`${req.id}/finish`, { ok: true, checks: lg.checks, marks: marks.shots, duration: marks.duration, keys });
       fs.rmSync(dir, { recursive: true, force: true });
     } catch (e) {
       const err = e instanceof BridgeError ? e : new BridgeError("build_error", String(e && /** @type {any} */ (e).message || e));

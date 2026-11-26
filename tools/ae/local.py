@@ -184,7 +184,7 @@ def render(s: dict, aep: Path, out: Path, timeout: float) -> str:     # aerender
     return (r.stdout or "") + (r.stderr or "")
 
 
-def build(film_dir, shots=None, progress=None, s: dict = None, sheet: dict = None) -> dict:
+def build(film_dir, shots=None, progress=None, s: dict = None, sheet: dict = None, draft: bool = False) -> dict:
     """Build and render these shots on this machine; returns {master, marks, checks, log, dir}."""
     s = s or settings()
     check(s)
@@ -196,7 +196,7 @@ def build(film_dir, shots=None, progress=None, s: dict = None, sheet: dict = Non
         raise AeError("disk_low", f"the work folder {work} has less than 2 GB free")
     rid = time.strftime("ae-%Y%m%d-%H%M%S-") + secrets.token_hex(2)
     folder = work / rid
-    b = bundle.make(film_dir, shots, folder.with_suffix(".tar"), sheet=sheet)
+    b = bundle.make(film_dir, shots, folder.with_suffix(".tar"), sheet=sheet, draft=draft)
     bundle.extract(b["path"], folder)
     Path(b["path"]).unlink()
     return run_folder(s, folder, b["shots"], b["proj"], progress)
@@ -222,5 +222,12 @@ def run_folder(s: dict, folder: Path, shots: list, proj: str, progress=None) -> 
     if not out.exists() or out.stat().st_size == 0:
         raise AeError("render_error", "After Effects rendered no video", _tail(text))
     marks = json.loads(marks_file.read_text(encoding="utf-8"))
+    keys = {}
+    kf = folder / f"keys_{proj[:-4]}.json"                    # specs/035 R5: keyframed motions per shot
+    if kf.is_file():
+        try:
+            keys = json.loads(kf.read_text(encoding="utf-8"))
+        except ValueError:
+            keys = {}
     return {"master": str(out), "marks": marks["shots"], "duration": marks["duration"], "checks": checks,
-            "log": text, "dir": str(folder)}
+            "log": text, "dir": str(folder), "keys": keys}
