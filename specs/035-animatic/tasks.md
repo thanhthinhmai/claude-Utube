@@ -92,13 +92,13 @@
 
 ### Tests
 
-- [ ] T037 [P] [US3] Test `tests/filmcheck/test_pins.py`: phần ghim dùng chung (đọc/ghi theo `base`, `x, y` ∈ [0, 100], ghi chú chung `frame: null`, lô, trả lời, ghi chú thêm khi lô đang chạy có `lot: null` và chờ lô sau); `tests/filmcheck/test_castnotes.py` của 034 vẫn đạt
-- [ ] T038 [P] [US3] Test `tests/filmcheck/test_animatic.py` (tiếp): `animatic/notes.json` khoá theo shot, `at` ∈ [0, độ dài shot], ghi chú mở làm đổi vân tay animatic (Animatic về chưa duyệt, FR-021); lượt thất bại giữ ghi chú mở (FR-022)
+- [X] T037 [P] [US3] Test `tests/filmcheck/test_pins.py`: phần ghim dùng chung (đọc/ghi theo `base`, `x, y` ∈ [0, 100], ghi chú chung `frame: null`, lô, trả lời, ghi chú thêm khi lô đang chạy có `lot: null` và chờ lô sau); `tests/filmcheck/test_castnotes.py` của 034 vẫn đạt
+- [X] T038 [P] [US3] Test `tests/filmcheck/test_animatic.py` (tiếp): `animatic/notes.json` khoá theo shot, `at` ∈ [0, độ dài shot], ghi chú mở làm đổi vân tay animatic (Animatic về chưa duyệt, FR-021); lượt thất bại giữ ghi chú mở (FR-022)
 
 ### Implementation
 
-- [ ] T039 [US3] Trước khi làm, nhắn session 034 (ListAgents/SendMessage) để chắc `castnotes.py` không còn đang sửa. Tách phần ghim của `tools/filmcheck/castnotes.py` thành `tools/filmcheck/pins.py` (R9), `castnotes.py` gọi lại không đổi hành vi
-- [ ] T040 [US3] Sổ ghi chú animatic trong `tools/filmcheck/animatic.py` dùng `pins.py`; lệnh `animatic notes add|delete|show|reply` trong `tools/filmcheck/cli.py` (contracts/cli.md)
+- [X] T039 [US3] Trước khi làm, nhắn session 034 (ListAgents/SendMessage) để chắc `castnotes.py` không còn đang sửa. Tách phần ghim của `tools/filmcheck/castnotes.py` thành `tools/filmcheck/pins.py` (R9), `castnotes.py` gọi lại không đổi hành vi
+- [X] T040 [US3] Sổ ghi chú animatic trong `tools/filmcheck/animatic.py` dùng `pins.py`; lệnh `animatic notes add|delete|show|reply` trong `tools/filmcheck/cli.py` (contracts/cli.md)
 - [ ] T041 [US3] API: `op: note_add|note_delete` với `notes_base`; quyết định `revise` kind `animatic` (note tự điền "N notes on: S2, S6"); `POST /films/{film}/animatic/fix` tạo việc `fix` `input.target="animatic"`, `input.shots` (409 `ae_unavailable`) trong `tools/studio/studio/actions.py`, `reviews.py`, `server.py`
 - [ ] T042 [US3] Việc `fix` `target: "animatic"` và quyết định `revise` trong `tools/runner/agent.py`, `tools/runner/JOB.md`: sửa mã các shot có ghi chú, `ae draft --shots …`, trả lời từng ghi chú, không duyệt; xong → Animatic `waiting`
 - [ ] T043 [US3] Giao diện trong `tools/studio/studio/web/app.js`, `style.css`: bấm shot phát `clips/S*.mp4`; dừng ở khung rồi bấm → ghim có số (phần trăm + mốc giây), ô ghi chú chung, xoá; "Send notes to Claude"; trạng thái việc sửa đang chạy; tự tải lại bản nháp và câu trả lời khi xong; lỗi + "Send again" khi lượt thất bại

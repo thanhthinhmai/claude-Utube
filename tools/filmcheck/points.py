@@ -78,8 +78,10 @@ def animatic_fingerprint(d: Path) -> str:
     h.update(b"\0")
     try:
         notes = json.loads((d / "animatic" / "notes.json").read_text(encoding="utf-8"))
-        opn = {s: [n for n in ns if n.get("state", "open") == "open"] for s, ns in (notes.get("shots") or {}).items()}
-        h.update(json.dumps({s: ns for s, ns in opn.items() if ns}, sort_keys=True).encode())
+        opn = {s: [n for n in (v or {}).get("notes", []) if not n.get("done")] for s, v in (notes.get("shots") or {}).items()}
+        opn = {s: ns for s, ns in opn.items() if ns}
+        if opn:                                   # no open note = no notes file: answered notes give the approval back
+            h.update(json.dumps(opn, sort_keys=True).encode())
     except (OSError, ValueError, AttributeError):
         pass
     h.update(b"\0")

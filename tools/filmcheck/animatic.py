@@ -169,15 +169,94 @@ def step_state(d: Path) -> tuple:
     return ("stale", "the film's code changed")
 
 
-# ---------- notes (counts; the notes themselves are US3) ----------
+# ---------- notes on the draft (US3, research R9: the shared pins of pins.py) ----------
+from filmcheck import pins  # noqa: E402
+
+NOTES = pins.Book("animatic/notes.json", "shots")
+
+
+def notes_load(d: Path) -> dict:
+    return NOTES.load(d)
+
+
+def notes_base(d: Path) -> str:
+    return NOTES.base(d)
+
+
+def _pin_err(fn):
+    def go(*a, **kw):
+        try:
+            return fn(*a, **kw)
+        except pins.PinError as e:
+            raise AnimaticError("changed" if e.code == "changed" else "bad_note", e.message) from None
+        except timing.TimingError as e:
+            raise AnimaticError(e.code, e.message) from None
+    go.__name__, go.__doc__ = fn.__name__, fn.__doc__
+    return go
+
+
+@_pin_err
+def note_add(d: Path, shot: str, text: str, at=None, x=None, y=None, by: str = "owner", b: str = None) -> dict:
+    """A note on one shot of the draft: pinned on the clip at `at` seconds (x, y in percent), or general (no pin)."""
+    NOTES.check_base(d, b)
+    doc = timing.require(d)
+    shot = (shot or "").upper()
+    if shot not in doc["frames"]:
+        raise AnimaticError("bad_shot", f"no shot {shot}")
+    length = doc["frames"][shot] / float(doc["fps"])
+    if x is None and y is None:
+        frame, x, y = None, None, None
+        at = None if at is None else float(at)
+    else:
+        frame = "clip"
+        x, y = pins.xy(x, y)
+        at = 0.0 if at is None else float(at)
+    if at is not None and not 0 <= at <= length + 1e-6:
+        raise AnimaticError("bad_note", f"at is 0 to {length:.2f} s for {shot}")
+    book = NOTES.load(d)
+    n = NOTES.new(book, shot, by=by, kind="note", frame=frame, x=x, y=y,
+                  at=None if at is None else round(at, 2), text=pins.text(text))
+    NOTES.write(d, book)
+    return n
+
+
+@_pin_err
+def note_delete(d: Path, shot: str, nid: str, b: str = None) -> None:
+    NOTES.delete(d, (shot or "").upper(), nid, b)
+
+
+@_pin_err
+def note_reply(d: Path, nid: str, text: str, done: bool = None, b: str = None) -> dict:
+    return NOTES.reply(d, nid, text, done, b)
+
+
 def open_notes(d: Path) -> dict:
-    doc = _read(adir(d) / "notes.json", {}) or {}
-    out = {}
-    for s, ns in (doc.get("shots") or {}).items():
-        n = sum(1 for x in ns if isinstance(x, dict) and x.get("state", "open") == "open")
-        if n:
-            out[s] = n
-    return out
+    """{shot: open notes}."""
+    try:
+        return NOTES.open_counts(d)
+    except pins.PinError:
+        return {}
+
+
+def notes_summary(d: Path) -> str:
+    """"N notes on: S2, S6" (film order) for the revise decision."""
+    by = open_notes(d)
+    n = sum(by.values())
+    if not n:
+        return ""
+    try:
+        order = list(timing.film(d)["shots"])
+    except Exception:                                  # noqa: BLE001
+        order = sorted(by)
+    return f"{n} note{'' if n == 1 else 's'} on: {', '.join(s for s in order if s in by)}"
+
+
+def notes_start(d: Path, job: str, shots=None) -> dict:
+    return NOTES.start_lot(d, job, shots)
+
+
+def notes_end(d: Path, job: str = None, error: str = None) -> None:
+    NOTES.end_lot(d, job, error)
 
 
 def problems(d: Path) -> list:

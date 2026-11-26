@@ -91,10 +91,12 @@ class Point(Base):
 
     def test_open_note_blocks(self):
         animfilm.fake_draft(self.d)
-        (self.d / "animatic" / "notes.json").write_text(json.dumps(
-            {"version": 1, "shots": {"S2": [{"id": "n1", "text": "faster", "state": "open"}]}}))
+        n = animatic.note_add(self.d, "S2", "faster")
         code, why = points.approve(self.d, "animatic", anyway=True)
         self.assertEqual((code, why), (1, ["S2: 1 open note(s)"]))
+        animatic.note_reply(self.d, n["id"], "made it faster", done=True)
+        code, why = points.approve(self.d, "animatic", anyway=True)
+        self.assertEqual(code, 0, why)
 
     def test_cli_anyway(self):
         animfilm.fake_draft(self.d)
@@ -205,6 +207,72 @@ class Fit(Base):
         self.assertEqual(run("undo", "--base", "0" * 16).returncode, 4)
         self.assertEqual(run("undo").returncode, 0)
         self.assertEqual(run("undo").returncode, 1)
+
+
+class Notes(Base):
+    """T038: animatic/notes.json keyed by shot, `at` within the shot, open notes in the fingerprint (FR-021), a failed
+    round keeps its notes open (FR-022)."""
+
+    def setUp(self):
+        super().setUp()
+        timing.start(self.d)
+
+    def test_pins_by_shot(self):
+        n = animatic.note_add(self.d, "s2", "the cup falls too early", at=1.2, x=40, y=30)
+        self.assertEqual((n["frame"], n["x"], n["y"], n["at"]), ("clip", 40.0, 30.0, 1.2))
+        g = animatic.note_add(self.d, "S6", "too slow overall")
+        self.assertEqual((g["frame"], g["x"], g["at"]), (None, None, None))
+        doc = json.loads((self.d / "animatic" / "notes.json").read_text())
+        self.assertEqual(sorted(doc["shots"]), ["S2", "S6"])
+        self.assertEqual(animatic.open_notes(self.d), {"S2": 1, "S6": 1})
+        self.assertEqual(animatic.notes_summary(self.d), "2 notes on: S2, S6")
+        for bad in ({"at": 3.91, "x": 1, "y": 1}, {"at": -0.1, "x": 1, "y": 1}, {"at": 1, "x": 101, "y": 1}):
+            with self.assertRaises(animatic.AnimaticError, msg=bad):
+                animatic.note_add(self.d, "S2", "x", **bad)                   # S2 is 117 frames = 3.9 s
+        with self.assertRaises(animatic.AnimaticError) as e:
+            animatic.note_add(self.d, "S99", "x")
+        self.assertEqual(e.exception.code, "bad_shot")
+        with self.assertRaises(animatic.AnimaticError) as e:
+            animatic.note_add(self.d, "S2", "x", b="0" * 16)
+        self.assertEqual(e.exception.exit_code(), 4)
+        animatic.note_delete(self.d, "S6", g["id"], animatic.notes_base(self.d))
+        self.assertEqual(animatic.open_notes(self.d), {"S2": 1})
+
+    def test_open_notes_change_the_fingerprint(self):
+        before = points.fingerprint(self.d, "animatic")
+        n = animatic.note_add(self.d, "S2", "faster")
+        mid = points.fingerprint(self.d, "animatic")
+        self.assertNotEqual(before, mid)
+        animatic.note_reply(self.d, n["id"], "done", done=True)
+        self.assertEqual(points.fingerprint(self.d, "animatic"), before)
+
+    def test_failed_round_keeps_notes_open(self):
+        a = animatic.note_add(self.d, "S2", "faster")
+        lot = animatic.notes_start(self.d, "job1")
+        self.assertEqual(lot["notes"], [a["id"]])
+        late = animatic.note_add(self.d, "S3", "later")                   # written during the round: next round
+        animatic.notes_end(self.d, "job1", error="AE stopped")
+        doc = animatic.notes_load(self.d)
+        self.assertEqual(doc["failed_lot"]["error"], "AE stopped")
+        self.assertEqual(animatic.open_notes(self.d), {"S2": 1, "S3": 1})
+        lot = animatic.notes_start(self.d, "job2")
+        self.assertEqual(sorted(lot["notes"]), sorted([a["id"], late["id"]]))
+        self.assertNotIn("failed_lot", animatic.notes_load(self.d))
+
+    def test_cli(self):
+        def st(*args):
+            return subprocess.run(["sh", str(REPO / "bin" / "studio"), "animatic", "notes", str(self.d), *args],
+                                  capture_output=True, text=True, env={**os.environ, "STUDIO_ROOT": str(self.d.parent)})
+        r = st("add", "S2", "--at", "1", "--x", "50", "--y", "50", "--text", "faster")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        r = st("show", "--json")
+        v = json.loads(r.stdout)
+        self.assertEqual([x["shot"] for x in v["notes"]], ["S2"])
+        r = st("reply", v["notes"][0]["id"], "--text", "faster now", "--done", "--base", "0" * 16)
+        self.assertEqual(r.returncode, 4, r.stderr)
+        r = st("reply", v["notes"][0]["id"], "--text", "faster now", "--done", "--base", v["base"])
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(animatic.open_notes(self.d), {})
 
 
 if __name__ == "__main__":
