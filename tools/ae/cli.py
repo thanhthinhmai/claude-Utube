@@ -149,6 +149,7 @@ def cmd_render(a) -> int:
     code, video = film_dirs(a.film, a.dir)
     from filmcheck import points
     why = points.gate(code, "animatic")                    # specs/035 FR-003: the final render waits for the animatic
+    why = why or points.gate(code, "mix")                  # specs/037 FR-028: … and for the Sound review when it is on
     if why:
         for w in why:
             print(f"✗ {w}", file=sys.stderr)

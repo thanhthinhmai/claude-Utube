@@ -829,10 +829,10 @@ main.wide-film #film-player .sh-strip-tools .sh-filters button { padding: 2px 10
 .anim .chip.warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
 .anim .chip.acc { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
 .anim .tabnum { font-variant-numeric: tabular-nums; }
-.anim .tl { position: relative; height: 54px; border-radius: 8px; overflow: hidden; background: var(--hover); border: 1px solid var(--line); }
-.anim .tl .sh { position: absolute; top: 0; height: 26px; border-right: 1px solid var(--panel); background: var(--line); font-size: 11px; color: var(--muted); padding: 4px 5px; overflow: hidden; white-space: nowrap; }
-.anim .tl .vo { position: absolute; top: 30px; height: 18px; border-radius: 4px; background: var(--accent); }
-.anim .tl .gap { position: absolute; top: 28px; height: 22px; border-radius: 4px; background: var(--warn-soft); outline: 1px dashed var(--warn); }
+.anim .tl, .sound-panel .tl { position: relative; height: 54px; border-radius: 8px; overflow: hidden; background: var(--hover); border: 1px solid var(--line); }
+.anim .tl .sh, .sound-panel .tl .sh { position: absolute; top: 0; height: 26px; border-right: 1px solid var(--panel); background: var(--line); font-size: 11px; color: var(--muted); padding: 4px 5px; overflow: hidden; white-space: nowrap; }
+.anim .tl .vo, .sound-panel .tl .vo { position: absolute; top: 30px; height: 18px; border-radius: 4px; background: var(--accent); }
+.anim .tl .gap, .sound-panel .tl .gap { position: absolute; top: 28px; height: 22px; border-radius: 4px; background: var(--warn-soft); outline: 1px dashed var(--warn); }
 .anim-legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); flex-wrap: wrap; margin-top: -6px; }
 .anim-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
 .anim-legend .k-sh { background: var(--line); } .anim-legend .k-vo { background: var(--accent); } .anim-legend .k-gap { background: var(--warn-soft); outline: 1px dashed var(--warn); }
@@ -871,6 +871,12 @@ main.wide-film #film-player .sh-strip-tools .sh-filters button { padding: 2px 10
 /* specs/037 US3: the Sound panel */
 .sound-panel .sound-media { width: 100%; max-height: 360px; margin: 8px 0; background: #000; border-radius: 8px; }
 .sound-panel audio.sound-media { background: none; max-height: none; }
+.sound-panel .tl { height: 76px; margin: 8px 0 4px; }
+.sound-panel .tl .fx { position: absolute; top: 52px; height: 18px; min-width: 3px; border-radius: 4px; background: var(--ok); color: var(--panel); font-size: 10px; line-height: 18px; padding: 0 3px; overflow: hidden; white-space: nowrap; }
+.sound-panel .tl .fx.warn { background: var(--warn); }
+.sound-panel .tl .sil { position: absolute; top: 50px; height: 22px; border-radius: 4px; outline: 1px dashed var(--muted); }
+.sound-panel .sound-pic { width: 100%; max-height: 360px; margin: 8px 0 0; background: #000; border-radius: 8px; }
+.sound-panel .sound-impact { margin: 4px 0; }
 .sound-shots { display: grid; gap: 10px; }
 .sound-shot { border: 1px solid var(--line, #ddd); border-radius: 10px; padding: 10px 12px; }
 .sound-shot.off { opacity: .7; }

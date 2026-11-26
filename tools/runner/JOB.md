@@ -32,6 +32,8 @@ Read in this order, and only these, when you reach them:
 
 Report each stage with `job step` before you start it, using exactly these names:
 `Treatment`, `Script`, `Look`, `Voice`, `Music`, `Picture`, `Mix`, `Render`, `Self-check`, `Publish` (no Storyboard online).
+After Effects films use `Treatment`, `Script`, `Cast`, `Voice`, `Animatic`, `Mix` (the Sound step: effects per shot from
+`STUDIO/tools/ae/SOUND.md`, after the Animatic is approved), `Render`, `Self-check`, `Publish`; your instructions give the order.
 
 ## The Script step (every film with narration)
 

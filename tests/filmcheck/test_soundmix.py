@@ -142,6 +142,17 @@ class Mix(unittest.TestCase):
         with self.assertRaises(soundplan.PlanError):
             soundmix.run(self.d, mux=False)
 
+    def test_mix_waits_for_the_animatic(self):
+        """specs/037 T056: `sound mix` is refused (exit 3) while the Animatic is not approved."""
+        from filmcheck import cli, points
+        import io
+        from contextlib import redirect_stderr
+        e = io.StringIO()
+        with mock.patch.object(points, "gate", side_effect=lambda d, p: ["the animatic review is not approved"]
+                               if p == "animatic" else []), redirect_stderr(e):
+            self.assertEqual(cli.main(["sound", "mix", "f1", "--dir", str(self.d)]), 3)
+        self.assertIn("animatic review is not approved", e.getvalue())
+
     def test_cli(self):
         from filmcheck import cli
         import io

@@ -84,7 +84,7 @@ class Anchors(PlanCase):
         (self.d / "animatic" / "keys.json").write_text(json.dumps(keys))
         soundfilm.set_frames(self.d, soundfilm.FRAMES)
         c = next(c for c in soundplan.resolve(self.d)["cues"] if c["id"] == a["id"])
-        self.assertEqual((c["state"], c["why"]), ("dropped", "motion 'Hand R · Rotation' is gone after the cut"))
+        self.assertEqual((c["state"], c["why"]), ("dropped", "motion 'Hand R · Rotation' is not in S2's keys any more"))
 
     def test_not_found_stays_missing(self):
         c = self.add("S1", {"shot_at": 0.1}, query="spaceship laser zap")

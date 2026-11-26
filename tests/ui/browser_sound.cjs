@@ -18,6 +18,8 @@ const [base, jid, film] = process.argv.slice(2);
   out.shots = await p.locator("#sound-panel .sound-shot").evaluateAll((x) => x.map((s) => s.dataset.shot));
   out.cues = await p.locator("#sound-panel .sound-cue").count();
   out.wide = await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  out.strip = { shots: await p.locator("#sound-panel .tl .sh").count(), fx: await p.locator("#sound-panel .tl .fx").count() };
+  out.impact = await p.locator("#sound-panel .sound-impact").innerText().catch(() => "");
   await p.fill("#sound-panel input[data-note='S2']", "The crash is late");
   await p.click("#sound-panel button[data-nadd='S2']");
   await p.waitForSelector("#send-sound-notes", { timeout: 30000 }).then(() => { out.send = true; }, () => { out.send = false; });

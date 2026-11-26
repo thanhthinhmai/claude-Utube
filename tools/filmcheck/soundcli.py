@@ -226,8 +226,13 @@ def cmd_plan(a) -> int:
 
 
 def cmd_mix(a) -> int:
-    from filmcheck import soundmix, soundplan
+    from filmcheck import points, soundmix, soundplan
     d = _fd(a)
+    why = points.gate(d, "animatic")                       # specs/037 T056: the Sound waits for the approved Animatic
+    if why:
+        for w in why:
+            print(f"✗ {w}", file=sys.stderr)
+        return 3
     t = time.time()
     try:
         r = soundmix.run(d)

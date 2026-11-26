@@ -97,6 +97,17 @@ class SoundFixJob(unittest.TestCase):
         for want in ("sound notes", "reply", "sound mix", "job done"):
             self.assertIn(want, p)
 
+    def test_film_prompt_sound_between_animatic_and_render(self):
+        """specs/037 T030: an AE film job makes the Sound after the Animatic and before the final render, never approving it."""
+        sys.path.insert(0, str(REPO / "tools" / "runner"))
+        import agent
+        p = agent.film_prompt({"kind": "film", "film": "f1", "engine": "ae", "style": "s", "idea": "x", "seconds": 60})
+        a, s, r = p.index("--step Animatic"), p.index("--step Mix"), p.index("--step Render")
+        self.assertLess(a, s)
+        self.assertLess(s, r)
+        self.assertIn("review request --kind mix", p)
+        self.assertIn("never approve the Sound yourself", p)
+
 
 if __name__ == "__main__":
     unittest.main()

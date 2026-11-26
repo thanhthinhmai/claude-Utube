@@ -186,7 +186,7 @@ def _anchor_time(c: dict, tm: dict, t0: dict, ks, lines: dict, wds: dict):
         want = _norm(a["motion"])
         hit = next((k for k in ks.get(shot, []) if _norm(motion_name(k)) == want), None)
         if not hit:
-            return None, f"motion '{a['motion']}' is gone after the cut"
+            return None, f"motion '{a['motion']}' is not in {shot}'s keys any more"
         rel = float(hit["t1"] if a.get("edge") == "end" else hit["t0"]) + off
         if rel >= length:
             return None, f"motion '{a['motion']}' now starts after {shot} ends"

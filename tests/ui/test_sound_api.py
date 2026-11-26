@@ -67,6 +67,16 @@ class SoundApi(unittest.TestCase):
         self.assertEqual((sb["shots"][1]["t0"], sb["shots"][1]["t1"]), (2.0, 5.0))
         self.assertEqual(sb["mix"]["url"], "out/mix.wav")
         self.assertEqual((len(sb["plan_base"]), len(sb["notes_base"])), (16, 16))
+        self.assertEqual(sb["impact"], ["Render", "Self-check", "Publish"])          # specs/037 T056 "If you change this"
+        self.assertIsNone(sb["shots"][0]["clip_url"])                                 # no Animatic draft yet
+        self.assertIsNone(sb["draft"])
+        clips = self.film / "animatic" / "clips"
+        clips.mkdir(parents=True)
+        (clips / "S2.mp4").write_bytes(b"x")
+        (self.film / "animatic" / "draft.mp4").write_bytes(b"x")
+        sb = self.steps()["sound"]
+        self.assertTrue(sb["shots"][1]["clip_url"].startswith("animatic/clips/S2.mp4?v="))
+        self.assertTrue(sb["draft"].startswith("animatic/draft.mp4?v="))
         r = self.c.get(f"/api/v1/jobs/{self.jid}/files/out/mix.wav", headers={"Range": "bytes=0-99"})
         self.assertEqual((r.status_code, len(r.content)), (206, 100))
         out = self.p.cli("job", "start", "--kind", "film", "--name", "pagefilm", "--film", "pagefilm")
@@ -138,6 +148,8 @@ class SoundApi(unittest.TestCase):
         self.assertEqual(o["sendText"], "Send 1 note to Claude")
         self.assertTrue(o["approveDisabled"])                        # open notes block the approval
         self.assertEqual(o["noteShown"], 1)
+        self.assertEqual(o["strip"], {"shots": 3, "fx": 1})                    # T056: shots and sounds on one timeline
+        self.assertTrue(o["impact"].startswith("If you change this: Final render"))
         self.assertEqual((o["filmShots"], o["filmNotes"], o["filmEdits"]), (3, 1, 0))   # the film page: notes only
 
 

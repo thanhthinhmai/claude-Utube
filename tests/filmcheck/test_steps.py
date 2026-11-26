@@ -93,8 +93,40 @@ class AeSteps(unittest.TestCase):
         self.assertEqual([s["label"] for s in rail][5:7], ["Sound", "Final render"])
         self.assertEqual(next(s for s in rail if s["name"] == "Animatic")["point"], "animatic")
         self.assertEqual(steps.impact("animatic", self.d), ["Mix", "Render", "Self-check", "Publish"])   # FR-004
+        self.assertEqual(steps.impact("mix", self.d), ["Render", "Self-check", "Publish"])   # specs/037 FR-029
+        self.assertEqual(steps.impact("mix"), ["Self-check", "Publish"])                     # web films: unchanged
         for p in ("script", "voice", "cast"):
             self.assertIn("Animatic", steps.impact(p, self.d))                                         # FR-005
+
+    def test_sound_stale_when_the_animatic_or_plan_changes(self):
+        """specs/037 T029 / FR-029: the Sound must run again after a new shot length or a plan edit, and its approval
+        no longer holds."""
+        import os
+        import time as _t
+        from filmcheck import points
+        st = lambda: next(s for s in steps.status(self.d) if s["name"] == "Mix")["state"]      # noqa: E731
+        (self.d / "out").mkdir(exist_ok=True)
+        (self.d / "sound").mkdir(exist_ok=True)
+        (self.d / "sound" / "plan.json").write_text('{"version": 1, "cues": []}')
+        mix = self.d / "out" / "mix.wav"
+        mix.write_bytes(b"RIFF")
+        old = _t.time() - 100
+        for f in [self.d / "mix.json", self.d / "narration.json", self.d / "timing.json", self.d / "sound" / "plan.json",
+                  *(self.d / "voices").glob("*.wav")]:
+            if f.exists():
+                os.utime(f, (old, old))
+        self.assertEqual(st(), "done")
+        fp = points.fingerprint(self.d, "mix")
+        for rel in ("timing.json", "sound/plan.json"):
+            f = self.d / rel
+            if not f.exists():
+                f.write_text("{}")
+            os.utime(f, None)
+            self.assertEqual(st(), "stale", rel)
+            os.utime(f, (old, old))
+        t = self.d / "timing.json"
+        t.write_text(t.read_text() + " ")
+        self.assertNotEqual(points.fingerprint(self.d, "mix"), fp)
 
     def test_animatic_step_state(self):
         from filmcheck import animatic

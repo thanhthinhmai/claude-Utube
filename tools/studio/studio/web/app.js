@@ -1113,6 +1113,16 @@ function soundPanel(host, sb, ctx) {
   const nNotes = sb.shots.reduce((/** @type {number} */ a, /** @type {any} */ s) => a + (s.notes_open || 0), 0);
   const notes = (sb.notes && sb.notes.shots) || {};
   const lot = sb.notes && sb.notes.lot, failedLot = sb.notes && sb.notes.failed_lot;
+  const T = sb.length || (sb.shots.length ? sb.shots[sb.shots.length - 1].t1 : 1) || 1;
+  const pct = (/** @type {number} */ x) => `${(100 * x / T).toFixed(3)}%`;
+  const strip = sb.shots.length ? `<div class="tl" role="img" aria-label="Shots, voice lines and sounds on one timeline">${sb.shots.map((/** @type {any} */ s) =>
+      `<div class="sh" style="left:${pct(s.t0)};width:${pct(s.t1 - s.t0)}" title="${esc(s.id)} · ${(s.t1 - s.t0).toFixed(2)} s">${esc(s.id)}</div>`
+      + (s.lines || []).map((/** @type {any} */ l) => `<div class="vo" style="left:${pct(l.at)};width:${pct(Math.max(0.05, l.end - l.at))}" title="${esc(l.id)}: ${esc(l.text || "")}"></div>`).join("")
+      + (s.silences || []).map((/** @type {any} */ x) => x.at != null ? `<div class="sil" style="left:${pct(x.at)};width:${pct(x.len_s || 0.1)}" title="silence"></div>` : "").join("")
+      + s.cues.filter((/** @type {any} */ c) => c.at != null).map((/** @type {any} */ c) =>
+        `<div class="fx${c.state === "placed" ? "" : " warn"}" style="left:${pct(c.at)};width:${pct(Math.max(0.15, c.len_s || 0.3))}" title="${esc(s.id)} · ${esc(c.action)}${c.sound ? ` → ${esc(c.sound.name)}` : ""}">${esc(c.action)}</div>`).join("")).join("")}</div>` : "";
+  const pic = ctx.picture && !ctx.video && ctx.media ? `<video class="sound-pic" id="snd-pic" muted playsinline preload="metadata" src="${ctx.picture}" aria-label="The Animatic draft, in time with the mix"></video>` : "";
+  const impact = sb.impact && sb.impact.length ? `<p class="muted small sound-impact">If you change this: ${sb.impact.map((/** @type {string} */ x) => esc(x === "Render" ? "Final render" : x)).join(", ")} run again.</p>` : "";
   const media = ctx.media ? (ctx.video ? `<video class="sound-media" id="snd-media" preload="metadata" controls playsinline src="${ctx.media}"></video>`
     : `<audio class="sound-media" id="snd-media" preload="metadata" controls src="${ctx.media}"></audio>`) : `<p class="muted">No mix yet.</p>`;
   box.innerHTML = `<p class="section-title">Sound</p>
@@ -1121,7 +1131,7 @@ function soundPanel(host, sb, ctx) {
     ${sb.error ? `<p class="notice warn small">${esc(sb.error)}</p>` : ""}
     ${lot ? `<p class="notice small" id="snd-lot">Claude is answering ${lot.notes.length} sound note${lot.notes.length === 1 ? "" : "s"}. Notes you add now wait for the next round.</p>` : ""}
     ${failedLot ? `<p class="notice warn small">The last round did not finish: ${esc(failedLot.error)}. The notes are still open: send them again.</p>` : ""}
-    ${media}
+    ${impact}${strip}${pic}${media}
     <p class="msg small" id="snd-msg" role="status">${esc(ctx.msg || "")}</p>
     <div class="sound-shots">${sb.shots.map((/** @type {any} */ s) => {
       const ns = notes[s.id] || [];
@@ -1169,6 +1179,14 @@ function soundPanel(host, sb, ctx) {
   const m = /** @type {HTMLMediaElement | null} */ (box.querySelector("#snd-media"));
   /** @type {number} */ let stopAt = -1;
   if (m) m.addEventListener("timeupdate", () => { if (stopAt >= 0 && m.currentTime >= stopAt) { m.pause(); stopAt = -1; } });
+  const pv = /** @type {HTMLVideoElement | null} */ (box.querySelector("#snd-pic"));
+  if (m && pv) {                                       // the draft's picture follows the mix (no final render yet)
+    const sync = () => { if (Math.abs(pv.currentTime - m.currentTime) > 0.15) pv.currentTime = m.currentTime; };
+    m.addEventListener("play", () => { sync(); pv.play().catch(() => {}); });
+    m.addEventListener("pause", () => pv.pause());
+    m.addEventListener("seeked", sync);
+    m.addEventListener("timeupdate", sync);
+  }
   const run = async (/** @type {HTMLButtonElement} */ btn, /** @type {() => Promise<string>} */ fn) => {
     box.querySelectorAll("button, input").forEach((x) => { /** @type {HTMLButtonElement} */ (x).disabled = true; });
     btn.textContent = "…"; msg.className = "msg small"; msg.textContent = "Saving and mixing again…";
@@ -1204,7 +1222,7 @@ function soundPanel(host, sb, ctx) {
 function editSound(body) {
   const sb = RAIL.data.sound;
   const can = canEdit("mix");
-  const ctx = { media: sb.video ? fileUrl(sb.video) : sb.mix ? fileUrl(sb.mix.url) : "", video: !!sb.video, cues: can, notes: can,
+  const ctx = { media: sb.video ? fileUrl(sb.video) : sb.mix ? fileUrl(sb.mix.url) : "", video: !!sb.video, picture: sb.draft ? animUrl(sb.draft) : "", cues: can, notes: can,
     msg: RAIL.msg.sound || "",
     /** @param {string} op @param {any} args @param {string} base */
     edit: async (op, args, base) => { const x = await sendEdit("mix", op, args, base); RAIL.msg.sound = editMsg(x); DONE.drawn = {}; doneRefresh(true); return RAIL.msg.sound; },

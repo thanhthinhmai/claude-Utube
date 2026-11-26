@@ -65,7 +65,7 @@ def fingerprint(film_dir: Path, point: str) -> str:
     files = {"script": ["SCRIPT.md", "SOURCES.md"], "mix": ["mix.json", "out/mix.wav"],
              "publish": ["publish/pack.json"]}[point]
     if point == "mix" and is_ae(d):                 # specs/037: the sound plan and its notes are part of the mix point
-        files = files + ["sound/plan.json", "sound/notes.json"]
+        files = files + ["sound/plan.json", "sound/notes.json", "timing.json", "narration.json"]   # FR-029
     return _hash(d, [d / f for f in files])
 
 

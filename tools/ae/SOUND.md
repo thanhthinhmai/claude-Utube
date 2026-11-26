@@ -27,6 +27,9 @@ sh bin/studio sound cue add <film> S3 --action "office fish tank" --query "aquar
 sh bin/studio sound silence add <film> S4 --line l05 --word silent --len 0.6 --db -57
 ```
 
+- Motion names are `<layer> · <property>` from `animatic/keys.json` (read the file for the
+  names). A character rig's moves go by the character and its control: `B s1 hero · HR` (right hand), `HL`, `FR`, `FL`
+  (feet), `crouch`, `lean`; a layer inside a precomp is `B s1 hero › Arm · Rotation`.
 - Every named motion worth hearing gets one cue anchored to it (`--motion`). A hit, a pop, a swoosh lands on the
   motion's start; a landing or a stop on its end (`--edge end`).
 - `--line/--word` for a sound tied to what the narrator says ("the window breaks"); `--at` only when no motion or

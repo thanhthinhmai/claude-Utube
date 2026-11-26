@@ -16,6 +16,7 @@ STEP_POINT = {v: k for k, v in POINT_STEP.items()}
 AE_ONLY = ("Cast", "Animatic")                      # web page films have neither (specs/034, 035)
 WEB_ONLY = ("Look", "Picture", "Shots")             # AE films draw in After Effects and review the animatic
 AE_LABEL = {"Mix": "Sound", "Render": "Final render"}
+AE_GRAPH = {**GRAPH, "Mix": ["Render", "Self-check"]}   # AE films: the Sound comes before the final render (specs/037)
 
 
 def hidden(film_dir) -> tuple:
@@ -25,15 +26,18 @@ def hidden(film_dir) -> tuple:
 
 def after(step: str, film_dir=None) -> list:
     """Every step that depends on this one, in film order (only the film's own steps when film_dir is given)."""
+    g = GRAPH
     if film_dir is not None:
         hide = hidden(film_dir)
-        return [s for s in after(step) if s not in hide]
-    seen, todo = set(), list(GRAPH.get(step, []))
+        g = AE_GRAPH if points.is_ae(Path(film_dir)) else GRAPH
+    seen, todo = set(), list(g.get(step, []))
     while todo:
         s = todo.pop()
         if s not in seen:
             seen.add(s)
-            todo += GRAPH.get(s, [])
+            todo += g.get(s, [])
+    if film_dir is not None:
+        return [s for s in STEPS if s in seen and s not in hide]
     return [s for s in STEPS if s in seen]
 
 
@@ -133,6 +137,8 @@ def base_states(film_dir: Path) -> dict:
     mix = d / "out" / "mix.wav"
     if mix.is_file():
         inputs = [d / "mix.json", d / "narration.json"] + sorted((d / "voices").glob("*.wav"))
+        if points.is_ae(d):                          # specs/037: the sound plan and the Animatic's shot lengths
+            inputs += [d / "sound" / "plan.json", d / "timing.json"]
         out["Mix"] = ("stale", "older than its inputs") if any(_mtime(p) > _mtime(mix) for p in inputs) else ("done", "")
     else:
         out["Mix"] = ("todo", "")

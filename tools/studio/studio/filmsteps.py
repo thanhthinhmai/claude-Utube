@@ -243,7 +243,7 @@ def _sound_meta(d: Path) -> dict:
 def sound_block(d: Path, scope: str = "all"):
     """The Sound panel of an AE film (specs/037 contracts/api.md); None for a page film. Shots with their sounds (each with
     its name, credit and up to 7 other choices), silences, the sound switch, notes and the bases the edits send."""
-    from filmcheck import points, soundnotes, soundplan
+    from filmcheck import points, soundnotes, soundplan, steps
     try:
         if not points.is_ae(d):
             return None
@@ -280,6 +280,14 @@ def sound_block(d: Path, scope: str = "all"):
                 "duration": m.get("duration")}
     off = set(plan.get("off") or [])
     open_n = soundnotes.open_counts(d) if out["notes"] is not None else {}
+    lines, anim = {}, d / "animatic"                 # the Animatic's timeline and clips (specs/035) under the sounds
+    try:
+        from filmcheck import animatic
+        for sh in animatic.timeline(d)["shots"]:
+            lines[sh["id"]] = [{k: ln.get(k) for k in ("id", "at", "end", "text")} for ln in sh.get("lines") or []]
+    except Exception:                             # noqa: BLE001 — a film made before 035: no lines on the strip
+        pass
+    v = int(anim.joinpath("draft.json").stat().st_mtime) if anim.joinpath("draft.json").is_file() else 0
     for sid in plan["shots"]:
         cues = []
         for c in plan["cues"]:
@@ -292,10 +300,13 @@ def sound_block(d: Path, scope: str = "all"):
             cues.append(row)
         out["shots"].append({"id": sid, "t0": round(plan["t0"][sid], 3), "t1": round(plan["t1"][sid], 3), "on": sid not in off,
                              "cues": cues, "silences": [s for s in plan["silences"] if s["shot"] == sid],
-                             "notes_open": open_n.get(sid, 0)})
+                             "notes_open": open_n.get(sid, 0), "lines": lines.get(sid, []),
+                             "clip_url": f"animatic/clips/{sid}.mp4?v={v}" if (anim / "clips" / f"{sid}.mp4").is_file() else None})
     states = [c["state"] for c in plan["cues"]]
     out.update(missing=states.count("missing"), dropped=states.count("dropped"), plan_base=plan["base"],
-               length=round(plan["length"], 3), timing_source=plan.get("timing_source"))
+               length=round(plan["length"], 3), timing_source=plan.get("timing_source"),
+               draft=f"animatic/draft.mp4?v={v}" if (anim / "draft.mp4").is_file() else None,
+               impact=steps.impact("mix", d))
     return out
 
 

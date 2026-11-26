@@ -201,18 +201,19 @@ no `qc shots`). For the picture:
    off, still make the draft and write the silence in the log, then go on. Never pass `--anyway` and never approve the
    animatic yourself. The final render uses the lengths in timing.json, so the mix must read narration.json as it is now.
 6. The film's mix.py makes the music only (out/music.wav, no effects) plus a first out/mix.wav of voice and music.
-   Set film.json "audio" to that file, then
-   `sh {st}/bin/studio job run {job} --step Render -- sh {st}/bin/studio ae render {film}`: it builds every shot in
-   After Effects (through the desktop app; it may wait for its turn), adds the sound and writes {film}.mp4 and
-   shots.json.
-7. Sound (specs/037), now that the shots have their lengths: read {st}/tools/ae/SOUND.md and the style's sound rules,
-   look at each shot, and add only the sounds the picture shows (`sh {st}/bin/studio sound cue add {film} S<n> …`,
-   anchored to a word, a line or the shot; `sound silence add` for a chosen silence). Then
-   `sh {st}/bin/studio job run {job} --step Mix -- sh {st}/bin/studio sound mix {film}`: it mixes voice, music and
-   effects at −14 LUFS and puts the sound back on the film (no new picture). When the mix point is on, send
-   `review request --kind mix --film {film}` and end your turn. Sent back with Sound notes: answer only the notes on
-   their shots (`sound notes show {film}`, change those cues, `sound mix`, then
+7. Sound (specs/037), once the Animatic is approved: the shot lengths are in timing.json. Read {st}/tools/ae/SOUND.md and
+   the style's sound rules, look at each shot's clip (animatic/clips/S<n>.mp4) and add only the sounds the picture shows
+   (`sh {st}/bin/studio sound cue add {film} S<n> …`, anchored to a word, a line, a motion or the shot; `sound silence
+   add` for a chosen silence). Then `sh {st}/bin/studio job run {job} --step Mix -- sh {st}/bin/studio sound mix {film}`:
+   it mixes voice, music and effects at −14 LUFS into out/mix.wav. When the mix point is on, send
+   `review request --kind mix --film {film}` and end your turn; never approve the Sound yourself. Sent back with Sound
+   notes: answer only the notes on their shots (`sound notes show {film}`, change those cues, `sound mix`, then
    `sound notes reply {film} <id> --text "…" --done --base <base>` for each) and send the mix review again.
+8. Set film.json "audio" to out/mix.wav, then
+   `sh {st}/bin/studio job run {job} --step Render -- sh {st}/bin/studio ae render {film}` (refused while the Animatic
+   or, when its point is on, the Sound is not approved): it builds every shot in After Effects (through the desktop
+   app; it may wait for its turn), adds the sound and writes {film}.mp4 and shots.json. A later `sound mix` puts a new
+   sound on the film without a new picture.
    Then the Self-check (`sh {st}/bin/studio qc {film}`) and the publish pack as in JOB.md.
 """
 

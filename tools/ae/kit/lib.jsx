@@ -527,22 +527,34 @@ CU.keyScan = function (comp) {
       try { p = g.property(k); } catch (e) { p = null; }
       if (!p) { continue; }
       if (p.propertyType === PropertyType.PROPERTY) {
-        if (p.numKeys >= 2) {
-          out.push({ layer: lname, prop: p.name, t0: Math.max(0, p.keyTime(1) + off), t1: Math.min(comp.duration, p.keyTime(p.numKeys) + off) });
+        if (p.numKeys >= 2) {                               // an effect's control (a rig's 'HR' Point) goes by the effect's name
+          out.push({ layer: lname, prop: CU.keyName(p), t0: Math.max(0, p.keyTime(1) + off), t1: Math.min(comp.duration, p.keyTime(p.numKeys) + off) });
         }
       } else if (depth < 12) { walk(p, lname, off, depth + 1); }
     }
   }
-  function scan(c, off, level) {
+  function scan(c, off, level, outer) {
     var i, L;
     for (i = 1; i <= c.numLayers; i++) {
-      L = c.layer(i);
-      walk(L, L.name, off, 0);
-      if (level < 3 && L.source && L.source instanceof CompItem) { scan(L.source, off + L.startTime, level + 1); }
+      L = c.layer(i);                                       // inside a precomp: "B s1 hero" (its CTRL) or "B s1 hero › Arm"
+      walk(L, outer ? (L.name === "CTRL" ? outer : outer + " \u203a " + L.name) : L.name, off, 0);
+      if (level < 3 && L.source && L.source instanceof CompItem) { scan(L.source, off + L.startTime, level + 1, L.name); }
     }
   }
-  scan(comp, 0, 0);
+  scan(comp, 0, 0, "");
   return out;
+};
+// The name of a keyed property for keys.json: an effect control is named by its effect ('HR', 'crouch'), adding the
+// control's own name when the effect has more than one control; any other property keeps its name ('Position').
+CU.keyName = function (p) {
+  var g = null;
+  try { g = p.parentProperty; } catch (e) { g = null; }
+  try {
+    if (g && g.parentProperty && g.parentProperty.matchName === "ADBE Effect Parade") {
+      return g.numProperties > 1 && !/^(Point|Slider|Angle|Checkbox|Color)$/.test(p.name) ? g.name + " " + p.name : g.name;
+    }
+  } catch (e2) { }
+  return p.name;
 };
 CU.jstr = function (s) {
   return "\"" + String(s).replace(/\\/g, "\\\\").replace(/"/g, "\\\"").replace(/[\u0000-\u001f]/g, " ") + "\"";

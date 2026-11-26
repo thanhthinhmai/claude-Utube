@@ -187,6 +187,16 @@ class StudioModel(unittest.TestCase):
         self.assertIn(f"--model {cfg['*']}", out)
         self.assertEqual(cfg["en"], "small.en")
 
+    def test_hears_the_voice_files_only(self):
+        """specs/037 T057: the recogniser hears the voice lines (voices/<id>.wav), never the mix or the film, so a mix
+        with Sonniss sounds never reaches a model."""
+        TMP.mkdir(exist_ok=True)
+        root = Path(tempfile.mkdtemp(dir=TMP))
+        cmd = self.run_asr(root, "- Language: en\n").splitlines()[-1].split()
+        d = root / "films" / "m"
+        self.assertEqual(cmd[2:4], [str(d / "lines.json"), str(d / "voices")])
+        self.assertFalse(any("mix" in x or x.endswith((".mp4", ".m4a")) for x in cmd))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -91,6 +91,16 @@ class Draft(unittest.TestCase):
         self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
         self.assertIn("point approve f1 animatic", r.stderr)
 
+    def test_render_waits_for_the_sound(self):
+        """specs/037 FR-028, SC-008: with the Sound point on and not approved, the final render is refused."""
+        from filmcheck import points
+        points.set_on(self.d, ["mix"])
+        (self.d / "out").mkdir(exist_ok=True)
+        (self.d / "out" / "mix.wav").write_bytes(b"RIFF")
+        r = self.ae("render", "f1")
+        self.assertEqual(r.returncode, 3, r.stdout + r.stderr)
+        self.assertIn("point approve f1 mix", r.stderr)
+
     def test_rebuild_some_shots_keeps_the_others(self):
         self.assertEqual(self.ae("draft", "f1").returncode, 0)
         a = self.d / "animatic"

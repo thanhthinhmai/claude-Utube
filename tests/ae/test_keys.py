@@ -41,7 +41,7 @@ class Bundle(unittest.TestCase):
 
     def test_kit_reads_timing_and_scans_keys(self):
         lib = (bundle.KIT / "lib.jsx").read_text()
-        for want in ("CU.shotFrames = function", "data/timing.json", "CU.keyScan = function", "numKeys >= 2"):
+        for want in ("CU.shotFrames = function", "data/timing.json", "CU.keyScan = function", "numKeys >= 2", "CU.keyName = function", "ADBE Effect Parade"):
             self.assertIn(want, lib)
         core = (bundle.KIT / "build_core.jsx").read_text()
         for want in ("CU.keyScan(sc)", "keys_", "M.resolutionFactor = [4, 4]", "CU.draftSettings(it)"):
