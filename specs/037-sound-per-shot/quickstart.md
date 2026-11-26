@@ -41,9 +41,22 @@ Kỳ vọng: nếu kho thiếu → tải 1 tiếng CC0 vào `$STUDIO_DATA/sound/
 5. Bước kiểm phim trên `out/mix.wav`: độ lớn, giọng nổi trên nền, phần trăm lặng không kém bản trộn viết tay cũ (so `checks.json` trước/sau).
 6. `films/ae-sleepless-test/CREDITS` có một dòng cho mỗi tiếng đã dùng.
 
+### Kết quả bước 4 (2026-11-26, T031, sau khi 035 merge)
+- Animatic đã duyệt; bản nháp dựng lại với `keys.json` có tên chuyển động của rig (T059, trước đó 6/9 tiếng bị bỏ vì `CTRL · Point`). 9 tiếng Claude đặt từ hôm trước, neo lại theo mốc trong code shot (S1 mắt 0,55 s; S6 xem đồng hồ 2,3 s; S7 kid0 ngáp 0,3 s, nhân vật giơ tay 2,15→2,4 s).
+- **SC-001: đạt một phần.** Lệch so với mốc chuyển động: 0 khung cho cả 5 tiếng neo chuyển động đã đặt (100% ≤ 1 khung). Phủ: 8/9 hành động có tiếng (89%, ngưỡng 90%): "eyes pop open" bị luật mật độ bỏ (phim 24,6 s cho tối đa 5 tiếng điểm; tiếng này nhỏ nhất), không phải vì thiếu tiếng trong kho.
+- **SC-002: đạt.** Trên bản sao, S2 103 → 93 khung: mọi mốc sau S2 lùi đúng 10 khung (0 lệch), S1–S2 giữ nguyên, không sửa tay; tiếng bị bỏ đều có `why`.
+- **SC-009: đạt.** `qc final` trên bản trộn mới: lặng 22% (bằng bản cũ, theo lời), không cảnh báo mới, LRA 4,2 LU (cũ 2,5); độ lớn −13,6 LUFS, đỉnh −2,5 dBFS (cũ −13,2 / −3,1); giọng cao hơn nền +6,3 dB khi đang nói (đo bằng stems, numpy, không mô hình).
+- CREDITS: 8 dòng Sonniss cho 8 tiếng đã dùng (tiếng bị bỏ không ghi).
+
 ## 5. Trang Sound (US3, SC-006, SC-008)
 
 Mở app → việc của phim → bước Sound: bấm S1 phát clip nháp với bản trộn; đổi tiếng sang gợi ý thứ 2, dời một tiếng 5 khung, xoá một tiếng. Kỳ vọng: bản trộn mới ≤ 30 s; ngoài [mốc − 60 ms, cuối + 60 ms] giống hệt từng mẫu (`tests/ui/browser_sound.cjs` đo bằng `stems`). `ae render` trước khi duyệt Sound → mã 3 kèm lý do.
+
+### Kết quả bước 5 (2026-11-26, T048)
+Trên bản sao phim trong web app (việc `job start` + `review request --kind mix`, sửa qua `/jobs/{id}/actions` như trang):
+- **SC-006: đạt.** Đổi tiếng c03 sang gợi ý thứ 2: 6,6 s; dời c07 5 khung: 5,5 s; xoá c08: 5,5 s (ngưỡng 30 s). Ngoài đoạn sửa [mốc − 60 ms, hết tiếng + 60 ms] (hết tiếng = min(mốc + độ dài tệp, chỗ cắt + fade)): **0 mẫu khác** cả ba lần; độ dài bản trộn không đổi.
+- **SC-008: đạt.** Bật điểm Sound, chưa duyệt: `ae render` → mã 3 "the mix review is not approved …", AE không chạy.
+- Chưa chạy lượt "Send notes to Claude" thật (không thuộc bước 5; có test `tests/online/test_sound_fix_job.py`).
 
 ## 6. Học tiếng trên mẫu đã kiểm (US4, SC-003)
 
