@@ -1144,6 +1144,14 @@ def delete_freesound_key(request: Request):
     return Response(status_code=204)
 
 
+@router.get("/sound/search")
+def sound_search(request: Request, q: str = ""):
+    """Search the library from "Add a sound": the studio owner sees every source, a customer CC0 only (FR-013a)."""
+    from .filmsteps import sound_search as search
+    a = me(request)
+    return {"results": search(q, "all" if a["role"] == "admin" else "cc0")}
+
+
 @router.get("/sound/preview/{entry}")
 def sound_preview(entry: str, request: Request):
     """Play one library sound, at most 30 s. A Sonniss sound only for the studio owner (FR-013a)."""

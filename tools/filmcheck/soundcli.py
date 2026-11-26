@@ -42,7 +42,8 @@ def add_parser(sub) -> None:
     s.add_argument("--edge", choices=["start", "end"], default="start"); s.add_argument("--word")
     s.add_argument("--offset-f", type=int, default=0); s.add_argument("--len", type=float)
     s.add_argument("--gain", type=float); s.add_argument("--cut", choices=["hard", "fade", "over"]); s.add_argument("--fade", type=float)
-    s.add_argument("--by", choices=["auto", "claude", "user"]); s.add_argument("--dir")
+    s.add_argument("--by", choices=["auto", "claude", "user"]); s.add_argument("--entry", help="a sound id from `sound lib search`")
+    s.add_argument("--dir")
     s = cue.add_parser("set"); s.add_argument("film"); s.add_argument("cue")
     s.add_argument("--entry"); s.add_argument("--offset-f", type=int); s.add_argument("--gain", type=float)
     s.add_argument("--cut", choices=["hard", "fade", "over"]); s.add_argument("--fade", type=float); s.add_argument("--len", type=float)
@@ -167,7 +168,7 @@ def cmd_cue(a) -> int:
                       {"line": a.line, **({"word": a.word} if a.word else {}), "offset_f": a.offset_f} if a.line else
                       {"shot_at": a.at} if a.at is not None else {"span": "shot"})
             c = soundplan.add_cue(d, a.shot, a.action, anchor, a.query, cat=a.cat, len_s=a.len, gain_db=a.gain,
-                                  cut=a.cut, fade_s=a.fade, by=by, scope=_scope())
+                                  cut=a.cut, fade_s=a.fade, by=by, scope=_scope(), entry=a.entry)
         elif a.ccmd == "set":
             fields = {k: v for k, v in (("entry", a.entry), ("offset_f", a.offset_f), ("gain_db", a.gain), ("cut", a.cut),
                                         ("fade_s", a.fade), ("len_s", a.len)) if v is not None}

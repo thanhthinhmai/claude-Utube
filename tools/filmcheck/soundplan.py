@@ -343,7 +343,8 @@ def _check_anchor(anchor: dict) -> dict:
 
 def add_cue(d: Path, shot: str, action: str, anchor: dict, query: str, cat: str = None, len_s: float = None,
             gain_db: float = None, cut: str = None, fade_s: float = None, by: str = "claude", scope: str = "all",
-            base_sha: str = None) -> dict:
+            base_sha: str = None, entry: str = None) -> dict:
+    """A new cue. `entry` (a sound picked from a search) is used as is; the query's other hits become its choices."""
     d = Path(d)
     _check_base(d, base_sha)
     tm = timing(d)
@@ -360,7 +361,12 @@ def add_cue(d: Path, shot: str, action: str, anchor: dict, query: str, cat: str 
     if shot in (plan.get("off") or []):
         raise PlanError("off", f"sound is off for {shot}: turn it on first (sound shot on <film> {shot})")
     dur = len_s or (tm["frames"][shot] / tm["fps"] if span else None)
+    picked = entry
     entry, alts = choose(d, query, cat, dur, scope)
+    if picked:
+        _use_entry(d, picked, scope)
+        alts = [x for x in ([entry] if entry else []) + alts if x != picked][:MAX_ALTS]
+        entry = picked
     c = {"id": _next_id(plan), "shot": shot, "action": action.strip()[:120], "anchor": anchor, "query": query.strip()[:200],
          "cat": (cat or "").upper(), "entry": entry, "alts": alts, "len_s": len_s, "gain_db": _gain(d, gain_db),
          "cut": cut, **({"fade_s": round(float(fade_s or 0.15), 3)} if cut == "fade" else {}), "by": by,
@@ -368,6 +374,20 @@ def add_cue(d: Path, shot: str, action: str, anchor: dict, query: str, cat: str 
     plan["cues"].append(c)
     r = resolve(d, plan, save=True)
     return next(x for x in r["cues"] if x["id"] == c["id"])
+
+
+def _use_entry(d: Path, v: str, scope: str) -> None:
+    """Copy one chosen library sound into the film and keep its text (PlanError when it is gone or out of scope)."""
+    from filmcheck import soundlib
+    try:
+        soundlib.cache(v, d, scope)
+        hit = soundlib.get(v, scope) if not soundlib.via_proxy() else {"id": v}
+    except soundlib.LibraryError as e:
+        raise PlanError("bad" if e.code != "scope" else "scope", e.message) from None
+    if hit.get("source") and hit["source"] not in SOURCES:
+        raise PlanError("bad", "this sound's source is not allowed")
+    if "name" in hit:
+        _remember(d, soundlib.public(hit) if "path" in hit else hit)
 
 
 def set_cue(d: Path, cue: str, fields: dict, by: str = "user", base: str = None, scope: str = "all") -> dict:
@@ -379,16 +399,7 @@ def set_cue(d: Path, cue: str, fields: dict, by: str = "user", base: str = None,
         raise PlanError("not_found", f"no cue {cue}")
     for k, v in fields.items():
         if k == "entry":
-            from filmcheck import soundlib
-            try:
-                soundlib.cache(v, d, scope)
-                hit = soundlib.get(v, scope) if not soundlib.via_proxy() else {"id": v}
-            except soundlib.LibraryError as e:
-                raise PlanError("bad" if e.code != "scope" else "scope", e.message) from None
-            if hit.get("source") and hit["source"] not in SOURCES:
-                raise PlanError("bad", "this sound's source is not allowed")
-            if "name" in hit:
-                _remember(d, soundlib.public(hit) if "path" in hit else hit)
+            _use_entry(d, v, scope)
             if c.get("entry") and c["entry"] != v and c["entry"] not in c["alts"]:
                 c["alts"] = ([c["entry"]] + c["alts"])[:MAX_ALTS]
             c["alts"] = [a for a in c["alts"] if a != v][:MAX_ALTS]

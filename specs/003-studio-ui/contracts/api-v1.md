@@ -37,6 +37,8 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 | `POST /films/{name}/sound/notes` body `{shot, text, base?}` | `201 {note, notes_base}`: ghi chú Sound trên một shot (037) | `409 changed` · `422 bad_shot` · `422 bad_text` · `404` |
 | `DELETE /films/{name}/sound/notes/{shot}/{note}?base=` | `{notes_base}` (037) | `409 changed` · `422 no_note` · `404` |
 | `POST /films/{name}/sound/fix` body `{}` | `201 {job, notes}`: việc `fix` `target: sound` trên các ghi chú Sound mở (037, chỉ trong app) | `422 no_notes` · `409 busy` · `409 app_only` · `422 not_ae` · `404` |
+| `GET /sound/search?q=` | `{results: [{id, name, category, duration, source, credit, license, cover}]}`: tìm trong kho tiếng cho "Add a sound", tốt nhất trước; kho ít kết quả tốt và có khoá Freesound thì lấy thêm tiếng CC0 trước (037) | `422 invalid` (`q` trống) |
+| `GET /sound/preview/{entry}` | âm thanh của một mục kho (≤ 30 s) cho nút ▶ (037) | `404 sound_not_found` |
 | `GET /films/{name}/poster` | `image/jpeg` | `404` |
 | `GET /films/{name}/subtitles.vtt` | WebVTT (chuyển từ `.srt`) | `404` |
 | `GET /films/{name}/publish` | gói đăng: `{titles, description, subtitles, files, check}` (specs/011) | `404` |

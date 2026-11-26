@@ -756,6 +756,11 @@ def create_app() -> FastAPI:
             src, kind = filmsteps.sound_preview_file(entry, "all")
             return FileResponse(src, media_type=kind)
 
+        @app.get(api + "/sound/search")
+        def sound_search_local(q: str = ""):
+            """Search the library from "Add a sound" (the owner: every source)."""
+            return {"results": filmsteps.sound_search(q, "all")}
+
     if online:
         from . import api_online, db
         (db.data_dir() / "tmp").mkdir(exist_ok=True)        # TMPDIR of the web container (uploads)

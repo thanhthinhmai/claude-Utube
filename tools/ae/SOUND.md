@@ -23,6 +23,7 @@ sh bin/studio sound cue add <film> S2 --action "window breaks" --query "glass wi
    --motion "Window · Scale" [--edge start|end] [--offset-f 2]
 sh bin/studio sound cue add <film> S1 --action "eyes pop open" --query "cartoon pop" --line l01 --word window
 sh bin/studio sound cue add <film> S5 --action "a beat later" --query "watch ding" --at 0.6     # share of the shot
+sh bin/studio sound cue add <film> S5 --action "a beat later" --query "watch ding" --at 0.6 --entry s:1a2b3c4d5e6f   # a sound picked from `sound lib search`
 sh bin/studio sound cue add <film> S3 --action "office fish tank" --query "aquarium bubbles loop" --cat WATER --span
 sh bin/studio sound silence add <film> S4 --line l05 --word silent --len 0.6 --db -57
 ```

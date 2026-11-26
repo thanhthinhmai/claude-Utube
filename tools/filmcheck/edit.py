@@ -946,8 +946,8 @@ def cue_rm(d: Path, a: dict) -> dict:
 
 @op("cue-add", "mix", _plan_base)
 def cue_add(d: Path, a: dict) -> dict:
-    """A new sound on a shot: shot, action, query (what to look for), and where: motion, line (+ word), at (seconds
-    into the shot) or nothing (the whole shot)."""
+    """A new sound on a shot: shot, action, query (what to look for), entry (optional: a sound picked from a search),
+    and where: motion, line (+ word), at (seconds into the shot) or nothing (the whole shot)."""
     from filmcheck import soundplan
     shot = a.get("shot") or (a.get("ref") or [None])[0]
     if not shot or not (a.get("action") or "").strip() or not (a.get("query") or "").strip():
@@ -965,7 +965,7 @@ def cue_add(d: Path, a: dict) -> dict:
     else:
         anchor = {"span": "shot"}
     c = _plan_call(soundplan.add_cue, d, shot.upper(), a["action"].strip()[:80], anchor, a["query"].strip()[:120],
-                   gain_db=_num(a, "gain_db"), by=a.get("by") or "user")
+                   gain_db=_num(a, "gain_db"), by=a.get("by") or "user", entry=a.get("entry") or None)
     return _remix(d, {"ok": True, "ref": c["id"], "new": {"shot": c["shot"], "action": c["action"], "entry": c.get("entry"),
                                                           "state": c["state"]}, "files": ["sound/plan.json", "out/mix.wav"]})
 

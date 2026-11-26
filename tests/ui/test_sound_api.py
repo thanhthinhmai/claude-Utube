@@ -15,6 +15,7 @@ sys.path.insert(0, str(REPO / "tests" / "filmcheck"))
 sys.path.insert(0, str(REPO / "tools"))
 import samples  # noqa: E402
 import soundfilm  # noqa: E402
+import soundfix  # noqa: E402
 
 NODE_MODULES = REPO / "lib" / "lemo-opuscar" / "node_modules"
 
@@ -30,8 +31,13 @@ def ae_sound_film(root: Path, name: str) -> Path:
 
 class SoundApi(unittest.TestCase):
     def setUp(self):
-        self.env = {k: os.environ.get(k) for k in ("STUDIO_DATA", "STUDIO_EDIT_NO_RUN", "FREESOUND_API_KEY")}
-        os.environ.update(STUDIO_DATA=tempfile.mkdtemp(prefix="snd data."), STUDIO_EDIT_NO_RUN="1", FREESOUND_API_KEY="")
+        self.env = {k: os.environ.get(k) for k in ("STUDIO_DATA", "STUDIO_EDIT_NO_RUN", "FREESOUND_API_KEY", "STUDIO_FREESOUND_URL")}
+        # never Freesound from a test, even when a key is found somewhere: a closed local port
+        os.environ.update(STUDIO_DATA=tempfile.mkdtemp(prefix="snd data."), STUDIO_EDIT_NO_RUN="1", FREESOUND_API_KEY="",
+                          STUDIO_FREESOUND_URL="http://127.0.0.1:9")
+        from filmcheck import soundlib                     # a small Sonniss-like library on this machine
+        soundlib.add_root(soundfix.make(Path(os.environ["STUDIO_DATA"]) / "packs" / "GDC2024"))
+        soundlib.index()
         self.p = Project(ports="18850-18859")
         self.film = ae_sound_film(self.p.dir, "aefilm")
         samples.review_film(self.p.dir, "pagefilm", kit=False)
@@ -93,6 +99,20 @@ class SoundApi(unittest.TestCase):
         r = self.c.get(f"/api/v1/sound/preview/{cue['entry']}")                      # the ▶ of a sound, project UI
         self.assertEqual((r.status_code, r.headers["content-type"][:6]), (200, "audio/"))
         self.assertEqual(self.c.get("/api/v1/sound/preview/s:nothing").json()["error"]["code"], "sound_not_found")
+        hits = self.c.get("/api/v1/sound/search", params={"q": "glass break"}).json()["results"]   # "Add a sound" search
+        self.assertGreaterEqual(len(hits), 2)
+        self.assertNotIn("path", hits[0])
+        self.assertEqual(self.c.get("/api/v1/sound/search", params={"q": " "}).status_code, 422)
+        pick = hits[-1]["id"]                                              # not the best match: the one the owner chose
+        sb = self.steps()["sound"]
+        a = self.act("cue-add", {"shot": "S3", "action": "glass", "query": "glass break", "entry": pick}, sb["plan_base"])
+        self.assertEqual(a["status"], "done", a)
+        c3 = self.steps()["sound"]["shots"][2]["cues"][0]
+        self.assertEqual(c3["sound"]["id"], pick)
+        self.assertNotIn(pick, [x["id"] for x in c3["alts"]])
+        sb = self.steps()["sound"]
+        self.assertEqual(self.act("cue-rm", {"cue": c3["id"]}, sb["plan_base"])["status"], "done")
+        sb = self.steps()["sound"]
         a = self.act("cue-set", {"cue": cue["id"], "gain_db": -3}, sb["plan_base"])
         self.assertEqual(a["status"], "done", a)
         a = self.act("cue-set", {"cue": cue["id"], "gain_db": 0}, sb["plan_base"])   # the old base
@@ -154,6 +174,10 @@ class SoundApi(unittest.TestCase):
         self.assertEqual(o["strip"], {"shots": 3, "fx": 1})                    # T056: shots and sounds on one timeline
         self.assertTrue(o["impact"].startswith("If you change this: Final render"))
         self.assertEqual((o["filmShots"], o["filmNotes"], o["filmEdits"]), (3, 1, 0))   # the film page: notes only
+        self.assertGreaterEqual(o["hits"], 2, o)                                # "Add a sound" searches the library
+        self.assertEqual((o.get("preOn"), o.get("preOff")), ("■", "▶"))       # a second click stops the sound
+        if o["playOn"]:                                                        # (headless may refuse to play audio)
+            self.assertEqual(o["playOff"], "▶ Play")
 
 
 if __name__ == "__main__":

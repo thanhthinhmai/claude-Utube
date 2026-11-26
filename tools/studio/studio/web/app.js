@@ -1095,11 +1095,23 @@ function animaticBar(body) {
 const sndT = (t) => { const m = Math.floor(t / 60), x = t - 60 * m; return `${m}:${x.toFixed(1).padStart(4, "0")}`; };
 const SND_STATE = { placed: ["ok", "Placed"], missing: ["warn", "Not found"], dropped: ["warn", "Dropped"], off: ["", "Off"] };
 /** @type {HTMLAudioElement | null} */ let SND_PREVIEW = null;
-/** Play one library sound (≤ 30 s). @param {string} id */
-function sndPreview(id) {
+/** @type {HTMLButtonElement | null} */ let SND_BTN = null;
+/** Stop the library sound that is playing and put its button back to ▶. */
+function sndStop() {
   if (SND_PREVIEW) { SND_PREVIEW.pause(); SND_PREVIEW = null; }
+  if (SND_BTN) { SND_BTN.textContent = "▶"; SND_BTN.classList.remove("playing"); SND_BTN.setAttribute("aria-pressed", "false"); SND_BTN = null; }
+}
+/** Play one library sound (≤ 30 s); its button shows ■ while it plays, and a second click stops it.
+ * @param {string} id @param {HTMLButtonElement} [btn] */
+function sndPreview(id, btn) {
+  const again = !!btn && btn === SND_BTN;
+  sndStop();
+  if (again) return;
   SND_PREVIEW = new Audio(`${API}/sound/preview/${encodeURIComponent(id)}`);
-  SND_PREVIEW.play().catch(() => { /* not in this mode or not allowed */ });
+  if (btn) { SND_BTN = btn; btn.textContent = "■"; btn.classList.add("playing"); btn.setAttribute("aria-pressed", "true"); }
+  SND_PREVIEW.onended = sndStop;
+  SND_PREVIEW.onerror = sndStop;
+  SND_PREVIEW.play().catch(sndStop);
 }
 /** The Sound panel: shots with their sounds, play a shot, change / move / level / remove a sound, add one, the shot's
  * sound switch, notes per shot and "Send N notes to Claude".
@@ -1166,9 +1178,11 @@ function soundPanel(host, sb, ctx) {
         ${cueRows ? `<ul class="plain sound-cues">${cueRows}</ul>` : `<p class="muted small">${s.on ? "No sound effects." : "Sound effects are off for this shot."}</p>`}
         ${ctx.cues && s.on ? `<details class="sound-add"><summary class="small">Add a sound</summary>
           <div class="row"><input data-f="action" placeholder="What happens (door slams)" maxlength="80">
-          <input data-f="query" placeholder="Look for (door slam)" maxlength="120">
-          <input data-f="at" type="number" min="0" step="0.05" placeholder="s into the shot" aria-label="Seconds into the shot">
-          <button class="btn small" data-add="${esc(s.id)}">Add</button></div></details>` : ""}
+          <input data-f="at" type="number" min="0" step="0.05" placeholder="s into the shot" aria-label="Seconds into the shot"></div>
+          <div class="row"><input data-f="query" type="search" placeholder="Search the library (door slam)" maxlength="120" data-q="${esc(s.id)}">
+          <button class="btn small" data-search="${esc(s.id)}">Search</button>
+          <button class="btn small" data-add="${esc(s.id)}" title="Add the best match without listening">Add best match</button></div>
+          <ul class="plain sound-hits" data-hits="${esc(s.id)}" aria-live="polite"></ul></details>` : ""}
         ${noteRows ? `<ul class="plain sound-notes">${noteRows}</ul>` : ""}
         ${ctx.notes ? `<div class="row sound-note-new"><input data-note="${esc(s.id)}" maxlength="2000" placeholder="A note on the sound of ${esc(s.id)}" aria-label="Note on ${esc(s.id)}">
           <button class="btn small" data-nadd="${esc(s.id)}">Add note</button></div>` : ""}
@@ -1179,6 +1193,9 @@ function soundPanel(host, sb, ctx) {
   const m = /** @type {HTMLMediaElement | null} */ (box.querySelector("#snd-media"));
   /** @type {number} */ let stopAt = -1;
   if (m) m.addEventListener("timeupdate", () => { if (stopAt >= 0 && m.currentTime >= stopAt) { m.pause(); stopAt = -1; } });
+  /** @type {HTMLButtonElement | null} */ let shotBtn = null;           // the shot whose ▶ Play is playing
+  const shotReset = () => { if (shotBtn) { shotBtn.textContent = "▶ Play"; shotBtn.classList.remove("playing"); shotBtn.setAttribute("aria-pressed", "false"); shotBtn = null; } };
+  if (m) { m.addEventListener("pause", () => { shotReset(); stopAt = -1; }); m.addEventListener("ended", shotReset); }
   const pv = /** @type {HTMLVideoElement | null} */ (box.querySelector("#snd-pic"));
   if (m && pv) {                                       // the draft's picture follows the mix (no final render yet)
     const sync = () => { if (Math.abs(pv.currentTime - m.currentTime) > 0.15) pv.currentTime = m.currentTime; };
@@ -1196,8 +1213,11 @@ function soundPanel(host, sb, ctx) {
   box.querySelectorAll("button").forEach((el) => {
     const bt = /** @type {HTMLButtonElement} */ (el), d = bt.dataset;
     if (d.play) bt.onclick = () => { const s = sb.shots.find((/** @type {any} */ x) => x.id === d.play); if (!m || !s) return;
-      m.currentTime = s.t0; stopAt = s.t1; m.play().catch(() => {}); };
-    else if (d.pre) bt.onclick = () => sndPreview(/** @type {string} */ (d.pre));
+      if (shotBtn === bt && !m.paused) { m.pause(); return; }
+      sndStop(); m.pause(); m.currentTime = s.t0; stopAt = s.t1;
+      m.play().then(() => { shotBtn = bt; bt.textContent = "■ Stop"; bt.classList.add("playing"); bt.setAttribute("aria-pressed", "true"); }).catch(() => {}); };
+    else if (d.pre) bt.onclick = () => { if (m && !m.paused) m.pause(); sndPreview(/** @type {string} */ (d.pre), bt); };
+    else if (d.search) bt.onclick = () => sndSearch(/** @type {string} */ (d.search));
     else if (d.alt) bt.onclick = () => { const ul = /** @type {HTMLElement} */ (box.querySelector(`#alts-${CSS.escape(d.alt || "")}`)); ul.hidden = !ul.hidden; };
     else if (d.use) bt.onclick = () => run(bt, () => ctx.edit("cue-set", { cue: d.use, entry: d.entry }, sb.plan_base));
     else if (d.move) bt.onclick = () => { const c = cue(/** @type {string} */ (d.move));
@@ -1205,14 +1225,37 @@ function soundPanel(host, sb, ctx) {
     else if (d.gain) bt.onclick = () => { const c = cue(/** @type {string} */ (d.gain));
       run(bt, () => ctx.edit("cue-set", { cue: d.gain, gain_db: Number(c.gain_db) + Number(d.d) }, sb.plan_base)); };
     else if (d.rm) bt.onclick = () => { if (confirm(`Remove ${cue(/** @type {string} */ (d.rm)).action}?`)) run(bt, () => ctx.edit("cue-rm", { cue: d.rm }, sb.plan_base)); };
-    else if (d.add) bt.onclick = () => { const row = /** @type {HTMLElement} */ (bt.parentElement);
+    else if (d.add) bt.onclick = () => { const row = /** @type {HTMLElement} */ (bt.closest(".sound-add"));
       const v = (/** @type {string} */ f) => /** @type {HTMLInputElement} */ (row.querySelector(`[data-f="${f}"]`)).value.trim();
-      if (!v("action") || !v("query")) { msg.className = "fail small"; msg.textContent = "Say what happens and what to look for."; return; }
-      run(bt, () => ctx.edit("cue-add", { shot: d.add, action: v("action"), query: v("query"), ...(v("at") ? { at: v("at") } : {}) }, sb.plan_base)); };
+      if (!v("query")) { msg.className = "fail small"; msg.textContent = "Say what to look for."; return; }
+      run(bt, () => ctx.edit("cue-add", { shot: d.add, action: v("action") || v("query"), query: v("query"), ...(v("at") ? { at: v("at") } : {}) }, sb.plan_base)); };
     else if (d.nadd) bt.onclick = () => { const inp = /** @type {HTMLInputElement} */ (box.querySelector(`[data-note="${CSS.escape(d.nadd || "")}"]`));
       if (!inp.value.trim()) return; run(bt, () => ctx.noteAdd(d.nadd, inp.value.trim())); };
     else if (d.ndel) bt.onclick = () => run(bt, () => ctx.noteDel(d.shot, d.ndel));
   });
+  /** "Add a sound": search the library, list the hits with ▶ and Use (specs/037). @param {string} shot */
+  const sndSearch = async (shot) => {
+    const sec = /** @type {HTMLElement} */ (box.querySelector(`.sound-shot[data-shot="${CSS.escape(shot)}"]`));
+    const f = (/** @type {string} */ k) => /** @type {HTMLInputElement} */ (sec.querySelector(`[data-f="${k}"]`));
+    const ul = /** @type {HTMLElement} */ (sec.querySelector("[data-hits]"));
+    const q = f("query").value.trim();
+    if (!q) { f("query").focus(); return; }
+    ul.innerHTML = `<li class="muted small">Searching…</li>`;
+    let hits;
+    try { hits = (await get(`/sound/search?q=${encodeURIComponent(q)}`)).results; }
+    catch (err) { ul.innerHTML = `<li class="fail small">${esc(/** @type {Error} */ (err).message)}</li>`; return; }
+    if (!hits.length) { ul.innerHTML = `<li class="muted small">No sound found for “${esc(q)}”. Try other words (what it is, not what it means: “glass shatter”, not “bad news”).</li>`; return; }
+    ul.innerHTML = hits.map((/** @type {any} */ h) => `<li class="row"><button class="btn small" data-hpre="${esc(h.id)}" aria-label="Listen to ${esc(h.name)}">▶</button>
+      <span class="grow">${esc(h.name)} <span class="muted small">${[h.category, h.duration != null ? `${Number(h.duration).toFixed(1)} s` : "", h.source === "freesound" ? "Freesound CC0" : h.source].filter(Boolean).map(esc).join(" · ")}</span></span>
+      <button class="btn small" data-huse="${esc(h.id)}">Use</button></li>`).join("");
+    ul.querySelectorAll("button").forEach((el) => { const hb = /** @type {HTMLButtonElement} */ (el);
+      if (hb.dataset.hpre) hb.onclick = () => { if (m && !m.paused) m.pause(); sndPreview(/** @type {string} */ (hb.dataset.hpre), hb); };
+      else hb.onclick = () => { sndStop(); const at = f("at").value.trim();
+        run(hb, () => ctx.edit("cue-add", { shot, action: f("action").value.trim() || q, query: q, entry: hb.dataset.huse, ...(at ? { at } : {}) }, sb.plan_base)); };
+    });
+  };
+  box.querySelectorAll("input[data-q]").forEach((el) => { const i = /** @type {HTMLInputElement} */ (el);
+    i.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); sndSearch(/** @type {string} */ (i.dataset.q)); } }; });
   box.querySelectorAll("input[data-on]").forEach((el) => { const i = /** @type {HTMLInputElement} */ (el);
     i.onchange = () => run(/** @type {any} */ ({ set textContent(_x) {} }), () => ctx.edit("shot-set", { shot: i.dataset.on, on: i.checked ? "yes" : "no" }, sb.plan_base)); });
   return { box, nNotes };

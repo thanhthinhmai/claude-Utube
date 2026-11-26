@@ -378,3 +378,18 @@ def sound_preview_file(entry: str, scope: str):
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(src), "-t", "30", "-ar", "48000", str(out)],
                        check=False, timeout=60)
     return out, "audio/wav"
+
+
+def sound_search(q: str, scope: str, n: int = 12) -> list:
+    """Library sounds for a text, best first, for "Add a sound" (specs/037): searched here, and when the library has
+    few good hits and a Freesound key is set, CC0 sounds are fetched first (FR-013). Public fields only."""
+    from filmcheck import soundlib
+    q = (q or "").strip()[:120]
+    if not q:
+        raise StudioError("invalid", "say what to look for", 422)
+    try:
+        hits = soundlib.find(q, None, None, scope, n=n)
+    except soundlib.LibraryError as e:
+        raise StudioError("sound_" + e.code, e.message, 404) from None
+    keep = ("id", "name", "category", "duration", "source", "credit", "license", "cover")
+    return [{k: h.get(k) for k in keep} for h in hits if h.get("source") in ("sonniss", "freesound", "user")]
