@@ -86,6 +86,7 @@
   - **Shot Blender**: một `blender build <film> S# --still 1 --quarter` cho mỗi shot (máy đứng yên, nhân vật là lớp do rig AE xuất như 038). Phương án là khung bắt đầu cắt từ ảnh đó, phóng lên 480×270.
   - Vẽ khung chữ nhật của khung cuối (màu vàng, 2 px) bằng Pillow → `films/<f>/camera/stills/S#-o<n>.jpg`.
   - Thiếu AE hoặc Blender thì dừng và báo (hiến pháp VII).
+  - Shot chưa có jsx thì báo mã 2. Luồng làm phim viết jsx của shot (bối cảnh, chỗ đứng, thời lượng ước tính) ngay sau Cast, trước Camera; chuyển động máy trong jsx gọi `CU.planCam`, nên đổi phương án không phải sửa jsx.
 - **Rationale**: người dùng chọn "ảnh ¼ cỡ thật + khung zoom".
 - **Alternatives**: phác thảo khối hình (người dùng không chọn).
 

@@ -72,7 +72,7 @@ Trạng thái `choice`: không có → `auto` (khi điểm Camera tắt hoặc a
 | `card`, `action`, `outdoor`, `prop` | bool, tuỳ chọn (R4) |
 | `camera` | object, chép từ phương án đã chọn: `size, start{scale,cx,cy}, move, zoom_pct, rate_pct_s, ease, ease_ae, drift_px, transition, ref, option` |
 
-`film.py` kiểm: các enum như trên; `0.5 ≤ start.scale ≤ 4`; `|zoom_pct| ≤ 40`; mỗi phần tử ease nằm trong [0,1] và tăng dần. `camera apply` (nằm trong `camera choose`) là nơi duy nhất ghi khối này. `shot_plan.move` được đặt bằng `camera.move` để depthcheck và 038 đọc như cũ.
+`film.py` kiểm: các enum như trên; `0.5 ≤ start.scale ≤ 4`; `|zoom_pct| ≤ 40`; mỗi phần tử ease nằm trong [0,1] và tăng dần. Cờ `by_user_request: true` (đặt khi sửa theo ghi chú người dùng đòi chuyển động ngoài video mẫu) cho phép move khác static/push/pull/pan; `qc camera` không báo shot có cờ này. `camera apply` (nằm trong `camera choose`) là nơi duy nhất ghi khối này. `shot_plan.move` được đặt bằng `camera.move` để depthcheck và 038 đọc như cũ.
 
 ## Camera note: `films/<f>/camera/notes.json` (sổ pins.py)
 
