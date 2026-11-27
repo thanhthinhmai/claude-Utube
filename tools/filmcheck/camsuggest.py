@@ -448,6 +448,11 @@ def _require(d: Path) -> dict:
 def suggest(d: Path, style: str = None, refset: str = None, shots=None, keep_others: bool = False) -> dict:
     d = Path(d)
     doc = _require(d)
+    if not style and not refset:               # suggesting again (a Camera note): the library the options came from
+        src = (load(d) or {}).get("source") or ""
+        kind, _, name = src.partition(":")
+        refset = name if kind == "set" and name else None
+        style = name if kind == "style" and name else None
     lib = load_library(d, doc, style, refset)
     durs = durations(d, doc)
     want = list(shots) if shots else list(doc["shots"])

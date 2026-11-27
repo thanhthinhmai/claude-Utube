@@ -165,6 +165,15 @@ class Options(Base):
             self.assertEqual(json.dumps(after["shots"][s]), json.dumps(before["shots"][s]))
         self.assertEqual(after["shots"]["S2"]["choice"]["n"], 2)
 
+    def test_suggest_again_uses_the_recorded_library(self):
+        """A Camera note on a film whose film.json names no style: the options' source is used again (T034)."""
+        fj = json.loads((self.d / "film.json").read_text())
+        fj.pop("style", None)
+        (self.d / "film.json").write_text(json.dumps(fj))
+        src = camsuggest.load(self.d)["source"]
+        o = camsuggest.suggest(self.d, shots=["S1"], keep_others=True)
+        self.assertEqual(o["source"], src)
+
     def test_choose_writes_shot_plan(self):
         r = camsuggest.choose(self.d, "S1", 2)
         fj = json.loads((self.d / "film.json").read_text())

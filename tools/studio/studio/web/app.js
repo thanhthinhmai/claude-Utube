@@ -783,14 +783,29 @@ function canEdit(pt) {
   if (v.busy && (v.busy.step === POINT_STEP[pt] || (v.impact[pt] || []).includes(v.busy.step))) return false;
   return v.points[pt] && v.points[pt].state !== "skipped";
 }
+// One edit at a time: the next one reads its base only when the one before has finished (specs/039: picking options
+// shot after shot faster than an edit finishes sent the old fingerprint and came back "conflict").
+/** @type {Promise<any>} */
+let EDIT_Q = Promise.resolve();
 /** Send one edit and wait for its result (the page never writes a file itself). @param {string} point @param {string} op @param {any} args @param {string} [base] another fingerprint (037: the sound plan or its notes) */
-async function sendEdit(point, op, args, base) {
-  base = base || RAIL.data.points[point].fingerprint;
-  const a = await post(`/jobs/${encodeURIComponent(DONE.job.id)}/actions`, { point, op, args, base });
+function sendEdit(point, op, args, base) {
+  const run = EDIT_Q.then(() => sendEditNow(point, op, args, base));
+  EDIT_Q = run.catch(() => {});
+  return run;
+}
+/** @param {string} point @param {string} op @param {any} args @param {string} [base] @param {boolean} [retried] @returns {Promise<any>} */
+async function sendEditNow(point, op, args, base, retried) {
+  const fp = base || RAIL.data.points[point].fingerprint;
+  const a = await post(`/jobs/${encodeURIComponent(DONE.job.id)}/actions`, { point, op, args, base: fp });
   for (let i = 0; i < 1200; i++) {
     await new Promise((r) => setTimeout(r, i < 20 ? 300 : 1000));
     const x = await get(`/jobs/${encodeURIComponent(DONE.job.id)}/actions/${a.id}`);
-    if (!["queued", "running"].includes(x.status)) { await railRefresh(); return x; }
+    if (["queued", "running"].includes(x.status)) continue;
+    if (x.result && x.result.fingerprint && RAIL.data.points[point]) RAIL.data.points[point].fingerprint = x.result.fingerprint;
+    await railRefresh();
+    // choosing a shot's option sets one whole value: after a conflict it is safe to send it once more on the new base
+    if (x.status === "conflict" && op === "camera-choose" && !base && !retried) return sendEditNow(point, op, args, base, true);
+    return x;
   }
   throw new Error("The edit is taking long; its result will show in the log.");
 }
