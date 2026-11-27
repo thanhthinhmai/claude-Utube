@@ -4,7 +4,7 @@
 
 - Video mẫu `charisma-ref` (đang ở `~/claude-Utube-037/references/charisma-ref`): liên kết hoặc chép vào `references/` của worktree 039, không vào git.
 - Số đo tay: `~/claude-Utube-038/films/charisma-30/out/measure/deep_ref.json` (pan ở 960 px → ×2).
-- Phim thử: `charisma-30` (15 shot), liên kết vào `films/`.
+- Phim thử: `charisma-30-cam` = bản chép của `charisma-30` (15 shot: 10 AE + 5 Blender) trong `films/` của worktree, không vào git. Lệnh `ae …` nhận **tên** phim, không nhận đường dẫn.
 
 ## US1: học máy quay (SC-001)
 
@@ -24,9 +24,9 @@ Ghép 15 shot theo thời điểm cắt của `deep.py` (CUTS). Kết quả mong
 ## US2: gợi ý (SC-002, SC-003)
 
 ```bash
-time sh bin/studio camera suggest charisma-30 --set charisma-ref
-time sh bin/studio camera stills charisma-30
-sh bin/studio camera show charisma-30
+time sh bin/studio camera suggest charisma-30-cam --set charisma-ref
+time sh bin/studio camera stills charisma-30-cam
+sh bin/studio camera show charisma-30-cam
 ```
 
 Kết quả mong đợi:
@@ -43,24 +43,35 @@ Mở vài ảnh thử để xem khung zoom có nằm đúng chỗ không.
 sh bin/studio app start
 ```
 
-Trên trang Camera của phim thử:
-1. Đổi phương án của S3 rồi kiểm `options.json` (`choice.source: user`).
-2. Ghim một ghi chú lên S5 rồi bấm "Send notes to Claude". Việc sửa chỉ làm lại S5: băm các shot còn lại không đổi.
+Trên trang Camera của phim thử (một bản chép chưa duyệt Camera; đã chạy bằng trình duyệt thật trên bộ máy chủ của bộ test
+UI, xem `checks/sc004.md`):
+1. Chọn phương án cho cả 15 shot (bấm liền tay, không chờ) rồi Approve: ≤ 5 phút, `options.json` có `choice.source: user`
+   ở 15/15 shot, không có "conflict".
+2. Ghim một ghi chú lên S5 rồi bấm "Send notes to Claude" (việc Claude, tốn lượt: hỏi chủ xưởng trước). Việc sửa chạy
+   `camera suggest <phim> --shots S5 --keep-others` rồi `camera stills <phim> --shots S5`: băm options + ảnh của 14 shot
+   còn lại không đổi.
 3. Duyệt: `voice make` không còn bị chặn bởi điểm Camera.
 
 ## US4: kiểm máy quay (SC-005, SC-006)
 
+Cần: Camera đã duyệt, có giọng (`voice make charisma-30-cam --provider kokoro`, miễn phí), jsx của shot gọi `CU.planCam`
+(hoặc `CU.end` của phim chuyển sang `CU.planCam` khi shot có `shot_plan.<S>.camera`), script Blender gọi `k.cam()` không
+truyền move/zoom.
+
 ```bash
-sh bin/studio ae draft charisma-30
-sh bin/studio qc camera charisma-30
+sh bin/studio ae draft charisma-30-cam
+sh bin/studio camera fit charisma-30-cam      # đo → fit_k cho shot lệch zoom → dựng lại các shot đó, tối đa 3 vòng
+sh bin/studio qc camera charisma-30-cam
 ```
 
-Kết quả mong đợi:
-- 0 shot lệch với bản dựng theo phương án.
-- Ba shot cố ý sai (zoom tuyến tính, thị sai, đúng) cho ra đúng 2 báo cáo.
+Kết quả mong đợi (`checks/sc005.md`):
+- Ba shot cố ý (đúng, zoom tuyến tính, thị sai) cho ra đúng 2 báo cáo (`tests/filmcheck/test_camcheck.py`).
+- Phim dùng máy chỉnh tay (không gọi `CU.planCam`) bị báo lệch.
+- Sau `camera fit`: 14/15 shot khớp phương án (S8 còn `cam_ease`: hành động trong khung đánh lừa phép đo ease;
+  `camera fit` chỉ sửa zoom). Shot không đổi theo `fit_k` được báo "tự đặt máy".
 
 ## Bộ test tự động
 
 ```bash
-sh tests/run.sh && sh tests/learn/run.sh && sh tests/filmcheck/run.sh && sh tests/ae/run.sh && sh tests/ui/run.sh && sh tests/online/run.sh
+sh tests/run.sh && sh tests/learn/run.sh && sh tests/filmcheck/run.sh && sh tests/ae/run.sh && sh tests/ui/run.sh && sh tests/online/run.sh && sh tests/render/run.sh
 ```
