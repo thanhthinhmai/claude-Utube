@@ -27,6 +27,7 @@
 #   sh bin/studio blender status | config [--exe P] [--work D] [--timeout S] | build <phim> S3 [--still F] [--quarter] | plate <phim> S5 --from S4  shot Blender (specs/038)
 #   sh bin/studio cast check|status|approve|notes|use|library|preview|update|library-approve … · ae sheet <phim> · ae rigs [--check|--lock R]  duyệt nhân vật phim AE (specs/034)
 #   sh bin/studio sound lib|key|cue|silence|plan|mix|notes …  kho tiếng và tiếng theo shot của phim AE (specs/037)
+#   sh bin/studio camera suggest|choose|retime|show|stills|note <phim> …  phương án máy quay theo shot của phim AE (specs/039)
 #   sh bin/studio help
 # Mã thoát: 0 = sẵn sàng / xong · 1 = chưa sẵn sàng / thất bại · 2 = sai cách dùng hoặc library.lock sai.
 set -eu
@@ -607,7 +608,7 @@ case ${1:-} in
   blender) shift; cmd_blender "$@" ;;
   config) if [ "${2:-}" = ae ]; then shift 2; cmd_ae config "$@"; else cmd_filmcheck "$@"; fi ;;
   ui | job | review | admin | app) cmd_studio "$@" ;;
-  script | web | qc | publish | eleven | channel | lesson | topics | kit | point | edit | people | shots | notes | film | cast | animatic | sound) cmd_filmcheck "$@" ;;
+  script | web | qc | publish | eleven | channel | lesson | topics | kit | point | edit | people | shots | notes | film | cast | animatic | sound | camera) cmd_filmcheck "$@" ;;
   help | -h | --help) usage ;;
   '') usage >&2; exit 2 ;;
   *) echo "✗ lệnh lạ: $1" >&2; usage >&2; exit 2 ;;

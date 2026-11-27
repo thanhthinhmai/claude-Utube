@@ -24,6 +24,7 @@ SHEET_FILE = "castsheet.jsx"
 SHEET_DATA = "data/cast_sheet.json"
 LAYER_FILE = "castlayer.jsx"
 LAYER_DATA = "data/layers.json"
+CAMERA_DATA = "data/camera.json"                 # specs/039: shot_plan.<S>.camera of the bundled shots
 PROJ = "build.aep"
 MAX_DATA = 50 * 1024 * 1024
 
@@ -103,6 +104,8 @@ def entry_text(doc: dict, shots: list, film_name: str, proj: str = PROJ, rig_lis
     if draft:
         lines += ["CU.DRAFT = true;   // ae draft (specs/035): quarter resolution, draft quality",
                   f"CU.DRAFT_FPS = {int(os.environ.get('STUDIO_AE_DRAFT_FPS') or 0)};   // 0: the film's own rate"]
+        if os.environ.get("STUDIO_AE_CAMSTILL") == "1":     # specs/039 R8: camera stills want the whole set at scale 1
+            lines += ["CU.CAMSTILL = true;   // camera stills: every CU.camera holds scale 1 on the middle"]
     lines += [f'#include "ae/{f}"' for f in doc["ae_files"]]
     lines += [f"CU.PROJ = {json.dumps(proj)};", 'CU.RENDER = "master.mp4";   // rendered inside After Effects (no aerender)',
               f"CU.build([{ids}]);", ""]
@@ -159,6 +162,10 @@ def make(film_dir, shots=None, out=None, proj: str = PROJ, sheet: dict = None, d
                         raise filmdoc.FilmError("bundle_too_big", "ae/data is larger than 50 MB")
                     rel = "data/" + p.relative_to(data).as_posix()
                     _add(tar, rel, p.read_bytes()); files.append(rel)
+        cams = {s: (doc.get("shot_plan") or {}).get(s, {}).get("camera") for s in shots}
+        cams = {s: c for s, c in cams.items() if c}
+        if cams and not sheet and not layers:                # specs/039 R7: CU.planCam reads it
+            _add(tar, CAMERA_DATA, json.dumps(cams, ensure_ascii=False, sort_keys=True).encode()); files.append(CAMERA_DATA)
         tj = d / "timing.json"
         if tj.is_file() and not sheet and not layers:        # specs/035: CU.shotFrames reads it
             _add(tar, "data/timing.json", tj.read_bytes()); files.append("data/timing.json")

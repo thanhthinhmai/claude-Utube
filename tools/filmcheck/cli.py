@@ -14,7 +14,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 
-from filmcheck import editor, eleven, report, script, soundcli, speakers, voicecat, voicefx, webfetch  # noqa: E402
+from filmcheck import camcli, editor, eleven, report, script, soundcli, speakers, voicecat, voicefx, webfetch  # noqa: E402
 
 NORMAL_ROUNDS = 3        # the first review and at most 2 fix rounds (FR-010)
 EDITOR_PASS = 8.0
@@ -2469,6 +2469,7 @@ def parser() -> argparse.ArgumentParser:
     g = n.add_mutually_exclusive_group(); g.add_argument("--done", action="store_true"); g.add_argument("--open", action="store_true")
     n.add_argument("--base")
     soundcli.add_parser(sub)                                     # specs/037
+    camcli.add_parser(sub)                                       # specs/039
     fm = sub.add_parser("film", help="the film's video (specs/029)").add_subparsers(dest="cmd", required=True)
     s = fm.add_parser("replace", help="put a new video in place, keeping one previous")
     s.add_argument("film"); s.add_argument("video"); s.add_argument("--shots"); s.add_argument("--dir")
@@ -2514,6 +2515,7 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("topics", "type"): cmd_topics_type, ("topics", "fit"): cmd_topics_fit, ("topics", "refs"): cmd_topics_refs,
             ("topics", "usage"): cmd_topics_usage, ("config", "youtube-key"): cmd_youtube_key}
 COMMANDS.update(soundcli.COMMANDS)
+COMMANDS.update(camcli.COMMANDS)
 
 
 def main(argv=None) -> int:

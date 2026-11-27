@@ -89,6 +89,12 @@
   - Vẽ khung chữ nhật của khung cuối (màu vàng, 2 px) bằng Pillow → `films/<f>/camera/stills/S#-o<n>.jpg`.
   - Thiếu AE hoặc Blender thì dừng và báo (hiến pháp VII).
   - Shot chưa có jsx thì báo mã 2. Luồng làm phim viết jsx của shot (bối cảnh, chỗ đứng, thời lượng ước tính) ngay sau Cast, trước Camera; chuyển động máy trong jsx gọi `CU.planCam`, nên đổi phương án không phải sửa jsx.
+- **Đổi khi implement (2026-11-27)**: mỗi shot chỉ dựng **một** lần, không phải mỗi phương án một lần.
+  - Shot AE: một lượt `ae draft` với `STUDIO_AE_CAMSTILL=1` (bundle ghi `CU.CAMSTILL`, mọi `CU.camera` giữ thang 1 ở giữa), rồi lấy khung đầu của từng shot từ master.
+  - Shot Blender: dựng như trên nhưng bỏ khối camera đi.
+  - Ảnh của từng phương án = cắt theo khung bắt đầu (`start`) rồi phóng lên 480×270. Máy 2D chỉ phóng và dời hình đã vẽ, nên phần cắt chính là khung AE sẽ vẽ (trừ lớp phủ nằm ngoài CAM).
+  - Ích lợi: nhanh gấp 2–3 lần (SC-003), và không phải sửa `ae draft` hay chép comp.
+  - Lệnh nằm ở `tools/filmcheck/camcli.py` theo mẫu `soundcli.py` (T018).
 - **Rationale**: người dùng chọn "ảnh ¼ cỡ thật + khung zoom".
 - **Alternatives**: phác thảo khối hình (người dùng không chọn).
 
