@@ -87,6 +87,27 @@ def load_library(d: Path, doc: dict, style: str = None, refset: str = None) -> d
             "shots": lib.get("shots") or []}
 
 
+def ref_file(d: Path, rel: str) -> Path:
+    """The file of a reference frame (an option's ref_frames entry), only inside the camera library the options came
+    from: my-styles/<style>/camera/… or references/<set>/profile/<vid>/camera/…; CameraError otherwise."""
+    o = load(Path(d)) or {}
+    src = str(o.get("source") or "")
+    if src.startswith("style:"):
+        base = stylerefs.style_dir(Path(d), src[6:])
+    elif src.startswith("set:"):
+        sys.path.insert(0, str(HERE.parent / "style-learn"))
+        from sl import refset
+        base = refset.set_dir(src[4:]) / "profile"
+    else:
+        raise CameraError("no camera options")
+    base = base.resolve()
+    p = (base / (rel or "")).resolve()
+    if base not in p.parents or "camera" not in p.relative_to(base).parts[:-1] \
+            or p.suffix.lower() not in (".jpg", ".jpeg", ".png") or not p.is_file():
+        raise CameraError(f"no reference frame {rel}")
+    return p
+
+
 # ---------- the film's shots ----------
 def durations(d: Path, doc: dict) -> dict:
     """Seconds per shot: timing.json, else the film's shots.json (R6)."""

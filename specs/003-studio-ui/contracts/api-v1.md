@@ -17,6 +17,7 @@ Gốc: `http://127.0.0.1:<port>/api/v1`. Tài liệu máy đọc được: `GET 
 | `GET /jobs/{id}/steps` | việc làm phim: `{film, steps, points, impact, busy, editable, catalog, voices, mix_ranges, review}`, có `ETag` (specs/026) | `404` |
 | `POST /jobs/{id}/actions` body `{point, op, args, base}` | `202 {id, status: queued}`: một thao tác sửa, chạy bằng `sh bin/studio edit` (026) | `422 invalid` · `409 finished` · `429 too_many` · `404` |
 | `GET /jobs/{id}/actions/{aid}` | thao tác: `{status: queued\|running\|done\|failed\|invalid\|conflict\|busy, result}` (026) | `404` |
+| `GET /jobs/{id}/camera-ref/{path}` | một khung a/b của shot mẫu cho trang Camera, chỉ trong thư viện máy quay mà phương án lấy từ đó (`my-styles/<style>/camera/…` hoặc `references/<set>/profile/<vid>/camera/…`, `.jpg`/`.png`); ảnh thử `camera/stills/S#-o<n>.jpg` đi qua `/jobs/{id}/files/` (specs/039) | `404` |
 | `PUT /jobs/{id}/points` body `{on: [điểm]}` | `{on}`: điểm duyệt của phim (026) | `409 point_locked` · `404` |
 | `GET /reviews?status=pending` | `{reviews: [Review]}` | |
 | `GET /reviews/{id}` | `Review` kèm `summary_html`, `decision\|null` | `404` |

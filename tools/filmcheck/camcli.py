@@ -36,6 +36,8 @@ def add_parser(sub) -> None:
     s.add_argument("--base"); s.add_argument("--json", action="store_true")
     s = no.add_parser("remove"); s.add_argument("film"); s.add_argument("id"); s.add_argument("--base")
     s = no.add_parser("list"); s.add_argument("film"); s.add_argument("--json", action="store_true")
+    s = no.add_parser("reply"); s.add_argument("film"); s.add_argument("id"); s.add_argument("--text", required=True)
+    s.add_argument("--done", action="store_true"); s.add_argument("--base")
 
 
 def _shots(text):

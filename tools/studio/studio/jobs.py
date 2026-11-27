@@ -239,6 +239,9 @@ def _end_cast_round(j: dict, error: str) -> None:
         if d is not None and (d / "sound" / "notes.json").is_file():          # specs/037: the Sound notes too
             from filmcheck import soundnotes
             soundnotes.end_lot(d, j["id"], f"The job {'stopped' if j.get('status') == 'stopped' else 'failed'}: {error}")
+        if d is not None and (d / "camera" / "notes.json").is_file():         # specs/039: and the Camera notes
+            from filmcheck import camnotes
+            camnotes.end_lot(d, j["id"], f"The job {'stopped' if j.get('status') == 'stopped' else 'failed'}: {error}")
     except Exception:                                   # noqa: BLE001 — never blocks ending the job
         pass
 

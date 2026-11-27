@@ -176,16 +176,19 @@ def normal(ch: dict) -> dict:
             out["cast_chosen"] = True
         if ch.get("animatic_chosen") is True:  # … and knowing the Animatic point (specs/035)
             out["animatic_chosen"] = True
+        if ch.get("camera_chosen") is True:    # … and knowing the Camera point (specs/039)
+            out["camera_chosen"] = True
     return out
 
 
-REVIEW_POINTS = ("script", "cast", "voice", "animatic", "shots", "mix", "publish")   # specs/026, 034, 035; = points.POINTS
+REVIEW_POINTS = ("script", "cast", "camera", "voice", "animatic", "shots", "mix", "publish")   # specs/026, 034, 035, 039; = points.POINTS
 DEFAULT_REVIEWS = ["script", "shots"]
 
 
 def chosen_of(ch: dict) -> set:
     """The points of points.AE_ON this channel's saved list chose about (specs/034, 035)."""
-    return {p for p, k in (("cast", "cast_chosen"), ("animatic", "animatic_chosen")) if ch.get(k) is True}
+    return {p for p, k in (("cast", "cast_chosen"), ("animatic", "animatic_chosen"), ("camera", "camera_chosen"))
+            if ch.get(k) is True}
 
 
 def reviews_of(ch: dict) -> list:

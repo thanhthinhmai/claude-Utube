@@ -33,7 +33,7 @@ class DecisionIn(BaseModel):
 
 
 class ActionIn(BaseModel):                     # specs/026 contracts/api.md
-    point: Literal["script", "cast", "voice", "animatic", "shots", "mix", "publish"]
+    point: Literal["script", "cast", "camera", "voice", "animatic", "shots", "mix", "publish"]
     op: str = Field(max_length=30)
     args: dict = Field(default_factory=dict)
     base: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{16}$")
@@ -54,7 +54,7 @@ WRITE_ROLES = {"customer", "admin"}            # a token limited to reading (any
 
 
 class PointsIn(BaseModel):
-    on: list[Literal["script", "cast", "voice", "animatic", "shots", "mix", "publish"]] = Field(max_length=7)
+    on: list[Literal["script", "cast", "camera", "voice", "animatic", "shots", "mix", "publish"]] = Field(max_length=8)
 
 
 class FreshStaticFiles(StaticFiles):
@@ -266,6 +266,19 @@ def create_app() -> FastAPI:
     @app.get(api + "/jobs/{job_id}/files/{path:path}")
     def job_file(job_id: str, path: str, request: Request):
         p = donesofar.file(_film_job(job_id, request), path)
+        return FileResponse(p, media_type=donesofar.content_type(path), headers={"Cache-Control": "no-cache"})
+
+    @app.get(api + "/jobs/{job_id}/camera-ref/{path:path}")
+    def job_camera_ref(job_id: str, path: str, request: Request):
+        """A reference frame of a camera option (specs/039): only inside the style's or set's camera library."""
+        from filmcheck import camsuggest
+        d = donesofar.film_dir(_film_job(job_id, request))
+        if d is None:
+            raise StudioError("not_found", "this job has no film folder yet", 404)
+        try:
+            p = camsuggest.ref_file(d, path)
+        except camsuggest.CameraError as e:
+            raise StudioError("not_found", str(e), 404) from None
         return FileResponse(p, media_type=donesofar.content_type(path), headers={"Cache-Control": "no-cache"})
 
     # ---------- review points and edits (specs/026) ----------

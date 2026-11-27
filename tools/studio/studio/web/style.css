@@ -895,3 +895,19 @@ main.wide-film #film-player .sh-strip-tools .sh-filters button { padding: 2px 10
 .sound-note { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
 .sound-note.done { color: var(--muted); }
 .sound-note .muted { flex-basis: 100%; }
+/* specs/039 US3: the Camera page */
+.cam-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.cam-opt { border: 1px solid var(--line); border-radius: 10px; padding: 8px; display: grid; gap: 6px; align-content: start; min-width: 0; }
+.cam-opt.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.cam-opt p { margin: 0; }
+.cam-still { position: relative; overflow: hidden; border-radius: 8px; line-height: 0; cursor: crosshair; background: var(--hover); }
+.cam-still img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.cam-still .pin { position: absolute; transform: translate(-50%, -50%); width: 20px; height: 20px; border-radius: 50%; background: var(--warn); color: var(--panel); font: 700 11px/20px system-ui, sans-serif; font-style: normal; text-align: center; box-shadow: 0 0 0 2px var(--panel); pointer-events: none; z-index: 1; }
+.cam-still .pin.new { background: var(--accent); }
+.cam-ref { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.cam-ref img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; display: block; }
+.cam .star { color: var(--warn); }
+.cam .warnt { color: var(--warn); }
+.cam .dot-note { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--warn); vertical-align: middle; }
+.cam .pinform { display: grid; gap: 6px; }
+.cam .pinform textarea { width: 100%; }

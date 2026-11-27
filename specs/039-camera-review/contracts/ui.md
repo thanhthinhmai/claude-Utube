@@ -35,4 +35,4 @@
 ## API
 
 - Không có route ghi mới: chọn và ghim đi qua `POST /jobs/{id}/actions {point:"camera", op, args, base}` (actions.OPS["camera"]); duyệt và revise đi qua route review có sẵn.
-- Ảnh: route tệp phim có sẵn, giới hạn trong `camera/` và `my-styles/<style>/camera/`.
+- Ảnh thử: route tệp phim có sẵn (`/jobs/{id}/files/camera/stills/S#-o<n>.jpg`). Khung a/b của shot mẫu: một route đọc mới `GET /jobs/{id}/camera-ref/{path}`, chỉ trong thư viện máy quay của phương án (`my-styles/<style>/camera/` hoặc `references/<set>/profile/<vid>/camera/`); đổi khi implement vì route tệp phim không đọc được ngoài thư mục phim.

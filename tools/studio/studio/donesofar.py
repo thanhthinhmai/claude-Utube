@@ -17,7 +17,7 @@ ALLOWED = re.compile(r"^(SCRIPT\.md|SOURCES\.md|lines\.json|checks\.json|CHECKS\
                      r"|scenes\.json|mix\.json|publish/pack\.json|publish/thumbnail-[123]\.(png|jpg)"
                      r"|cast/sheets/[a-z0-9-]{1,32}(\.prev)?/([a-z0-9-]{1,40}\.jpg|walk\.mp4|sheet\.json)"
                      r"|cast/voices/[a-z0-9-]{1,32}/[123]\.wav"
-                     r"|animatic/(draft(\.prev)?\.mp4|clips/S\d{1,4}\.mp4|frames/S\d{1,4}\.jpg))$")   # 035: the animatic   # 036: voice samples of a character   # 034: cast sheets       # 026: scene table, mix settings, publish pack
+                     r"|animatic/(draft(\.prev)?\.mp4|clips/S\d{1,4}\.mp4|frames/S\d{1,4}\.jpg)|camera/stills/S\d{1,4}-o[1-9]\.jpg)$")   # 039: camera stills   # 035: the animatic   # 036: voice samples of a character   # 034: cast sheets       # 026: scene table, mix settings, publish pack
 # Never listed nor served, even if the allow list grows (specs/029 contracts/files.md): shot notes' pictures, the
 # small-picture cache, the previous video and its shot marks
 EXCLUDED = re.compile(r"^(shot-notes/|\.shots/|shots\.prev\.json$|[^/]*\.prev\.mp4$)")
@@ -271,6 +271,21 @@ def summary(job: dict) -> dict:
                 order.insert([k for k, _ in order].index("voice") + 1, ("animatic", "Animatic"))
                 sections["animatic"] = {"version": h.hexdigest()[:16]}
     except Exception:                              # noqa: BLE001 — a broken timing.json shows on the Animatic panel
+        pass
+    try:                                           # specs/039: an AE film's camera options, after Cast (or Script)
+        from filmcheck import camsuggest, cast
+        if cast.is_ae(d) and (d / "camera" / "options.json").is_file():
+            import hashlib
+            h = hashlib.sha256()
+            for f in ("options.json", "notes.json"):
+                h.update((d / "camera" / f).read_bytes() if (d / "camera" / f).is_file() else b"-")
+            o = camsuggest.load(d) or {}
+            st["camera"] = "running" if "Camera" in running_steps else "done" if all(
+                (r or {}).get("choice") for r in (o.get("shots") or {}).values()) else "waiting"
+            keys = [k for k, _ in order]
+            order.insert(keys.index("cast") + 1 if "cast" in keys else keys.index("voice"), ("camera", "Camera"))
+            sections["camera"] = {"version": h.hexdigest()[:16], "shots": len(o.get("shots") or {})}
+    except Exception:                              # noqa: BLE001 — a broken options.json shows on the Camera panel
         pass
     steps = []
     for key, label in order:

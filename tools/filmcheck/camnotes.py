@@ -119,6 +119,10 @@ def cli(a, d: Path) -> int:
             remove(d, a.id, b=a.base)
             print(f"✓ note {a.id} removed")
             return 0
+        if a.ncmd == "reply":
+            n = reply(d, a.id, a.text, True if a.done else None, b=a.base)
+            print(f"✓ note {n['id']} answered" + (" (done)" if n.get("done") else ""))
+            return 0
         doc = NOTES.load(d)
         if a.json:
             print(json.dumps({"base": NOTES.base(d), **doc}, ensure_ascii=False))

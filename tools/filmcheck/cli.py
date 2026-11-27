@@ -423,7 +423,7 @@ def cmd_channel_set(a, channels):
         from filmcheck import points
         try:
             ch[f] = points.parse_list(",".join(vals))
-            ch["cast_chosen"] = ch["animatic_chosen"] = True     # specs/034, 035: left out on purpose stays off
+            ch["cast_chosen"] = ch["animatic_chosen"] = ch["camera_chosen"] = True     # specs/034, 035: left out on purpose stays off
         except points.PointError as e:
             raise channels.ChannelError(str(e)) from None
     elif f == "hero":                                            # specs/022: hero hoodie=#d9b23a hair=bald …
