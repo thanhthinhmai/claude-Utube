@@ -102,3 +102,8 @@
 2. US2: gợi ý + ảnh thử + bản dựng dùng máy đã chọn; đây là lúc phim mới hưởng lợi.
 3. US3 trang Camera, US4 kiểm sau dựng.
 4. Commit sau mỗi phase (tin nhắn ngắn tiếng Anh, không tên mô hình).
+
+## Phase 8: Convergence
+
+- [ ] T044 Tìm vì sao S8 của `charisma-30-cam` đo ease q½ 0,10 thay vì 0,47 (hành động trong khung hay cách `CU.planCam` đặt `ease_ae` vào hai khoá), sửa shot hoặc cách đặt ease, hoặc để người dùng miễn; `qc camera` báo 0 lệch per SC-005 (partial)
+- [ ] T045 Khi chủ xưởng cho phép (tốn một lượt Claude): chạy thật một việc "Send notes to Claude" trên phim thử, kiểm chỉ shot có ghi chú đổi, ghi vào `checks/sc004.md` per FR-015 (partial)
