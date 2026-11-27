@@ -786,7 +786,7 @@ def cmd_render_setting(a) -> int:
 
 
 # ---------- QC tiers (specs/020) ----------
-QC_SUBS = ("voice", "plan", "shots", "except", "accept-style", "final", "depth")
+QC_SUBS = ("voice", "plan", "shots", "except", "accept-style", "final", "depth", "camera")
 
 
 def lib_dir() -> str:
@@ -880,6 +880,29 @@ def cmd_qc_depth(a) -> int:
     return 0 if r["pass"] else 1
 
 
+def cmd_qc_camera(a) -> int:
+    """specs/039: each built shot's camera against the option chosen for it (reports, never blocks the render)."""
+    from filmcheck import camcheck
+    d = film_dir(a.film)
+    try:
+        r = camcheck.run(d, [x for x in (a.shots or "").split(",") if x] or None)
+    except camcheck.CameraCheckError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    lines = []
+    for i in r["issues"]:
+        lines.append(f"  {'·' if i.get('excepted') else '✗'} {i['shot']} {i['rule']}: have {json.dumps(i['have'])}, "
+                     f"want {json.dumps(i['want'])}" + (f" (excepted: {i['excepted']['reason']})" if i.get("excepted")
+                                                        else f" — {i['fix']}"))
+    for w in r.get("warnings") or []:
+        lines.append(f"  ! {w['shot']} measure not reliable: {w.get('why')}")
+    bad = sorted({i["shot"] for i in r["issues"] if not i.get("excepted")})
+    lines.append(f"{'✓' if r['pass'] else '✗'} camera: " + ("every shot as chosen" if r["pass"] else
+                 f"{len(bad)} shot(s) off: {', '.join(bad)}") + f" · {r['seconds']:.0f} s")
+    out(a, r, lines)
+    return 0 if r["pass"] else 1
+
+
 def cmd_qc_accept_style(a) -> int:
     from filmcheck import shotcheck, tiers
     d = film_dir(a.film)
@@ -920,7 +943,12 @@ def cmd_qc_except(a) -> int:
         dr = depthcheck.recompute(d)
         if dr:
             t = {**t, "depth": dr}
-    keys = [k for k in ("plan", "shots", "depth") if t.get(k)]
+    if a.rule in tiers.CAMERA_RULES:                  # specs/039
+        from filmcheck import camcheck
+        cr = camcheck.recompute(d)
+        if cr:
+            t = {**t, "camera": cr}
+    keys = [k for k in ("plan", "shots", "depth", "camera") if t.get(k)]
     lines += [f"  {k}: {'pass' if t[k]['pass'] else 'fail'}" for k in keys]
     out(a, {"exceptions": tiers.load_exceptions(d), "tiers": {k: t[k] for k in keys}}, lines)
     return 0
@@ -2214,6 +2242,10 @@ def parser() -> argparse.ArgumentParser:
     s = sub.add_parser("qc-depth", help="each shot's camera and space against the style's measured depth (specs/038)")
     s.add_argument("film")
     s.add_argument("--json", action="store_true")
+    s = sub.add_parser("qc-camera", help="each built shot's camera against the chosen option (specs/039)")
+    s.add_argument("film")
+    s.add_argument("--shots", help="S2,S6 (default: every shot with a chosen camera)")
+    s.add_argument("--json", action="store_true")
     s = sub.add_parser("qc-voice", help="tier 0: check the voice lines (specs/020)")
     s.add_argument("film")
     s.add_argument("--json", action="store_true")
@@ -2507,7 +2539,7 @@ COMMANDS = {("script", "check"): cmd_check, ("script", "review"): cmd_review, ("
             ("qc", "qc"): cmd_qc, ("publish", "publish"): cmd_publish,
             ("qc-plan", "qc-plan"): cmd_qc_plan, ("render-gate", "render-gate"): cmd_render_gate,
             ("qc-shots", "qc-shots"): cmd_qc_shots, ("qc-accept-style", "qc-accept-style"): cmd_qc_accept_style,
-            ("qc-except", "qc-except"): cmd_qc_except, ("qc-depth", "qc-depth"): cmd_qc_depth, ("qc-voice", "qc-voice"): cmd_qc_voice,
+            ("qc-except", "qc-except"): cmd_qc_except, ("qc-depth", "qc-depth"): cmd_qc_depth, ("qc-camera", "qc-camera"): cmd_qc_camera, ("qc-voice", "qc-voice"): cmd_qc_voice,
             ("voice-asr", "voice-asr"): cmd_voice_asr, ("voice-make", "voice-make"): cmd_voice_make,
             ("voice-usage", "voice-usage"): cmd_voice_usage, ("eleven", "test"): cmd_eleven, ("eleven", "voices"): cmd_eleven,
             ("voice-check", "voice-check"): cmd_voice_check, ("voice-channel", "voice-channel"): cmd_voice_channel,

@@ -72,8 +72,8 @@
 **Goal**: `qc camera` so bản dựng với phương án đã chọn.
 **Independent Test**: 3 shot cố ý (đúng, zoom tuyến tính, thị sai) → báo đúng 2 (SC-005).
 
-- [ ] T035 [US4] `tools/filmcheck/camcheck.py` (R12): đo `animatic/shots/S#.mp4` hoặc clip shot của bản đẹp bằng `camtrack.measure`; luật `cam_zoom` (> 1 điểm phần trăm), `cam_dir`, `cam_ease` (q½ lệch > 0,10), `cam_parallax`, `cam_transition`; tier `camera` trong `tiers.py`; miễn theo shot qua `tiers.add_exception` (từ chối trong việc của app); lệnh `qc camera [--except S3 "<lý do>"]` trong `tools/filmcheck/cli.py`; shot có `by_user_request` thì không báo
-- [ ] T036 [P] [US4] Test `tests/filmcheck/test_camcheck.py`: clip tổng hợp đúng/tuyến tính/thị sai → báo đúng 2; miễn trong job bị từ chối; miễn ngoài job được ghi theo shot
+- [X] T035 [US4] `tools/filmcheck/camcheck.py` (R12): đo `animatic/shots/S#.mp4` hoặc clip shot của bản đẹp bằng `camtrack.measure`; luật `cam_zoom` (> 1 điểm phần trăm), `cam_dir`, `cam_ease` (q½ lệch > 0,10), `cam_parallax`, `cam_transition`; tier `camera` trong `tiers.py`; miễn theo shot qua `tiers.add_exception` (từ chối trong việc của app); lệnh `qc camera [--except S3 "<lý do>"]` trong `tools/filmcheck/cli.py`; shot có `by_user_request` thì không báo
+- [X] T036 [P] [US4] Test `tests/filmcheck/test_camcheck.py`: clip tổng hợp đúng/tuyến tính/thị sai → báo đúng 2; miễn trong job bị từ chối; miễn ngoài job được ghi theo shot
 - [ ] T037 [US4] Chạy thật: `ae draft charisma-30` theo phương án đã chọn, `qc camera` → 0 lệch; dựng 3 shot cố ý sai → 2/2; so zoom trung bình mỗi shot với video mẫu (SC-006); xem thử clip thật và các điểm cắt (feedback continuity); ghi `specs/039-camera-review/checks/sc005.md`
 
 ## Phase 7: Polish
