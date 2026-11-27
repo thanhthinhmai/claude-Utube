@@ -39,7 +39,7 @@ class Tiers(unittest.TestCase):
         (self.d / "kit" / "sound" / "__pycache__" / "timing.cpython-312.pyc").write_bytes(b"pyc")
         (self.d / "compare").mkdir(); (self.d / "compare" / "sheet.jpg").write_bytes(b"jpg")
         self.assertEqual(tiers.fingerprint(self.d), a)
-        (self.d / "index.html").write_text("<p>b</p>")
+        (self.d / "index.html").write_text("<p>bb</p>")   # another size: the cache keys on mtime+size
         self.assertNotEqual(tiers.fingerprint(self.d), a)
         self.assertEqual(tiers.fingerprint(self.d, "voice"), v)            # the page is not part of the voice
         (self.d / "voices" / "l01.wav").write_bytes(b"RIFF2")
