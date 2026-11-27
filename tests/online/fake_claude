@@ -98,7 +98,10 @@ def labeler(prompt):
         got = given.get(i) or ["med", "eye", False]
         sc, an, fg = got[:3]
         place = got[3] if len(got) > 3 else "room"
-        shots.append({"id": i, "scale": sc, "angle": an, "foreground_blur": bool(fg), "place": place, "confidence": "high"})
+        depth = {"cam_height": "eye", "lens": "normal", "depth": "mid", "layers": ["mid", "bg"], "occluder": False}
+        depth.update(got[4] if len(got) > 4 and isinstance(got[4], dict) else {})    # specs/038 schema v3
+        shots.append({"id": i, "scale": sc, "angle": an, "foreground_blur": bool(fg), "place": place, "confidence": "high",
+                      **depth})
     out = {"shots": "none"} if mode == "bad" else {"shots": shots}
     print(json.dumps({"type": "result", "is_error": False, "structured_output": out,
                       "usage": {"input_tokens": 2000, "output_tokens": 200}, "modelUsage": {"claude-opus-5-5": {}}}))

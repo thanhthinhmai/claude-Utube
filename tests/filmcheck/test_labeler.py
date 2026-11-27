@@ -69,6 +69,33 @@ class Labeler(unittest.TestCase):
         groups = [(self.sheet, [f"S{i:03d}"]) for i in range(1, 10)]
         self.assertEqual(labeler.label(groups, {})["calls"], 3)
 
+    def test_schema_v3_depth(self):
+        """specs/038: cam_height, lens, depth, layers, occluder; measured lines go into the prompt."""
+        f = self.d / "labels.json"
+        f.write_text(json.dumps({"S001": ["huge", "high", False, "hall",
+                                          {"cam_height": "high", "lens": "wide", "depth": "deep",
+                                           "layers": ["far", "fg", "mid"], "occluder": True}]}))
+        os.environ["FAKE_LABELS"] = str(f)
+        r = labeler.label([(self.sheet, ["S001", "S002"])], {"S001": {"vanish": {"horizon": 0.25, "hfov_deg": 70.0,
+                                                                                 "lines": 90}}})
+        a, b = r["labels"]["S001"], r["labels"]["S002"]
+        self.assertEqual((a["cam_height"], a["lens"], a["depth"], a["occluder"]), ("high", "wide", "deep", True))
+        self.assertEqual(a["layers"], ["fg", "mid", "far"])                 # in depth order
+        self.assertEqual((b["cam_height"], b["depth"], b["layers"]), ("eye", "mid", ["mid", "bg"]))
+        p = labeler.prompt([self.sheet], ["S001", "S002"], {"S001": {"vanish": {"horizon": 0.25, "hfov_deg": 70.0,
+                                                                                "lines": 90}}})
+        self.assertIn("horizon=0.25 hfov=70.0 lines=90", p)
+        self.assertIn("- S002 focus=? sharpest=?,? lines=? (no measure)", p)
+        self.assertIn("cam_height", json.dumps(labeler.SCHEMA))
+
+    def test_vanish_disagrees(self):
+        self.assertTrue(labeler.vanish_disagrees({"cam_height": "low"}, {"horizon": 0.2}))
+        self.assertTrue(labeler.vanish_disagrees({"cam_height": "top"}, {"horizon": 0.8}))
+        self.assertFalse(labeler.vanish_disagrees({"cam_height": "high"}, {"horizon": 0.2}))
+        self.assertFalse(labeler.vanish_disagrees({"cam_height": "low"}, {"horizon": None}))
+        self.assertFalse(labeler.vanish_disagrees({"cam_height": "low"}, None))
+        self.assertTrue(labeler.contradicts({"scale": "wide", "cam_height": "low"}, {}, {"horizon": 0.1}))
+
     def test_contradicts_and_steps(self):
         self.assertTrue(labeler.contradicts({"scale": "cu"}, {"focused_share": 1 / 12, "sharpest_at": [0, 2]}))
         self.assertFalse(labeler.contradicts({"scale": "cu"}, {"focused_share": 0.5, "sharpest_at": [1, 1]}))

@@ -317,7 +317,12 @@ def shot_grammar(d: Path, fp: str, job: str, out: Path, mids: list, shots: list,
             sheets = _node([HERE / "shots.mjs", d, job], timeout=1800).get("sheets", [])
             ids = [f["shot"] for f in mids]
             groups = [(sh, ids[k * 48:(k + 1) * 48]) for k, sh in enumerate(sheets)]
-            got = labeler.label(groups, {f["shot"]: f.get("focus") or {} for f in mids})
+            van = labeler.vanish_hints({f["shot"]: f["file"] for f in mids if f.get("file")})    # specs/038
+            got = labeler.label(groups, {f["shot"]: {**(f.get("focus") or {}), "vanish": van.get(f["shot"])} for f in mids})
+            for sid, v in van.items():
+                if sid in got["labels"]:
+                    got["labels"][sid]["vanish"] = v
+                    got["labels"][sid]["check"] = labeler.vanish_disagrees(got["labels"][sid], v)
             labels = got["labels"]
             info = {"reused": False, "model": got["model"], "calls": got["calls"], "usage": got["usage"]}
             lf.write_text(json.dumps({"fingerprint": fp, "labeler": labeler.version(), "model": got["model"], "at": tiers.now(),

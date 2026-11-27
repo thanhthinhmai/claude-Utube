@@ -45,3 +45,63 @@ def confetti(k, t0: float = 0.0, t1: float = None, at=None, area=(8.0, 6.0), cou
     st.effector_weights.gravity, st.brownian_factor, st.drag_factor = 0.1, 0.4, 0.3
     em.show_instancer_for_render = False
     return em
+
+
+def foam(k, t0: float = 0.0, at=None, count: int = 40, power: float = 3.2, seed: int = 5, col: str = "#e84a3c"):
+    """A paper volcano erupting: blobs shoot up from `at` (default the set's volcano), arc under gravity and splat
+    on the floor, keyed per frame (no simulation, so every run gives the same frames)."""
+    import math
+    import random
+    from kit import mesh
+    rnd = random.Random(seed)
+    at = Vector(at or k.objects.get("volcano") or (0, 0, 1))
+    mats = [toon.mat("foam0", col), toon.mat("foam1", "#ff8a5c"), toon.mat("foam2", "#fff1e0")]
+    f0 = k.f(t0)
+    g = 9.8
+    for i in range(count):
+        r = rnd.uniform(0.05, 0.13)
+        o = mesh.sphere(f"foam{i}", tuple(at), r, mats[i % 3], outline=0.006, seg=10, layer="mid")
+        a = rnd.uniform(0, 2 * math.pi)
+        sp = rnd.uniform(0.3, 1.0) * power * 0.45
+        vz = rnd.uniform(0.7, 1.0) * power
+        vx, vy = math.cos(a) * sp, math.sin(a) * sp
+        start = f0 + rnd.randrange(0, max(1, int(k.fps * 0.6)))
+        o.hide_render = True
+        o.keyframe_insert("hide_render", frame=max(1, start - 1))
+        o.hide_render = False
+        o.keyframe_insert("hide_render", frame=start)
+        landed = None
+        for f in range(start, k.frames + 1, 2):
+            t = (f - start) / k.fps
+            z = at.z + vz * t - g * t * t / 2
+            if z <= r * 0.4:
+                if landed is None:
+                    landed = (at.x + vx * t, at.y + vy * t)
+                o.location = (landed[0], landed[1], r * 0.4)
+                o.scale = (1.4, 1.4, 0.4)
+            else:
+                o.location = (at.x + vx * t, at.y + vy * t, z)
+                o.scale = (1, 1, 1)
+            o.keyframe_insert("location", frame=f)
+            o.keyframe_insert("scale", frame=f)
+
+
+def ball(k, frm=(0, 0, 1.2), to=(0, 5, 3), t0: float = 0.5, t1: float = 1.2, r: float = 0.11, col: str = "#e05a4f",
+         arc: float = 0.8, hide_after: bool = True, hide_before: bool = False, show_from: float | None = None):
+    """A thrown ball: held at `frm` until t0, flies on an arc (`arc` metres above the straight line) to `to` by t1,
+    gone after t1 when hide_after (it went through the window); hidden until t0 when hide_before (held out of sight),
+    or until show_from when given (the hand comes up with it before the throw).
+    Keyed per frame."""
+    from kit import mesh
+    o = mesh.sphere("ball", (0, 0, 0), r, toon.mat("ball", col), outline=0.006, seg=20)
+    a, b = Vector(frm), Vector(to)
+    f0, f1 = k.f(t0), k.f(t1)
+    fs = k.f(show_from) if show_from is not None else f0
+    for f in range(1, k.frames + 1):
+        u = 0.0 if f <= f0 else 1.0 if f >= f1 else (f - f0) / max(1, f1 - f0)
+        o.location = a.lerp(b, u) + Vector((0, 0, arc * 4 * u * (1 - u)))
+        o.hide_render = o.hide_viewport = bool((hide_after and f > f1) or (hide_before and f < fs))
+        o.keyframe_insert("location", frame=f)
+        o.keyframe_insert("hide_render", frame=f)
+        o.keyframe_insert("hide_viewport", frame=f)
+    return o

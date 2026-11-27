@@ -52,6 +52,13 @@ def plane(name, c, size, m, rot=(0, 0, 0), layer: str = "mid"):
     return from_bm(name, bm, m, smooth=False, layer=layer)
 
 
+def tri(name, pts, m, layer: str = "mid"):
+    """A flat triangle (pennants, banner tips): pts are three (x, y, z)."""
+    bm = bmesh.new()
+    bm.faces.new([bm.verts.new(p) for p in pts])
+    return from_bm(name, bm, m, smooth=False, layer=layer)
+
+
 def sphere(name, c, r, m, scale=(1, 1, 1), outline: float = 0.0, seg: int = 24, layer: str = "mid"):
     bm = bmesh.new()
     bmesh.ops.create_uvsphere(bm, u_segments=seg, v_segments=max(6, seg // 2), radius=r)

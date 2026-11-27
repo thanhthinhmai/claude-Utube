@@ -80,6 +80,14 @@ Mỗi mục: Quyết định · Lý do · Phương án đã cân nhắc.
   - Một bản code nhân vật duy nhất, nên hình ở hai bộ máy là một (SC-006).
   - Rig chỉ chọn góc lúc dựng comp, nên phải dựng mỗi góc thành một lớp riêng.
   - Đường dẫn làm việc của AE và Blender cùng nằm trên ổ Windows, nên lượt lớp không phải chép.
+- **Kết quả thử thật (T040, 2026-11-27, AE 2027)**:
+  - `om.setSettings({"Format": "PNG Sequence", ...})`, cả dạng phẳng lẫn dạng lồng `"Video Output"`, đều bị AE từ chối: "Invalid Value for key: <Format>. Property is read-only".
+  - Template `"Lossless with Alpha"` chạy được, ra AVI `rawvideo` `bgra`. Kiểm khung 1: góc (0,0,0,0) trong suốt, giữa (230,77,51,255) đặc.
+  - **Chốt cách làm**:
+    - AE render mỗi lớp thành `L<shot>-<char>-<view>.avi` bằng template này.
+    - Máy chủ tách AVI thành `f####.png` RGBA bằng `ffmpeg -i x.avi -pix_fmt rgba f%04d.png`, rồi xoá AVI (≈ 4,7 MB mỗi khung 1080²).
+    - Tên thư mục và cách Blender đọc giữ nguyên.
+  - **Bẫy**: lỗi trong khối `catch` của script `-r` làm AE bật hộp thoại lỗi và đứng chờ. Mọi lệnh `-r` sau đó bị giữ lại cho đến khi bấm OK. Script lớp phải ghi log từng dòng (mở, ghi, đóng ngay), và không đặt tên biến trùng với tên biến của catch.
 - **Phương án đã cân nhắc**:
   - ProRes 4444 `.mov`: một tệp mỗi lớp, nhưng không chắc Blender đọc được alpha của ProRes. PNG chắc chắn đọc được.
   - Dựng sẵn thư viện động tác: bị loại theo câu 3 của clarify.

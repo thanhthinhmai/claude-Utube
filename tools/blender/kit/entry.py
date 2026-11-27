@@ -137,11 +137,22 @@ def main(argv: list) -> None:
             core.fail("script", script_error(sid, path, e))
         if bpy.context.scene.camera is None:
             core.fail("script", f"{sid}: the shot has no camera; call k.cam(...)")
+        spec = k.objects.get("cast_spec")
         if kind == "plan":
-            angle = max([c.get("angle", 0) for c in k.cards] or [0])
-            json.dump({"shot": sid, "frames": s["frames"], "chars": k.cards, "card_angle_max": angle},
+            from kit import cards
+            got = cards.measure(k) if spec else {"chars": {}, "crowd": None}
+            json.dump({"shot": sid, "fps": k.fps, "frames": s["frames"], **got},
                       open(os.path.join(out, "plan.json"), "w"), indent=1)
-        elif kind == "plate" or s.get("still"):
+            core.log(f"shot {sid} ok")
+            continue
+        if spec and kind != "plate":                  # the cast cards on the AE layers (R6)
+            from kit import cards
+            lp = os.path.join(k.layers_dir, "layers.json") if k.layers_dir else ""
+            try:
+                cards.build(k, json.load(open(lp, encoding="utf-8")) if lp and os.path.isfile(lp) else None)
+            except ValueError as e:
+                core.fail("layers", f"{sid}: {e}")
+        if kind == "plate" or s.get("still"):
             name = "plate.png" if kind == "plate" else f"still-{int(s.get('still') or 1):04d}.png"
             core.render_still(os.path.join(out, name), int(s.get("still") or (s["frames"] + 1) // 2))
         else:

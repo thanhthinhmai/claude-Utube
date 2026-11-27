@@ -60,9 +60,10 @@ def mat(name: str, col: str, spec: float = 0.0, rough: float = 0.5, emit: bool =
     if tex == "planks":
         w = N.new("ShaderNodeTexWave")
         w.wave_type, w.bands_direction = "BANDS", "X"
-        w.inputs["Scale"].default_value = 0.9
-        w.inputs["Distortion"].default_value = 0.0
-        cr = _ramp(N, L, w.outputs["Fac"], [(0.0, hexc(col)), (0.93, hexc(tex_col or "#8a5a34"))])
+        w.inputs["Scale"].default_value = 0.35          # in metres (object space): a seam every ~0.9 m whatever the floor
+        w.inputs["Distortion"].default_value = 0.0      # size; generated coords gave one wide dark band on a big floor
+        L.new(N.new("ShaderNodeTexCoord").outputs["Object"], w.inputs["Vector"])
+        cr = _ramp(N, L, w.outputs["Fac"], [(0.0, hexc(col)), (0.965, hexc(tex_col or "#8a5a34"))])
         cr.color_ramp.interpolation = "CONSTANT"
         bc = cr.outputs[0]
     elif tex == "tiles":

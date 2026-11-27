@@ -101,6 +101,48 @@ def shot_refs(summary: dict) -> dict:
     return {k: v for k, v in out.items() if v not in (None, {}, [])}
 
 
+SIZES = ("ecu", "cu", "med", "wide", "huge")
+
+
+def _share(vals: list) -> dict:
+    vals = [v for v in vals if v and v != "unknown"]
+    if not vals:
+        return {}
+    return {k: round(vals.count(k) / len(vals), 2) for k in sorted(set(vals), key=lambda k: -vals.count(k))}
+
+
+def _pct(v: list, q: float) -> int:
+    v = sorted(v)
+    return v[min(len(v) - 1, int(q * (len(v) - 1) + 0.5))]
+
+
+def depth_block(rows: list) -> dict:
+    """specs/038 data-model "Style depth block": per shot size, how the reference videos place the camera and how many
+    layers they show. rows: labelled shots (schema v3) with "_vid"; shots without cam_height (older labels) are left out."""
+    by = {}
+    for size in SIZES:
+        rs = [r for r in rows if r.get("scale") == size and r.get("cam_height") and not r.get("short")]
+        if not rs:
+            continue
+        lay = [len(r.get("layers") or []) for r in rs]
+        best = sorted(rs, key=lambda r: (-len(r.get("layers") or []), not r.get("occluder")))[:5]
+        by[size] = {"n": len(rs), "cam_height": _share([r.get("cam_height") for r in rs]),
+                    "lens": _share([r.get("lens") for r in rs]), "depth": _share([r.get("depth") for r in rs]),
+                    "layers_p25": _pct(lay, 0.25), "layers_p50": _pct(lay, 0.5),
+                    "occluder_share": round(sum(bool(r.get("occluder")) for r in rs) / len(rs), 2),
+                    "evidence": [f"{r['_vid']}:{r['id']}" for r in best if r.get("_vid")]}
+    return {"version": 1, "by_size": by} if by else {}
+
+
+def depth_refs(name: str) -> dict:
+    from . import shots as shotmod
+    rows = []
+    for v in shotmod._videos_with_shots(name):
+        d = refset.read_json(shotmod.shots_file(name, v["id"]))
+        rows += [{**r, "_vid": v["id"]} for r in d.get("shots", [])]
+    return depth_block(rows)
+
+
 def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bool = False, update: bool = False) -> int:
     refset.check_slug(slug, "mã phong cách")
     mine = refset.root() / "my-styles"
@@ -184,6 +226,9 @@ def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bo
         shutil.copy2(p, dst)
     shutil.copy2(ours, tmp / "styleframe.jpg")
     refs = shot_refs(s)                                      # specs/021: the shot grammar the checks compare with
+    dep = depth_refs(name)                                   # specs/038: depth and space per shot size
+    if dep:
+        refs["depth"] = dep
     if refs:
         refset.write_json(tmp / "shots.json", refs)
     if update:                                               # the demo film stays with the style (specs/021 FR-015)

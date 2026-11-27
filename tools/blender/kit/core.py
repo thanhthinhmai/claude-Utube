@@ -68,12 +68,19 @@ def setup_scene(fps: int, size, frames: int, quarter: bool = False, samples: int
             break
         except TypeError:
             continue
-    sc.eevee.taa_render_samples = samples or (16 if quarter else 48)
+    # flat toon: more samples add time, not look. Measured (S7 classroom, 1080p, Intel UHD 730): 48 samples 10 s,
+    # 16 samples 3.6 s, 8 samples + one shadow ray + half shadow maps + persistent data 1.6 s per frame, same picture.
+    sc.eevee.taa_render_samples = samples or (4 if quarter else 8)
+    for attr, val in (("shadow_ray_count", 1), ("shadow_step_count", 1), ("shadow_resolution_scale", 0.5)):
+        if hasattr(sc.eevee, attr):
+            setattr(sc.eevee, attr, val)
+    sc.render.use_persistent_data = True               # keep the scene on the GPU between frames
     sc.view_settings.view_transform = "Standard"
     sc.view_settings.look = "None"
     sc.render.film_transparent = False
     sc.render.image_settings.file_format = "PNG"
     sc.render.image_settings.color_mode = "RGB"
+    sc.render.image_settings.compression = 0           # frames are re-encoded at once: no time on zlib
     return sc
 
 
@@ -158,6 +165,19 @@ def render_still(path: str, frame: int) -> None:
     sc.render.filepath = path
     sc.render.use_file_extension = False
     bpy.ops.render.render(write_still=True)
+
+
+def ease_bezier(u: float, out_inf: float, in_inf: float) -> float:
+    """After Effects' speed-0 ease: out influence of the first key and in influence of the last, as parts of 1
+    (0, 0 = linear; 0.33, 0.33 = AE Easy Ease). The curve is the cubic bezier (0,0) (out,0) (1-in,1) (1,1)."""
+    u = max(0.0, min(1.0, u))
+    lo, hi = 0.0, 1.0
+    for _ in range(40):
+        t = (lo + hi) / 2
+        x = 3 * (1 - t) ** 2 * t * out_inf + 3 * (1 - t) * t * t * (1 - in_inf) + t ** 3
+        lo, hi = (t, hi) if x < u else (lo, t)
+    t = (lo + hi) / 2
+    return 3 * (1 - t) * t * t + t ** 3
 
 
 def ease_io(u: float) -> float:

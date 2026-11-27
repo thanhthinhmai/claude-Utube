@@ -66,4 +66,40 @@ Chạy app (`sh bin/studio app start`) và chọn Blender ở trang Blender. T�
 
 ## Kết quả
 
-(ghi sau khi chạy)
+### Mục 3–4, ngày 2026-11-27, phim thử `films/ae-mix-038` (T028)
+
+Phim thử: 6 shot AE (S1–S5, S9), 3 shot Blender chưa có nhân vật (S6 hành lang, S7 và S8 lớp học), 30 khung/giây.
+
+**Mục 3 (`ae build`): đạt.**
+- Ước tính in trước khi dựng: Blender 311 khung ≈ 10 phút, AE 6 shot ≈ 6 phút.
+- Dựng thật mất khoảng 9 phút (23:56 → 00:05). GPU là Intel UHD 730 OPENGL, ghi trong `build-shots.json`.
+- `out/build.mp4` có 739 khung, 1920×1080, dài 24,63 s.
+- Clip Blender khớp số khung: S6 99, S7 119, S8 93.
+- Xem tờ khung: chỗ chuyển giữa AE và Blender không có khung đen, không nhảy màu.
+
+**Tốc độ Blender.** Đo một khung 1080p của shot S7:
+
+| Cài đặt | Giây/khung |
+|---|---|
+| 48 mẫu | 10,1 |
+| 16 mẫu | 3,6 |
+| 8 mẫu, 1 tia bóng, bản đồ bóng ½, persistent data, PNG không nén (mặc định mới) | 1,6 |
+
+So hai bản cạnh nhau thì hình như nhau.
+
+**Mục 4 (`ae fix ae-mix-038 S8`): đạt một phần.**
+- Bản dựng trộn được dùng làm video của phim, vì phim thử chưa render.
+- Chỉ S8 được dựng lại, mất 2 phút 24 giây, nằm trong giới hạn S8 + 2 phút.
+- Khung ngoài S8 **không trùng md5**: `splice` mã hoá lại cả video (libx264 crf 21, có từ 031).
+  - PSNR so với bản trước: thấp nhất 44,7 dB, trung bình 47,2 dB.
+  - Mắt không thấy khác, nhưng SC-002 ghi "giống hệt (md5)". Người dùng chọn (2026-11-27): ghép không mã hoá lại.
+  - Đã làm: `ae render` đặt khung khoá ở đầu mỗi shot (closed GOP, tắt scenecut); `splice` cắt video cũ tại các khung
+    khoá đó và chép nguyên, chỉ mã hoá shot dựng lại, rồi nối và chép tiếng. Video cũ không có khung khoá thì mã hoá
+    lại một lần (có khung khoá), lần sửa sau chép nguyên.
+  - Đo lại trên ae-mix-038 (`ae fix S8` hai lần): 739/739 khung trùng framemd5; mọi shot khác S8 trùng từng khung.
+    Phần ghép mất < 1 s.
+- Phát hiện thêm:
+  - `k.fg` đặt vật tiền cảnh theo khung đầu.
+  - Khi máy vòng (S8), cuối shot cây đến quá gần và che gần nửa khung.
+  - Cần đặt theo cả đường máy chạy, giới hạn phần khung bị che.
+

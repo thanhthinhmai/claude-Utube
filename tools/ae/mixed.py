@@ -76,6 +76,8 @@ def blender_part(code: Path, doc: dict, shots: list, draft: bool = False, progre
     if not shots:
         return {}
     frames = bundle.frames_of(code, doc, shots)
+    from ae import castpass                                  # specs/038 US3: cast layers first, they are in the version
+    castpass.run(code, doc, shots, progress=progress, say=say)
     g = uses.kit_graph()
     st = load_state(code, draft)
     vers = {s: bundle.version(code, doc, s, frames[s], g) for s in shots}
@@ -110,6 +112,8 @@ def build(code, shots=None, progress=None, draft: bool = False, say=print, **kw)
     code = Path(code)
     doc = filmdoc.require_ae(code)
     run_ae = ae_runner()
+    if kw.get("sheet"):                                   # a cast sheet is drawn by After Effects alone, not the film's shots
+        return run_ae(code, None, progress=progress, **kw)
     picked = filmdoc.pick_shots(doc, shots)
     bl = filmdoc.blender_shots(doc, picked)
     if not bl:                                            # 032 path, same arguments as before

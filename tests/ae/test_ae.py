@@ -118,6 +118,12 @@ class Bundle(unittest.TestCase):
             bundle.extract(tmp / "bad.tar", tmp / "out")
 
 
+def framemd5(video) -> list:
+    r = subprocess.run(["ffmpeg", "-v", "error", "-i", str(video), "-map", "0:v", "-f", "framemd5", "-"],
+                       capture_output=True, text=True, check=True)
+    return [x.rsplit(",", 1)[1].strip() for x in r.stdout.splitlines() if x and not x.startswith("#")]
+
+
 class Splice(unittest.TestCase):
     def test_two_shots_frame_exact(self):
         tmp = Path(tempfile.mkdtemp())
@@ -142,6 +148,43 @@ class Splice(unittest.TestCase):
         r = splice.splice(old, [[0, 1, "", "S1"], [1, 2, "", "S2"], [2, 3, "", "S3"]], {"S2": (str(new), 0)}, tmp / "o.mp4")
         self.assertEqual(frames(r["out"]), 90)
         self.assertGreater(psnr(old, r["out"], 2, 1), 40)
+
+    def test_keyed_video_copies_other_shots_bit_for_bit(self):
+        """038 SC-002: a film video with a key frame on each shot start keeps every frame of the other shots."""
+        tmp = Path(tempfile.mkdtemp())
+        raw, old, new = tmp / "raw.mp4", tmp / "old.mp4", tmp / "new.mp4"
+        testsrc(raw, 4)
+        marks = [[0, 1, "", "S1"], [1, 2.5, "", "S2"], [2.5, 3, "", "S3"], [3, 4, "", "S4"]]
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(raw), "-c:a", "copy"] + splice.VCODEC
+                       + splice.key_args(splice.shot_starts(marks, 30)) + [str(old)], check=True)
+        testsrc(new, 1, pattern="smptebars", audio=False)
+        tagged = tmp / "tagged.mp4"                                  # a Blender clip says sRGB / bt709, the film nothing
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(new), "-color_range", "tv", "-color_primaries", "bt709",
+                        "-color_trc", "iec61966-2-1", "-colorspace", "bt709", "-c:v", "libx264", str(tagged)], check=True)
+        r = splice.splice(old, marks, {"S3": (str(tagged), 0)}, tmp / "fix.mp4")
+        self.assertTrue(r["exact"])
+        self.assertEqual(splice.vparams(tmp / "fix.mp4"), splice.vparams(old))
+        info = subprocess.run(["ffmpeg", "-v", "info", "-i", str(tmp / "fix.mp4"), "-vf", "showinfo", "-f", "null", "-"],
+                              capture_output=True, text=True).stderr
+        self.assertEqual(info.count(" n:   0 "), 1)                    # one filter graph: no change mid-film
+        a, b = framemd5(old), framemd5(tmp / "fix.mp4")
+        self.assertEqual(len(b), 120)
+        self.assertEqual(a[:75] + a[90:], b[:75] + b[90:])          # S1, S2, S4 the same, frame by frame
+        self.assertNotEqual(a[75:90], b[75:90])
+        self.assertTrue(splice.has_audio(tmp / "fix.mp4"))
+        r2 = splice.splice(tmp / "fix.mp4", marks, {"S1": (str(new), 0)}, tmp / "fix2.mp4")   # and again
+        self.assertTrue(r2["exact"])
+        self.assertEqual(framemd5(tmp / "fix2.mp4")[30:], b[30:])
+
+    def test_old_video_gets_key_frames(self):
+        tmp = Path(tempfile.mkdtemp())
+        old, new = tmp / "old.mp4", tmp / "new.mp4"
+        testsrc(old, 3)
+        testsrc(new, 1, pattern="smptebars", audio=False)
+        marks = [[0, 1, "", "S1"], [1, 2, "", "S2"], [2, 3, "", "S3"]]
+        r = splice.splice(old, marks, {"S2": (str(new), 0)}, tmp / "fix.mp4")
+        self.assertFalse(r["exact"])
+        self.assertTrue({0, 30, 60} <= splice.key_frames(tmp / "fix.mp4", 30))
 
     def test_unknown_shot(self):
         with self.assertRaises(splice.SpliceError):

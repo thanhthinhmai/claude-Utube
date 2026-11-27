@@ -13,7 +13,7 @@ PLAN_CHOICES = {
     "cam_height": ("low", "eye", "high", "top"),
     "lens": ("wide", "normal", "long"),
     "depth": ("shallow", "mid", "deep"),
-    "move": ("static", "push", "pull", "pan", "dolly", "orbit", "track", "crane"),
+    "move": ("static", "push", "pull", "pan", "dolly", "orbit", "track", "crane", "zoom"),
     "transition": ("cut", "fade", "dip"),
 }
 LAYERS = ("fg", "mid", "bg", "far")

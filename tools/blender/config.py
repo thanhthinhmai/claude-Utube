@@ -2,7 +2,7 @@
 
 blender.json (~/.config/claude-utube/blender.json or $STUDIO_BLENDER_CONFIG):
   {"blender": "<blender.exe or Blender.app/Contents/MacOS/Blender>", "work": "<folder Blender can see>",
-   "shotTimeoutSec": 3600, "secPerFrame": 5.5}
+   "shotTimeoutSec": 3600, "secPerFrame": 2.0}
 Blender is the user's own install (constitution VII): the studio never downloads or bundles it."""
 import json
 import os
@@ -14,7 +14,7 @@ from pathlib import Path
 FAKE = Path(__file__).resolve().parents[2] / "desktop" / "test" / "fake-blender.mjs"
 SHOT_TIMEOUT = 3600            # a 3 s 1080p shot on an integrated GPU takes ~7 min; long shots more
 START_TIMEOUT = 120
-SEC_PER_FRAME = 5.5            # measured on Intel UHD 730, EEVEE, 1080p (2026-11-26); replaced by each real run
+SEC_PER_FRAME = 2.0            # measured on Intel UHD 730, EEVEE 8 samples, 1080p (2026-11-26); replaced by each real run
 SOFTWARE = re.compile(r"llvmpipe|softpipe|swrast|swiftshader|microsoft basic render|\bsoftware\b", re.I)
 WIN_DRIVE = re.compile(r"^[A-Za-z]:[\\/]")
 

@@ -5,6 +5,7 @@
 // (2 s per shot) and the project file. aerender writes a clip as long as the project's shots (ffmpeg testsrc when
 // ffmpeg is on PATH, else the 2 s clip in vectors/).
 // afterfx also renders master.mp4 like CU.renderMaster (After Effects' render queue; aerender is not used any more).
+// bundle kind "layers" (specs/038): one transparent <name>.avi per job of data/layers.json, "layer … ok" lines.
 // FAKE_AE_MODE: hang (no log, sleeps), noscript (exits without a log), err (ERR line), norender (no master.mp4), slowrender
 // FAKE_AE_LOCK=<file>: counts runs that overlap (a second afterfx/aerender while one is running) into <file>.overlap
 import fs from "node:fs";
@@ -44,6 +45,24 @@ if (tool === "afterfx") {
     const meta = JSON.parse(fs.readFileSync(path.join(dir, "bundle.json"), "utf8"));
     const log = [];
     log.push("START");
+    if (meta.kind === "layers") {                      // specs/038 T044: one transparent AVI per cast layer
+      const plan = JSON.parse(fs.readFileSync(path.join(dir, "data", "layers.json"), "utf8"));
+      for (const j of plan.jobs) {
+        const s = j.size, h = Math.round(s * 0.6), dur = j.frames / (plan.fps || 30);
+        const r = plan.fps || 30;                      // a transparent ground with an opaque box where the person stands
+        spawnSync("ffmpeg", ["-v", "error", "-y",
+          "-f", "lavfi", "-i", `color=c=black@0.0:size=${s}x${s}:rate=${r}:duration=${dur},format=rgba`,
+          "-f", "lavfi", "-i", `color=c=red:size=${Math.round(s * 0.4)}x${h}:rate=${r}:duration=${dur},format=rgba`,
+          "-filter_complex", `[0][1]overlay=${Math.round(s * 0.3)}:${s - h}:format=auto,format=rgba`,
+          "-frames:v", String(j.frames), "-c:v", "rawvideo", "-pix_fmt", "bgra", path.join(dir, `${j.name}.avi`)]);
+        log.push(`layer ${j.shot} ${j.layer || j.char} ${j.view} ${mode === "norender" ? "missing" : "ok"}`);
+      }
+      if (mode === "err") log.push("ERR layer: ReferenceError: CU.nothing is undefined line 3");
+      log.push("DONE");
+      fs.writeFileSync(path.join(dir, "log.txt"), log.join("\n") + "\n");
+      leave();
+      process.exit(0);
+    }
     const rows = [];
     let t = 0;
     // specs/035: shot lengths from data/timing.json when the bundle has one (else 2 s), and keys_<proj>.json with one

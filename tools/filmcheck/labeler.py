@@ -12,6 +12,10 @@ from filmcheck import editor, models
 SCALES = ["ecu", "cu", "med", "wide", "huge", "insert", "unknown"]
 ANGLES = ["eye", "low", "high", "top", "ots", "unknown"]
 ORDER = ["ecu", "cu", "med", "wide", "huge"]          # "one step" for the agreement check
+CAM_HEIGHTS = ["low", "eye", "high", "top", "unknown"]   # specs/038 schema v3: depth and space of the shot
+LENSES = ["wide", "normal", "long", "unknown"]
+DEPTHS = ["shallow", "mid", "deep", "unknown"]
+LAYERS = ["fg", "mid", "bg", "far"]
 SHEETS_PER_CALL = 4
 
 SYSTEM = """You are the studio's shot labeler. You look at contact sheets of video frames, one frame per shot, each cell
@@ -40,14 +44,30 @@ foreground_blur: true when a large out-of-focus shape (head, shoulder, object) s
 place: where the shot is, in at most three lowercase words ("bedroom", "football field", "empty void"). Use the same
 words for every shot in the same place, across all the sheets you are given; a text card on a plain backdrop is
 "text card".
+Depth and space of the shot (judge the camera and the room, not the figure):
+- cam_height: where the camera stands: low (near the floor, looking up), eye (standing eye height), high (above heads,
+  looking down at a slant), top (straight down); unknown for a text card or flat graphic
+- lens: wide (strong perspective, lines rush to the vanishing point, near things big), normal, long (flat, little
+  perspective, background large behind the subject)
+- depth: how far the place reaches behind the subject: shallow (a wall or backdrop right behind), mid (a room),
+  deep (a long hall, a field, far windows, a city)
+- layers: which of fg (something between the camera and the subject), mid (the subject's plane), bg (the place behind),
+  far (sky, far wall, view through a window) can be seen; list each one present
+- occluder: true when a thing in the foreground (seat back, door frame, plant, desk edge, shoulder) frames the subject
+Each shot may come with measured lines: the horizon height of the main vanishing point (0 top, 1 bottom), the field of
+view in degrees when two vanishing directions were found, and how many straight lines were found. A horizon near the
+top means the camera looks down (high); near the bottom, it looks up (low). Few lines: no measure.
 Each shot comes with a measured focus: the share of the frame in focus (0-1) and the column, row of the sharpest
 tile (4 x 3 grid). Use it to check yourself, not to replace looking. Answer every listed id exactly once."""
 
 SCHEMA = {"type": "object", "required": ["shots"], "properties": {"shots": {"type": "array", "items": {
-    "type": "object", "required": ["id", "scale", "angle", "foreground_blur", "place", "confidence"],
+    "type": "object", "required": ["id", "scale", "angle", "foreground_blur", "place", "confidence", "cam_height", "lens",
+                                   "depth", "layers", "occluder"],
     "properties": {"id": {"type": "string"}, "scale": {"enum": SCALES}, "angle": {"enum": ANGLES},
                    "foreground_blur": {"type": "boolean"}, "place": {"type": "string", "maxLength": 40},
-                   "confidence": {"enum": ["high", "low"]}}}}}}
+                   "confidence": {"enum": ["high", "low"]}, "cam_height": {"enum": CAM_HEIGHTS},
+                   "lens": {"enum": LENSES}, "depth": {"enum": DEPTHS},
+                   "layers": {"type": "array", "items": {"enum": LAYERS}}, "occluder": {"type": "boolean"}}}}}}
 
 
 def version() -> str:
@@ -69,11 +89,14 @@ GUIDE = Path(__file__).resolve().parent / "labeler-guide.png"      # code-drawn 
 def prompt(sheets: list, ids: list, hints: dict) -> str:
     guide = [f"* {GUIDE} (the guide: read it first; it is not a shot)"] if GUIDE.is_file() else []
     lines = ["Read these images:", *guide, *[f"* {Path(s).resolve()}" for s in sheets], "",
-             "Label these shots (id, measured focus share, sharpest tile column,row):"]
+             "Label these shots (id, measured focus share, sharpest tile column,row, measured lines):"]
     for i in ids:
         h = hints.get(i) or {}
         at = h.get("sharpest_at") or ["?", "?"]
-        lines.append(f"- {i} focus={h.get('focused_share', '?')} sharpest={at[0]},{at[1]}")
+        v = h.get("vanish") or {}
+        vl = (f" horizon={v['horizon']} hfov={v.get('hfov_deg') or '?'} lines={v.get('lines')}"
+              if v.get("horizon") is not None else f" lines={v.get('lines', '?')} (no measure)")
+        lines.append(f"- {i} focus={h.get('focused_share', '?')} sharpest={at[0]},{at[1]}{vl}")
     return "\n".join(lines) + "\n"
 
 
@@ -87,7 +110,12 @@ def _valid(ans, ids: list):
         place = " ".join(str(s.get("place") or "unknown").lower().split()[:3])
         out[s["id"]] = {"scale": s["scale"], "angle": s["angle"], "foreground_blur": bool(s.get("foreground_blur")),
                         "place": place,
-                        "confidence": s.get("confidence") if s.get("confidence") in ("high", "low") else "low"}
+                        "confidence": s.get("confidence") if s.get("confidence") in ("high", "low") else "low",
+                        "cam_height": s.get("cam_height") if s.get("cam_height") in CAM_HEIGHTS else "unknown",
+                        "lens": s.get("lens") if s.get("lens") in LENSES else "unknown",
+                        "depth": s.get("depth") if s.get("depth") in DEPTHS else "unknown",
+                        "layers": [x for x in LAYERS if x in (s.get("layers") or [])],
+                        "occluder": bool(s.get("occluder"))}
     return out if set(out) == set(ids) else None
 
 
@@ -147,8 +175,31 @@ def label(groups: list, hints: dict, timeout: int = 900) -> dict:
     return {"labels": labels, "model": model, "usage": usage, "calls": calls}
 
 
-def contradicts(lab: dict, focus: dict) -> bool:
-    """A label that the focus measure argues against (FR-002): look at it again."""
+def vanish_hints(frames: dict) -> dict:
+    """{id: frame path} → {id: vanish.measure(...)} (specs/038); a frame that cannot be read gets no measure."""
+    from filmcheck import vanish
+    out = {}
+    for i, f in frames.items():
+        try:
+            out[i] = vanish.measure(str(f))
+        except Exception:                      # noqa: BLE001 — no OpenCV, unreadable frame: the labeler looks alone
+            out[i] = None
+    return out
+
+
+def vanish_disagrees(lab: dict, v) -> bool:
+    """specs/038: a horizon near the top means looking down; labelled low (or high/top with the horizon near the bottom)
+    is looked at again."""
+    hz = (v or {}).get("horizon")
+    if hz is None:
+        return False
+    return (hz < 0.3 and lab.get("cam_height") == "low") or (hz > 0.7 and lab.get("cam_height") in ("high", "top"))
+
+
+def contradicts(lab: dict, focus: dict, vanish=None) -> bool:
+    """A label that the focus measure (FR-002) or the measured lines (specs/038) argue against: look at it again."""
+    if vanish_disagrees(lab, vanish):
+        return True
     if not focus:
         return False
     share = focus.get("focused_share", 0)

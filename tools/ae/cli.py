@@ -135,11 +135,12 @@ def marks_doc(r: dict, video: str, doc: dict) -> dict:
     return m
 
 
-def _mux(master: Path, audio, out: Path) -> None:
+def _mux(master: Path, audio, out: Path, starts=()) -> None:
+    """The film's video: a key frame on every shot start, so ae fix can copy the shots it does not rebuild (038 SC-002)."""
     cmd = ["ffmpeg", "-v", "error", "-y", "-i", str(master)]
     if audio:
         cmd += ["-i", str(audio), "-map", "0:v", "-map", "1:a", "-c:a", "aac", "-b:a", "192k", "-shortest"]
-    cmd += ["-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p", str(out)]
+    cmd += splice.VCODEC + splice.key_args(starts) + ["-video_track_timescale", "15360", str(out)]
     subprocess.run(cmd, check=True, capture_output=True)
 
 
@@ -177,6 +178,12 @@ def cmd_render(a) -> int:
         for w in why:
             print(f"✗ {w}", file=sys.stderr)
         return 3
+    from filmcheck import depthcheck
+    why = depthcheck.gate(code)                            # specs/038 FR-014: no shot closer or shallower than the reference
+    if why:
+        for w in why:
+            print(f"✗ depth: {w}", file=sys.stderr)
+        return 1
     try:
         doc = filmdoc.require_ae(code)
         r = do_build(code, None)
@@ -189,7 +196,7 @@ def cmd_render(a) -> int:
     out = code / "out"
     out.mkdir(exist_ok=True)
     full = out / "render.mp4"
-    _mux(Path(r["master"]), audio, full)
+    _mux(Path(r["master"]), audio, full, splice.shot_starts(r["marks"], float(doc["fps"])))
     marks = marks_doc(r, f"{code.name}.mp4", doc)
     (out / "render-shots.json").write_text(json.dumps(marks))
     if in_job():
@@ -233,7 +240,9 @@ def cmd_fix(a) -> int:
         (out / "fix-shots.json").write_text(json.dumps(marks))
     except (filmdoc.FilmError, local.AeError, splice.SpliceError, BlenderError) as e:
         return fail(e)
-    print(f"✓ rebuilt {', '.join(res['replaced'])} · {res['frames']} frames → {out / 'fix.mp4'}")
+    print(f"✓ rebuilt {', '.join(res['replaced'])} · {res['frames']} frames → {out / 'fix.mp4'}"
+          + (" · other shots copied bit for bit" if res.get("exact") else
+             " · encoded once more (the old video had no key frame on each shot); the next fix copies"))
     if in_job():
         print("the job's end puts out/fix.mp4 in place of the film's video (the previous one is kept)")
     else:

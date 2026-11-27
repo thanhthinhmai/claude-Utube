@@ -2,6 +2,7 @@
 research R7, R10; contracts/checks.md). Results live in checks.json → tiers.<tier>; exceptions in qc-exceptions.json."""
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 
@@ -9,7 +10,9 @@ from filmcheck import report
 
 TIERS = ("voice", "plan", "shots", "render", "final")
 EXCEPTABLE = ("flat", "dark", "blown", "still", "shot_long", "text_over_subtitle", "blurred",   # blurred: specs/021
-              "craft_action")   # specs/027: the shot leaves the action share at the next qc plan
+              "craft_action",   # specs/027: the shot leaves the action share at the next qc plan
+              "depth_close", "depth_shallow", "card_angle")   # specs/038: qc depth, by the user only (FR-014)
+DEPTH_RULES = ("depth_close", "depth_shallow", "card_angle")
 SKIP_DIRS = {"out", "stills", "publish", ".check", "node_modules", "compare"}   # as tools/render/lib.mjs; compare/: specs/023 sheets
 SKIP_SUFFIX = (".mp4", ".log", ".pyc")
 SKIP_NAMES = {"checks.json", "CHECKS.md", "qc-exceptions.json", ".job", ".job.out", "mix.json"}   # .job: the job id is not the film (specs/023); mix.json: the mix is not the picture (specs/026)
@@ -96,6 +99,12 @@ def load_exceptions(film_dir: Path) -> list:
 
 
 def shot_ids(film_dir: Path):
+    try:                                         # an AE film (specs/032): its shots are in film.json
+        doc = json.loads((Path(film_dir) / "film.json").read_text(encoding="utf-8"))
+        if doc.get("engine") == "ae" and isinstance(doc.get("shots"), list):
+            return set(doc["shots"])
+    except (OSError, ValueError, AttributeError):
+        pass
     try:
         inp = json.loads((Path(film_dir) / ".check" / "plan-input.json").read_text(encoding="utf-8"))
         return {s["id"] for s in inp.get("shots") or []}
@@ -107,6 +116,9 @@ def add_exception(film_dir: Path, shot: str, rule: str, reason: str) -> dict:
     reason = (reason or "").strip()
     if rule not in EXCEPTABLE:
         raise TierError(f"rule \"{rule}\" cannot be excepted; only {', '.join(EXCEPTABLE)}")
+    if rule in DEPTH_RULES and os.environ.get("STUDIO_JOB"):
+        raise TierError(f"\"{rule}\" is excepted by the user only, never inside a job (specs/038 FR-014): fix the shot "
+                        "to the measured depth, or ask the user")
     if not reason:
         raise TierError("an exception needs a reason (--reason \"…\")")
     if len(reason) > REASON_MAX:
@@ -117,7 +129,7 @@ def add_exception(film_dir: Path, shot: str, rule: str, reason: str) -> dict:
     if shot not in ids:
         raise TierError(f"no shot \"{shot}\" in the film's shot list (window.SHOTS)")
     exc = [e for e in load_exceptions(film_dir) if not (e.get("shot") == shot and e.get("rule") == rule)]
-    e = {"shot": shot, "rule": rule, "reason": reason, "at": now()}
+    e = {"shot": shot, "rule": rule, "reason": reason, "at": now(), **({"by": "user"} if rule in DEPTH_RULES else {})}
     exc.append(e)
     report._write(Path(film_dir) / EXC_FILE, json.dumps(exc, ensure_ascii=False, indent=1))
     return e

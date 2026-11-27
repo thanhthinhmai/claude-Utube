@@ -54,5 +54,153 @@
  ],
  "longest_same_scale_max": 11.0,
  "top_set_share_max": 0.384,
- "focus_t": 200.0
+ "focus_t": 200.0,
+ "depth": {
+  "version": 1,
+  "by_size": {
+   "ecu": {
+    "n": 121,
+    "cam_height": {
+     "eye": 0.79,
+     "high": 0.17,
+     "low": 0.03
+    },
+    "lens": {
+     "normal": 0.96,
+     "wide": 0.03,
+     "long": 0.01
+    },
+    "depth": {
+     "shallow": 0.71,
+     "mid": 0.23,
+     "deep": 0.06
+    },
+    "layers_p25": 1,
+    "layers_p50": 2,
+    "occluder_share": 0.08,
+    "evidence": [
+     "v01:S202",
+     "v02:S200",
+     "v04:S006",
+     "v07:S055",
+     "v07:S114"
+    ]
+   },
+   "cu": {
+    "n": 448,
+    "cam_height": {
+     "eye": 0.9,
+     "low": 0.06,
+     "high": 0.04,
+     "top": 0.01
+    },
+    "lens": {
+     "normal": 0.94,
+     "wide": 0.04,
+     "long": 0.02
+    },
+    "depth": {
+     "mid": 0.51,
+     "shallow": 0.28,
+     "deep": 0.21
+    },
+    "layers_p25": 2,
+    "layers_p50": 2,
+    "occluder_share": 0.17,
+    "evidence": [
+     "v09:S021",
+     "v09:S034",
+     "v09:S057",
+     "v09:S079",
+     "v10:S017"
+    ]
+   },
+   "med": {
+    "n": 621,
+    "cam_height": {
+     "eye": 0.87,
+     "high": 0.08,
+     "low": 0.05,
+     "top": 0.0
+    },
+    "lens": {
+     "normal": 0.86,
+     "wide": 0.13,
+     "long": 0.01
+    },
+    "depth": {
+     "mid": 0.55,
+     "deep": 0.29,
+     "shallow": 0.16
+    },
+    "layers_p25": 2,
+    "layers_p50": 3,
+    "occluder_share": 0.2,
+    "evidence": [
+     "v02:S179",
+     "v02:S227",
+     "v04:S034",
+     "v04:S113",
+     "v05:S123"
+    ]
+   },
+   "wide": {
+    "n": 532,
+    "cam_height": {
+     "eye": 0.83,
+     "high": 0.13,
+     "low": 0.03,
+     "top": 0.01
+    },
+    "lens": {
+     "normal": 0.84,
+     "wide": 0.15,
+     "long": 0.0
+    },
+    "depth": {
+     "deep": 0.43,
+     "mid": 0.41,
+     "shallow": 0.15
+    },
+    "layers_p25": 2,
+    "layers_p50": 2,
+    "occluder_share": 0.07,
+    "evidence": [
+     "v01:S055",
+     "v01:S063",
+     "v01:S065",
+     "v01:S072",
+     "v01:S126"
+    ]
+   },
+   "huge": {
+    "n": 262,
+    "cam_height": {
+     "eye": 0.6,
+     "high": 0.34,
+     "low": 0.05,
+     "top": 0.01
+    },
+    "lens": {
+     "normal": 0.65,
+     "wide": 0.35
+    },
+    "depth": {
+     "deep": 0.9,
+     "mid": 0.07,
+     "shallow": 0.02
+    },
+    "layers_p25": 2,
+    "layers_p50": 3,
+    "occluder_share": 0.04,
+    "evidence": [
+     "v02:S096",
+     "v04:S005",
+     "v04:S053",
+     "v04:S075",
+     "v04:S010"
+    ]
+   }
+  }
+ }
 }

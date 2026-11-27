@@ -7,7 +7,8 @@ same bundle runs from any work folder on Windows or macOS.
 specs/034: the bundle also carries every locked rig version the film's cast/cast.json names plus the newest one
 (kit/rigs/<family>/v<N>/), and entry.jsx defines CU.rig(id), CU.CAST (the film's characters) and CU.char(id, o), so a
 shot always draws a character with the rig version and spec that were approved. sheet=… builds the cast sheet
-(kit/castsheet.jsx) instead of the film's shots."""
+(kit/castsheet.jsx) instead of the film's shots; layers=… (specs/038 T044) draws the cast layers of Blender shots
+(kit/castlayer.jsx, data/layers.json), one transparent AVI per job, instead of the film's shots."""
 import io
 import json
 import os
@@ -21,6 +22,8 @@ KIT = Path(__file__).resolve().parent / "kit"
 KIT_FILES = ("lib.jsx", "chars.jsx", "scene.jsx", "persp.jsx", "build_core.jsx")
 SHEET_FILE = "castsheet.jsx"
 SHEET_DATA = "data/cast_sheet.json"
+LAYER_FILE = "castlayer.jsx"
+LAYER_DATA = "data/layers.json"
 PROJ = "build.aep"
 MAX_DATA = 50 * 1024 * 1024
 
@@ -78,7 +81,7 @@ CU.char = function (id, o) {
 
 
 def entry_text(doc: dict, shots: list, film_name: str, proj: str = PROJ, rig_list=(), cast: dict = None,
-               sheet: bool = False, draft: bool = False) -> str:
+               sheet: bool = False, draft: bool = False, layers: bool = False) -> str:
     ids = ", ".join(json.dumps(s[1:]) for s in shots)
     w, h = doc["size"]
     lines = [f"// entry.jsx (tools/ae/bundle.py): builds {', '.join(shots)} of {film_name} into {proj}.",
@@ -93,6 +96,9 @@ def entry_text(doc: dict, shots: list, film_name: str, proj: str = PROJ, rig_lis
         lines += [f'#include "kit/{SHEET_FILE}"', f"CU.PROJ = {json.dumps(proj)};",
                   'CU.RENDER = "master.mp4";   // rendered inside After Effects (no aerender)',
                   f'CU.build(CU.castSheet(CU.readJSON(CU.WORK + "/{SHEET_DATA}")));', ""]
+        return "\n".join(lines)
+    if layers:
+        lines += [f'#include "kit/{LAYER_FILE}"', f'CU.castLayers(CU.readJSON(CU.WORK + "/{LAYER_DATA}"));', ""]
         return "\n".join(lines)
     if draft:
         lines += ["CU.DRAFT = true;   // ae draft (specs/035): quarter resolution, draft quality",
@@ -109,14 +115,19 @@ def _add(tar: tarfile.TarFile, name: str, data: bytes) -> None:
     tar.addfile(ti, io.BytesIO(data))
 
 
-def make(film_dir, shots=None, out=None, proj: str = PROJ, sheet: dict = None, draft: bool = False) -> dict:
+def make(film_dir, shots=None, out=None, proj: str = PROJ, sheet: dict = None, draft: bool = False,
+         layers: dict = None) -> dict:
     """Write bundle.tar for these shots (default: all); returns {path, shots, proj, files}.
     sheet: the cast sheet plan of tools/ae/sheet.py ({frames:[…], …}); the bundle then draws one shot per frame.
     draft: `ae draft` (specs/035): CU.DRAFT = true. The film's timing.json goes in as data/timing.json."""
     d = Path(film_dir)
     doc = filmdoc.require_ae(d)
     cast = sheet.get("cast") if sheet else cast_doc(d)
-    if sheet:
+    if layers:
+        shots = [j["name"] for j in layers.get("jobs", [])]
+        if not shots:
+            raise filmdoc.FilmError("bad_layers", "the layers plan has no layers to draw")
+    elif sheet:
         shots = [f"S{i + 1}" for i in range(len(sheet["frames"]))]
         if not shots:
             raise filmdoc.FilmError("bad_cast", "the cast sheet has no pictures to draw")
@@ -129,16 +140,18 @@ def make(film_dir, shots=None, out=None, proj: str = PROJ, sheet: dict = None, d
     out.parent.mkdir(parents=True, exist_ok=True)
     files, size = [], 0
     with tarfile.open(out, "w") as tar:
-        for f in KIT_FILES + ((SHEET_FILE,) if sheet else ()):
+        for f in KIT_FILES + ((SHEET_FILE,) if sheet else ()) + ((LAYER_FILE,) if layers else ()):
             _add(tar, f"kit/{f}", (KIT / f).read_bytes()); files.append(f"kit/{f}")
         for r in rig_list:
             _add(tar, f"kit/{rig_file(r)}", (KIT / rig_file(r)).read_bytes()); files.append(f"kit/{rig_file(r)}")
         if sheet:
             _add(tar, SHEET_DATA, json.dumps(sheet, ensure_ascii=False).encode()); files.append(SHEET_DATA)
-        for f in ([] if sheet else doc["ae_files"]):
+        if layers:
+            _add(tar, LAYER_DATA, json.dumps(layers, ensure_ascii=False).encode()); files.append(LAYER_DATA)
+        for f in ([] if sheet or layers else doc["ae_files"]):
             _add(tar, f"ae/{f}", (d / "ae" / f).read_bytes()); files.append(f"ae/{f}")
         data = d / "ae" / "data"
-        if data.is_dir() and not sheet:
+        if data.is_dir() and not sheet and not layers:
             for p in sorted(data.rglob("*")):
                 if p.is_file() and not p.is_symlink() and "heads" not in p.relative_to(data).parts:
                     size += p.stat().st_size
@@ -147,14 +160,15 @@ def make(film_dir, shots=None, out=None, proj: str = PROJ, sheet: dict = None, d
                     rel = "data/" + p.relative_to(data).as_posix()
                     _add(tar, rel, p.read_bytes()); files.append(rel)
         tj = d / "timing.json"
-        if tj.is_file() and not sheet:                       # specs/035: CU.shotFrames reads it
+        if tj.is_file() and not sheet and not layers:        # specs/035: CU.shotFrames reads it
             _add(tar, "data/timing.json", tj.read_bytes()); files.append("data/timing.json")
         ti = tarfile.TarInfo("data/heads"); ti.type, ti.mode, ti.mtime = tarfile.DIRTYPE, 0o755, 0
         tar.addfile(ti)
         meta = {"film": d.name, "shots": shots, "proj": proj, "fps": doc["fps"], "size": doc["size"], "rigs": rig_list,
-                "kind": "sheet" if sheet else ("draft" if draft else "film")}
+                "kind": "layers" if layers else "sheet" if sheet else ("draft" if draft else "film")}
         _add(tar, "bundle.json", json.dumps(meta, ensure_ascii=False).encode())
-        _add(tar, "entry.jsx", entry_text(doc, shots, d.name, proj, rig_list, cast, bool(sheet), draft).encode())
+        _add(tar, "entry.jsx", entry_text(doc, shots, d.name, proj, rig_list, cast, bool(sheet), draft,
+                                             bool(layers)).encode())
         files += ["bundle.json", "entry.jsx"]
     return {"path": str(out), "shots": shots, "proj": proj, "files": files}
 

@@ -113,7 +113,7 @@ description: "Tasks for 038 Blender engine, per-shot engine, depth"
 - [X] T027 [US1] Viết `tools/blender/cli.py` và nối vào `bin/studio`:
   - `blender build <phim> S3 [--still F] [--quarter]`
   - `blender config [--exe] [--work] [--timeout]`
-- [ ] T028 [US1] Kiểm thật (quickstart mục 3–4) trên phim thử `films/film30` (AE + ít nhất 3 shot Blender chưa có nhân vật):
+- [X] T028 [US1] Kiểm thật (quickstart mục 3–4) trên phim thử `films/film30` (AE + ít nhất 3 shot Blender chưa có nhân vật):
   - chạy trên GPU
   - đo khung bằng ffprobe
   - xem bản tổng
@@ -127,31 +127,31 @@ description: "Tasks for 038 Blender engine, per-shot engine, depth"
 
 **Independent test**: Quickstart mục 5.
 
-- [ ] T029 [P] [US2] Viết test `tests/filmcheck/test_vanish.py`: ảnh hành lang vẽ bằng code, có điểm tụ đã biết, cho `horizon` đúng ±0,03. Ảnh ít đường thẳng thì ra `None`.
-- [ ] T030 [P] [US2] Viết `tools/filmcheck/vanish.py`: Canny + HoughLinesP, gom giao điểm, `measure(img)` theo `contracts/style-depth.md`.
-- [ ] T031 [US2] Mở rộng labeler `tools/filmcheck/labeler.py`:
+- [X] T029 [P] [US2] Viết test `tests/filmcheck/test_vanish.py`: ảnh hành lang vẽ bằng code, có điểm tụ đã biết, cho `horizon` đúng ±0,03. Ảnh ít đường thẳng thì ra `None`.
+- [X] T030 [P] [US2] Viết `tools/filmcheck/vanish.py`: Canny + HoughLinesP, gom giao điểm, `measure(img)` theo `contracts/style-depth.md`.
+- [X] T031 [US2] Mở rộng labeler `tools/filmcheck/labeler.py`:
   - schema v3 (`cam_height`, `lens`, `depth`, `layers`, `occluder`)
   - tăng `LABELER_VERSION`
   - hints từ `vanish.measure`
   - nhãn lệch điểm tụ thì đánh `check`
 
   Cập nhật test labeler hiện có trong `tests/filmcheck/` (Claude giả).
-- [ ] T032 [P] [US2] Vẽ thêm vào `tools/style-learn/sl/guide.py` ba dải ví dụ bằng code (độ cao máy, ống kính, lớp cảnh và vật che), rồi tạo lại `labeler-guide.png`.
-- [ ] T033 [US2] Ghi khối `depth` trong `tools/style-learn/sl/save.py` theo data-model.md: theo cỡ cảnh có `n`, tỉ lệ `cam_height`, `lens`, `depth`, `layers_p25`, `layers_p50`, `occluder_share`, `evidence`. Có test trong `tests/learn/`.
-- [ ] T034 [P] [US2] Viết test `tests/filmcheck/test_depthcheck.py`:
+- [X] T032 [P] [US2] Vẽ thêm vào `tools/style-learn/sl/guide.py` ba dải ví dụ bằng code (độ cao máy, ống kính, lớp cảnh và vật che), rồi tạo lại `labeler-guide.png`.
+- [X] T033 [US2] Ghi khối `depth` trong `tools/style-learn/sl/save.py` theo data-model.md: theo cỡ cảnh có `n`, tỉ lệ `cam_height`, `lens`, `depth`, `layers_p25`, `layers_p50`, `occluder_share`, `evidence`. Có test trong `tests/learn/`.
+- [X] T034 [P] [US2] Viết test `tests/filmcheck/test_depthcheck.py`:
   - luật `depth_close`, `depth_shallow`, `card_angle` theo bảng trong contract
   - `size_share` lệch hơn 10 điểm phần trăm chỉ cảnh báo
   - `n < 5` chỉ cảnh báo (FR-015)
   - được miễn thì không chặn
   - `gate()` chặn `ae render`
-- [ ] T035 [US2] Viết `tools/filmcheck/depthcheck.py` và lệnh `qc depth`:
+- [X] T035 [US2] Viết `tools/filmcheck/depthcheck.py` và lệnh `qc depth`:
   - lấy khung giữa từ `animatic/shots/S#.mp4`, không có thì dùng khung ¼ qua `blender build --still --quarter` hoặc `ae draft`
   - chạy labeler, so với `depth` của phong cách
   - ghi `checks.json` → `tiers.depth` kèm vân tay
   - phong cách thiếu `depth` thì thoát mã 2
-- [ ] T036 [US2] Sửa `tools/filmcheck/tiers.py`: thêm `depth_close`, `depth_shallow`, `card_angle` vào `EXCEPTABLE`. `qc except` từ chối (mã 2) khi biến `STUDIO_JOB` có mặt (FR-014). Có test.
-- [ ] T037 [US2] Gọi `depthcheck.gate()` trong `ae render` (`tools/ae/cli.py`) cạnh `points.gate(…,"animatic")`. Còn lỗi thì thoát mã 1 và liệt kê từng shot.
-- [ ] T038 [US2] Đo lại phong cách của phim thử bằng `learn` (labeler v3) để có khối `depth`, rồi lập `shot_plan` theo số đo.
+- [X] T036 [US2] Sửa `tools/filmcheck/tiers.py`: thêm `depth_close`, `depth_shallow`, `card_angle` vào `EXCEPTABLE`. `qc except` từ chối (mã 2) khi biến `STUDIO_JOB` có mặt (FR-014). Có test.
+- [X] T037 [US2] Gọi `depthcheck.gate()` trong `ae render` (`tools/ae/cli.py`) cạnh `points.gate(…,"animatic")`. Còn lỗi thì thoát mã 1 và liệt kê từng shot.
+- [X] T038 [US2] Đo lại phong cách của phim thử bằng `learn` (labeler v3) để có khối `depth`, rồi lập `shot_plan` theo số đo.
   - Kiểm SC-005: 40 shot, người dùng kiểm nhãn.
   - Lượt Claude có trả phí: hỏi người dùng trước.
 - [ ] T039 [US2] Kiểm thật quickstart mục 5:
@@ -169,14 +169,14 @@ description: "Tasks for 038 Blender engine, per-shot engine, depth"
 
 **Independent test**: Quickstart mục 6, và shot Blender có nhân vật đi bộ, vẫy tay.
 
-- [ ] T040 [US3] Thử thật (spike) với AE: output module "PNG Sequence" và "RGB + Alpha" qua `setSettings`; nếu không được thì dùng template "Lossless with Alpha". Ghi kết quả vào research.md mục R6 trước các task sau.
-- [ ] T041 [P] [US3] Viết test `tests/blender/test_layers.py`:
+- [X] T040 [US3] Thử thật (spike) với AE: output module "PNG Sequence" và "RGB + Alpha" qua `setSettings`; nếu không được thì dùng template "Lossless with Alpha". Ghi kết quả vào research.md mục R6 trước các task sau.
+- [X] T041 [P] [US3] Viết test `tests/blender/test_layers.py`:
   - đổi góc nhìn ra view của rig, có trễ 15° để không nhấp nháy
   - `dir` ±1
   - `height_px` × 1,2, tối đa 1080
   - `track` chỉ ghi khi trạng thái đổi
   - đám đông dùng một bộ nhỏ lớp
-- [ ] T042 [US3] Viết lượt tính:
+- [X] T042 [US3] Viết lượt tính:
   - `tools/blender/kit/cards.py` phần plan: `k.cast` và `k.crowd` ghi vị trí và hướng, tính yaw của máy so với nhân vật cho từng khung, tính `card_angle_max`
   - `tools/blender/layers.py` ra `layers.json` theo data-model.md
 - [ ] T043 [US3] Viết `tools/ae/kit/castlayer.jsx`: `CU.layers(json)` dựng mỗi (char, view) một comp chỉ có rig (`CU.rig`), nền trong suốt, động tác theo `track`, rồi đưa vào render queue PNG alpha. Ghi log `layer S3 hero 34 ok`.
