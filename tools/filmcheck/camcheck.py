@@ -8,7 +8,8 @@ reference library (camtrack.measure, US1) and compared with shot_plan.<shot>.cam
   cam_ease        the progress at the half of the shot is more than 0.10 off
   cam_parallax    the picture has parallax where the option has none (a 2D camera never does)
   cam_transition  the shot plan's transition is not the option's
-A shot whose camera the user asked for by hand (camera.by_user_request) is not reported. A measure that cannot be
+A shot whose camera the user asked for by hand (camera.by_user_request) is not reported, but only when the owner
+picked that option (options.json choice: source "user", not by Claude): a flag written inside a job is still checked. A measure that cannot be
 trusted (too short, too few corners) is a warning. The tier only reports, it never blocks `ae render` (R12).
 Exceptions are per shot, with a reason, by the user only: tiers.add_exception refuses them inside a job (FR-019)."""
 import hashlib
@@ -67,13 +68,27 @@ def _issue(sid: str, rule: str, have, want, sev: str = "block") -> dict:
     return {"ref": sid, "shot": sid, "rule": rule, "severity": sev, "have": have, "want": want, "fix": FIX[rule]}
 
 
-def rules(plan: dict, measured: dict) -> tuple:
-    """plan {sid: shot_plan row}, measured {sid: camtrack.measure result}. Returns (issues, warnings)."""
+def owner_picked(film_dir) -> set:
+    """Shots whose option the owner picked (camera/options.json choice: source "user", not by Claude)."""
+    try:
+        o = json.loads((Path(film_dir) / "camera" / "options.json").read_text())
+    except (OSError, ValueError):
+        return set()
+    return {sid for sid, row in (o.get("shots") or {}).items()
+            if (row.get("choice") or {}).get("source") == "user" and (row.get("choice") or {}).get("by") != "claude"}
+
+
+def rules(plan: dict, measured: dict, picked=None) -> tuple:
+    """plan {sid: shot_plan row}, measured {sid: camtrack.measure result}, picked = owner_picked(). Returns
+    (issues, warnings). by_user_request skips a shot only when the owner picked its option."""
     issues, warns = [], []
+    picked = picked or set()
     for sid, m in measured.items():
         row = plan.get(sid) or {}
         cam = row.get("camera")
-        if not cam or cam.get("by_user_request") or row.get("by_user_request"):
+        if not cam:
+            continue
+        if (cam.get("by_user_request") or row.get("by_user_request")) and sid in picked:
             continue
         if not m.get("reliable", True):
             warns.append({"rule": "unreliable", "shot": sid, "why": m.get("why_unreliable")})
@@ -161,7 +176,7 @@ def run(film_dir, shots=None, measure=None) -> dict:
     if not have:
         raise CameraCheckError("no shot has a chosen camera: approve the Camera page (or sh bin/studio camera choose)")
     m = measure_all(d, have, measure)
-    issues, warns = rules(plan, m)
+    issues, warns = rules(plan, m, owner_picked(d))
     return _finish(d, issues, warns, {"shots": m, "skipped": [s for s in want if s not in have]},
                    fingerprint(d, plan, have), time.time() - t0)
 
