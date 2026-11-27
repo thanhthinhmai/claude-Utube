@@ -207,10 +207,12 @@ def clean_ease(e):
 
 
 # ---------- framing (T016) ----------
-def framing(ref: dict, size_sum: dict, zoom_pct: float, drift: list) -> dict:
-    """start {scale, cx, cy}: the person at the reference height and place, the whole move inside the picture."""
-    med = (size_sum or {}).get("subject_h") or [None, None, None]
-    sh, mh = (ref or {}).get("subject_h"), med[1]
+def framing(ref: dict, base_sum: dict, size_sum: dict, zoom_pct: float, drift: list) -> dict:
+    """start {scale, cx, cy}: the person at the reference height and place, the whole move inside the picture.
+    base_sum: the summary of the size the shot is drawn at (its person height at scale 1); size_sum: the option's size
+    (its median height when the option comes from the summary, not from one reference shot)."""
+    mh = ((base_sum or {}).get("subject_h") or [None, None, None])[1]
+    sh = (ref or {}).get("subject_h") or ((size_sum or {}).get("subject_h") or [None, None, None])[1]
     scale = max(1.0, sh / mh) if sh and mh else 1.0
     sx, sy = (ref or {}).get("subject_x"), (ref or {}).get("subject_y")
     cx = 50 + (50 - sx) / scale if sx is not None else 50.0
@@ -253,6 +255,9 @@ def _from_ref(ref: dict, size: str, dur: float, summ: dict, clamp: bool) -> dict
     by = summ.get("by_size") or {}
     ss = by.get(size) or {}
     move = ref["move"] if ref.get("move") in MOVES_2D else "static"
+    if move in ("push", "pull") and abs(float(ref.get("zoom_pct") or 0)) < 1.0 and \
+            math.hypot(*(ref.get("drift_px") or [0, 0])) >= 4.0:
+        move = "pan"                       # a zoom under 1 % with a real drift reads as a pan
     rate = float(ref.get("rate_pct_s") or 0) if move in ("push", "pull") else 0.0
     zoom = rate * dur
     zq = _q(ss, "zoom_pct")
@@ -327,11 +332,13 @@ def options_for(sid: str, plan: dict, dur: float, lib: dict) -> dict:
     engine = plan.get("engine") or ("blender" if plan.get("size") in ("wide", "huge") else "ae")
     size0 = plan.get("size")
     opts = []
+    first_size = [None]                   # the size the shot is drawn at when the plan names none: option 1's
 
     def add(base: dict, ref, score, why, reason, clamp_note=True):
         o = {"n": len(opts) + 1, "recommended": not opts, "engine": engine, "dur": round(dur, 3), **base,
              "transition": main}
-        o["start"] = framing(ref, by.get(o["size"]), o["zoom_pct"], o["drift_px"])
+        o["start"] = framing(ref, by.get(size0 or first_size[0] or o["size"]), by.get(o["size"]), o["zoom_pct"],
+                             o["drift_px"])
         o.update({"ref": ref["id"] if ref else None,
                   "ref_frames": (ref or {}).get("evidence") or None, "score": score, "why": why, "reason": reason})
         o["note"] = _note(o, by.get(o["size"]), main)
@@ -352,6 +359,7 @@ def options_for(sid: str, plan: dict, dur: float, lib: dict) -> dict:
         add(_from_summary(size, dur, summ, still=False), None, top, None,
             f"không có shot mẫu giống (điểm cao nhất {top:.2f}); lấy trung vị của {SIZE_VI.get(size, size)}")
     first = opts[0]
+    first_size[0] = first["size"]
     # option 2: the best reference shot that differs in size or direction
     others = [c for c in cands if c[0] >= MIN_SCORE and
               ((c[2].get("size") or first["size"]) != first["size"] or c[2].get("move") != first["move"])]
@@ -372,7 +380,7 @@ def options_for(sid: str, plan: dict, dur: float, lib: dict) -> dict:
                 f"cỡ rộng hơn một bậc: trung vị của {SIZE_VI[wider]} (n={by[wider]['n']})")
     # the film maker's own camera block stays an option
     own = plan.get("camera")
-    if isinstance(own, dict) and own.get("start") and len(opts) < 4:
+    if isinstance(own, dict) and own.get("start"):
         o = {"n": len(opts) + 1, "recommended": False, "engine": engine, "dur": round(dur, 3),
              **{k: own.get(k) for k in ("size", "move", "start", "zoom_pct", "rate_pct_s", "ease", "ease_ae",
                                         "drift_px")},
@@ -382,6 +390,9 @@ def options_for(sid: str, plan: dict, dur: float, lib: dict) -> dict:
             o["by_user_request"] = True
         o["note"] = _note(o, by.get(o["size"]), main) if o.get("zoom_pct") is not None else None
         if not any(_same(o, p) for p in opts):
+            if len(opts) == 3:                 # at most 3: the film maker's camera takes the place of option 3
+                opts.pop()
+            o["n"] = len(opts) + 1
             opts.append(o)
     return {"dur": round(dur, 3), "options": opts}
 

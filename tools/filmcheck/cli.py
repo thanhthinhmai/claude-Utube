@@ -1060,6 +1060,7 @@ def cmd_voice_make(a) -> int:
         print(f"! voice make: script review skipped — {a.skip_review.strip()}")
     why = points.gate(d, "script")
     why = why or points.gate(d, "cast")             # specs/034: an AE film's characters are approved first
+    why = why or points.gate(d, "camera")           # specs/039: then each shot's camera
     for w in why:
         print(f"✗ voice make: {w}", file=sys.stderr)
     if why:
@@ -1195,7 +1196,24 @@ def cmd_voice_make(a) -> int:
             (vdir / "speakers.json").write_text(json.dumps(sp, ensure_ascii=False, indent=1), encoding="utf-8")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+    if rc == 0:
+        _camera_retime(d)
     return rc
+
+
+def _camera_retime(d: Path) -> None:
+    """specs/039 FR-012: new lengths → each option's zoom and drift from its rate; the chosen option stays chosen."""
+    if not (d / "camera" / "options.json").is_file():
+        return
+    from filmcheck import camsuggest
+    try:
+        ch = camsuggest.retime(d)
+    except camsuggest.CameraError as e:
+        print(f"! camera retime: {e}", file=sys.stderr)
+        return
+    for c in ch:
+        print(f"  camera {c['shot']}: {c['dur0']} → {c['dur1']} s"
+              + (f", zoom {c['zoom0']} → {c['zoom1']} %" if c.get("zoom0") is not None else ""))
 
 
 def read_eleven(d: Path, rows: list, model: str, estimated: int):
@@ -1710,6 +1728,7 @@ def cmd_animatic_accept(a) -> int:
             return 2
         r = animatic.accept(d, shots, by=os.environ.get("STUDIO_USER") or "claude", expect=a.base)
         print(f"✓ accepted {', '.join(r['accepted'])} · {_sil_line(d)}")
+        _camera_retime(d)
         return 0
     return _anim(a, go)
 

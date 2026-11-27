@@ -1011,6 +1011,61 @@ def sound_note_delete(d: Path, a: dict) -> dict:
     return {"ok": True, "ref": a["note"], "files": ["sound/notes.json"], "no_stale": True}
 
 
+# ---------- camera (specs/039 US3) ----------
+def _cam_notes_base(d: Path) -> str:
+    from filmcheck import camnotes
+    return camnotes.base(d)
+
+
+def _cam_call(fn, *args, **kw):
+    from filmcheck import camnotes, camsuggest
+    try:
+        return fn(*args, **kw)
+    except camnotes.CamNoteError as e:
+        raise EditError(f"{e.code}: {e.message}") from None
+    except camsuggest.CameraError as e:
+        raise EditError(str(e)) from None
+
+
+def _cam_shot(a: dict, name: str) -> str:
+    shot = a.get("shot") or (a.get("ref") or [None])[0]
+    if not shot:
+        raise EditError(f"{name}: shot=<S2>")
+    return str(shot).strip().upper()
+
+
+@op("camera-choose", "camera")
+def camera_choose(d: Path, a: dict) -> dict:
+    """Use one option of a shot: shot, n (1–3)."""
+    from filmcheck import camsuggest
+    shot = _cam_shot(a, "camera-choose")
+    n = _num(a, "n", int)
+    if n is None:
+        raise EditError("camera-choose: n=<1–3>")
+    old = ((camsuggest.load(d) or {}).get("shots", {}).get(shot) or {}).get("choice", {}).get("n")
+    _cam_call(camsuggest.choose, d, shot, n, by=a.get("by") or "owner", source="user")
+    return {"ok": True, "ref": shot, "old": old, "new": n, "files": ["camera/options.json", "film.json"]}
+
+
+@op("camera-note-add", "camera", _cam_notes_base)
+def camera_note_add(d: Path, a: dict) -> dict:
+    """A pin on one option's still: shot, option, x, y (%), text."""
+    from filmcheck import camnotes
+    shot = _cam_shot(a, "camera-note-add")
+    n = _cam_call(camnotes.add, d, shot, a.get("option") or a.get("n") or 1, _num(a, "x"), _num(a, "y"),
+                  _note_text(a), by=a.get("by") or "owner")
+    return {"ok": True, "ref": n["id"], "new": n["text"], "files": ["camera/notes.json"], "no_stale": True}
+
+
+@op("camera-note-remove", "camera", _cam_notes_base)
+def camera_note_remove(d: Path, a: dict) -> dict:
+    from filmcheck import camnotes
+    if not a.get("note"):
+        raise EditError("camera-note-remove: note=<id>")
+    _cam_call(camnotes.remove, d, a["note"])
+    return {"ok": True, "ref": a["note"], "files": ["camera/notes.json"], "no_stale": True}
+
+
 # ---------- publish (US5) ----------
 @op("publish", "publish")
 def publish_edit(d: Path, a: dict) -> dict:

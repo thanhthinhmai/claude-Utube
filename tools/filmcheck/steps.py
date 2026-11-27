@@ -5,15 +5,15 @@ from pathlib import Path
 
 from filmcheck import points, report, tiers
 
-STEPS = ["Treatment", "Script", "Cast", "Voice", "Animatic", "Look", "Picture", "Shots", "Mix", "Render", "Self-check",
+STEPS = ["Treatment", "Script", "Cast", "Camera", "Voice", "Animatic", "Look", "Picture", "Shots", "Mix", "Render", "Self-check",
          "Publish"]
-GRAPH = {"Script": ["Cast", "Voice"], "Cast": ["Picture", "Animatic"], "Voice": ["Animatic", "Picture", "Mix"],
+GRAPH = {"Script": ["Cast", "Voice"], "Cast": ["Camera", "Picture", "Animatic"], "Camera": ["Animatic"], "Voice": ["Animatic", "Picture", "Mix"],
          "Animatic": ["Mix", "Render"], "Look": ["Picture"], "Picture": ["Shots"], "Shots": ["Render"], "Mix": ["Self-check"],
          "Render": ["Self-check"], "Self-check": ["Publish"], "Publish": []}
-POINT_STEP = {"script": "Script", "cast": "Cast", "voice": "Voice", "animatic": "Animatic", "shots": "Shots", "mix": "Mix",
+POINT_STEP = {"script": "Script", "cast": "Cast", "camera": "Camera", "voice": "Voice", "animatic": "Animatic", "shots": "Shots", "mix": "Mix",
               "publish": "Publish"}
 STEP_POINT = {v: k for k, v in POINT_STEP.items()}
-AE_ONLY = ("Cast", "Animatic")                      # web page films have neither (specs/034, 035)
+AE_ONLY = ("Cast", "Camera", "Animatic")            # web page films have none of them (specs/034, 035, 039)
 WEB_ONLY = ("Look", "Picture", "Shots")             # AE films draw in After Effects and review the animatic
 AE_LABEL = {"Mix": "Sound", "Render": "Final render"}
 AE_GRAPH = {**GRAPH, "Mix": ["Render", "Self-check"]}   # AE films: the Sound comes before the final render (specs/037)
@@ -105,6 +105,17 @@ def cast_state(d: Path) -> tuple:
     return ("todo", f"no sheet: {', '.join(missing)}") if missing else ("done", "")
 
 
+def camera_state(d: Path) -> tuple:
+    """Camera step (AE films, specs/039): skipped (no camera library) · todo (no options, or shots without a still) · done."""
+    why = points.camera_skip_reason(d)
+    if why:
+        return ("skipped", why)
+    if not (d / "camera" / "options.json").is_file():
+        return ("todo", "")
+    miss = points.camera_missing(d)
+    return ("todo", f"no still: {', '.join(miss)}") if miss else ("done", "")
+
+
 def animatic_state(d: Path) -> tuple:
     """Animatic step (AE films, specs/035): todo (no current draft) · done · stale (the draft is older than the shot
     lengths, the narration or the film's code)."""
@@ -130,6 +141,7 @@ def base_states(film_dir: Path) -> dict:
         else:
             out["Voice"] = ("todo", "")
     out["Cast"] = cast_state(d)
+    out["Camera"] = camera_state(d)
     out["Animatic"] = animatic_state(d) if points.is_ae(d) else ("skipped", "not an After Effects film")
     out["Look"] = ("done", "") if (d / "index.html").is_file() else ("todo", "")
     out["Picture"] = (_tier_state(d, "plan", fp) or "todo", "")
