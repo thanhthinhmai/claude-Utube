@@ -105,5 +105,5 @@
 
 ## Phase 8: Convergence
 
-- [ ] T044 Tìm vì sao S8 của `charisma-30-cam` đo ease q½ 0,10 thay vì 0,47 (hành động trong khung hay cách `CU.planCam` đặt `ease_ae` vào hai khoá), sửa shot hoặc cách đặt ease, hoặc để người dùng miễn; `qc camera` báo 0 lệch per SC-005 (partial)
-- [ ] T045 Khi chủ xưởng cho phép (tốn một lượt Claude): chạy thật một việc "Send notes to Claude" trên phim thử, kiểm chỉ shot có ghi chú đổi, ghi vào `checks/sc004.md` per FR-015 (partial)
+- [X] T044 Tìm vì sao S8 của `charisma-30-cam` đo ease q½ 0,10 thay vì 0,47 (hành động trong khung hay cách `CU.planCam` đặt `ease_ae` vào hai khoá), sửa shot hoặc cách đặt ease, hoặc để người dùng miễn; `qc camera` báo 0 lệch per SC-005 (partial) — 2026-11-28: chủ xưởng miễn `cam_ease` S8 (`qc except`), `qc camera` pass
+- [X] T045 Khi chủ xưởng cho phép (tốn một lượt Claude): chạy thật một việc "Send notes to Claude" trên phim thử, kiểm chỉ shot có ghi chú đổi, ghi vào `checks/sc004.md` per FR-015 (partial)

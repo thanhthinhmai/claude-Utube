@@ -112,9 +112,12 @@ class Rules(unittest.TestCase):
                 "S4": {"camera": {**CAM, "transition": "cut"}, "transition": "dissolve"}}
         m = {"S1": {"move": "pull", "zoom_pct": -5.0, "ease": EASE}, "S2": {"move": "push", "zoom_pct": 4.0, "ease": EASE},
              "S3": {"move": "pull", "zoom_pct": -9.0}, "S4": {"move": "push", "zoom_pct": 6.2, "ease": EASE}}
-        issues, _ = camcheck.rules(plan, m)
+        issues, _ = camcheck.rules(plan, m, {"S3"})
         self.assertEqual(sorted((i["shot"], i["rule"]) for i in issues),
                          [("S1", "cam_dir"), ("S2", "cam_dir"), ("S4", "cam_transition")])
+        # the flag alone (written inside a job, not picked by the owner) is still checked
+        issues, _ = camcheck.rules(plan, m)
+        self.assertIn(("S3", "cam_dir"), [(i["shot"], i["rule"]) for i in issues])
 
     def test_zoom_tolerance(self):
         plan = {"S1": {"camera": CAM}}
