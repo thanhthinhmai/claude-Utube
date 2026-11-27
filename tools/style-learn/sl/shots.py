@@ -236,7 +236,8 @@ def label_set(name: str, log=print) -> dict:
         full = [r for r in full if not cells or r["id"] in cells]
         plain = draw_sheets(full, lambda s: cells.get(s["id"]) or prof / s["frame"], prof / "label-sheets",
                             f"{v['id']}_plain", captions=False)
-        hints = {r["id"]: r.get("focus") or {} for r in full}
+        van = labeler.vanish_hints({r["id"]: cells.get(r["id"]) or prof / r["frame"] for r in full})    # specs/038
+        hints = {r["id"]: {**(r.get("focus") or {}), "vanish": van.get(r["id"])} for r in full}
         got = labeler.label(plain, hints)
         for r in full:
             if r.get("edited_by") == "user":
@@ -245,7 +246,8 @@ def label_set(name: str, log=print) -> dict:
             if lab:
                 r.update(lab)
                 r["set"] = lab.get("place") or r.get("set")       # specs/021 FR-004 (2026-11-13): places from the labeler
-                r["check"] = labeler.contradicts(lab, r.get("focus"))
+                r["vanish"] = van.get(r["id"])
+                r["check"] = labeler.contradicts(lab, r.get("focus"), van.get(r["id"]))
                 if r["check"]:
                     total["check"].append(f"{v['id']}:{r['id']}")
         d["labeler"] = {"model": got["model"], "usage": got["usage"], "calls": got["calls"]}

@@ -21,6 +21,8 @@ Python packages in each `*.dist-info/`, npm packages in `node_modules/*/`, Debia
 - FFmpeg and FFprobe (https://ffmpeg.org), GPL-3.0, static builds. Linux: https://johnvansickle.com/ffmpeg/
   (source: https://ffmpeg.org/releases/). macOS: the ffmpeg-static and @ffprobe-installer npm packages
   (source: https://ffmpeg.org/releases/). The GPL text ships next to the binaries.
+- Blender (https://www.blender.org), GPL-2.0-or-later. Not bundled: the user installs it; the studio runs it to render
+  Blender shots (specs/038). Pictures it renders from the studio's own scripts belong to the user.
 - Kokoro-82M voice model (https://huggingface.co/hexgrad/Kokoro-82M), Apache-2.0; downloaded at setup
   from the library's own release (onnx export by kokoro-onnx, MIT).
 - ElevenLabs text to speech (https://elevenlabs.io), an optional online service reached with the user's own API key

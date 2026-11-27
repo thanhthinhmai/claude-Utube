@@ -33,13 +33,16 @@ Các lệnh `/speckit-plan`, `/speckit-analyze` và `/speckit-converge` đều k
 - Thư viện phong cách bên ngoài (lemo-opuscar) **PHẢI** được giữ nguyên để cập nhật được từ bản gốc. Không sửa file bên trong nó.
 - Mọi phần mở rộng (phong cách riêng, công cụ, skill) nằm **bên ngoài** thư viện, trong thư mục của dự án.
 
-### VII. Hai bộ máy dựng hình, mỗi phim một bộ
-- Xưởng có **hai** bộ máy dựng hình chính thức:
+### VII. Ba bộ máy dựng hình, trộn theo shot cho phim nhân vật
+- Xưởng có **ba** bộ máy dựng hình chính thức:
   - **Trang web dựng bằng code** (bộ máy đầu tiên, specs/019): giữ cho các phim và phong cách đang dùng nó.
-  - **Adobe After Effects** (từ 2026-11-23, theo quyết định của người dùng vì hình từ trang web chưa đạt): dự án AE do script ExtendScript của xưởng sinh ra, dựng bằng `aerender`. Đây là hướng chính cho phim hoạt hình nhân vật.
-- Mỗi phim dùng **đúng một** bộ máy, ghi trong thư mục phim; không trộn hai bộ máy trong một phim.
-- After Effects là phần mềm thương mại của người dùng, chạy trên máy Windows hoặc macOS của họ. Xưởng **KHÔNG ĐƯỢC** cài, phân phối, bẻ khoá hay mua thay; bản quyền do người dùng tự lo. Thiếu AE thì báo rõ, không âm thầm đổi sang bộ máy khác.
-- Thêm bộ máy thứ ba chỉ khi có lý do ghi trong "Complexity Tracking" và được người dùng duyệt.
+  - **Adobe After Effects** (từ 2026-11-23): dự án AE do script ExtendScript của xưởng sinh ra, dựng bằng hàng đợi render của chính AE (AE để mở giữa các lượt). Đây là hướng chính cho cận, biểu cảm, thoại và đồ hoạ chữ của phim hoạt hình nhân vật.
+  - **Blender** (từ 2026-11-26, specs/038): bối cảnh 3D do script Python của xưởng sinh ra, dựng trên GPU. Dùng cho cảnh rộng có không gian, máy đi hay vòng quanh, đám đông, ánh sáng và bóng đổ.
+- Phim hoạt hình nhân vật (`engine: "ae"`) được trộn After Effects và Blender **theo từng shot**; mỗi shot ghi bộ máy của nó. Phim trang web chỉ dùng một bộ máy, không trộn.
+- Nhân vật của phim trộn có **một** bản code (rig AE đã duyệt ở Cast); shot Blender dùng lớp nhân vật do chính rig đó xuất.
+- Mọi hình của mọi bộ máy **PHẢI** do code của xưởng hoặc do Claude Code viết sinh ra. **KHÔNG ĐƯỢC** dùng mô hình AI tạo ảnh hay video.
+- After Effects là phần mềm thương mại của người dùng; Blender là phần mềm miễn phí người dùng tự cài. Xưởng **KHÔNG ĐƯỢC** cài, tải, đóng gói, phân phối, bẻ khoá hay mua thay. Thiếu bộ máy nào thì báo rõ, không âm thầm đổi shot sang bộ máy khác.
+- Thêm bộ máy thứ tư chỉ khi có lý do ghi trong "Complexity Tracking" và được người dùng duyệt.
 
 ### VIII. Học phong cách bằng đo, không bằng cảm nhận
 - Học phong cách từ kênh YouTube theo phương pháp của claude-animated-shorts: xem đủ mọi khung hình, đo bằng công cụ, rút ra luật kèm con số. Chỉ lấy **phương pháp** và **style bible**, không lấy code dựng hình của repo đó.
@@ -82,9 +85,10 @@ Các lệnh `/speckit-plan`, `/speckit-analyze` và `/speckit-converge` đều k
 - Hiến pháp này có hiệu lực cao hơn mọi hướng dẫn khác trong dự án.
 - Muốn sửa hiến pháp thì phải ghi lý do, được người dùng duyệt và tăng số phiên bản.
 
-**Version**: 3.0.0 | **Ratified**: 2026-11-05 | **Last Amended**: 2026-11-23
+**Version**: 4.0.0 | **Ratified**: 2026-11-05 | **Last Amended**: 2026-11-26
 
 ### Lịch sử sửa đổi
+- 4.0.0: Đổi nguyên tắc VII thành "Ba bộ máy dựng hình, trộn theo shot cho phim nhân vật": thêm Blender (người dùng tự cài, dựng trên GPU); phim hoạt hình nhân vật trộn After Effects và Blender theo từng shot, một bản code nhân vật; mọi hình bằng code, không AI tạo ảnh; sửa chữ `aerender` thành hàng đợi render của AE. Người dùng chọn "Trộn theo cảnh" ngày 2026-11-26 (specs/038).
 - 3.0.0: Đổi nguyên tắc VII từ "Một bộ máy dựng hình" thành "Hai bộ máy dựng hình, mỗi phim một bộ": thêm Adobe After Effects làm bộ máy chính thức thứ hai (phần mềm thương mại của người dùng, xưởng không cài hay mua thay), mỗi phim dùng đúng một bộ máy.
 - 2.2.0: Thêm mục "Phần mềm hệ thống": xưởng không tự cài phần mềm hệ thống; ngoại lệ cho app desktop bật tính năng của hệ điều hành (WSL2) khi người dùng bấm và đồng ý quyền quản trị.
 - 2.1.0: Cho phép dịch vụ online tải video từ kênh YouTube khách nêu để học phong cách, kèm điều kiện (xác nhận quyền, giữ kín, xoá sau khi học).

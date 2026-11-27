@@ -60,7 +60,7 @@ class CastLibraryPage(unittest.TestCase):
                 web.close()
             self.assertEqual(res["errors"], [])
             self.assertEqual((res["cards1280"], res["cards400"]), (1, 1))
-            self.assertEqual(res["chips1280"], ["Preview ready"])
+            self.assertEqual(res["chips1280"], ["New rig version: ball@2", "Preview ready"])   # specs/038: ball@2 is the newest rig
             self.assertEqual(res["compare"], ["Preview with the new rig"])
             self.assertEqual(res["afterUpdate"], ["Version 2 waits for your approval"])
             self.assertIn("version 2", res["head"])

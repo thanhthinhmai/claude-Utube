@@ -158,7 +158,7 @@ class Library(unittest.TestCase):
         rows = castlib.listing(self.acc)
         self.assertEqual(rows[0]["channel"], "default")
         hero = next(c for c in rows[0]["characters"] if c["id"] == "hero")
-        self.assertEqual((hero["latest"], hero["rig"], hero["films"], hero["new_rig"]), (1, "ball@1", ["f1"], None))
+        self.assertEqual((hero["latest"], hero["rig"], hero["films"], hero["new_rig"]), (1, "ball@1", ["f1"], "ball@2"))   # specs/038: ball@2 is the newest rig
 
 
 if __name__ == "__main__":

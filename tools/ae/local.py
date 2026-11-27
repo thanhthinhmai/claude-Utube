@@ -212,6 +212,49 @@ def build(film_dir, shots=None, progress=None, s: dict = None, sheet: dict = Non
     return run_folder(s, folder, b["shots"], b["proj"], progress)
 
 
+def build_layers(film_dir, plan: dict, out_root, progress=None, s: dict = None) -> dict:
+    """The cast layers pass (specs/038 T044): After Effects draws each job of plan (tools/ae/castpass.py) as a
+    transparent AVI, then ffmpeg turns each into <out_root>/<shot>/<char>-<view>/f####.png (RGBA). Returns
+    {"dir", "log", "layers": {job name: folder}}."""
+    s = s or settings()
+    check(s)
+    work = Path(s["work"] or (Path.home() / ".cache" / "claude-utube-ae" if s["kind"] in ("fake", "mac") else ""))
+    if not s["work"] and s["kind"] == "windows":
+        raise AeError("bad_work", "set a work folder Windows can see: sh bin/studio config ae --work /mnt/e/claude-utube-ae/work")
+    work.mkdir(parents=True, exist_ok=True)
+    folder = work / (time.strftime("ae-layers-%Y%m%d-%H%M%S-") + secrets.token_hex(2))
+    b = bundle.make(film_dir, None, folder.with_suffix(".tar"), layers=plan)
+    bundle.extract(b["path"], folder)
+    Path(b["path"]).unlink()
+    proc = run_script(s, folder / "entry.jsx")
+    text = wait_log(s, folder / "log.txt", b["shots"], proc, progress)
+    if proc.poll() is None and s["kind"] == "fake":
+        proc.wait(timeout=10)
+    errs = [x for x in text.splitlines() if x.startswith("ERR")]
+    if errs:
+        raise AeError("render_error" if errs[0].startswith("ERR render") else "build_error", errs[0], _tail(text))
+    out = {}
+    for j in plan["jobs"]:
+        avi = folder / f"{j['name']}.avi"
+        lay = j.get("layer") or j["char"]
+        if not avi.is_file() or not re.search(rf"^layer {re.escape(j['shot'])} {re.escape(lay)} {j['view']} ok$",
+                                              text, re.M):
+            raise AeError("render_error", f"After Effects drew no layer {j['shot']} {lay} {j['view']}", _tail(text))
+        dst = Path(out_root) / j["shot"] / f"{lay}-{j['view']}"
+        if dst.exists():
+            shutil.rmtree(dst)
+        dst.mkdir(parents=True)
+        r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", str(avi), "-pix_fmt", "rgba", "-frames:v", str(j["frames"]),
+                            str(dst / "f%04d.png")], capture_output=True, text=True)
+        n = len(list(dst.glob("f*.png")))
+        if r.returncode or n < j["frames"]:
+            raise AeError("render_error", f"layer {j['name']}: {n}/{j['frames']} frames from the AVI "
+                                          f"{r.stderr.strip()[-200:]}", _tail(text))
+        avi.unlink()                                          # 4.7 MB a frame at 1080²: the PNGs are kept, not the AVI
+        out[j["name"]] = str(dst)
+    return {"dir": str(folder), "log": text, "layers": out}
+
+
 def run_folder(s: dict, folder: Path, shots: list, proj: str, progress=None) -> dict:
     """Run an unpacked bundle in folder (shared by the CLI and tests)."""
     log = folder / "log.txt"
