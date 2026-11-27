@@ -7,7 +7,7 @@
 
 Bốn phần, đều nằm trong các công cụ đã có:
 
-1. **Đo máy quay theo thời gian** (`camtrack`): một cách đo dùng chung cho video mẫu và phim của xưởng. Nó xây trên mô hình máy theo cặp khung của `sl/craft.py` (dịch x, dịch y, zoom quanh tâm), cộng dồn thành đường đi của máy, rồi tinh chỉnh tổng zoom và trôi bằng một lần so trực tiếp khung đầu với khung cuối ở 640 px. Kết quả cho mỗi shot: zoom %, chiều, ease ở ¼–½–¾, trôi px ở 1080p, pan, độ thị sai (sai số còn lại của các khối đứng yên), và chuyển cảnh lấy lại từ `craft.transition`. Bố cục (khung nhân vật chính) do bộ gán nhãn craft-label bản 2 trả về.
+1. **Đo máy quay theo thời gian** (`camtrack`): một cách đo dùng chung cho video mẫu và phim của xưởng. Nó theo dõi điểm góc khung nối khung (LK + RANSAC đồng dạng, như bản đo tay `deep.py`), rồi nối các phép thành đường đi của máy. Kết quả cho mỗi shot: zoom %, chiều, ease ở ¼–½–¾, trôi px ở 1080p, pan, độ thị sai (sai số còn lại của các khối đứng yên), và chuyển cảnh lấy lại từ `craft.transition`. Bố cục (khung nhân vật chính) do bộ gán nhãn craft-label bản 2 trả về.
 2. **Thư viện shot mẫu**: `learn camera SET` ghi `profile/<vid>/camera.json`. `learn save` gom vào `my-styles/<style>/camera.json`, gồm từng shot, bảng tổng theo cỡ cảnh và khung bằng chứng (tối đa 150 shot có ảnh).
 3. **Gợi ý và điểm duyệt Camera**:
    - `camera suggest` chấm độ giống giữa từng shot của phim và từng shot mẫu bằng luật cố định, có giải thích. Từ đó nó đưa 2–3 phương án đã kẹp vào khoảng p25–p75 và vẽ ảnh thử ¼ cỡ thật kèm khung zoom cuối.
@@ -18,7 +18,7 @@ Bốn phần, đều nằm trong các công cụ đã có:
 ## Technical Context
 
 **Language/Version**: Python 3.12 (venv của xưởng), ExtendScript (AE kit), Python của Blender (kit 038), JavaScript thuần (app, không build)
-**Primary Dependencies**: numpy, Pillow, ffmpeg (đã có); `claude -p` Opus 5.5 cho craft-label (đã có, specs/024)
+**Primary Dependencies**: numpy, Pillow, ffmpeg, opencv-python-headless (đã có trong venv học, nay ghi vào requirements-learn.txt; R1); `claude -p` Opus 5.5 cho craft-label (đã có, specs/024)
 **Storage**: tệp JSON trong `references/<set>/profile/`, `my-styles/<style>/camera.json` (+ `camera/*.jpg`), `films/<f>/camera/` và `film.json`
 **Testing**: unittest qua `sh tests/learn/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ae/run.sh`, `sh tests/ui/run.sh` (+ browser `.cjs`), `sh tests/run.sh`, `sh tests/online/run.sh`
 **Target Platform**: WSL2 Ubuntu 24.04 (máy phát triển), After Effects và Blender trên Windows qua cầu nối đã có

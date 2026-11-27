@@ -61,12 +61,15 @@ def _evidence(path, vid: str, row: dict, t: float, tag: str, prof) -> str:
     return rel
 
 
-def measure_row(path, vid: str, row: dict, labels: dict, prof, cut_evidence: bool = True) -> dict:
-    """One Reference shot (data-model) for a shots.json row."""
-    m = camtrack.measure(path, row["t0"], row["t1"])
+def measure_row(path, vid: str, row: dict, labels: dict, prof, cut_evidence: bool = True, trans_in=None,
+                trans_out=None) -> dict:
+    """One Reference shot (data-model) for a shots.json row. trans_in/out: craft.transition() at its two ends."""
+    if trans_in is None and float(row["t0"]) > 0:
+        trans_in = craft.transition(path, float(row["t0"]))
+    m = camtrack.measure(path, row["t0"], row["t1"], camtrack.trim_for(trans_in), camtrack.trim_for(trans_out))
     lab = labels.get(row["id"]) or {}
     sx, sy, sh, head = composition(lab.get("subject"))
-    trans = craft.transition(path, float(row["t0"]))["type"] if float(row["t0"]) > 0 else None
+    trans = trans_in["type"] if trans_in else None
     out = {"id": f"{vid}:{row['id']}", "t0": float(row["t0"]), "t1": float(row["t1"]), "dur": m["dur"],
            "size": row.get("scale"), "cam_height": row.get("cam_height"), "lens": row.get("lens"),
            "card": lab.get("card"), "people": lab.get("people"), "action": lab.get("action"),
@@ -121,9 +124,18 @@ def camera_set(name: str, videos=None, force: bool = False, log=print) -> dict:
         done["need"].update(need)
         prof = refset.profile_dir(name, vid)
         out, skipped = [], []
+        cuts = {}
+        for r in rows:                                   # transition at each start, shared by the shot before
+            if float(r["t0"]) > 0:
+                try:
+                    cuts[round(float(r["t0"]), 3)] = craft.transition(path, float(r["t0"]))
+                except craft.CraftError:
+                    pass
         for r in rows:
             try:
-                out.append(measure_row(path, vid, r, labels.get(vid) or {}, prof))
+                out.append(measure_row(path, vid, r, labels.get(vid) or {}, prof,
+                                       trans_in=cuts.get(round(float(r["t0"]), 3)),
+                                       trans_out=cuts.get(round(float(r["t1"]), 3))))
             except (camtrack.TrackError, craft.CraftError) as e:
                 skipped.append({"id": f"{vid}:{r['id']}", "reason": str(e)})
         doc = {"version": 1, "video": vid, "measured_at": datetime.date.today().isoformat(), "measure": MEASURE,

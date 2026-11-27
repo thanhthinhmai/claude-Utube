@@ -29,10 +29,14 @@ class CamTrack(unittest.TestCase):
 
     def test_total_zoom(self):
         for i, (g, k) in enumerate(self.pairs()):
+            if k["parallax"]:
+                continue                                   # two layers zoom apart: no single zoom to compare
             self.assertAlmostEqual(g["zoom_pct"], k["zoom_pct"], delta=0.3, msg=f"shot {i}")
 
     def test_drift(self):
         for i, (g, k) in enumerate(self.pairs()):
+            if k["parallax"]:
+                continue
             for a, b in zip(g["drift_px"], k["drift_px"]):
                 self.assertAlmostEqual(a, b, delta=2.0, msg=f"shot {i}")
 

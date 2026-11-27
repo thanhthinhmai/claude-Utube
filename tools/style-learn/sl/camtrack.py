@@ -1,87 +1,119 @@
 """Camera path of one shot (specs/039 research R1): total 2D zoom, ease, drift and parallax.
 
 One measure for the reference (learn camera) and for the studio's own films (qc camera), so both compare (FR-005).
+The same method as the hand measure of charisma-30 (out/measure/deep.py), which the user checked shot by shot:
 
-1. Chain: craft.pairs() gives a camera model (dx, dy, z) per sampled pair (12 frames/s, 320×180): content at x (from
-   the frame centre) in frame k is found at (1+z)·x + d in frame k+1. Chaining the pairs maps frame 0 onto frame k:
-   x_k = A_k·x_0 + B_k, with A the scale and B the content shift at the centre.
-2. Refine: the chained map of the whole shot drifts by about 0.1 %/s, so the first and last frames are matched
-   directly at 640×360, starting from the chained map (craft.warp + block_shifts ±2 + fit_camera, up to 3 rounds).
-3. Numbers:
-     zoom_pct   (A − 1)·100, negative = zooming out
-     drift_px   how far the camera window moved on screen at 1080p ([x, y], + = right/down): −B·(1080/360)
-     ease       share of the move done at ¼, ½, ¾ of the measured span (log A when zooming, else drift along B)
-     parallax   after the refined fit, p75 of the leftover shift of textured blocks (a block that does not fit within
-                ±PARALLAX_SEARCH counts as PARALLAX_SEARCH+1), in px at 1080p. A camera that really moves leaves the
-                near and far layers apart; a 2D zoom leaves almost nothing.
-The edges of a shot (craft.EDGE_TRIM each side) are left out, as in craft: transitions live there.
-
-PARALLAX_PX: set in T005 from two groups (see the note at the constant)."""
+1. Frame to frame (30 frames/s, grey 640×360): corners (goodFeaturesToTrack) followed by pyramidal Lucas–Kanade, a
+   similarity (zoom, turn, shift) fitted with RANSAC. Block matching (craft.py) was tried first and failed on cartoon
+   frames (flat colours, moving characters): zoom off by up to 6 points on charisma-ref (checks/sc001.md).
+2. The frame maps are chained: T maps frame 0 onto the last frame.
+     zoom_pct   (scale of T − 1)·100, negative = zooming out
+     drift_px   how far the camera window moved on screen at 1080p ([x, y], + = right/down): −(T·c − c)·3
+     ease       share of the move done at ¼, ½, ¾ of the measured span (log zoom when zooming, else drift)
+3. Parallax: corners of the first frame are followed through the whole shot. One similarity is fitted to where they
+   start and end (RANSAC, 1 px at 360 high); a second one to the points the first leaves out. When the second fits at
+   least PAR_MIN_POINTS points and PAR_MIN_SHARE of them, and lands more than PARALLAX_PX (1080p) away from the first
+   at those points, two layers moved apart: a camera that really moves. A 2D zoom has one layer. A second "layer" fixed
+   on screen is an overlay (sponsor card, logo), and one narrower than PAR_MIN_SPAN of the frame is a character moving
+   as a block (charisma-ref S044/S045/S086); neither counts.
+At a shot end only a frame or so is left out after a straight cut, the whole transition after a soft one (learn
+camera knows both); without them craft.EDGE_TRIM is left out at each end."""
 import numpy as np
 
 from sl import craft
 
-FPS = craft.FPS
-RW, RH = 640, 360                 # refine size
+FPS = 30
+RW, RH = 640, 360
 TO_1080 = 1080 / RH
 STILL_ZOOM = 0.5                  # |zoom| below this (%) and
 STILL_DRIFT = 4.0                 # drift below this (px at 1080p) is a still camera
 PAN_MIN = 4.0
-PARALLAX_SEARCH = 4               # px at 640 for the leftover pass
-# T005 calibration (2026-11-27): see specs/039-camera-review/checks/sc001.md. Starting value 6 px at 1080p
-# (2 px at 360 high), between the 2D-zoom group and the moving-camera group.
-PARALLAX_PX = 6.0
+RANSAC_PX = 1.0                   # px at 640×360
+PAR_MIN_POINTS = 12
+PAR_MIN_SHARE = 0.25
+PAR_MIN_SPAN = 0.4                # the second layer spans at least this share of the frame width
+# T005 calibration (2026-11-27, checks/sc001.md): charisma-ref, 89 shots of 2D zoom/pan, largest leftover 8.6 px
+# (S027, a 0.8 s pan) and 5.7 px (S041); the synthetic two-layer shot (near layer ×2 zoom, ×3 drift) 15 px. The
+# Blender tests on disk (s68) used a lens zoom, so they have no parallax (0.0). Threshold between the groups:
+PARALLAX_PX = 10.0
 MIN_DUR = 1.0
-MIN_INLIERS = 6
+MIN_INLIERS = 12
 
 
 class TrackError(Exception):
     pass
 
 
-def _chain(ps):
-    """[(A, Bx, By)] for k = 0..n (frame k relative to frame 0), at sample size (320×180)."""
-    A, bx, by = 1.0, 0.0, 0.0
-    out = [(A, bx, by)]
-    for p in ps:
-        dx, dy, z = p["model"]
-        A, bx, by = A * (1 + z), bx * (1 + z) + dx, by * (1 + z) + dy
-        out.append((A, bx, by))
-    return out
+def _cv():
+    try:
+        import cv2
+    except ImportError:
+        raise TrackError("cần OpenCV: sh bin/studio deps learn") from None
+    return cv2
 
 
-def _refine(a, b, A, bx, by, rounds=4):
-    """Fit the map a → b at refine size, starting from (A, bx, by); returns (A, bx, by, inliers, leftover px)."""
-    dx, dy, z = bx, by, A - 1
-    inl = 0
-    for r in range(rounds):
-        w = craft.warp(b, dx, dy, z)
-        gx, gy = craft.global_shift(a, w) if r == 0 else (0, 0)   # the chain leans to whole px: catch what it missed
-        sx, sy, valid = craft.block_shifts(a, np.roll(w, (-gy, -gx), axis=(0, 1)) if (gx or gy) else w,
-                                           search=craft.SEARCH if r == 0 else 2)
-        sx, sy = sx + gx, sy + gy
-        ex, ey, ez, keep = craft.fit_camera(sx, sy, valid, a.shape)
-        inl = int(keep.sum())
-        # the warp samples b at x + s(x); a residual shift r at x adds to s: compose to first order
-        dx, dy, z = dx + ex * (1 + z), dy + ey * (1 + z), z + ez * (1 + z)
-        if abs(ex) < 0.02 and abs(ey) < 0.02 and abs(ez) * RW / 2 < 0.02:
-            break
-    # leftover shifts after the final fit, for parallax
-    w = craft.warp(b, dx, dy, z)
-    S = PARALLAX_SEARCH
-    sx, sy, valid = craft.block_shifts(a, w, search=S)
-    h, wd = a.shape
-    nby, nbx, _ = craft._grid(h, wd)
-    tex = a[:nby * craft.BLOCK, :nbx * craft.BLOCK].reshape(nby, craft.BLOCK, nbx, craft.BLOCK).std((1, 3)) > 3.0
-    tex[0, :] = tex[-1, :] = False                     # the outer ring sees new picture coming in at a zoom
-    tex[:, 0] = tex[:, -1] = False
-    left = np.where(valid, np.hypot(sx, sy), S + 1.0)[tex]
-    leftover = float(np.percentile(left, 75)) if left.size >= 6 else 0.0
-    return 1 + z, dx, dy, inl, leftover
+def _corners(cv2, g):
+    p = cv2.goodFeaturesToTrack(g, 600, 0.01, 8)
+    return None if p is None else p.astype(np.float32)
+
+
+def _pair(cv2, a, b):
+    """3×3 similarity mapping frame a onto frame b, and its inlier count (None, 0 when it cannot be fitted)."""
+    p0 = _corners(cv2, a)
+    if p0 is None or len(p0) < 12:
+        return None, 0
+    p1, st, _ = cv2.calcOpticalFlowPyrLK(a, b, p0, None, winSize=(21, 21), maxLevel=3)
+    ok = st.ravel() == 1
+    if ok.sum() < 12:
+        return None, 0
+    M, inl = cv2.estimateAffinePartial2D(p0[ok], p1[ok], method=cv2.RANSAC, ransacReprojThreshold=RANSAC_PX,
+                                         maxIters=4000)
+    if M is None:
+        return None, 0
+    return np.vstack([M, [0, 0, 1]]), int(inl.sum())
+
+
+def _scale(T) -> float:
+    return float(np.hypot(T[0, 0], T[1, 0]))
+
+
+def _parallax(cv2, frames) -> float:
+    """px at 1080p between two layers that each move rigidly, or 0.0 (see the module note)."""
+    p0 = _corners(cv2, frames[0])
+    if p0 is None or len(p0) < 2 * PAR_MIN_POINTS:
+        return 0.0
+    cur, alive = p0.copy(), np.ones(len(p0), bool)
+    for a, b in zip(frames[:-1], frames[1:]):
+        nxt, st, _ = cv2.calcOpticalFlowPyrLK(a, b, cur, None, winSize=(21, 21), maxLevel=3)
+        alive &= st.ravel() == 1
+        cur = nxt
+    s, e = p0[alive].reshape(-1, 2), cur[alive].reshape(-1, 2)
+    if len(s) < 2 * PAR_MIN_POINTS:
+        return 0.0
+    M1, in1 = cv2.estimateAffinePartial2D(s, e, method=cv2.RANSAC, ransacReprojThreshold=RANSAC_PX, maxIters=4000)
+    if M1 is None:
+        return 0.0
+    out = in1.ravel() == 0
+    if out.sum() < PAR_MIN_POINTS:
+        return 0.0
+    M2, in2 = cv2.estimateAffinePartial2D(s[out], e[out], method=cv2.RANSAC, ransacReprojThreshold=RANSAC_PX,
+                                          maxIters=4000)
+    if M2 is None:
+        return 0.0
+    k = in2.ravel() == 1
+    if k.sum() < PAR_MIN_POINTS or k.sum() < PAR_MIN_SHARE * len(s):
+        return 0.0
+    pts = s[out][k]
+    if abs(np.hypot(M2[0, 0], M2[1, 0]) - 1) < 0.002 and abs(M2[0, 1]) < 0.002 and np.hypot(*M2[:, 2]) < 0.5:
+        return 0.0                                     # fixed on screen: an overlay (logo, card), not a layer of the set
+    x = pts[:, 0]
+    if np.percentile(x, 95) - np.percentile(x, 5) < PAR_MIN_SPAN * RW:
+        return 0.0                                     # narrow: a character moving as a block, not a layer of the set
+    d = (pts @ M2[:, :2].T + M2[:, 2]) - (pts @ M1[:, :2].T + M1[:, 2])
+    return float(np.median(np.hypot(d[:, 0], d[:, 1]))) * TO_1080
 
 
 def _quartiles(curve):
-    """curve: progress values 0..1 at evenly spaced samples → value at ¼, ½, ¾."""
     n = len(curve) - 1
     if n < 2:
         return None
@@ -89,61 +121,83 @@ def _quartiles(curve):
     return [round(float(np.interp(q, t, curve)), 3) for q in (0.25, 0.5, 0.75)]
 
 
-def track(frames, first, last) -> dict:
-    """frames: grey samples at craft size; first/last: grey frames at refine size (the span's ends)."""
-    ps = craft.pairs(frames) if len(frames) >= 2 else []
-    ch = _chain(ps)
-    A, bx, by = ch[-1]
-    k = RW / craft.SW                                  # chained shift is at 320 wide → refine size
-    A2, bx2, by2, inl, leftover = _refine(first, last, A, bx * k, by * k)
-    zoom = (A2 - 1) * 100
-    drift = [-bx2 * TO_1080, -by2 * TO_1080]
+def track(frames) -> dict:
+    """frames: grey uint8 (n, 360, 640) at FPS."""
+    cv2 = _cv()
+    c = np.array([RW / 2, RH / 2, 1.0])
+    T = np.eye(3)
+    logz, shift, inl = [0.0], [np.zeros(2)], []
+    for a, b in zip(frames[:-1], frames[1:]):
+        M, k = _pair(cv2, a, b)
+        inl.append(k)
+        if M is not None:
+            T = M @ T
+        logz.append(np.log(_scale(T)))
+        shift.append((T @ c)[:2] - c[:2])
+    zoom = (_scale(T) - 1) * 100
+    drift = [-float(shift[-1][0]) * TO_1080, -float(shift[-1][1]) * TO_1080]
     mag = float(np.hypot(*drift))
-    if abs(zoom) < STILL_ZOOM and mag < STILL_DRIFT:
-        move, ease = "static", None
+    ease = None
+    if abs(zoom) >= STILL_ZOOM:
+        move = "push" if zoom > 0 else "pull"
+        lz = np.array(logz)
+        ease = _quartiles(np.clip(lz / lz[-1], -0.5, 1.5))
+    elif mag >= max(STILL_DRIFT, PAN_MIN):
+        move = "pan"
+        u = shift[-1] / (np.hypot(*shift[-1]) or 1)
+        proj = np.array([sh @ u for sh in shift])
+        ease = _quartiles(np.clip(proj / proj[-1], -0.5, 1.5)) if abs(proj[-1]) > 1e-6 else None
     else:
-        if abs(zoom) >= STILL_ZOOM:
-            move = "push" if zoom > 0 else "pull"
-            la = np.log([c[0] for c in ch])
-            curve = la / la[-1] if abs(la[-1]) > 1e-6 else None
-        else:
-            move = "pan" if mag >= PAN_MIN else "static"
-            u = np.array([bx, by]) / (np.hypot(bx, by) or 1)
-            proj = np.array([c[1] * u[0] + c[2] * u[1] for c in ch])
-            curve = proj / proj[-1] if abs(proj[-1]) > 1e-6 else None
-        ease = _quartiles(np.clip(curve, -0.5, 1.5)) if curve is not None else None
-    par_px = round(leftover * TO_1080, 2)
+        move = "static"
+    par = round(_parallax(cv2, frames), 2)
     return {"move": move, "zoom_pct": round(zoom, 2), "drift_px": [round(drift[0], 1), round(drift[1], 1)],
-            "ease": ease, "parallax_px": par_px, "parallax": par_px > PARALLAX_PX, "inliers": inl}
+            "ease": ease, "parallax_px": par, "parallax": par > PARALLAX_PX,
+            "inliers": int(np.median(inl)) if inl else 0}
 
 
-def measure(path, t0: float, t1: float) -> dict:
-    """The camera of [t0, t1] of a video: track() plus duration, rate and reliability."""
+def frames_of(path, a: float, b: float):
+    f = craft.sample(path, a, b, fps=FPS, size=(RW, RH))
+    return f.astype(np.uint8)
+
+
+CUT_TRIM = 0.05                   # s left out at a straight cut (the cut may be a frame off)
+
+
+def trim_for(trans: dict) -> float:
+    """Seconds to leave out at a shot end: a frame or so at a straight cut, the whole transition otherwise."""
+    if not trans or trans.get("type") in (None, "cut"):
+        return CUT_TRIM
+    return max(craft.EDGE_TRIM, float(trans.get("dur") or 0) / 2 + CUT_TRIM)
+
+
+def measure(path, t0: float, t1: float, trim_in: float = None, trim_out: float = None) -> dict:
+    """The camera of [t0, t1] of a video: track() plus duration, rate and reliability. Without trims, craft.EDGE_TRIM
+    is left out at each end (the transitions are unknown)."""
     t0, t1 = float(t0), float(t1)
     dur = t1 - t0
-    a, b = t0 + craft.EDGE_TRIM, t1 - craft.EDGE_TRIM
+    a = t0 + (craft.EDGE_TRIM if trim_in is None else trim_in)
+    b = t1 - (craft.EDGE_TRIM if trim_out is None else trim_out)
     if b - a < 3 / FPS:
         a, b = t0, t1
-    frames = craft.sample(path, a, b)
-    ends = craft.sample(path, a, b, fps=FPS, size=(RW, RH))
-    if len(frames) < 2 or len(ends) < 2:
+    fr = frames_of(path, a, b)
+    if len(fr) < 2:
         raise TrackError(f"too few frames in {t0:.2f}–{t1:.2f}")
-    out = track(frames, ends[0], ends[-1])
-    span = max(1e-6, (len(ends) - 1) / FPS)
+    out = track(fr)
+    span = max(1e-6, (len(fr) - 1) / FPS)
     out["dur"] = round(dur, 3)
     out["rate_pct_s"] = round(out["zoom_pct"] / span, 3)
     why = None
     if dur < MIN_DUR:
         why = f"shorter than {MIN_DUR:.0f} s"
     elif out["inliers"] < MIN_INLIERS:
-        why = "too few blocks fit the camera"
-    elif _flash(ends):
+        why = "too few corners fit the camera"
+    elif _flash(fr):
         why = "flash or cut inside the shot"
     out["reliable"] = why is None
     out["why_unreliable"] = why
     return out
 
 
-def _flash(ends) -> bool:
-    m = ends.reshape(len(ends), -1).mean(1)
+def _flash(fr) -> bool:
+    m = fr.reshape(len(fr), -1).mean(1)
     return bool(len(m) > 2 and np.max(np.abs(np.diff(m))) > 40)

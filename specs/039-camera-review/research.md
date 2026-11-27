@@ -2,22 +2,24 @@
 
 ## R1. Đo đường đi máy (camtrack)
 
-- **Decision**: Bắt đầu từ `craft.pairs()`, tức mô hình (dx, dy, z) của mỗi cặp khung ở 12 khung/giây, ảnh xám 320×180.
-  1. Cộng dồn thành đường đi: thang đo S(t) = ∏(1+zᵢ), vị trí cộng dồn theo thang đo.
-  2. Tinh chỉnh tổng bằng một lần so trực tiếp khung đầu với khung cuối (bỏ 0,15 s ở hai đầu như craft) ở 640×360. Lấy đường đi cộng dồn làm phép biến đổi ban đầu, rồi dùng `block_shifts(search=2)` và `fit_camera`, lặp tối đa 3 lần.
-  3. Kết quả:
-     - `zoom_pct` = (S_cuối − 1)·100.
-     - `drift_px` = dịch cuối quy ra 1080p.
-     - `ease` = tiến độ của log S (hoặc của độ dời khi |zoom| < 0,5 %) ở ¼, ½, ¾ thời lượng.
-     - `rate_pct_s` = zoom_pct / thời lượng đo.
-- **Thị sai**: sau lần so trực tiếp, lấy p75 sai số còn lại của các khối nằm trong mô hình và không thuộc vùng cử động trong shot (`craft.inner`), quy ra px ở 1080p.
-  - `parallax = p75 > PARALLAX_PX`. Giá trị khởi đầu là 2,0 px, hiệu chỉnh trong task bằng hai nhóm mẫu:
-    - nhóm 0: 15 shot charisma-ref, số đo tay có sai số 0,2–0,4 px ở 960;
-    - nhóm 1: các shot Blender orbit/dolly của bài thử 2026-11-26 (`/mnt/e/claude-utube-ae/blendertest`), nếu còn, nếu không thì video tổng hợp hai mặt phẳng.
-  - Ngưỡng được đặt ở giữa hai nhóm và ghi vào `camtrack.py` kèm số đo.
-- **Rationale**: craft.py đã có khớp khối và khử ngoại lai, nhưng chỉ ra trung vị tốc độ. Cộng dồn các cặp ở 320 px trôi khoảng 0,1 %/s, nên cần lần so trực tiếp để tổng zoom lệch ≤ 1 điểm phần trăm (SC-001). Cách đo của `deep.py` (LK + RANSAC ở 960) cần OpenCV, không có trong venv học.
-- **Alternatives**: thêm OpenCV (nặng thêm, trái nguyên tắc V); chỉ dùng tốc độ trung vị × thời lượng (sai khi có ease, đúng là lỗi của charisma-30).
-- **Kiểm chứng**: video tổng hợp có zoom 3/6/9 %, ease 0,13/0,48/0,85 và trôi 0/8/12 px phải đo lệch ≤ 0,3 điểm phần trăm và ≤ 2 px. Video hai lớp có thị sai phải ra `parallax: true`. Trên 15 shot charisma-ref, so với `deep_ref.json` (pan_px của deep.py đo ở 960 → ×2).
+- **Decision (đổi khi implement, 2026-11-27)**: theo dõi điểm góc khung nối khung, đúng cách đo tay `deep.py` của charisma-30 mà người dùng đã kiểm:
+  - Đọc 30 khung/giây, ảnh xám 640×360. Lấy góc bằng `goodFeaturesToTrack`, theo bằng Lucas–Kanade kim tự tháp, rồi khớp phép đồng dạng (zoom, xoay, dịch) bằng RANSAC 1 px.
+  - Nối các phép của từng cặp khung thành T, phép từ khung đầu tới khung cuối:
+    - `zoom_pct` = (thang đo của T − 1)·100;
+    - `drift_px` = −(T·tâm − tâm)·3, quy ra px ở 1080p;
+    - `ease` = tiến độ của log zoom (hoặc của độ dời khi đứng zoom) ở ¼, ½, ¾.
+  - Hai đầu shot: sau cắt thẳng chỉ bỏ 0,05 s; sau chuyển cảnh mềm thì bỏ cả đoạn chuyển. Lý do: bỏ 0,15 s ở shot 1,5–1,8 s làm hụt 17 % zoom (S7, S8).
+- **Thị sai**:
+  - Theo các góc của khung đầu suốt cả shot. Khớp phép đồng dạng thứ nhất giữa chỗ đầu và chỗ cuối, rồi khớp phép thứ hai cho các điểm phép thứ nhất bỏ ra.
+  - Tính là thị sai khi phép thứ hai đạt đủ cả bốn điều kiện:
+    - phủ ≥ 12 điểm và ≥ 25 % số điểm;
+    - không đứng yên trên màn hình (lớp phủ như thẻ QR hay logo thì không tính);
+    - trải ≥ 40 % bề ngang khung (nhân vật trượt như một khối thì không tính);
+    - lệch phép thứ nhất > `PARALLAX_PX` = 10 px ở 1080p.
+  - Ngưỡng được hiệu chỉnh ở T005: charisma-ref 89 shot có mức cao nhất 8,6 px (S027, shot pan 0,8 s); shot tổng hợp hai lớp ra 15 px.
+- **Rationale**: cách khớp khối của `craft.py` (bản đầu của R1) hỏng trên khung hoạt hình (màu phẳng, nhân vật cử động). Trên charisma-ref, zoom lệch tới 6 điểm phần trăm và 86/89 shot bị báo thị sai. OpenCV đã có trong venv học, giấy phép Apache-2.0; đã thêm vào `requirements-learn.txt` và `CREDITS`.
+- **Kết quả**: xem `checks/sc001.md`, 13/15 shot lệch ≤ 1 điểm phần trăm so với đo tay.
+- **Alternatives**: khớp khối của craft.py (đã thử, trượt SC-001); đo bằng tốc độ trung vị × thời lượng (sai khi có ease).
 
 ## R2. Bố cục
 
