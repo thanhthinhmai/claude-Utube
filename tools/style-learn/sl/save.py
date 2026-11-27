@@ -143,6 +143,32 @@ def depth_refs(name: str) -> dict:
     return depth_block(rows)
 
 
+def write_camera(name: str, dest) -> int:
+    """specs/039 T011: my-styles/<style>/camera.json and camera/<vid>-<id>-{a,b}.jpg (≤ 150 shots) from the set's
+    measured library; nothing when the set has no camera.json. Returns the number of shots with evidence frames."""
+    from . import camlib
+    if not camlib.library(name):
+        return 0
+    doc = camlib.style_doc(name)
+    cam_dir = dest / "camera"
+    shutil.rmtree(cam_dir, ignore_errors=True)
+    n = 0
+    for r in doc["shots"]:
+        if not r.get("evidence"):
+            continue
+        vid, sid = r["id"].split(":")
+        src = [refset.profile_dir(name, vid) / "camera" / f"{sid}-{t}.jpg" for t in ("a", "b")]
+        if not all(p.exists() for p in src):
+            r["evidence"] = None
+            continue
+        cam_dir.mkdir(parents=True, exist_ok=True)
+        for p, rel in zip(src, r["evidence"]):
+            shutil.copy2(p, dest / rel)
+        n += 1
+    refset.write_json(dest / "camera.json", doc)
+    return n
+
+
 def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bool = False, update: bool = False) -> int:
     refset.check_slug(slug, "mã phong cách")
     mine = refset.root() / "my-styles"
@@ -231,8 +257,10 @@ def save(name: str, slug: str, en: str, cn: str, based_on: str, accept_proof: bo
         refs["depth"] = dep
     if refs:
         refset.write_json(tmp / "shots.json", refs)
+    write_camera(name, tmp)                                  # specs/039: reference-shot library + camera summary
     if update:                                               # the demo film stays with the style (specs/021 FR-015)
-        for f in KEEP_ON_UPDATE + tuple(f for f in TEMPLATE_FILES if not (tmp / f).exists()):
+        keep_cam = () if (tmp / "camera.json").exists() else ("camera.json", "camera")
+        for f in KEEP_ON_UPDATE + keep_cam + tuple(f for f in TEMPLATE_FILES if not (tmp / f).exists()):
             src = old / f
             if src.is_dir():
                 shutil.copytree(src, tmp / f)

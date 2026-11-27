@@ -12,12 +12,16 @@ parallax, the way the reference films move (measured 2026-11-27: every shot a 3-
 influences in % of After Effects' speed-0 ease (0, 0 = linear); measured frame by frame the reference eases most
 zooms about (40, 40): slow start, slow end. `parallax` (0..1): that share of the zoom comes from moving the camera
 toward the subject instead of the lens, so near layers grow faster than the wall (the reference's layered 2D look:
-desk edges, frames and blinds slide against each other, measured 2026-11-27)."""
+desk edges, frames and blinds slide against each other, measured 2026-11-27).
+specs/039: a camera block chosen at the Camera review (shot_plan.<S>.camera) wins over the plan's move when the shot
+passes no move or zoom of its own (frm, to and look still place the camera): a still camera, the lens zooming and the
+frame shifting (kit/camblock.py)."""
 import math
 
 import bpy
 from mathutils import Vector
 
+from kit import camblock
 from kit.core import ease_bezier, ease_io
 
 LENS = {"wide": 18.0, "normal": 35.0, "long": 85.0}
@@ -68,17 +72,24 @@ def _path(move: str, frm: Vector, look: Vector, d: float):
 
 def cam(k, size: str = None, height: str = None, lens=None, move: str = None, frm=None, to=None, look=None,
         dof: bool = False, fstop: float = 2.8, t0: float = 0.0, t1: float = None, exposure: float = None,
-        zoom: float = None, shift=(0.0, 0.0), ease=(40, 40), parallax: float = 0.0):
+        zoom: float = None, shift=(0.0, 0.0), ease=(40, 40), parallax: float = 0.0, shift0=(0.0, 0.0)):
     plan = k.plan or {}
+    blk = plan.get("camera") if move is None and zoom is None else None     # frm/to/look only place the still camera
+    lens_scale = 1.0
+    if blk:
+        p = camblock.from_block(blk, k.size[0] / float(k.size[1]))
+        move, zoom, shift0, shift, ease, parallax = p["move"], p["zoom"], p["shift0"], p["shift"], p["ease"], 0.0
+        size, lens_scale = size or p["size"], p["lens_scale"]
     if exposure is not None:              # per-shot exposure over the set's (a wider view can show more bright wall)
         bpy.context.scene.view_settings.exposure = float(exposure)
     size = size or plan.get("size") or "med"
     height = height or plan.get("cam_height") or "eye"
     lens_mm = float(lens) if isinstance(lens, (int, float)) else LENS.get(lens or plan.get("lens") or "normal", 35.0)
+    d = distance(size, lens_mm, k.size[0] / float(k.size[1]))     # the camera stands for the plain lens
+    lens_mm *= lens_scale
     move = move or plan.get("move") or "static"
     aspect = k.size[0] / float(k.size[1])
     look = Vector(look or k.objects.get("look") or (0, 0, 1.2))
-    d = distance(size, lens_mm, aspect)
     if frm is None:
         cdir = Vector(k.objects.get("cam_dir") or (0, -1, 0))
         cdir.z = 0
@@ -117,7 +128,9 @@ def cam(k, size: str = None, height: str = None, lens=None, move: str = None, fr
             u = ease_bezier((f - f0) / n, ease[0] / 100.0, ease[1] / 100.0)
             m = 1 + (z - 1) * u                # magnification at the subject; `parallax` of it comes from moving in
             md = m ** parallax
-            cd.lens, cd.shift_x, cd.shift_y = lens_mm * m / md, shift[0] * u, shift[1] * u
+            cd.lens = lens_mm * m / md
+            cd.shift_x = shift0[0] + (shift[0] - shift0[0]) * u
+            cd.shift_y = shift0[1] + (shift[1] - shift0[1]) * u
             for prop in ("lens", "shift_x", "shift_y"):
                 cd.keyframe_insert(prop, frame=f)
             if parallax:

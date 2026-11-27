@@ -10,9 +10,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))     # tools/: filmc
 
 # job log text is English (005); question and treatment are for online film jobs (007 FR-014)
 KINDS = {"style-1": "review 1", "style-2": "review 2", "question": "question", "treatment": "treatment review",
-         "script": "script review", "cast": "cast review", "voice": "voice review", "animatic": "animatic review", "shots": "shots review", "mix": "mix review",
+         "script": "script review", "cast": "cast review", "camera": "camera review", "voice": "voice review", "animatic": "animatic review", "shots": "shots review", "mix": "mix review",
          "publish": "publish review"}
-POINT_KINDS = ("script", "cast", "voice", "animatic", "shots", "mix", "publish")   # review points of a film (specs/026, 034, 035)
+POINT_KINDS = ("script", "cast", "camera", "voice", "animatic", "shots", "mix", "publish")   # review points (specs/026, 034, 035, 039)
 VALUES = {"approve", "revise", "accept_anyway", "stop"}
 LABEL = {"approve": "Approve", "revise": "Request changes", "accept_anyway": "Accept anyway", "stop": "Stop"}   # = DECISION in web/app.js
 SOURCES = {"ui", "chat", "api"}
@@ -66,6 +66,8 @@ def create(job_id: str, kind: str, set_name: str, summary_md: str, final_round: 
         _anim_notes(lambda an, d: an.notes_end(d), job)
     if kind == "mix":                                # specs/037: Claude sends the mix again, the sound-notes lot is over
         _sound_notes(lambda sn, d: sn.end_lot(d), job)
+    if kind == "camera":                             # specs/039: the options are back for review, the notes lot is over
+        _cam_notes(lambda cn, d: cn.end_lot(d), job)
 
     def f(j):
         if j["status"] in jobs.FINAL:
@@ -111,6 +113,18 @@ def _sound_notes(fn, job: dict):
     try:
         from filmcheck import soundnotes
         return fn(soundnotes, d)
+    except Exception:                                # noqa: BLE001
+        return None
+
+
+def _cam_notes(fn, job: dict):
+    """Run fn(camnotes, film folder) for an AE film's Camera notes (specs/039); never blocks the review itself."""
+    d = film_folder(job)
+    if d is None or not (d / "camera" / "notes.json").is_file():
+        return None
+    try:
+        from filmcheck import camnotes
+        return fn(camnotes, d)
     except Exception:                                # noqa: BLE001
         return None
 
@@ -170,6 +184,8 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str
         note = animatic_summary(jobs.load(r["job_id"]))
     if r["kind"] == "mix" and value == "revise" and not note:      # "Send notes to Claude" on the Sound panel (037)
         note = _sound_notes(lambda sn, d: sn.summary(d), jobs.load(r["job_id"])) or ""
+    if r["kind"] == "camera" and value == "revise" and not note:   # "Send notes to Claude" on the Camera page (039)
+        note = _cam_notes(lambda cn, d: cn.summary(d), jobs.load(r["job_id"])) or ""
     if value == "revise" and len(note) < 3:
         raise StudioError("note_required", "hãy ghi góp ý (ít nhất 3 ký tự) khi yêu cầu sửa", 422)
     if len(note) > 4000:
@@ -184,6 +200,8 @@ def decide(rid: str, value: str, note: str = None, source: str = "ui", base: str
             _anim_notes(lambda an, d: an.notes_start(d, r["job_id"]), jobs.load(r["job_id"]))
         if r["kind"] == "mix" and value == "revise":
             _sound_notes(lambda sn, d: sn.start_lot(d, r["job_id"]), jobs.load(r["job_id"]))
+        if r["kind"] == "camera" and value == "revise":
+            _cam_notes(lambda cn, d: cn.start_lot(d, r["job_id"], cn.open_shots(d)), jobs.load(r["job_id"]))
     d = {"value": value, "note": note, "source": source, "at": store.now_iso()}
     if not store.doc_create("decision", rid, {**d, "owner": r.get("owner", "local")}):
         raise StudioError("already_decided", "yêu cầu này đã được duyệt", 409)

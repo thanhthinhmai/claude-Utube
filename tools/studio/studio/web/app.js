@@ -9,7 +9,7 @@ const STATUS = {
 };
 const KIND = { learn: "Learn a style", film: "Make a film", topics: "Score topics" };
 const REVIEW = { "style-1": "Review 1: style draft", "style-2": "Review 2: proof frame", question: "Question from the studio",
-  treatment: "Treatment review", script: "Script review", cast: "Cast review", voice: "Voice review", animatic: "Animatic review", shots: "Shots review", mix: "Mix review",
+  treatment: "Treatment review", script: "Script review", cast: "Cast review", camera: "Camera review", voice: "Voice review", animatic: "Animatic review", shots: "Shots review", mix: "Mix review",
   publish: "Publish review" };
 // Online mode (specs/007): the same page serves many customers; MODE comes from GET /health
 let MODE = "local";
@@ -282,16 +282,17 @@ async function pageChannels() {
   });
 }
 
-const POINTS = [["script", "Script"], ["cast", "Cast (After Effects films)"], ["voice", "Voice"], ["animatic", "Animatic (After Effects films)"], ["shots", "Shots (before render)"], ["mix", "Mix"], ["publish", "Publish"]];
+const POINTS = [["script", "Script"], ["cast", "Cast (After Effects films)"], ["camera", "Camera (After Effects films)"], ["voice", "Voice"], ["animatic", "Animatic (After Effects films)"], ["shots", "Shots (before render)"], ["mix", "Mix"], ["publish", "Publish"]];
 /** Five boxes: where a film stops for this person's review (specs/026). @param {string} id @param {string[]} on */
 const pointBoxes = (id, on) => `<fieldset class="points" id="${id}"><legend>Stop for my review at <span class="hint">You can change and approve each one on the job page</span></legend>
   ${POINTS.map(([k, l]) => `<label class="check"><input type="checkbox" value="${k}" ${on.includes(k) ? "checked" : ""}> <span>${l}</span></label>`).join("")}</fieldset>`;
 /** a channel's review points; a list saved before specs/034 (035) never chose about Cast (Animatic), so it shows ticked
  * @param {any} c */
 const reviewsOf = (c) => {
-  if (!c.reviews) return ["script", "cast", "animatic", "shots"];
+  if (!c.reviews) return ["script", "cast", "camera", "animatic", "shots"];
   const r = c.cast_chosen || c.reviews.includes("cast") ? c.reviews : [...c.reviews, "cast"];
-  return c.animatic_chosen || r.includes("animatic") ? r : [...r, "animatic"];
+  const r2 = c.animatic_chosen || r.includes("animatic") ? r : [...r, "animatic"];
+  return c.camera_chosen || r2.includes("camera") ? r2 : [...r2, "camera"];       // specs/039: Camera, the same way
 };
 const pointsOf = (/** @type {string} */ id) => Array.from(document.querySelectorAll(`#${id} input:checked`)).map((x) => /** @type {HTMLInputElement} */ (x).value);
 
@@ -554,7 +555,7 @@ async function doneRefresh(clicked = false) {
   DONE.drawn.key = key;
   railMarks();                                        // "If you change …" follows the step shown
   stopAudio();
-  await ({ script: doneScript, cast: doneCast, voice: doneVoice, animatic: doneAnimatic, shots: doneShots, mix: doneMix, render: doneRender }[DONE.tab] || (() => {}))(body, sec);
+  await ({ script: doneScript, cast: doneCast, camera: doneCamera, voice: doneVoice, animatic: doneAnimatic, shots: doneShots, mix: doneMix, render: doneRender }[DONE.tab] || (() => {}))(body, sec);
   await editPanel(body);
 }
 /** specs/026: the edit part of the open section. @param {HTMLElement} body */
@@ -568,6 +569,7 @@ async function editPanel(body) {
   }
   if (pt === "cast") { castBar(body); return; }
   if (pt === "animatic") { animaticBar(body); return; }
+  if (pt === "camera") { cameraBar(body); return; }
   if (pt === "mix" && RAIL.data.sound) { editSound(body); return; }
   const edit = { script: async () => { const sc = body.querySelector(".script"); if (sc) sc.remove(); await editScript(body); },
     voice: async () => { body.querySelectorAll(".tbl, .done-actions").forEach((x) => x.remove()); await editVoice(body); },
@@ -723,9 +725,9 @@ function doneRender(body, s) {
 /** @type {any} */
 const RAIL = { data: null, editing: {}, last: {}, msg: {} };
 const STATE_LABEL = { done: "Done", running: "Running", waiting: "Waiting for you", todo: "Not yet", stale: "Must run again", skipped: "Skipped" };
-const STEP_TAB = { Script: "script", Cast: "cast", Voice: "voice", Animatic: "animatic", Shots: "shots", Mix: "mix", Render: "render", "Self-check": "selfcheck", Publish: "publish" };
-const TAB_POINT = { script: "script", cast: "cast", voice: "voice", animatic: "animatic", shots: "shots", mix: "mix", publish: "publish" };
-const POINT_STEP = { script: "Script", cast: "Cast", voice: "Voice", animatic: "Animatic", shots: "Shots", mix: "Mix", publish: "Publish" };
+const STEP_TAB = { Script: "script", Cast: "cast", Camera: "camera", Voice: "voice", Animatic: "animatic", Shots: "shots", Mix: "mix", Render: "render", "Self-check": "selfcheck", Publish: "publish" };
+const TAB_POINT = { script: "script", cast: "cast", camera: "camera", voice: "voice", animatic: "animatic", shots: "shots", mix: "mix", publish: "publish" };
+const POINT_STEP = { script: "Script", cast: "Cast", camera: "Camera", voice: "Voice", animatic: "Animatic", shots: "Shots", mix: "Mix", publish: "Publish" };
 
 async function railRefresh() {
   const slot = document.getElementById("rail-slot");
@@ -745,7 +747,7 @@ async function railRefresh() {
           : s.note || STATE_LABEL[s.state] || s.state)}</span></button></li>`).join("")}</ol>
     <div id="impact"></div>
     <div class="point-toggles" id="point-toggles"><span class="muted small">Stop for my review at:</span>
-      ${POINTS.filter(([k]) => v.points[k] && !(["cast", "animatic", "shots"].includes(k) && v.points[k].state === "skipped")).map(([k, l]) => {
+      ${POINTS.filter(([k]) => v.points[k] && !(["cast", "camera", "animatic", "shots"].includes(k) && v.points[k].state === "skipped")).map(([k, l]) => {
         const pt = v.points[k], locked = ["approved", "waiting", "skipped"].includes(pt.state) || ["done", "failed", "stopped"].includes(DONE.job.status);
         return `<label class="check small" title="${locked ? esc(`${l}: ${pt.state}`) : ""}"><input type="checkbox" value="${k}" ${pt.on ? "checked" : ""} ${locked ? "disabled" : ""}> <span>${esc(l.replace(" (before render)", "").replace(" (After Effects films)", ""))}</span></label>`;
       }).join("")}<span class="msg small" id="points-msg"></span></div>`;
@@ -781,14 +783,29 @@ function canEdit(pt) {
   if (v.busy && (v.busy.step === POINT_STEP[pt] || (v.impact[pt] || []).includes(v.busy.step))) return false;
   return v.points[pt] && v.points[pt].state !== "skipped";
 }
+// One edit at a time: the next one reads its base only when the one before has finished (specs/039: picking options
+// shot after shot faster than an edit finishes sent the old fingerprint and came back "conflict").
+/** @type {Promise<any>} */
+let EDIT_Q = Promise.resolve();
 /** Send one edit and wait for its result (the page never writes a file itself). @param {string} point @param {string} op @param {any} args @param {string} [base] another fingerprint (037: the sound plan or its notes) */
-async function sendEdit(point, op, args, base) {
-  base = base || RAIL.data.points[point].fingerprint;
-  const a = await post(`/jobs/${encodeURIComponent(DONE.job.id)}/actions`, { point, op, args, base });
+function sendEdit(point, op, args, base) {
+  const run = EDIT_Q.then(() => sendEditNow(point, op, args, base));
+  EDIT_Q = run.catch(() => {});
+  return run;
+}
+/** @param {string} point @param {string} op @param {any} args @param {string} [base] @param {boolean} [retried] @returns {Promise<any>} */
+async function sendEditNow(point, op, args, base, retried) {
+  const fp = base || RAIL.data.points[point].fingerprint;
+  const a = await post(`/jobs/${encodeURIComponent(DONE.job.id)}/actions`, { point, op, args, base: fp });
   for (let i = 0; i < 1200; i++) {
     await new Promise((r) => setTimeout(r, i < 20 ? 300 : 1000));
     const x = await get(`/jobs/${encodeURIComponent(DONE.job.id)}/actions/${a.id}`);
-    if (!["queued", "running"].includes(x.status)) { await railRefresh(); return x; }
+    if (["queued", "running"].includes(x.status)) continue;
+    if (x.result && x.result.fingerprint && RAIL.data.points[point]) RAIL.data.points[point].fingerprint = x.result.fingerprint;
+    await railRefresh();
+    // choosing a shot's option sets one whole value: after a conflict it is safe to send it once more on the new base
+    if (x.status === "conflict" && op === "camera-choose" && !base && !retried) return sendEditNow(point, op, args, base, true);
+    return x;
   }
   throw new Error("The edit is taking long; its result will show in the log.");
 }
@@ -1087,6 +1104,161 @@ function animaticBar(body) {
       p.append(b);
     }
     anim.prepend(p);
+  }
+}
+
+// ---------- the Camera page of an After Effects film (specs/039 US3) ----------
+const SIZE_EN = { ecu: "extreme close-up", cu: "close-up", med: "medium", wide: "wide", huge: "very wide" };
+/** A reference frame of the camera library. @param {string} rel */
+const camRef = (rel) => `${API}/jobs/${encodeURIComponent(DONE.job.id)}/camera-ref/${rel.split("/").map(encodeURIComponent).join("/")}`;
+/** Open notes of one shot. @param {any} cb @param {string} id */
+const camNotes = (cb, id) => ((cb.notes && cb.notes.shots && cb.notes.shots[id] && cb.notes.shots[id].notes) || []);
+/** The end of the move as a CSS transform of the still (the still is the start window). @param {any} o */
+function camEnd(o) {
+  const k = 1 + (Number(o.zoom_pct) || 0) / 100, d = o.drift_px || [0, 0];
+  const fx = (Number(d[0]) || 0) / 1920 / k, fy = (Number(d[1]) || 0) / 1080 / k;
+  return `scale(${k.toFixed(4)}) translate(${(-100 * fx).toFixed(3)}%, ${(-100 * fy).toFixed(3)}%)`;
+}
+/** AE speed-0 ease (influences in %) as a CSS curve. @param {any} o */
+const camCurve = (o) => o.ease_ae ? `cubic-bezier(${(o.ease_ae[0] / 100).toFixed(2)}, 0, ${(1 - o.ease_ae[1] / 100).toFixed(2)}, 1)` : "linear";
+/** One option column. @param {any} cb @param {any} s @param {any} o @param {boolean} can */
+function camOption(cb, s, o, can) {
+  const open = camNotes(cb, s.id).filter((/** @type {any} */ n) => !n.done && n.option === o.n);
+  const pin = DONE.camPin && DONE.camPin.shot === s.id && DONE.camPin.n === o.n ? DONE.camPin : null;
+  const zoom = Number(o.zoom_pct) || 0, d = o.drift_px || [0, 0];
+  const facts = [SIZE_EN[o.size] || o.size, o.move, o.move === "static" ? "" : `zoom ${zoom > 0 ? "+" : ""}${zoom.toFixed(1)}%`,
+    Math.hypot(d[0], d[1]) >= 1 ? `drift ${Math.round(d[0])}, ${Math.round(d[1])} px` : "",
+    o.ease ? `ease ${o.ease.map((/** @type {number} */ x) => x.toFixed(2)).join(" / ")}` : "", o.transition, o.engine === "blender" ? "Blender set" : "After Effects"].filter(Boolean);
+  return `<div class="cam-opt${o.n === s.chosen ? " on" : ""}" data-n="${o.n}">
+    <div class="row spread"><b>Option ${o.n}${o.n === s.recommended ? ` <span class="star" title="Recommended">★</span>` : ""}</b>
+      ${o.n === s.chosen ? `<span class="chip ok">In use</span>` : can ? `<button class="btn small" data-use="${o.n}">Use this</button>` : ""}</div>
+    <div class="cam-still" data-pinn="${o.n}">${o.still ? `<img src="${fileUrl(o.still)}" alt="${esc(s.id)} option ${o.n}" style="transform-origin:50% 50%">` : `<div class="anim-none muted">No still yet</div>`}
+      ${open.map((/** @type {any} */ n, /** @type {number} */ i) => n.x != null ? `<i class="pin" style="left:${n.x}%;top:${n.y}%">${i + 1}</i>` : "").join("")}
+      ${pin ? `<i class="pin new" style="left:${pin.x}%;top:${pin.y}%">${open.length + 1}</i>` : ""}</div>
+    <div class="row"><button class="btn small" data-prev="${o.n}" ${o.still ? "" : "disabled"}>▶ Preview</button><span class="muted small tabnum">${Number(o.dur || s.dur || 0).toFixed(1)} s</span></div>
+    ${pin ? `<div class="pinform"><textarea id="cam-pin-note" rows="2" maxlength="2000" placeholder="What should change in this camera?">${esc(pin.text || "")}</textarea>
+      <div class="row"><button class="btn small accent" id="cam-pin-save">Save note</button><button class="btn small" id="cam-pin-cancel">Cancel</button></div>
+      <p class="small fail" id="cam-pin-msg" role="status"></p></div>` : ""}
+    ${(o.ref_frames || []).length ? `<div class="cam-ref" title="The reference shot: first and last frame">${o.ref_frames.slice(0, 2).map((/** @type {string} */ r) => `<img src="${camRef(r)}" alt="reference ${esc(o.ref || "")}" loading="lazy">`).join("")}</div>` : ""}
+    <p class="small">${facts.map((x) => `<span class="chip">${esc(x)}</span>`).join(" ")}</p>
+    ${o.reason ? `<p class="muted small">${esc(o.reason)}</p>` : ""}
+    ${(o.notes || []).map((/** @type {string} */ x) => `<p class="small warnt">⚠ ${esc(x)}</p>`).join("")}</div>`;
+}
+/** @param {HTMLElement} body @param {any} _s */
+async function doneCamera(body, _s) {
+  if (!RAIL.data || RAIL.data.camera === undefined) await railRefresh();
+  const cb = RAIL.data && RAIL.data.camera;
+  if (!cb) { body.innerHTML = `<p class="muted">No camera page for this film.</p>`; return; }
+  if (cb.state === "skipped" || cb.state === "off" && cb.skip_reason) { body.innerHTML = `<p class="muted">Camera: skipped (${esc(cb.skip_reason || "off")}).</p>`; return; }
+  if (!cb.shots.length) { body.innerHTML = `<p class="muted">${esc(cb.error || "No camera options yet.")}</p>`; return; }
+  const can = canEdit("camera");
+  const s = cb.shots.find((/** @type {any} */ x) => x.id === DONE.camShot);
+  const lot = new Set(((cb.notes && cb.notes.lot) || {}).notes || []);
+  const notes = s ? camNotes(cb, s.id) : [];
+  const li = (/** @type {any} */ n, /** @type {number} */ i) => `<li><span><b>${n.done ? "✓" : i + 1}.</b> ${esc(n.text)} <span class="muted small">option ${n.option}${lot.has(n.id) ? " · sent to Claude" : ""}</span>
+      ${n.reply ? `<br><span class="small reply">↳ ${esc(n.reply)}</span>` : ""}</span>
+      ${can && !n.done && !lot.has(n.id) ? `<button class="btn small" data-ndel="${esc(n.id)}" aria-label="Delete note ${i + 1}">Delete</button>` : ""}</li>`;
+  body.innerHTML = `<div class="anim cam">
+    <div class="phead"><span class="row"><span class="chip tabnum">${cb.shots.length} shots</span>
+      ${cb.missing.length ? `<span class="chip warn" id="cam-missing">No still: ${esc(cb.missing.join(", "))}</span>` : ""}
+      ${cb.source ? `<span class="chip">${esc(cb.source.replace("style:", "style ").replace("set:", "set "))}</span>` : ""}</span></div>
+    ${s ? `<div class="anim-note cam-box" id="cam-box" data-shot="${esc(s.id)}">
+      <div class="row spread"><b>${esc(s.id)} · ${Number(s.dur || 0).toFixed(1)} s</b><button class="btn small" id="cam-close">Close</button></div>
+      <div class="cam-opts">${s.options.map((/** @type {any} */ o) => camOption(cb, s, o, can)).join("")}</div>
+      <p class="muted small">${can ? "Click a still to pin a note on that option." : "Notes can be added while the camera waits for your review."}</p>
+      ${notes.length ? `<ol class="anim-notes">${notes.filter((/** @type {any} */ n) => !n.done).map(li).join("")}${notes.filter((/** @type {any} */ n) => n.done).map(li).join("")}</ol>` : ""}</div>`
+      : `<p class="muted small" id="cam-hint">Click a shot to see its camera options.</p>`}
+    <div class="shot-grid">${cb.shots.map((/** @type {any} */ x) => {
+      const o = x.options.find((/** @type {any} */ y) => y.n === x.chosen) || x.options[0] || {};
+      return `<figure class="shot${x.id === DONE.camShot ? " on" : ""}" data-cam="${esc(x.id)}" tabindex="0">
+        ${o.still ? `<img src="${fileUrl(o.still)}" alt="${esc(x.id)}" loading="lazy">` : `<div class="shot-none muted">${esc(x.id)}</div>`}
+        <figcaption><span class="row spread"><b>${esc(x.id)}${x.chosen === x.recommended ? ` <span class="star" title="Recommended option">★</span>` : ""}</b>
+          <span class="tabnum muted">${Number(x.dur || 0).toFixed(1)} s${x.open_notes ? ` <span class="dot-note" title="${x.open_notes} open note${x.open_notes === 1 ? "" : "s"}"></span>` : ""}</span></span>
+          <span class="muted">${esc([SIZE_EN[o.size] || o.size, o.move, o.move === "static" ? "" : `${(Number(o.zoom_pct) || 0).toFixed(1)}%`].filter(Boolean).join(" · "))}</span></figcaption></figure>`; }).join("")}</div>
+    <div class="how"><strong>How Camera works</strong>Each shot gets two or three camera options learned from the reference videos: the size, a slow 2D zoom with its ease, a small drift.
+      The still shows where the shot starts; the yellow box shows where the move ends, and ▶ plays the move at its real speed.
+      Pick one with "Use this" (★ is used where you pick nothing), or pin a note on a still; "Send notes to Claude" makes new options only for the shots with notes.</div></div>`;
+  const redraw = () => { DONE.drawn = {}; doneRefresh(true); };
+  body.querySelectorAll(".shot[data-cam]").forEach((el) => {
+    const pick = () => { DONE.camShot = /** @type {HTMLElement} */ (el).dataset.cam; DONE.camPin = null; redraw(); };
+    /** @type {HTMLElement} */ (el).onclick = pick;
+    /** @type {HTMLElement} */ (el).onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
+  });
+  const box = /** @type {HTMLElement | null} */ (body.querySelector("#cam-box"));
+  if (!box || !s) return;
+  /** @type {HTMLElement} */ (box.querySelector("#cam-close")).onclick = () => { DONE.camShot = null; DONE.camPin = null; redraw(); };
+  box.querySelectorAll("[data-use]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = async () => {
+    /** @type {HTMLButtonElement} */ (el).disabled = true;
+    try { const x = await sendEdit("camera", "camera-choose", { shot: s.id, n: Number(/** @type {HTMLElement} */ (el).dataset.use) }); if (x.status !== "done") alert(editMsg(x)); }
+    catch (err) { alert(/** @type {Error} */ (err).message); }
+    redraw();
+  }; });
+  box.querySelectorAll("[data-prev]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = () => {
+    const n = Number(/** @type {HTMLElement} */ (el).dataset.prev), o = s.options.find((/** @type {any} */ y) => y.n === n);
+    const img = /** @type {HTMLImageElement | null} */ (box.querySelector(`.cam-opt[data-n="${n}"] .cam-still img`));
+    if (!img || !o) return;
+    img.style.transition = "none"; img.style.transform = "none";
+    void img.offsetWidth;                              // start again from the first frame
+    img.style.transition = `transform ${Math.max(0.3, Number(o.dur || s.dur || 1)).toFixed(2)}s ${camCurve(o)}`;
+    img.style.transform = camEnd(o);
+    img.dataset.playing = "1";
+    img.addEventListener("transitionend", () => { delete img.dataset.playing; setTimeout(() => { img.style.transition = "none"; img.style.transform = "none"; }, 600); }, { once: true });
+  }; });
+  box.querySelectorAll(".cam-still").forEach((el) => { /** @type {HTMLElement} */ (el).onclick = (e) => {
+    if (!canEdit("camera")) return;
+    const r = /** @type {HTMLElement} */ (el).getBoundingClientRect();
+    const x = Math.min(100, Math.max(0, ((e.clientX - r.left) / r.width) * 100)), y = Math.min(100, Math.max(0, ((e.clientY - r.top) / r.height) * 100));
+    const old = /** @type {HTMLTextAreaElement | null} */ (box.querySelector("#cam-pin-note"));
+    DONE.camPin = { shot: s.id, n: Number(/** @type {HTMLElement} */ (el).dataset.pinn), x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, text: old ? old.value : "" };
+    redraw();
+    /** @type {HTMLElement | null} */ (body.querySelector("#cam-pin-note"))?.focus();
+  }; });
+  const cancel = /** @type {HTMLElement | null} */ (box.querySelector("#cam-pin-cancel"));
+  if (cancel) cancel.onclick = () => { DONE.camPin = null; redraw(); };
+  const save = /** @type {HTMLButtonElement | null} */ (box.querySelector("#cam-pin-save"));
+  if (save) save.onclick = async () => {
+    const text = /** @type {HTMLTextAreaElement} */ (box.querySelector("#cam-pin-note")).value.trim(), m = /** @type {HTMLElement} */ (box.querySelector("#cam-pin-msg"));
+    if (!text) { m.textContent = "Write what should change."; return; }
+    const p = DONE.camPin; save.disabled = true;
+    try {
+      const x = await sendEdit("camera", "camera-note-add", { shot: s.id, option: p.n, x: p.x, y: p.y, text }, cb.notes_base || undefined);
+      if (x.status !== "done") { m.textContent = editMsg(x); save.disabled = false; return; }
+      DONE.camPin = null; redraw();
+    } catch (err) { m.textContent = /** @type {Error} */ (err).message; save.disabled = false; }
+  };
+  box.querySelectorAll("[data-ndel]").forEach((el) => { /** @type {HTMLButtonElement} */ (el).onclick = async () => {
+    /** @type {HTMLButtonElement} */ (el).disabled = true;
+    try { const x = await sendEdit("camera", "camera-note-remove", { note: /** @type {HTMLElement} */ (el).dataset.ndel }, cb.notes_base || undefined); if (x.status !== "done") alert(editMsg(x)); }
+    catch (err) { alert(/** @type {Error} */ (err).message); }
+    redraw();
+  }; });
+  if (cb.notes && cb.notes.lot) setTimeout(() => { if (DONE.tab === "camera" && !DONE.camPin) { railRefresh().then(redraw); } }, 5000);
+}
+/** The approve bar of the Camera page: a missing still or an open note blocks it. @param {HTMLElement} body */
+function cameraBar(body) {
+  const cb = RAIL.data && RAIL.data.camera;
+  if (!cb || !cb.shots.length) return;
+  const nNotes = cb.shots.reduce((/** @type {number} */ k, /** @type {any} */ s) => k + (s.open_notes || 0), 0);
+  const blocked = cb.missing.length ? `No still yet for ${cb.missing.join(", ")}.` : nNotes ? "Open notes: send them to Claude first." : "";
+  approveBar(body, "camera", blocked);
+  const bar = body.querySelector(".approve-bar"), r = pendingFor("camera");
+  const ask = bar && /** @type {HTMLElement | null} */ (bar.querySelector("#ask-changes"));
+  if (r && ask) {                                   // "Request changes…" becomes "Send N notes to Claude"
+    const b = document.createElement("button");
+    b.className = "btn"; b.id = "cam-send"; b.disabled = !nNotes;
+    b.textContent = nNotes ? `Send ${nNotes} note${nNotes === 1 ? "" : "s"} to Claude` : "Send notes to Claude";
+    b.onclick = async () => {
+      b.disabled = true;
+      try { await post(`/reviews/${encodeURIComponent(r.id)}/decision`, { value: "revise", note: "" }); route(); }
+      catch (err) { const m = /** @type {HTMLElement} */ (bar.querySelector("#approve-msg")); m.className = "fail small"; m.textContent = /** @type {Error} */ (err).message; b.disabled = false; }
+    };
+    ask.replaceWith(b);
+  }
+  const lot = cb.notes && cb.notes.lot, cam = body.querySelector(".cam");
+  if (lot && cam) {
+    const p = document.createElement("p"); p.className = "notice small"; p.id = "cam-lot";
+    p.textContent = `Claude is making new options for the shots with notes (${lot.notes.length} note${lot.notes.length === 1 ? "" : "s"}); notes you add now wait for the next round.`;
+    cam.prepend(p);
   }
 }
 
@@ -3258,7 +3430,7 @@ async function pageNew() {
       <label>Length in seconds <span class="hint">Up to ${max} seconds.</span>
         <input id="seconds" type="number" min="5" max="${max}" value="${Math.min(30, max)}" required></label>
       <label class="check"><input id="treat" type="checkbox"> <span>Let me review the treatment (the written plan) before the picture is made</span></label>
-      ${pointBoxes("f-reviews", ["script", "cast", "animatic", "shots"])}
+      ${pointBoxes("f-reviews", ["script", "cast", "camera", "animatic", "shots"])}
       <div><button class="primary" type="submit" ${left === 0 || !ME.verified ? "disabled" : ""}>Make the film (uses 1 credit)</button></div>
     </form><p id="msg" class="muted" role="status"></p>`;
   $app.querySelector("input[name=style]:checked")?.closest("label")?.scrollIntoView({ block: "nearest" });

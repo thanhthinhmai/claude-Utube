@@ -4,7 +4,7 @@
 #   sh bin/studio status [--json]       trạng thái xưởng (không dùng mạng, không ghi file)
 #   sh bin/studio deps [voice] [music]  cài gói của thư viện (Node, Python, giọng, nhạc) vào lib/lemo-opuscar
 #   sh bin/studio deps learn [--extra]  cài công cụ học phong cách vào tools/.venv (--extra: tải video, chép lời)
-#   sh bin/studio learn <lệnh> …        học phong cách: fetch | measure | shots | label | transcribe | summary | check-names | compare | save | clean
+#   sh bin/studio learn <lệnh> …        học phong cách: fetch | measure | shots | label | transcribe | summary | check-names | compare | save | clean | camera
 #   sh bin/studio deps ui               cài giao diện web (tools/.venv)
 #   sh bin/studio deps sound            cài công cụ học tiếng (torch CPU, demucs, transformers) vào tools/.venv (specs/037)
 #   sh bin/studio deps online           cài thêm gói cho chế độ online (specs/007)
@@ -12,7 +12,7 @@
 #   sh bin/studio online up|down|logs|admin <email>  chạy xưởng online bằng Docker Compose (deploy/, xem deploy/README.md)
 #   sh bin/studio ui [open|status|stop] mở / xem / tắt giao diện; job … · review …: sổ việc và duyệt (xem specs/003)
 #   sh bin/studio script check|review|status|skip <phim>  chấm kịch bản (specs/010); web fetch <url>: mở một trang
-#   sh bin/studio qc [voice|plan|shots|final] <phim> · qc except|accept-style …  kiểm theo tầng (specs/020); voice asr <phim>
+#   sh bin/studio qc [voice|plan|shots|final|depth|camera] <phim> · qc except|accept-style …  kiểm theo tầng (specs/020); voice asr <phim>
 #   sh bin/studio publish <phim> [--check-only] [--json]   gói đăng YouTube từ publish/pack.json (specs/011)
 #   sh bin/studio channel list|new|show|set|decide|attach … · lesson list|draft|add|approve|retire …  kênh và bài học (specs/012)
 #   sh bin/studio kit use <phim> [--style S] [--update]   chép bộ dựng của phong cách vào films/<phim>/kit/ (specs/022)
@@ -27,6 +27,7 @@
 #   sh bin/studio blender status | config [--exe P] [--work D] [--timeout S] | build <phim> S3 [--still F] [--quarter] | plate <phim> S5 --from S4  shot Blender (specs/038)
 #   sh bin/studio cast check|status|approve|notes|use|library|preview|update|library-approve … · ae sheet <phim> · ae rigs [--check|--lock R]  duyệt nhân vật phim AE (specs/034)
 #   sh bin/studio sound lib|key|cue|silence|plan|mix|notes …  kho tiếng và tiếng theo shot của phim AE (specs/037)
+#   sh bin/studio camera suggest|choose|retime|show|stills|note|fit <phim> …  phương án máy quay theo shot của phim AE (specs/039)
 #   sh bin/studio help
 # Mã thoát: 0 = sẵn sàng / xong · 1 = chưa sẵn sàng / thất bại · 2 = sai cách dùng hoặc library.lock sai.
 set -eu
@@ -607,7 +608,7 @@ case ${1:-} in
   blender) shift; cmd_blender "$@" ;;
   config) if [ "${2:-}" = ae ]; then shift 2; cmd_ae config "$@"; else cmd_filmcheck "$@"; fi ;;
   ui | job | review | admin | app) cmd_studio "$@" ;;
-  script | web | qc | publish | eleven | channel | lesson | topics | kit | point | edit | people | shots | notes | film | cast | animatic | sound) cmd_filmcheck "$@" ;;
+  script | web | qc | publish | eleven | channel | lesson | topics | kit | point | edit | people | shots | notes | film | cast | animatic | sound | camera) cmd_filmcheck "$@" ;;
   help | -h | --help) usage ;;
   '') usage >&2; exit 2 ;;
   *) echo "✗ lệnh lạ: $1" >&2; usage >&2; exit 2 ;;

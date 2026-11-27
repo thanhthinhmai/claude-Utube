@@ -7,12 +7,12 @@ from pathlib import Path
 
 from filmcheck import report, tiers
 
-POINTS = ("script", "cast", "voice", "animatic", "shots", "mix", "publish")
+POINTS = ("script", "cast", "camera", "voice", "animatic", "shots", "mix", "publish")
 DEFAULT_ON = ["script", "shots"]
-AE_ON = ("cast", "animatic")            # on by default for After Effects films unless turned off (specs/034, 035)
-STEP = {"script": "Script", "cast": "Cast", "voice": "Voice", "animatic": "Animatic", "shots": "Shots", "mix": "Mix",
+AE_ON = ("cast", "camera", "animatic")  # on by default for After Effects films unless turned off (specs/034, 035, 039)
+STEP = {"script": "Script", "cast": "Cast", "camera": "Camera", "voice": "Voice", "animatic": "Animatic", "shots": "Shots", "mix": "Mix",
         "publish": "Publish"}
-AE_ONLY = ("cast", "animatic")          # skipped for web page films
+AE_ONLY = ("cast", "camera", "animatic")  # skipped for web page films
 WEB_ONLY = ("shots",)                   # skipped for AE films: they review the animatic (specs/035 R10)
 LOCKED = {"approved", "waiting"}            # a point in these states cannot be turned on or off (data-model)
 
@@ -62,6 +62,8 @@ def fingerprint(film_dir: Path, point: str) -> str:
         return cast.fingerprint(d) if cast.exists(d) else ""
     if point == "animatic":
         return animatic_fingerprint(d)
+    if point == "camera":
+        return camera_fingerprint(d)
     files = {"script": ["SCRIPT.md", "SOURCES.md"], "mix": ["mix.json", "out/mix.wav"],
              "publish": ["publish/pack.json"]}[point]
     if point == "mix" and is_ae(d):                 # specs/037: the sound plan and its notes are part of the mix point
@@ -89,6 +91,73 @@ def animatic_fingerprint(d: Path) -> str:
     h.update(b"\0")
     h.update(_hash(d, [d / "narration.json", d / "cast" / "cast.json", *sorted((d / "ae").glob("*.jsx"))]).encode())
     return h.hexdigest()[:16]
+
+
+CAM_PLAN_KEYS = ("size", "people", "card", "action", "outdoor", "prop", "engine")
+CAM_OPT_KEYS = ("n", "size", "move", "rate_pct_s", "ease", "ease_ae", "start", "transition")
+
+
+def camera_fingerprint(d: Path) -> str:
+    """specs/039 R9: the shots, the plan fields the similarity reads, each shot's chosen option and its length-free
+    numbers, and the open Camera notes. zoom_pct and drift_px follow the shot length (retime), so they are left out."""
+    from filmcheck import camnotes, camsuggest
+    h = hashlib.sha256()
+    try:
+        doc = json.loads((d / "film.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        doc = {}
+    plans = doc.get("shot_plan") or {}
+    shots = list(doc.get("shots") or [])
+    h.update(json.dumps([[s, {k: (plans.get(s) or {}).get(k) for k in CAM_PLAN_KEYS}] for s in shots],
+                        sort_keys=True).encode())
+    o = camsuggest.load(d) or {}
+    chosen = {}
+    for s, row in (o.get("shots") or {}).items():
+        n = (row.get("choice") or {}).get("n")
+        opt = next((x for x in row.get("options") or [] if x.get("n") == n), None)
+        chosen[s] = {k: (opt or {}).get(k) for k in CAM_OPT_KEYS}
+    h.update(b"\0" + json.dumps(chosen, sort_keys=True).encode())
+    opn = {s: [[n.get("id"), n.get("text")] for n in ns] for s, ns in camnotes.open_notes(d).items()}
+    if opn:
+        h.update(b"\0" + json.dumps(opn, sort_keys=True).encode())
+    return h.hexdigest()[:16]
+
+
+def camera_missing(d: Path) -> list:
+    """Shots without camera options or without the still of their chosen option (★ when none is chosen)."""
+    from filmcheck import camsuggest
+    try:
+        shots = json.loads((d / "film.json").read_text(encoding="utf-8")).get("shots") or []
+    except (OSError, ValueError):
+        return []
+    o = camsuggest.load(d) or {}
+    out = []
+    for s in shots:
+        row = (o.get("shots") or {}).get(s)
+        opts = (row or {}).get("options") or []
+        n = ((row or {}).get("choice") or {}).get("n")          # untouched: ★ (approve takes it)
+        opt = next((x for x in opts if x.get("n") == n), None) if n else \
+            next((x for x in opts if x.get("recommended")), opts[0] if opts else None)
+        if not opt or not opt.get("still") or not (d / opt["still"]).is_file():
+            out.append(s)
+    return out
+
+
+def camera_skip_reason(d: Path):
+    """Why the Camera point does not apply: not an AE film, or no camera library for the film's style (FR-020)."""
+    if not is_ae(d):
+        return "not an After Effects film"
+    if (d / "camera" / "options.json").is_file():
+        return None
+    from filmcheck import stylerefs
+    try:
+        doc = json.loads((d / "film.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        doc = {}
+    slug = doc.get("style") or stylerefs.slug_of(d)
+    if slug and (stylerefs.style_dir(d, slug) / "camera.json").is_file():
+        return None
+    return "the style has no camera library (learn camera, then learn save)"
 
 
 # ---------- state ----------
@@ -142,6 +211,7 @@ def reached(film_dir: Path, point: str) -> bool:
             "mix": (d / "out" / "mix.wav").is_file(),
             "publish": (d / "publish" / "pack.json").is_file(),
             "cast": _cast_reached(d),
+            "camera": point == "camera" and (d / "camera" / "options.json").is_file() and not camera_missing(d),
             "animatic": point == "animatic" and _animatic_reached(d)}[point]
 
 
@@ -164,6 +234,8 @@ def skip_reason(film_dir: Path, point: str):
     """Why a point does not apply to this film, or None."""
     if point == "cast":
         return cast_skip_reason(film_dir)
+    if point == "camera":
+        return camera_skip_reason(Path(film_dir))
     if point == "animatic" and not is_ae(film_dir):
         return "not an After Effects film"
     if point in WEB_ONLY and is_ae(film_dir):
@@ -290,6 +362,12 @@ def checks_pass(film_dir: Path, point: str) -> list:
     if point == "animatic":
         from filmcheck import animatic
         return animatic.problems(d)
+    if point == "camera":
+        from filmcheck import camnotes
+        miss = camera_missing(d)
+        why = [f"no camera options or still for: {', '.join(miss)} (sh bin/studio camera suggest|stills {d.name})"] if miss else []
+        why += [f"{s}: {len(ns)} open camera note(s)" for s, ns in camnotes.open_notes(d).items()]
+        return why
     if point == "mix":
         mix = d / "out" / "mix.wav"
         if not mix.is_file():
@@ -334,6 +412,13 @@ def approve(film_dir: Path, point: str, base: str = None, source: str = "chat", 
         if why:
             return 1, why
     extra = {}
+    if point == "camera":         # approving takes every shot's choice (★ when untouched) into shot_plan
+        from filmcheck import camsuggest
+        try:
+            camsuggest.choose_auto(d, by=by or "owner")
+        except camsuggest.CameraError as e:
+            return 1, [str(e)]
+        fp = fingerprint(d, point)
     if point == "animatic":
         from filmcheck import animatic, rhythm
         sil = animatic.silence(d)
@@ -371,6 +456,10 @@ def gate(film_dir: Path, point: str) -> list:
     """[] when the step after this point may run; else the reasons, each with the command to run."""
     d = Path(film_dir)
     st = state(d, point)
+    if point == "camera" and st == "not_reached":                # specs/039: the style has a camera library
+        miss = camera_missing(d)
+        return [f"no camera options or stills yet for {', '.join(miss) if miss else 'this film'} "
+                f"(sh bin/studio camera suggest {d.name} then sh bin/studio camera stills {d.name})"]
     if st in ("off", "skipped", "approved", "not_reached"):      # not_reached: nothing to review (no SCRIPT.md, …)
         return []
     sk = load(d)["skipped"].get(point)

@@ -162,6 +162,31 @@ def cmd_craft(a):
         raise StepError(str(e))
 
 
+def cmd_camera(a):
+    """specs/039 US1: measure every reference shot's camera; --write puts the library into an existing style."""
+    from sl import camlib, save
+    vids = [x for x in (a.videos or "").split(",") if x] or None
+    try:
+        tot = camlib.camera_set(a.set, vids, a.force)
+    except camlib.camtrack.TrackError as e:
+        raise StepError(str(e)) from None
+    except camlib.CameraError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 2
+    print(f"Camera: {tot['shots']} shot(s) measured now in {tot['videos']} video(s), {tot['skipped']} skipped.")
+    for n in tot["need"]:
+        print(f"! left empty until you run: {n} {a.set}")
+    if a.write:
+        dest = refset.root() / "my-styles" / refset.check_slug(a.write, "mã phong cách")
+        if not dest.is_dir():
+            raise UsageError(f"--write: chưa có my-styles/{a.write}/")
+        n = save.write_camera(a.set, dest)
+        if not (dest / "camera.json").exists():
+            raise StepError("chưa có số đo máy quay nào để ghi")
+        print(f"✓ my-styles/{a.write}/camera.json ({n} shot(s) with evidence frames)")
+    return 0
+
+
 def cmd_evidence(a):
     from sl import craft
     print(craft.evidence(a.set, a.vid, a.t, a.name))
@@ -305,6 +330,11 @@ def main(argv=None) -> int:
     cr = sub.add_parser("craft", help="đo máy, cử động trong cảnh, chuyển cảnh; cắt dải khung (specs/023)")
     cr.add_argument("set"); cr.add_argument("--only", nargs="*"); cr.add_argument("--strips", type=int, default=80)
     cr.set_defaults(fn=cmd_craft)
+
+    ca = sub.add_parser("camera", help="máy quay từng shot mẫu: zoom, ease, trôi, thị sai, bố cục (specs/039)")
+    ca.add_argument("set"); ca.add_argument("--videos", help="v01,v02"); ca.add_argument("--force", action="store_true")
+    ca.add_argument("--write", metavar="STYLE", help="ghi thư viện vào my-styles/<STYLE>/ đã có (giữ phần khác)")
+    ca.set_defaults(fn=cmd_camera)
 
     ev = sub.add_parser("evidence", help="trích một khung 640 px làm bằng chứng (video phải còn)")
     ev.add_argument("set"); ev.add_argument("vid"); ev.add_argument("t", type=float); ev.add_argument("--name", required=True)

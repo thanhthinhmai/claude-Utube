@@ -240,6 +240,47 @@ def _sound_meta(d: Path) -> dict:
     return out
 
 
+def camera_block(d: Path, pending: bool = False):
+    """The Camera panel of an AE film (specs/039 contracts/ui.md); None for a film without the camera point."""
+    from filmcheck import camnotes, camsuggest, points
+    try:
+        if not points.is_ae(d):
+            return None
+    except Exception:                             # noqa: BLE001 — no film.json: not an AE film
+        return None
+    st = points.state(d, "camera", pending)
+    out = {"state": {"ready": "waiting", "stale": "must_run_again"}.get(st, st),
+           "skip_reason": points.skip_reason(d, "camera"), "source": None, "shots": [],
+           "missing": points.camera_missing(d), "notes": None, "notes_base": None,
+           "summary": "", "error": None}
+    try:
+        o = camsuggest.load(d)
+    except Exception as e:                        # noqa: BLE001 — a broken file: the panel says why
+        out["error"] = f"camera/options.json cannot be read: {e}"[:300]
+        return out
+    if not o:
+        return out
+    try:
+        out["notes"], out["notes_base"] = camnotes.NOTES.load(d), camnotes.base(d)
+        out["summary"] = camnotes.summary(d)
+    except Exception as e:                        # noqa: BLE001
+        out["error"] = str(getattr(e, "message", e))[:300]
+    open_n = {s: len(v) for s, v in camnotes.open_notes(d).items()}
+    out["source"] = o.get("source")
+    keys = ("n", "ref", "size", "move", "zoom_pct", "rate_pct_s", "ease", "ease_ae", "drift_px", "start", "transition",
+            "engine", "reason", "notes", "dur", "score", "cam_height", "lens")
+    for sid, row in (o.get("shots") or {}).items():
+        opts = row.get("options") or []
+        rec = next((x["n"] for x in opts if x.get("recommended")), opts[0]["n"] if opts else None)
+        ch = (row.get("choice") or {}).get("n")
+        out["shots"].append({
+            "id": sid, "dur": row.get("dur"), "chosen": ch or rec, "chosen_by": (row.get("choice") or {}).get("by"),
+            "recommended": rec, "open_notes": open_n.get(sid, 0), "note": row.get("note"),
+            "options": [{**{k: x.get(k) for k in keys}, "still": x.get("still"),
+                         "ref_frames": x.get("ref_frames") or []} for x in opts]})
+    return out
+
+
 def sound_block(d: Path, scope: str = "all"):
     """The Sound panel of an AE film (specs/037 contracts/api.md); None for a page film. Shots with their sounds (each with
     its name, credit and up to 7 other choices), silences, the sound switch, notes and the bases the edits send."""
@@ -351,7 +392,7 @@ def view(j: dict) -> dict:
                          "reason": None if cat is not None else ("no scene table" if has_kit else "style has no kit")},
             "catalog": cat, "voices": voices() + [v["id"] for v in el_voices()], "voice_rows": voice_rows(),
             "voice_cost": voice_cost(d), "speakers": speaker_rows(d), "emotions": emotions(d), "narrator_voice": narrator_now(d), "mix_ranges": mix_ranges(d), "review": rv, "cast": cast_block(d),
-            "animatic": animatic_block(d, j), "sound": sound_block(d, sound_scope(j))}
+            "animatic": animatic_block(d, j), "sound": sound_block(d, sound_scope(j)), "camera": camera_block(d, "camera" in pending)}
 
 
 def etag(v: dict) -> str:

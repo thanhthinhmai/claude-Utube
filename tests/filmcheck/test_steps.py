@@ -29,9 +29,9 @@ class Steps(unittest.TestCase):
                          ["Treatment", "Script", "Voice", "Look", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
         self.assertEqual(steps.impact("script", self.d), ["Voice", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
         # specs/034, 035: without a film, every step of either kind of film
-        self.assertEqual(steps.impact("script"), ["Cast", "Voice", "Animatic", "Picture", "Shots", "Mix", "Render", "Self-check",
+        self.assertEqual(steps.impact("script"), ["Cast", "Camera", "Voice", "Animatic", "Picture", "Shots", "Mix", "Render", "Self-check",
                                                   "Publish"])
-        self.assertEqual(steps.impact("cast"), ["Animatic", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
+        self.assertEqual(steps.impact("cast"), ["Camera", "Animatic", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
         self.assertEqual(steps.impact("voice"), ["Animatic", "Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
         self.assertEqual(steps.impact("voice", self.d), ["Picture", "Shots", "Mix", "Render", "Self-check", "Publish"])
         self.assertEqual(steps.impact("shots"), ["Render", "Self-check", "Publish"])
@@ -88,9 +88,9 @@ class AeSteps(unittest.TestCase):
 
     def test_order_labels_and_impact(self):
         rail = steps.status(self.d)
-        self.assertEqual([s["name"] for s in rail], ["Treatment", "Script", "Cast", "Voice", "Animatic", "Mix", "Render",
+        self.assertEqual([s["name"] for s in rail], ["Treatment", "Script", "Cast", "Camera", "Voice", "Animatic", "Mix", "Render",
                                                      "Self-check", "Publish"])
-        self.assertEqual([s["label"] for s in rail][5:7], ["Sound", "Final render"])
+        self.assertEqual([s["label"] for s in rail][6:8], ["Sound", "Final render"])
         self.assertEqual(next(s for s in rail if s["name"] == "Animatic")["point"], "animatic")
         self.assertEqual(steps.impact("animatic", self.d), ["Mix", "Render", "Self-check", "Publish"])   # FR-004
         self.assertEqual(steps.impact("mix", self.d), ["Render", "Self-check", "Publish"])   # specs/037 FR-029

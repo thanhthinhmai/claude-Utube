@@ -17,6 +17,9 @@ PLAN_CHOICES = {
     "transition": ("cut", "fade", "dip"),
 }
 LAYERS = ("fg", "mid", "bg", "far")
+FLAGS = ("occluder", "card", "action", "outdoor", "prop")        # specs/039 R4: same meaning as craft-label
+CAM_MOVES = ("static", "push", "pull", "pan")                    # specs/039: 2D camera moves of a camera block
+CAM_TRANSITIONS = ("cut", "fade", "dip", "streak", "flash", "wipe", "dissolve")
 
 
 class FilmError(Exception):
@@ -82,13 +85,60 @@ def _check_plan(doc: dict) -> None:
                                                  f"not {row[key]!r}")
         if "layers" in row and not (isinstance(row["layers"], list) and all(x in LAYERS for x in row["layers"])):
             raise FilmError("bad_film_json", f"film.json: shot_plan.{sid}.layers holds some of {', '.join(LAYERS)}")
-        if "occluder" in row and not isinstance(row["occluder"], bool):
-            raise FilmError("bad_film_json", f"film.json: shot_plan.{sid}.occluder must be true or false")
+        for key in FLAGS:
+            if key in row and not isinstance(row[key], bool):
+                raise FilmError("bad_film_json", f"film.json: shot_plan.{sid}.{key} must be true or false")
+        if "camera" in row:
+            _check_camera(sid, row["camera"])
         if "people" in row and not (isinstance(row["people"], int) and row["people"] >= 0):
             raise FilmError("bad_film_json", f"film.json: shot_plan.{sid}.people must be a whole number")
         for key in ("set", "reason"):
             if key in row and not isinstance(row[key], str):
                 raise FilmError("bad_film_json", f"film.json: shot_plan.{sid}.{key} must be text")
+
+
+FIT_K = (0.5, 3.0)        # specs/039 camera fit: keyed zoom = zoom_pct · fit_k (the track reads flat art short)
+
+
+def _num(v) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _check_camera(sid: str, cam) -> None:
+    """specs/039 data-model "Shot plan": the chosen camera of a shot (written only by `camera choose|retime`)."""
+    where = f"film.json: shot_plan.{sid}.camera"
+    if not isinstance(cam, dict):
+        raise FilmError("bad_film_json", f"{where} must be an object")
+    if cam.get("size") not in PLAN_CHOICES["size"]:
+        raise FilmError("bad_film_json", f"{where}.size must be one of {', '.join(PLAN_CHOICES['size'])}")
+    move = cam.get("move")
+    if not (isinstance(move, str) and (move in CAM_MOVES or cam.get("by_user_request") is True)):
+        raise FilmError("bad_film_json", f"{where}.move must be one of {', '.join(CAM_MOVES)} "
+                                         "(another move only with by_user_request: true)")
+    st = cam.get("start")
+    if not (isinstance(st, dict) and all(_num(st.get(k)) for k in ("scale", "cx", "cy"))):
+        raise FilmError("bad_film_json", f"{where}.start must be {{scale, cx, cy}}")
+    if not 0.5 <= st["scale"] <= 4:
+        raise FilmError("bad_film_json", f"{where}.start.scale must be between 0.5 and 4")
+    if not (_num(cam.get("zoom_pct")) and abs(cam["zoom_pct"]) <= 40):
+        raise FilmError("bad_film_json", f"{where}.zoom_pct must be a number from -40 to 40")
+    if not _num(cam.get("rate_pct_s")):
+        raise FilmError("bad_film_json", f"{where}.rate_pct_s must be a number")
+    fk = cam.get("fit_k")
+    if fk is not None and not (_num(fk) and FIT_K[0] <= fk <= FIT_K[1]):
+        raise FilmError("bad_film_json", f"{where}.fit_k must be a number from {FIT_K[0]} to {FIT_K[1]} (camera fit)")
+    e = cam.get("ease")
+    if e is not None and not (isinstance(e, list) and len(e) == 3 and all(_num(x) and 0 <= x <= 1 for x in e)
+                              and e[0] <= e[1] <= e[2]):
+        raise FilmError("bad_film_json", f"{where}.ease must be three rising numbers from 0 to 1, or null")
+    ea = cam.get("ease_ae")
+    if ea is not None and not (isinstance(ea, list) and len(ea) == 2 and all(_num(x) and 0.1 <= x <= 100 for x in ea)):
+        raise FilmError("bad_film_json", f"{where}.ease_ae must be [in, out] influence from 0.1 to 100")
+    d = cam.get("drift_px")
+    if not (isinstance(d, list) and len(d) == 2 and all(_num(x) for x in d)):
+        raise FilmError("bad_film_json", f"{where}.drift_px must be [x, y]")
+    if cam.get("transition", "cut") not in CAM_TRANSITIONS:
+        raise FilmError("bad_film_json", f"{where}.transition must be one of {', '.join(CAM_TRANSITIONS)}")
 
 
 def engine_of(doc: dict, shot: str) -> str:

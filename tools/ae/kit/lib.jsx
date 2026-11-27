@@ -304,7 +304,9 @@ CU.opa = function (L) { return CU.T(L, "ADBE Opacity"); };
 CU.anc = function (L) { return CU.T(L, "ADBE Anchor Point"); };
 
 // Camera: parent every layer (except those listed) to a CAM null and frame [t, fx, fy, zoom].
+CU.CAMSTILL = CU.CAMSTILL || false;  // specs/039: `camera stills` builds every shot at scale 1, centred (the options crop it)
 CU.camera = function (comp, frames, skip, inf) {
+  if (CU.CAMSTILL) { frames = [[0, comp.width / 2, comp.height / 2, 1], [comp.duration, comp.width / 2, comp.height / 2, 1]]; frames.fromMotion = true; inf = 0; }
   if (CU.CUR_SHOT && !frames.fromMotion && !(CU.NO_MOTION && CU.NO_MOTION[CU.CUR_SHOT])) {
     var mf = new File(CU.MOTION + "S" + CU.CUR_SHOT + ".json");
     if (mf.exists) { frames = CU.camFromMotion(comp, CU.readJSON(mf.fsName), [frames[0][1], frames[0][2]], frames[0][3]); inf = 0; CU.say("camera S" + CU.CUR_SHOT + ": measured path"); }
@@ -564,6 +566,45 @@ CU.camFromMotion = function (comp, motion, f0, z0) {
   for (k = 0; k < 25; k++) { fr = CU._camFromMotion(comp, motion, f0, z0); if (CU.camInside(comp, fr)) { return fr; } z0 *= 1.02; }
   CU.say("CHECK camera " + comp.name + ": the measured move leaves the drawn background even at zoom " + z0.toFixed(2));
   return fr;
+};
+// specs/039 R7: the camera chosen at the Camera review (the shot plan of film.json, bundled as data/camera.json).
+// CU.planCam(comp, "S3", skip) parents the layers to CAM like CU.camera and keys its start and end:
+//   start {scale, cx, cy}  zoom and the scene point (% of the comp) at the frame centre on the first frame
+//   zoom_pct, drift_px     end zoom = scale·(1 + zoom·fit_k/100); the window moves drift_px (1080p screen px) by the end
+//   fit_k                  set by `camera fit` so the built picture measures the option's zoom (default 1)
+//   ease_ae [in, out]      speed-0 ease, out influence on the first key and in influence on the last
+// A measured path (data/motion/S#.json) still wins (CU.camera). Returns the CAM null, or null when the shot has no
+// camera block (the shot then keeps its own CU.camera frames).
+CU.CAMPLAN = null;
+CU.planCamBlock = function (id) {
+  if (CU.CAMPLAN === null) {
+    var f = new File(CU.WORK + "/data/camera.json");
+    try { CU.CAMPLAN = f.exists ? CU.readJSON(f.fsName) : {}; } catch (e) { CU.CAMPLAN = {}; }
+  }
+  return CU.CAMPLAN[id] || null;
+};
+CU.planFrames = function (comp, c) {
+  var W = comp.width, H = comp.height, st = c.start, z0 = st.scale, z1 = st.scale * (1 + c.zoom_pct * (c.fit_k || 1) / 100);
+  var fx = st.cx / 100 * W, fy = st.cy / 100 * H, d = c.drift_px || [0, 0];
+  return [[0, fx, fy, z0], [comp.duration, fx + d[0] / z1, fy + d[1] / z1, z1]];
+};
+CU.planCam = function (comp, id, skip) {
+  var c = CU.planCamBlock(id || ("S" + CU.CUR_SHOT));
+  if (!c) { return null; }
+  var frames = CU.planFrames(comp, c), cam = CU.camera(comp, frames, skip, 0), k, p, e = c.ease_ae;
+  if (!e || c.move === "static") { return cam; }
+  var props = [CU.pos(cam), CU.scl(cam)];
+  for (k = 0; k < props.length; k++) {
+    p = props[k];
+    if (p.numKeys !== 2) { continue; }                       // a measured path keyed every frame: keep it
+    var j, q, a, b;                                          // Position takes 1 ease, Scale one per dimension
+    for (j = 1; j <= 3; j++) {
+      a = []; b = []; for (q = 0; q < j; q++) { a.push(new KeyframeEase(0, e[1])); b.push(new KeyframeEase(0, e[0])); }
+      try { p.setTemporalEaseAtKey(1, a, a); p.setTemporalEaseAtKey(2, b, b); break; } catch (er) { }
+    }
+  }
+  CU.say("camera " + id + ": " + c.move + " " + c.zoom_pct + "%" + (c.fit_k ? " ×" + c.fit_k : "") + " (Camera review)");
+  return cam;
 };
 CU.BOUNDS = {}; // comp name -> [x0, y0, x1, y1] drawn background area when it is larger than the comp
 CU.camInside = function (comp, frames) {
