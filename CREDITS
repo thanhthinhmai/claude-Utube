@@ -39,6 +39,21 @@ Python packages in each `*.dist-info/`, npm packages in `node_modules/*/`, Debia
 - Debian packages of the Linux core (Windows): Ubuntu 24.04 (https://ubuntu.com) and the apt packages installed by
   deploy/core.Dockerfile (bubblewrap, socat, fonts-noto, fonts-dejavu, git, curl and their dependencies), each under
   the license in its `/usr/share/doc/<package>/copyright`.
+- Sonniss GDC Game Audio Bundles (https://sonniss.com/gameaudiogdc), Sonniss GDC licence 2.0: royalty-free commercial
+  use, no credit needed; the sounds may not be redistributed or offered as such (also not as a service's output) and may
+  not be used for AI. Not bundled: the owner downloads the packs to their own machine and adds the folder in Settings
+  (specs/037). The studio indexes only file names and the text inside the files, never the audio, and uses these sounds
+  in the studio owner's own films only. Each film lists the sounds it used in its own CREDITS.
+- Freesound (https://freesound.org), an optional online service reached through APIv2 with the user's own free key
+  (specs/037); only sounds under Creative Commons 0 (CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/) are
+  fetched, as HQ previews. Each film names the Freesound sounds it used (id, author, page) in its own CREDITS.
+
+- Sound learning models (specs/037, `sh bin/studio deps sound`, run on the owner's machine, not bundled): htdemucs
+  (Demucs, https://github.com/adefossez/demucs, MIT, © Meta Platforms); MIT/ast-finetuned-audioset-10-10-0.4593
+  (Audio Spectrogram Transformer, BSD-3-Clause); laion/larger_clap_general (CLAP, Apache-2.0). Labels and the
+  level-2 tree in tools/style-learn/sl/audioset.py come from the AudioSet ontology (https://github.com/audioset/ontology),
+  © Google, CC BY 4.0. Python packages of that tier: PyTorch and torchaudio (BSD-3-Clause), demucs (MIT), Transformers
+  (Apache-2.0), soundfile (BSD-3-Clause).
 
 ## Python packages
 

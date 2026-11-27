@@ -1054,6 +1054,113 @@ def delete_elevenlabs_key(request: Request):
     return Response(status_code=204)
 
 
+# ---------- the sound library (specs/037 US2, contracts/api.md) ----------
+_sound_index = {"running": False, "last": None, "error": None}
+
+
+def _sound_state() -> dict:
+    from filmcheck import soundlib
+    st = soundlib.status()
+    return {"roots": st["roots"], "by_source": st["by_source"], "broken": st["broken"],
+            "index": dict(_sound_index), "freesound": voicekeys.status("freesound")}       # never the key itself
+
+
+def _sound_reindex() -> None:
+    import threading
+    from filmcheck import soundlib
+    if _sound_index["running"]:
+        return
+
+    def run():
+        _sound_index.update(running=True, error=None)
+        try:
+            _sound_index["last"] = soundlib.index()
+        except Exception as e:                 # noqa: BLE001 — shown on the Settings page
+            _sound_index["error"] = str(e)[:300]
+        finally:
+            _sound_index["running"] = False
+    threading.Thread(target=run, daemon=True).start()
+
+
+class SoundFolderIn(BaseModel):
+    path: str = Field(min_length=1, max_length=1000)
+
+
+@router.get("/admin/sound")
+def get_sound(request: Request):
+    admin(request)
+    return _sound_state()
+
+
+@router.post("/admin/sound")
+def add_sound_folder(body: SoundFolderIn, request: Request):
+    """Add a Sonniss folder and index it in the background (names and text only, FR-013b)."""
+    from filmcheck import soundlib
+    admin(request)
+    try:
+        soundlib.add_root(body.path)
+    except soundlib.LibraryError as e:
+        raise StudioError("sound_folder_" + e.code, e.message, 422) from None
+    _sound_reindex()
+    return _sound_state()
+
+
+@router.post("/admin/sound/index")
+def reindex_sound(request: Request):
+    admin(request)
+    _sound_reindex()
+    return _sound_state()
+
+
+@router.delete("/admin/sound")
+def remove_sound_folder(request: Request, path: str = Query(..., max_length=1000)):
+    from filmcheck import soundlib
+    admin(request)
+    soundlib.remove_root(path)
+    _sound_reindex()
+    return _sound_state()
+
+
+class FreesoundKeyIn(BaseModel):
+    key: str = Field(min_length=16, max_length=100)
+
+
+@router.put("/admin/sound/freesound-key")
+def put_freesound_key(body: FreesoundKeyIn, request: Request):
+    """Try the key with one search, then keep it encrypted; only the proxy reads it back (research R4)."""
+    from filmcheck import freesound
+    who = admin(request)
+    try:
+        return voicekeys.save_named("freesound", body.key, by=(who or {}).get("id") if isinstance(who, dict) else None)
+    except freesound.FreesoundError as e:
+        raise StudioError("freesound_key_invalid" if e.code == "invalid_key" else "freesound_error",
+                          freesound.redact(e.message, body.key), 422 if e.code == "invalid_key" else 502) from None
+
+
+@router.delete("/admin/sound/freesound-key", status_code=204)
+def delete_freesound_key(request: Request):
+    admin(request)
+    voicekeys.delete("freesound")
+    return Response(status_code=204)
+
+
+@router.get("/sound/search")
+def sound_search(request: Request, q: str = ""):
+    """Search the library from "Add a sound": the studio owner sees every source, a customer CC0 only (FR-013a)."""
+    from .filmsteps import sound_search as search
+    a = me(request)
+    return {"results": search(q, "all" if a["role"] == "admin" else "cc0")}
+
+
+@router.get("/sound/preview/{entry}")
+def sound_preview(entry: str, request: Request):
+    """Play one library sound, at most 30 s. A Sonniss sound only for the studio owner (FR-013a)."""
+    from .filmsteps import sound_preview_file
+    a = me(request)
+    src, kind = sound_preview_file(entry, "all" if a["role"] == "admin" else "cc0")
+    return FileResponse(src, media_type=kind)
+
+
 @router.put("/admin/settings")
 async def put_settings(request: Request):
     admin(request)

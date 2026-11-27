@@ -83,6 +83,7 @@ Số trung bình của từng khung không cho biết máy đẩy vào hay nhân
 ```sh
 sh bin/studio job run $JOB --step "Craft" -- sh bin/studio learn craft <set> --strips 80   # máy (dời, phóng, bám), cử động sau khi bù máy, chuyển cảnh; 80 dải khung
 sh bin/studio job run $JOB --step "Sound" -- sh bin/studio learn sound <set>              # nhịp đọc, nhạc trong khoảng nghỉ, tiếng động, tempo
+sh bin/studio job run $JOB --step "Sfx" -- sh bin/studio learn sfx <set> --style <slug>   # tiếng động theo hành động, hai bộ phân loại đồng ý (specs/037)
 sh bin/studio learn evidence <set> <vNN> <giây> --name <tên>                             # khung lẻ 640 px làm bằng chứng (máy, âm thanh, nhịp đọc)
 ```
 
@@ -90,6 +91,7 @@ sh bin/studio learn evidence <set> <vNN> <giây> --name <tên>                  
 - `still_ratio` cũ chỉ thấy máy dời; số máy đứng thật (không dời, không phóng) lấy từ `craft-summary.json → motion`.
 - Diễn xuất chỉ đọc trên cảnh máy đứng: máy đi trong cảnh 3D để lại phần dư do thị sai.
 - Tempo có độ tin cậy thấp thì ghi như gợi ý; số tiếng động là mức trần (có lẫn phách nhạc).
+- `learn sfx` (specs/037) tự chạy ngay sau `learn sound` cho phong cách mới, khi video còn trên máy: tách lớp (htdemucs), mỗi sự kiện được AST và CLAP gọi tên, chỉ tin khi hai bên đồng ý; xét cả lớp giọng ngoài từ của người kể (đám đông reo rơi vào đó). Kết quả: `profile/<v>/sfx.json`, rồi `template.json → sound.sfx` và một đoạn bằng chứng trong `STYLE.md` của phong cách (`--style`). Chỉ ghi số, nhãn, mốc; lớp tách ra ở `references/<set>/stems/` bị xoá cùng video (`learn clean`). Thiếu tầng thì lệnh trả mã 3: `sh bin/studio deps sound` (miễn phí, ~1 GB, chạy CPU). Phong cách đã có, video đã xoá: tải lại bằng `learn refetch`, rồi `learn sfx <set> --style <slug>`; chỉ tổng hợp lại từ sfx.json đã có: `learn sfx <set> --style <slug> --summary`.
 - Đo xong thì xoá video ngay (bước 10), trước khi làm bộ dựng; dải khung và khung bằng chứng được giữ.
 - Học thêm một bộ đã xoá video: `sh bin/studio learn refetch <set> --videos <URL…>` tải lại vào đúng `vNN` cũ (ghép theo độ dài và khung giữa cảnh), nên nhãn và bằng chứng cũ vẫn dùng được; `transcribe` chép lời lại cho video đã mất `words.json`.
 

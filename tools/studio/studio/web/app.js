@@ -568,6 +568,7 @@ async function editPanel(body) {
   }
   if (pt === "cast") { castBar(body); return; }
   if (pt === "animatic") { animaticBar(body); return; }
+  if (pt === "mix" && RAIL.data.sound) { editSound(body); return; }
   const edit = { script: async () => { const sc = body.querySelector(".script"); if (sc) sc.remove(); await editScript(body); },
     voice: async () => { body.querySelectorAll(".tbl, .done-actions").forEach((x) => x.remove()); await editVoice(body); },
     mix: async () => editMix(body),
@@ -780,9 +781,9 @@ function canEdit(pt) {
   if (v.busy && (v.busy.step === POINT_STEP[pt] || (v.impact[pt] || []).includes(v.busy.step))) return false;
   return v.points[pt] && v.points[pt].state !== "skipped";
 }
-/** Send one edit and wait for its result (the page never writes a file itself). @param {string} point @param {string} op @param {any} args */
-async function sendEdit(point, op, args) {
-  const base = RAIL.data.points[point].fingerprint;
+/** Send one edit and wait for its result (the page never writes a file itself). @param {string} point @param {string} op @param {any} args @param {string} [base] another fingerprint (037: the sound plan or its notes) */
+async function sendEdit(point, op, args, base) {
+  base = base || RAIL.data.points[point].fingerprint;
   const a = await post(`/jobs/${encodeURIComponent(DONE.job.id)}/actions`, { point, op, args, base });
   for (let i = 0; i < 1200; i++) {
     await new Promise((r) => setTimeout(r, i < 20 ? 300 : 1000));
@@ -1086,6 +1087,241 @@ function animaticBar(body) {
       p.append(b);
     }
     anim.prepend(p);
+  }
+}
+
+// ---------- the Sound panel of an After Effects film (specs/037 US3) ----------
+/** m:ss.s @param {number} t */
+const sndT = (t) => { const m = Math.floor(t / 60), x = t - 60 * m; return `${m}:${x.toFixed(1).padStart(4, "0")}`; };
+const SND_STATE = { placed: ["ok", "Placed"], missing: ["warn", "Not found"], dropped: ["warn", "Dropped"], off: ["", "Off"] };
+/** @type {HTMLAudioElement | null} */ let SND_PREVIEW = null;
+/** @type {HTMLButtonElement | null} */ let SND_BTN = null;
+/** Stop the library sound that is playing and put its button back to ▶. */
+function sndStop() {
+  if (SND_PREVIEW) { SND_PREVIEW.pause(); SND_PREVIEW = null; }
+  if (SND_BTN) { SND_BTN.textContent = "▶"; SND_BTN.classList.remove("playing"); SND_BTN.setAttribute("aria-pressed", "false"); SND_BTN = null; }
+}
+/** Play one library sound (≤ 30 s); its button shows ■ while it plays, and a second click stops it.
+ * @param {string} id @param {HTMLButtonElement} [btn] */
+function sndPreview(id, btn) {
+  const again = !!btn && btn === SND_BTN;
+  sndStop();
+  if (again) return;
+  SND_PREVIEW = new Audio(`${API}/sound/preview/${encodeURIComponent(id)}`);
+  if (btn) { SND_BTN = btn; btn.textContent = "■"; btn.classList.add("playing"); btn.setAttribute("aria-pressed", "true"); }
+  SND_PREVIEW.onended = sndStop;
+  SND_PREVIEW.onerror = sndStop;
+  SND_PREVIEW.play().catch(sndStop);
+}
+/** The Sound panel: shots with their sounds, play a shot, change / move / level / remove a sound, add one, the shot's
+ * sound switch, notes per shot and "Send N notes to Claude".
+ * ctx: {media: url (video, or the mix), video: bool, cues: may change sounds, notes: may write notes,
+ *       edit(op, args, base) → Promise<string> message, noteAdd(shot, text), noteDel(shot, id), msg}
+ * @param {HTMLElement} host @param {any} sb @param {any} ctx */
+function soundPanel(host, sb, ctx) {
+  const box = document.createElement("div");
+  box.className = "sound-panel"; box.id = "sound-panel";
+  const placed = sb.shots.reduce((/** @type {number} */ a, /** @type {any} */ s) => a + s.cues.filter((/** @type {any} */ c) => c.state === "placed").length, 0);
+  const nNotes = sb.shots.reduce((/** @type {number} */ a, /** @type {any} */ s) => a + (s.notes_open || 0), 0);
+  const notes = (sb.notes && sb.notes.shots) || {};
+  const lot = sb.notes && sb.notes.lot, failedLot = sb.notes && sb.notes.failed_lot;
+  const T = sb.length || (sb.shots.length ? sb.shots[sb.shots.length - 1].t1 : 1) || 1;
+  const pct = (/** @type {number} */ x) => `${(100 * x / T).toFixed(3)}%`;
+  const strip = sb.shots.length ? `<div class="tl" role="img" aria-label="Shots, voice lines and sounds on one timeline">${sb.shots.map((/** @type {any} */ s) =>
+      `<div class="sh" style="left:${pct(s.t0)};width:${pct(s.t1 - s.t0)}" title="${esc(s.id)} · ${(s.t1 - s.t0).toFixed(2)} s">${esc(s.id)}</div>`
+      + (s.lines || []).map((/** @type {any} */ l) => `<div class="vo" style="left:${pct(l.at)};width:${pct(Math.max(0.05, l.end - l.at))}" title="${esc(l.id)}: ${esc(l.text || "")}"></div>`).join("")
+      + (s.silences || []).map((/** @type {any} */ x) => x.at != null ? `<div class="sil" style="left:${pct(x.at)};width:${pct(x.len_s || 0.1)}" title="silence"></div>` : "").join("")
+      + s.cues.filter((/** @type {any} */ c) => c.at != null).map((/** @type {any} */ c) =>
+        `<div class="fx${c.state === "placed" ? "" : " warn"}" style="left:${pct(c.at)};width:${pct(Math.max(0.15, c.len_s || 0.3))}" title="${esc(s.id)} · ${esc(c.action)}${c.sound ? ` → ${esc(c.sound.name)}` : ""}">${esc(c.action)}</div>`).join("")).join("")}</div>` : "";
+  const pic = ctx.picture && !ctx.video && ctx.media ? `<video class="sound-pic" id="snd-pic" muted playsinline preload="metadata" src="${ctx.picture}" aria-label="The Animatic draft, in time with the mix"></video>` : "";
+  const impact = sb.impact && sb.impact.length ? `<p class="muted small sound-impact">If you change this: ${sb.impact.map((/** @type {string} */ x) => esc(x === "Render" ? "Final render" : x)).join(", ")} run again.</p>` : "";
+  const media = ctx.media ? (ctx.video ? `<video class="sound-media" id="snd-media" preload="metadata" controls playsinline src="${ctx.media}"></video>`
+    : `<audio class="sound-media" id="snd-media" preload="metadata" controls src="${ctx.media}"></audio>`) : `<p class="muted">No mix yet.</p>`;
+  box.innerHTML = `<p class="section-title">Sound</p>
+    ${facts([`${b(placed)} sound${placed === 1 ? "" : "s"} on ${b(sb.shots.length)} shots`, sb.missing ? `${b(sb.missing)} not found` : "",
+      sb.dropped ? `${b(sb.dropped)} dropped` : "", sb.library ? `Library ${b(sb.library.entries)}${sb.scope === "cc0" ? " (CC0)" : ""}` : ""])}
+    ${sb.error ? `<p class="notice warn small">${esc(sb.error)}</p>` : ""}
+    ${lot ? `<p class="notice small" id="snd-lot">Claude is answering ${lot.notes.length} sound note${lot.notes.length === 1 ? "" : "s"}. Notes you add now wait for the next round.</p>` : ""}
+    ${failedLot ? `<p class="notice warn small">The last round did not finish: ${esc(failedLot.error)}. The notes are still open: send them again.</p>` : ""}
+    ${impact}${strip}${pic}${media}
+    <p class="msg small" id="snd-msg" role="status">${esc(ctx.msg || "")}</p>
+    <div class="sound-shots">${sb.shots.map((/** @type {any} */ s) => {
+      const ns = notes[s.id] || [];
+      const cueRows = s.cues.map((/** @type {any} */ c) => {
+        const [k, l] = SND_STATE[c.state] || ["", c.state];
+        const at = c.at != null ? `${(c.at - s.t0).toFixed(2)} s` : "—";
+        const tools = ctx.cues && s.on ? `<span class="row sc-tools">
+            ${c.alts && c.alts.length ? `<button class="btn small" data-alt="${esc(c.id)}">Change</button>` : ""}
+            <button class="btn small" data-move="${esc(c.id)}" data-d="-2" title="2 frames earlier">−2f</button>
+            <button class="btn small" data-move="${esc(c.id)}" data-d="2" title="2 frames later">+2f</button>
+            <button class="btn small" data-gain="${esc(c.id)}" data-d="-3" title="3 dB quieter">−3 dB</button>
+            <button class="btn small" data-gain="${esc(c.id)}" data-d="3" title="3 dB louder">+3 dB</button>
+            <button class="btn small danger" data-rm="${esc(c.id)}">Remove</button></span>` : "";
+        const alts = ctx.cues && c.alts && c.alts.length ? `<ul class="plain sound-alts" id="alts-${esc(c.id)}" hidden>${c.alts.map((/** @type {any} */ a) =>
+          `<li class="row"><button class="btn small" data-pre="${esc(a.id)}" aria-label="Listen to ${esc(a.name)}">▶</button>
+            <span>${esc(a.name)} <span class="muted small">${esc(a.credit || "")}</span></span>
+            <button class="btn small" data-use="${esc(c.id)}" data-entry="${esc(a.id)}">Use</button></li>`).join("")}</ul>` : "";
+        return `<li class="sound-cue" data-cue="${esc(c.id)}"><div class="row spread"><span><b>${esc(c.action)}</b>
+            <span class="muted">→ ${c.sound ? esc(c.sound.name) : "nothing found"}</span>
+            ${c.sound ? `<button class="btn small" data-pre="${esc(c.sound.id)}" aria-label="Listen">▶</button>` : ""}
+            <span class="chip small ${k}">${esc(l)}</span> <span class="muted small">at ${at} · ${c.gain_db} dB${c.why ? ` · ${esc(c.why)}` : ""}</span></span>
+            ${tools}</div>${alts}</li>`;
+      }).join("");
+      const noteRows = ns.map((/** @type {any} */ n) => `<li class="sound-note${n.done ? " done" : ""}">${n.done ? "✓ " : ""}${esc(n.text)}
+          ${n.reply ? `<span class="muted small">↳ ${esc(n.reply)}</span>` : ""}
+          ${ctx.notes && !n.done ? `<button class="btn small" data-ndel="${esc(n.id)}" data-shot="${esc(s.id)}">Delete</button>` : ""}</li>`).join("");
+      return `<section class="sound-shot${s.on ? "" : " off"}" data-shot="${esc(s.id)}">
+        <div class="row spread"><span><b>${esc(s.id)}</b> <span class="muted small">${sndT(s.t0)}–${sndT(s.t1)}</span>
+          ${s.notes_open ? ` <span class="chip warn small">${s.notes_open} note${s.notes_open === 1 ? "" : "s"}</span>` : ""}</span>
+          <span class="row">${ctx.media ? `<button class="btn small" data-play="${esc(s.id)}">▶ Play</button>` : ""}
+          ${ctx.cues ? `<label class="small"><input type="checkbox" data-on="${esc(s.id)}" ${s.on ? "checked" : ""}> Sound effects</label>` : (s.on ? "" : `<span class="muted small">Sound effects off</span>`)}</span></div>
+        ${cueRows ? `<ul class="plain sound-cues">${cueRows}</ul>` : `<p class="muted small">${s.on ? "No sound effects." : "Sound effects are off for this shot."}</p>`}
+        ${ctx.cues && s.on ? `<details class="sound-add"><summary class="small">Add a sound</summary>
+          <div class="row"><input data-f="action" placeholder="What happens (door slams)" maxlength="80">
+          <input data-f="at" type="number" min="0" step="0.05" placeholder="s into the shot" aria-label="Seconds into the shot"></div>
+          <div class="row"><input data-f="query" type="search" placeholder="Search the library (door slam)" maxlength="120" data-q="${esc(s.id)}">
+          <button class="btn small" data-search="${esc(s.id)}">Search</button>
+          <button class="btn small" data-add="${esc(s.id)}" title="Add the best match without listening">Add best match</button></div>
+          <ul class="plain sound-hits" data-hits="${esc(s.id)}" aria-live="polite"></ul></details>` : ""}
+        ${noteRows ? `<ul class="plain sound-notes">${noteRows}</ul>` : ""}
+        ${ctx.notes ? `<div class="row sound-note-new"><input data-note="${esc(s.id)}" maxlength="2000" placeholder="A note on the sound of ${esc(s.id)}" aria-label="Note on ${esc(s.id)}">
+          <button class="btn small" data-nadd="${esc(s.id)}">Add note</button></div>` : ""}
+      </section>`;
+    }).join("")}</div>`;
+  host.append(box);
+  const msg = /** @type {HTMLElement} */ (box.querySelector("#snd-msg"));
+  const m = /** @type {HTMLMediaElement | null} */ (box.querySelector("#snd-media"));
+  /** @type {number} */ let stopAt = -1;
+  if (m) m.addEventListener("timeupdate", () => { if (stopAt >= 0 && m.currentTime >= stopAt) { m.pause(); stopAt = -1; } });
+  /** @type {HTMLButtonElement | null} */ let shotBtn = null;           // the shot whose ▶ Play is playing
+  const shotReset = () => { if (shotBtn) { shotBtn.textContent = "▶ Play"; shotBtn.classList.remove("playing"); shotBtn.setAttribute("aria-pressed", "false"); shotBtn = null; } };
+  if (m) { m.addEventListener("pause", () => { shotReset(); stopAt = -1; }); m.addEventListener("ended", shotReset); }
+  const pv = /** @type {HTMLVideoElement | null} */ (box.querySelector("#snd-pic"));
+  if (m && pv) {                                       // the draft's picture follows the mix (no final render yet)
+    const sync = () => { if (Math.abs(pv.currentTime - m.currentTime) > 0.15) pv.currentTime = m.currentTime; };
+    m.addEventListener("play", () => { sync(); pv.play().catch(() => {}); });
+    m.addEventListener("pause", () => pv.pause());
+    m.addEventListener("seeked", sync);
+    m.addEventListener("timeupdate", sync);
+  }
+  const run = async (/** @type {HTMLButtonElement} */ btn, /** @type {() => Promise<string>} */ fn) => {
+    box.querySelectorAll("button, input").forEach((x) => { /** @type {HTMLButtonElement} */ (x).disabled = true; });
+    btn.textContent = "…"; msg.className = "msg small"; msg.textContent = "Saving and mixing again…";
+    try { msg.textContent = await fn(); } catch (err) { msg.className = "fail small"; msg.textContent = /** @type {Error} */ (err).message; }
+  };
+  const cue = (/** @type {string} */ id) => sb.shots.flatMap((/** @type {any} */ s) => s.cues).find((/** @type {any} */ c) => c.id === id);
+  box.querySelectorAll("button").forEach((el) => {
+    const bt = /** @type {HTMLButtonElement} */ (el), d = bt.dataset;
+    if (d.play) bt.onclick = () => { const s = sb.shots.find((/** @type {any} */ x) => x.id === d.play); if (!m || !s) return;
+      if (shotBtn === bt && !m.paused) { m.pause(); return; }
+      sndStop(); m.pause(); m.currentTime = s.t0; stopAt = s.t1;
+      m.play().then(() => { shotBtn = bt; bt.textContent = "■ Stop"; bt.classList.add("playing"); bt.setAttribute("aria-pressed", "true"); }).catch(() => {}); };
+    else if (d.pre) bt.onclick = () => { if (m && !m.paused) m.pause(); sndPreview(/** @type {string} */ (d.pre), bt); };
+    else if (d.search) bt.onclick = () => sndSearch(/** @type {string} */ (d.search));
+    else if (d.alt) bt.onclick = () => { const ul = /** @type {HTMLElement} */ (box.querySelector(`#alts-${CSS.escape(d.alt || "")}`)); ul.hidden = !ul.hidden; };
+    else if (d.use) bt.onclick = () => run(bt, () => ctx.edit("cue-set", { cue: d.use, entry: d.entry }, sb.plan_base));
+    else if (d.move) bt.onclick = () => { const c = cue(/** @type {string} */ (d.move));
+      run(bt, () => ctx.edit("cue-set", { cue: d.move, offset_f: ((c.anchor && c.anchor.offset_f) || 0) + Number(d.d) }, sb.plan_base)); };
+    else if (d.gain) bt.onclick = () => { const c = cue(/** @type {string} */ (d.gain));
+      run(bt, () => ctx.edit("cue-set", { cue: d.gain, gain_db: Number(c.gain_db) + Number(d.d) }, sb.plan_base)); };
+    else if (d.rm) bt.onclick = () => { if (confirm(`Remove ${cue(/** @type {string} */ (d.rm)).action}?`)) run(bt, () => ctx.edit("cue-rm", { cue: d.rm }, sb.plan_base)); };
+    else if (d.add) bt.onclick = () => { const row = /** @type {HTMLElement} */ (bt.closest(".sound-add"));
+      const v = (/** @type {string} */ f) => /** @type {HTMLInputElement} */ (row.querySelector(`[data-f="${f}"]`)).value.trim();
+      if (!v("query")) { msg.className = "fail small"; msg.textContent = "Say what to look for."; return; }
+      run(bt, () => ctx.edit("cue-add", { shot: d.add, action: v("action") || v("query"), query: v("query"), ...(v("at") ? { at: v("at") } : {}) }, sb.plan_base)); };
+    else if (d.nadd) bt.onclick = () => { const inp = /** @type {HTMLInputElement} */ (box.querySelector(`[data-note="${CSS.escape(d.nadd || "")}"]`));
+      if (!inp.value.trim()) return; run(bt, () => ctx.noteAdd(d.nadd, inp.value.trim())); };
+    else if (d.ndel) bt.onclick = () => run(bt, () => ctx.noteDel(d.shot, d.ndel));
+  });
+  /** "Add a sound": search the library, list the hits with ▶ and Use (specs/037). @param {string} shot */
+  const sndSearch = async (shot) => {
+    const sec = /** @type {HTMLElement} */ (box.querySelector(`.sound-shot[data-shot="${CSS.escape(shot)}"]`));
+    const f = (/** @type {string} */ k) => /** @type {HTMLInputElement} */ (sec.querySelector(`[data-f="${k}"]`));
+    const ul = /** @type {HTMLElement} */ (sec.querySelector("[data-hits]"));
+    const q = f("query").value.trim();
+    if (!q) { f("query").focus(); return; }
+    ul.innerHTML = `<li class="muted small">Searching…</li>`;
+    let hits;
+    try { hits = (await get(`/sound/search?q=${encodeURIComponent(q)}`)).results; }
+    catch (err) { ul.innerHTML = `<li class="fail small">${esc(/** @type {Error} */ (err).message)}</li>`; return; }
+    if (!hits.length) { ul.innerHTML = `<li class="muted small">No sound found for “${esc(q)}”. Try other words (what it is, not what it means: “glass shatter”, not “bad news”).</li>`; return; }
+    ul.innerHTML = hits.map((/** @type {any} */ h) => `<li class="row"><button class="btn small" data-hpre="${esc(h.id)}" aria-label="Listen to ${esc(h.name)}">▶</button>
+      <span class="grow">${esc(h.name)} <span class="muted small">${[h.category, h.duration != null ? `${Number(h.duration).toFixed(1)} s` : "", h.source === "freesound" ? "Freesound CC0" : h.source].filter(Boolean).map(esc).join(" · ")}</span></span>
+      <button class="btn small" data-huse="${esc(h.id)}">Use</button></li>`).join("");
+    ul.querySelectorAll("button").forEach((el) => { const hb = /** @type {HTMLButtonElement} */ (el);
+      if (hb.dataset.hpre) hb.onclick = () => { if (m && !m.paused) m.pause(); sndPreview(/** @type {string} */ (hb.dataset.hpre), hb); };
+      else hb.onclick = () => { sndStop(); const at = f("at").value.trim();
+        run(hb, () => ctx.edit("cue-add", { shot, action: f("action").value.trim() || q, query: q, entry: hb.dataset.huse, ...(at ? { at } : {}) }, sb.plan_base)); };
+    });
+  };
+  box.querySelectorAll("input[data-q]").forEach((el) => { const i = /** @type {HTMLInputElement} */ (el);
+    i.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); sndSearch(/** @type {string} */ (i.dataset.q)); } }; });
+  box.querySelectorAll("input[data-on]").forEach((el) => { const i = /** @type {HTMLInputElement} */ (el);
+    i.onchange = () => run(/** @type {any} */ ({ set textContent(_x) {} }), () => ctx.edit("shot-set", { shot: i.dataset.on, on: i.checked ? "yes" : "no" }, sb.plan_base)); });
+  return { box, nNotes };
+}
+
+/** The job page: the Sound panel in the Mix tab of an AE film (edits through the job's actions). @param {HTMLElement} body */
+function editSound(body) {
+  const sb = RAIL.data.sound;
+  const can = canEdit("mix");
+  const ctx = { media: sb.video ? fileUrl(sb.video) : sb.mix ? fileUrl(sb.mix.url) : "", video: !!sb.video, picture: sb.draft ? animUrl(sb.draft) : "", cues: can, notes: can,
+    msg: RAIL.msg.sound || "",
+    /** @param {string} op @param {any} args @param {string} base */
+    edit: async (op, args, base) => { const x = await sendEdit("mix", op, args, base); RAIL.msg.sound = editMsg(x); DONE.drawn = {}; doneRefresh(true); return RAIL.msg.sound; },
+    /** @param {string} shot @param {string} text */
+    noteAdd: async (shot, text) => ctx.edit("sound-note-add", { shot, text }, sb.notes_base),
+    /** @param {string} shot @param {string} note */
+    noteDel: async (shot, note) => ctx.edit("sound-note-delete", { shot, note }, sb.notes_base) };
+  body.querySelectorAll("audio").forEach((x) => x.remove());          // the panel plays the film itself
+  const { nNotes } = soundPanel(body, sb, ctx);
+  approveBar(body, "mix", nNotes ? `${nNotes} sound note${nNotes === 1 ? "" : "s"} to send: Claude changes those shots' sounds, then you approve.` : "");
+  const bar = body.querySelector(".approve-bar"), r = pendingFor("mix");
+  const ask = bar && /** @type {HTMLElement | null} */ (bar.querySelector("#ask-changes"));
+  if (ask && r && nNotes) {                          // "Request changes…" becomes "Send N notes to Claude"
+    const send = document.createElement("button");
+    send.className = "btn"; send.id = "send-sound-notes";
+    send.textContent = `Send ${nNotes} note${nNotes === 1 ? "" : "s"} to Claude`;
+    send.onclick = async () => {
+      send.disabled = true;
+      const msg = /** @type {HTMLElement} */ (/** @type {HTMLElement} */ (bar).querySelector("#approve-msg"));
+      try { await post(`/reviews/${encodeURIComponent(r.id)}/decision`, { value: "revise", note: "" }); route(); }
+      catch (err) { msg.className = "fail small"; msg.textContent = /** @type {Error} */ (err).message; send.disabled = false; }
+    };
+    ask.replaceWith(send);
+  }
+}
+
+/** The film page of a finished AE film: the Sound panel with notes and "Send notes to Claude" (a fix job, target sound).
+ * @param {string} name */
+async function filmSound(name) {
+  const slot = document.getElementById("sound-slot");
+  if (!slot) return;
+  const path = `/films/${encodeURIComponent(name)}`;
+  let sb;
+  try { sb = await get(`${path}/sound`); } catch { slot.remove(); return; }
+  if (!sb) { slot.remove(); return; }
+  slot.innerHTML = "";
+  const again = async (/** @type {string} */ m) => { await filmSound(name); const x = document.getElementById("snd-msg"); if (x) x.textContent = m; return m; };
+  const can = MODE === "online";
+  const ctx = { media: sb.video ? `${API}${path}/video` : "", video: true, cues: false, notes: can,
+    edit: async () => "",
+    /** @param {string} shot @param {string} text */
+    noteAdd: async (shot, text) => { await post(`${path}/sound/notes`, { shot, text, base: sb.notes_base }); return again("Note saved."); },
+    /** @param {string} shot @param {string} note */
+    noteDel: async (shot, note) => { await send("DELETE", `${path}/sound/notes/${encodeURIComponent(shot)}/${encodeURIComponent(note)}?base=${sb.notes_base}`); return again("Note deleted."); } };
+  const { box, nNotes } = soundPanel(slot, sb, ctx);
+  box.classList.add("panel");
+  if (can && !(sb.notes && sb.notes.lot)) {
+    const row = document.createElement("div"); row.className = "row done-actions";
+    row.innerHTML = `<button class="primary" id="snd-fix" ${nNotes ? "" : "disabled"}>${nNotes ? `Send ${nNotes} note${nNotes === 1 ? "" : "s"} to Claude` : "Send notes to Claude"}</button>
+      <span class="muted small">Claude changes only the sounds of the shots with notes, mixes again and answers each note.</span>`;
+    box.append(row);
+    /** @type {HTMLElement} */ (row.querySelector("#snd-fix")).onclick = async (e) => {
+      const btn = /** @type {HTMLButtonElement} */ (e.currentTarget); btn.disabled = true;
+      try { const r = await post(`${path}/sound/fix`, {}); await again(`Sent: job ${r.job}.`); }
+      catch (err) { const x = document.getElementById("snd-msg"); if (x) { x.className = "fail small"; x.textContent = /** @type {Error} */ (err).message; } btn.disabled = false; }
+    };
   }
 }
 
@@ -2050,6 +2286,7 @@ async function pageFilm(name) {
     : `<p class="notice">${f.rendering ? "The film is still rendering: see progress on the Jobs page." : "No film file yet."}</p>
       ${MODE === "online" && !f.rendering ? `<p class="film-actions"><button class="danger" id="del-film">Delete this film</button></p>` : ""}`}
     ${f.has_video ? `<div id="shots-slot"><div class="panel"><p class="section-title">Shots</p><p class="muted">Loading…</p></div></div>` : ""}
+    ${f.engine === "ae" ? `<div id="sound-slot"></div>` : ""}
     ${tiersHtml(f.tiers)}
     ${f.treatment_html ? `<h2>Script (TREATMENT)</h2><div class="panel md">${f.treatment_html}</div>` : ""}
     ${f.credits ? `<h2>Third-party assets (CREDITS)</h2><pre class="log">${esc(f.credits)}</pre>` : ""}</div>
@@ -2057,6 +2294,7 @@ async function pageFilm(name) {
   const acts = document.getElementById("film-actions"), side = document.getElementById("film-side");
   if (acts && side) side.appendChild(acts);
   if (f.has_video) filmShots(name, f);
+  if (f.engine === "ae") filmSound(name);
   const del = document.getElementById("del-film");
   if (del) del.onclick = async () => {
     if (!confirm("Delete this film for good?")) return;
@@ -3175,7 +3413,25 @@ async function pageSettings(tab = "general") {
       ${el.set ? `<button id="el-key-test">Test</button><select id="el-model" aria-label="ElevenLabs model">${["eleven_multilingual_v2", "eleven_v3", "eleven_turbo_v2_5", "eleven_flash_v2_5"]
         .map((m) => `<option${m === el.model ? " selected" : ""}>${m}</option>`).join("")}</select><button class="danger" id="el-key-del">Remove</button>` : ""}</div>
     <p id="el-msg" class="muted" role="status"></p></section>`;
-  $app.innerHTML = `${top}${ytKey}${elKey}<section class="panel card-pad"><h2>Studio</h2><p class="muted">Limits for every member, and how many films run at once.</p>
+  // specs/037: the sound library on this machine (Sonniss packs, names and text only) and Freesound CC0 for gaps
+  const snd = await get("/admin/sound").catch(() => null);
+  const fs = (snd && snd.freesound) || { set: false };
+  const sndCount = snd ? Object.entries(snd.by_source || {}).map(([k, n]) => `${n} ${esc(k)}`).join(" · ") || "no sounds yet" : "";
+  const sndKey = !snd ? "" : `<section class="panel card-pad" id="sound-lib"><h2>Sound library</h2>
+    <p class="muted">Sound effects for After Effects films. Add the folders where you unpacked the Sonniss GDC bundles: the
+      studio reads only file names and the text inside the files, never the sounds themselves. Sonniss sounds are used in
+      your own films only; members' films get CC0 sounds from Freesound. ${sndCount}${snd.broken ? ` · ${snd.broken} broken files` : ""}
+      ${snd.index.running ? " · <strong>indexing…</strong>" : snd.index.last ? ` · last index ${snd.index.last.new} new, ${snd.index.last.gone} gone, ${snd.index.last.secs} s` : ""}</p>
+    <ul class="plain">${(snd.roots || []).map((r) => `<li><code>${esc(r.path)}</code> <button class="link danger" data-snd-del="${esc(r.path)}">Remove</button></li>`).join("")}</ul>
+    <div class="row"><input id="snd-path" type="text" autocomplete="off" placeholder="/mnt/e/SoundLibrary/Sonniss"><button id="snd-add">Add folder</button>
+      <button id="snd-index">Index again</button></div>
+    <h3>Freesound (CC0 only)</h3>
+    <p class="muted">Fills what the library lacks with public-domain (CC0) sounds. Get a free API key at freesound.org/apiv2/apply.
+      ${fs.set ? `<strong>Key set (…${esc(fs.last4)})</strong>` : "<strong>No key yet.</strong>"}</p>
+    <div class="row"><input id="fs-key-input" type="password" autocomplete="off" placeholder="Paste a Freesound API key">
+      <button id="fs-key-save">${fs.set ? "Replace key" : "Save key"}</button>${fs.set ? `<button class="danger" id="fs-key-del">Remove</button>` : ""}</div>
+    <p id="snd-msg" class="muted" role="status"></p></section>`;
+  $app.innerHTML = `${top}${ytKey}${elKey}${sndKey}<section class="panel card-pad"><h2>Studio</h2><p class="muted">Limits for every member, and how many films run at once.</p>
     <form class="form" id="settings"><div class="admin-grid">${SETTING.map(input).join("")}</div>
       <div><button class="primary" type="submit">Save settings</button></div></form><p id="msg" class="muted" role="status"></p></section>`;
   /** @type {HTMLButtonElement} */ (document.getElementById("yt-key-save")).onclick = async () => {
@@ -3196,6 +3452,22 @@ async function pageSettings(tab = "general") {
   if (elModel) elModel.onchange = elRun(() => send("PUT", "/admin/elevenlabs-model", { model: elModel.value }));
   const elDel = document.getElementById("el-key-del");
   if (elDel) elDel.onclick = async () => { if (confirm("Remove the ElevenLabs key? Voices already made stay.")) { await send("DELETE", "/admin/elevenlabs-key"); pageSettings("general"); } };
+  const sndMsg = document.getElementById("snd-msg");
+  const sndRun = (/** @type {() => Promise<any>} */ fn) => async () => {
+    sndMsg.className = "muted"; sndMsg.textContent = "Working…";
+    try { await fn(); pageSettings("general"); } catch (e) { sndMsg.className = "fail"; sndMsg.textContent = e.message; }
+  };
+  const sndAdd = document.getElementById("snd-add");
+  if (sndAdd) sndAdd.onclick = sndRun(() => send("POST", "/admin/sound", { path: field("snd-path").value.trim() }));
+  const sndIndex = document.getElementById("snd-index");
+  if (sndIndex) sndIndex.onclick = sndRun(() => send("POST", "/admin/sound/index"));
+  document.querySelectorAll("[data-snd-del]").forEach((b) => {
+    /** @type {HTMLElement} */ (b).onclick = sndRun(() => send("DELETE", `/admin/sound?path=${encodeURIComponent(/** @type {HTMLElement} */ (b).dataset.sndDel || "")}`));
+  });
+  const fsSave = document.getElementById("fs-key-save");
+  if (fsSave) fsSave.onclick = sndRun(() => send("PUT", "/admin/sound/freesound-key", { key: field("fs-key-input").value.trim() }));
+  const fsDel = document.getElementById("fs-key-del");
+  if (fsDel) fsDel.onclick = async () => { if (confirm("Remove the Freesound key? Sounds already fetched stay.")) { await send("DELETE", "/admin/sound/freesound-key"); pageSettings("general"); } };
   const ytDel = document.getElementById("yt-key-del");
   if (ytDel) ytDel.onclick = async () => { if (confirm("Remove the YouTube key?")) { await send("DELETE", "/admin/youtube-key"); pageSettings("general"); } };
   onSubmit(async () => {

@@ -868,6 +868,147 @@ def animatic_draft(d: Path, a: dict) -> dict:
         raise EditError((p.stderr or p.stdout).strip()[-300:] or f"ae draft ended with {p.returncode}")
     return {"ok": True, "ref": shots or "all", "new": (p.stdout.strip().splitlines() or [""])[-1],
             "files": ["animatic/draft.mp4"], "no_stale": True}
+# ---------- Sound of an AE film (specs/037 US3) ----------
+def _plan_base(d: Path) -> str:
+    from filmcheck import soundplan
+    return soundplan.base(d)
+
+
+def _sound_notes_base(d: Path) -> str:
+    from filmcheck import soundnotes
+    return soundnotes.base(d)
+
+
+def _num(a: dict, key: str, kind=float):
+    v = a.get(key)
+    if v in (None, ""):
+        return None
+    try:
+        return kind(v)
+    except ValueError:
+        raise EditError(f"{key}: a number") from None
+
+
+def _plan_call(fn, *args, **kw):
+    from filmcheck import soundplan
+    try:
+        return fn(*args, **kw)
+    except soundplan.PlanError as e:
+        raise EditError(f"{e.code}: {e.message}") from None
+
+
+def _remix(d: Path, out: dict) -> dict:
+    """Mix again after a cue edit (FR-026: ≤ 30 s) and put the sound back on a rendered film; nothing else goes stale."""
+    out["no_stale"] = True
+    if no_run():
+        return out
+    import time as _t
+    from filmcheck import soundmix, soundplan
+    t = _t.time()
+    try:
+        r = soundmix.run(d)
+    except soundplan.PlanError as e:
+        return {**out, "ok": False, "error": f"the mix failed: {e.message}"}
+    out["check"] = {k: r.get(k) for k in ("placed", "dropped", "missing", "off", "muxed")} | {"secs": round(_t.time() - t, 1)}
+    return out
+
+
+def _cue_of(a: dict) -> str:
+    cue = a.get("cue") or (a.get("ref") or [None])[0]
+    if not cue:
+        raise EditError("cue=<id> (c01 …)")
+    return cue
+
+
+@op("cue-set", "mix", _plan_base)
+def cue_set(d: Path, a: dict) -> dict:
+    """Change one sound: entry (another library sound), offset_f (frames), gain_db, cut, fade_s, len_s."""
+    from filmcheck import soundplan
+    cue = _cue_of(a)
+    fields = {k: v for k, v in (("entry", a.get("entry") or None), ("offset_f", _num(a, "offset_f", int)),
+                                ("gain_db", _num(a, "gain_db")), ("cut", a.get("cut") or None), ("fade_s", _num(a, "fade_s")),
+                                ("len_s", _num(a, "len_s"))) if v is not None}
+    if not fields:
+        raise EditError("nothing to change: entry=…, offset_f=…, gain_db=…, cut=…, fade_s=… or len_s=…")
+    old = next((c for c in soundplan.load(d)["cues"] if c["id"] == cue), None)
+    c = _plan_call(soundplan.set_cue, d, cue, fields, by=a.get("by") or "user")
+    return _remix(d, {"ok": True, "ref": cue, "old": {k: (old or {}).get(k) for k in fields}, "new": {k: c.get(k) for k in fields},
+                      "files": ["sound/plan.json", "out/mix.wav"]})
+
+
+@op("cue-rm", "mix", _plan_base)
+def cue_rm(d: Path, a: dict) -> dict:
+    from filmcheck import soundplan
+    cue = _cue_of(a)
+    _plan_call(soundplan.rm_cue, d, cue)
+    return _remix(d, {"ok": True, "ref": cue, "files": ["sound/plan.json", "out/mix.wav"]})
+
+
+@op("cue-add", "mix", _plan_base)
+def cue_add(d: Path, a: dict) -> dict:
+    """A new sound on a shot: shot, action, query (what to look for), entry (optional: a sound picked from a search),
+    and where: motion, line (+ word), at (seconds into the shot) or nothing (the whole shot)."""
+    from filmcheck import soundplan
+    shot = a.get("shot") or (a.get("ref") or [None])[0]
+    if not shot or not (a.get("action") or "").strip() or not (a.get("query") or "").strip():
+        raise EditError("cue-add: shot, action=… and query=…")
+    if a.get("motion"):
+        anchor = {"motion": a["motion"], "edge": a.get("edge") or "start", "offset_f": _num(a, "offset_f", int) or 0}
+    elif a.get("line"):
+        anchor = {"line": a["line"], **({"word": a["word"]} if a.get("word") else {}), "offset_f": _num(a, "offset_f", int) or 0}
+    elif a.get("at") not in (None, ""):                 # seconds into the shot → the plan's fraction of the shot
+        tm = _plan_call(soundplan.timing, d)
+        frames = tm["frames"].get(shot.upper())
+        if not frames:
+            raise EditError(f"no shot {shot} in this film")
+        anchor = {"shot_at": round(min(max(_num(a, "at") / (frames / tm["fps"]), 0.0), 0.999), 4)}
+    else:
+        anchor = {"span": "shot"}
+    c = _plan_call(soundplan.add_cue, d, shot.upper(), a["action"].strip()[:80], anchor, a["query"].strip()[:120],
+                   gain_db=_num(a, "gain_db"), by=a.get("by") or "user", entry=a.get("entry") or None)
+    return _remix(d, {"ok": True, "ref": c["id"], "new": {"shot": c["shot"], "action": c["action"], "entry": c.get("entry"),
+                                                          "state": c["state"]}, "files": ["sound/plan.json", "out/mix.wav"]})
+
+
+@op("shot-set", "mix", _plan_base)
+def shot_set(d: Path, a: dict) -> dict:
+    """Turn the sound effects of shots on or off (shot=S2,S3 on=yes|no)."""
+    from filmcheck import soundplan
+    shots = [x.strip().upper() for x in (a.get("ref") or []) + str(a.get("shot") or "").split(",") if x.strip()]
+    if not shots or a.get("on") not in ("yes", "no", "true", "false", "on", "off", ""):
+        raise EditError("shot-set: shot=S2[,S3] on=yes|no")
+    on = a.get("on") in ("yes", "true", "on")
+    p = _plan_call(soundplan.set_shots, d, shots, on)
+    return _remix(d, {"ok": True, "ref": ",".join(shots), "new": {"on": on, "off": p["off"]},
+                      "files": ["sound/plan.json", "out/mix.wav"]})
+
+
+def _snote_call(fn, *args, **kw):
+    from filmcheck import soundnotes
+    try:
+        return fn(*args, **kw)
+    except soundnotes.SoundNoteError as e:
+        raise EditError(f"{e.code}: {e.message}") from None
+
+
+@op("sound-note-add", "mix", _sound_notes_base)
+def sound_note_add(d: Path, a: dict) -> dict:
+    from filmcheck import soundnotes
+    shot = a.get("shot") or (a.get("ref") or [None])[0]
+    if not shot:
+        raise EditError("sound-note-add: shot=<S2> and the text")
+    n = _snote_call(soundnotes.add, d, shot, _note_text(a), a.get("by") or "owner")
+    return {"ok": True, "ref": n["id"], "new": n["text"], "files": ["sound/notes.json"], "no_stale": True}
+
+
+@op("sound-note-delete", "mix", _sound_notes_base)
+def sound_note_delete(d: Path, a: dict) -> dict:
+    from filmcheck import soundnotes
+    shot = a.get("shot") or (a.get("ref") or [None])[0]
+    if not shot or not a.get("note"):
+        raise EditError("sound-note-delete: shot=<S2> note=<id>")
+    _snote_call(soundnotes.delete, d, shot, a["note"])
+    return {"ok": True, "ref": a["note"], "files": ["sound/notes.json"], "no_stale": True}
 
 
 # ---------- publish (US5) ----------
