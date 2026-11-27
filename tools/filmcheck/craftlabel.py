@@ -28,13 +28,17 @@ For each shot answer:
   parking lot, beach, space). Inside a room, hall, shop or vehicle: false.
 - prop: true when a person is holding an object in a hand (phone, cards, money, ball, box, cup, paper, tool, food).
   Clothes and bags worn on the body do not count.
+- subject: the box around the main person (the one the shot is about; when unsure, the largest), as
+  [left, top, right, bottom] in percent of the frame (0 = left/top edge, 100 = right/bottom edge), from the top of the
+  head (or hair) to the lowest visible part of the body. null when there is no person or the frame is a card.
 Answer every listed id exactly once."""
 
 SCHEMA = {"type": "object", "required": ["shots"], "properties": {"shots": {"type": "array", "items": {
-    "type": "object", "required": ["id", "card", "people", "action", "outdoor", "prop"],
+    "type": "object", "required": ["id", "card", "people", "action", "outdoor", "prop", "subject"],
     "properties": {"id": {"type": "string"}, "card": {"type": "boolean"},
                    "people": {"type": "integer", "minimum": 0, "maximum": 9},
-                   "action": {"type": "boolean"}, "outdoor": {"type": "boolean"}, "prop": {"type": "boolean"}}}}}}
+                   "action": {"type": "boolean"}, "outdoor": {"type": "boolean"}, "prop": {"type": "boolean"},
+                   "subject": {"type": ["array", "null"], "items": {"type": "number"}, "minItems": 4, "maxItems": 4}}}}}}
 
 
 def version() -> str:
@@ -51,7 +55,8 @@ def prompt(sheets: list, ids: list) -> str:
 
 
 def valid(ans, ids: list):
-    """The answer as {id: {card, people, action, outdoor, prop}}, or None when it is not every id in the asked form."""
+    """The answer as {id: {card, people, action, outdoor, prop, subject}}, or None when it is not every id in the asked
+    form. A subject box outside 0–100 or upside down is dropped (null), not the whole answer (specs/039 R2)."""
     if not isinstance(ans, dict) or not isinstance(ans.get("shots"), list):
         return None
     out = {}
@@ -67,8 +72,19 @@ def valid(ans, ids: list):
         out[s["id"]] = {"card": card, "people": 0 if card else n,
                         "action": bool(s["action"]) and not card and n > 0,
                         "outdoor": bool(s["outdoor"]) and not card,
-                        "prop": bool(s["prop"]) and not card and n > 0}
+                        "prop": bool(s["prop"]) and not card and n > 0,
+                        "subject": _box(s.get("subject")) if not card and n > 0 else None}
     return out if set(out) == set(ids) else None
+
+
+def _box(b):
+    """[x0, y0, x1, y1] in percent, rounded, or None when it is not a real box inside the frame."""
+    if not (isinstance(b, list) and len(b) == 4 and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in b)):
+        return None
+    x0, y0, x1, y1 = b
+    if not (0 <= x0 < x1 <= 100 and 0 <= y0 < y1 <= 100):
+        return None
+    return [round(float(v), 1) for v in b]
 
 
 def _call(sheets: list, ids: list, timeout: int) -> tuple:

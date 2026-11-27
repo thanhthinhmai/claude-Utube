@@ -8,8 +8,31 @@ from sl import craftset, refset
 from filmcheck import craftlabel
 
 
-def lab(card=False, people=1, action=False, outdoor=False, prop=False):
-    return {"card": card, "people": people, "action": action, "outdoor": outdoor, "prop": prop}
+def lab(card=False, people=1, action=False, outdoor=False, prop=False, subject=None):
+    return {"card": card, "people": people, "action": action, "outdoor": outdoor, "prop": prop, "subject": subject}
+
+
+class Subject(unittest.TestCase):
+    """specs/039 T007: the main person's box (composition)."""
+    def test_box_kept(self):
+        got = craftlabel.valid({"shots": [{"id": "S1", **lab(subject=[30, 12.34, 60, 95])}]}, ["S1"])
+        self.assertEqual(got["S1"]["subject"], [30.0, 12.3, 60.0, 95.0])
+
+    def test_null_and_bad_boxes(self):
+        for b in (None, [10, 10, 5, 50], [-1, 0, 50, 50], [0, 0, 50, 101], [1, 2, 3], "x"):
+            got = craftlabel.valid({"shots": [{"id": "S1", **lab(subject=b)}]}, ["S1"])
+            self.assertIsNotNone(got, b)
+            self.assertIsNone(got["S1"]["subject"], b)
+
+    def test_card_or_empty_has_no_subject(self):
+        got = craftlabel.valid({"shots": [{"id": "S1", **lab(card=True, subject=[1, 1, 50, 50])},
+                                          {"id": "S2", **lab(people=0, subject=[1, 1, 50, 50])}]}, ["S1", "S2"])
+        self.assertIsNone(got["S1"]["subject"])
+        self.assertIsNone(got["S2"]["subject"])
+
+    def test_schema_asks_for_subject(self):
+        self.assertIn("subject", craftlabel.SCHEMA["properties"]["shots"]["items"]["required"])
+        self.assertIn("subject", craftlabel.SYSTEM)
 
 
 class Valid(unittest.TestCase):
@@ -17,7 +40,7 @@ class Valid(unittest.TestCase):
         ans = {"shots": [{"id": "S1", **lab(action=True)}, {"id": "S2", **lab(card=True, people=3, action=True)}]}
         got = craftlabel.valid(ans, ["S1", "S2"])
         self.assertTrue(got["S1"]["action"])
-        self.assertEqual(got["S2"], {"card": True, "people": 0, "action": False, "outdoor": False, "prop": False})
+        self.assertEqual(got["S2"], {"card": True, "people": 0, "action": False, "outdoor": False, "prop": False, "subject": None})
 
     def test_missing_or_bad(self):
         self.assertIsNone(craftlabel.valid({"shots": [{"id": "S1", **lab()}]}, ["S1", "S2"]))

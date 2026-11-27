@@ -83,3 +83,39 @@ class ShotPlan(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+CAM = {"size": "med", "start": {"scale": 1.1, "cx": 50, "cy": 45}, "move": "push", "zoom_pct": 5.6,
+       "rate_pct_s": 2.0, "ease": [0.13, 0.48, 0.85], "ease_ae": [60, 70], "drift_px": [0, 8], "transition": "cut",
+       "ref": "v01:S003", "option": 1}
+
+
+class CameraBlock(unittest.TestCase):
+    """specs/039 T006: craft flags and the chosen camera block of shot_plan."""
+    def setUp(self):
+        self.d = Path(tempfile.mkdtemp())
+
+    def bad(self, row):
+        with self.assertRaises(film.FilmError) as c:
+            film.load(make(self.d, {"S1": row}))
+        return c.exception.message
+
+    def test_good(self):
+        doc = film.load(make(self.d, {"S1": {"card": False, "action": True, "outdoor": False, "prop": True,
+                                             "camera": dict(CAM)}}))
+        self.assertEqual(doc["shot_plan"]["S1"]["camera"]["zoom_pct"], 5.6)
+
+    def test_flags_are_bool(self):
+        for k in ("card", "action", "outdoor", "prop"):
+            self.assertIn(k, self.bad({k: 1}))
+
+    def test_camera_rules(self):
+        self.assertIn("start.scale", self.bad({"camera": dict(CAM, start={"scale": 5, "cx": 50, "cy": 50})}))
+        self.assertIn("zoom_pct", self.bad({"camera": dict(CAM, zoom_pct=41)}))
+        self.assertIn("ease", self.bad({"camera": dict(CAM, ease=[0.5, 0.4, 0.9])}))
+        self.assertIn("ease", self.bad({"camera": dict(CAM, ease=[0.1, 0.5, 1.2])}))
+        self.assertIn("move", self.bad({"camera": dict(CAM, move="orbit")}))
+        self.assertIn("drift_px", self.bad({"camera": dict(CAM, drift_px=[1])}))
+
+    def test_user_requested_move(self):
+        film.load(make(self.d, {"S1": {"camera": dict(CAM, move="orbit", by_user_request=True)}}))
