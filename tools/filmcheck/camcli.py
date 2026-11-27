@@ -3,6 +3,7 @@
 Exit codes: 0 done · 1 not done · 2 bad input (no library, not an AE film, bad value) · 3 missing engine, no GPU or
 no bridge."""
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -74,6 +75,10 @@ def cmd_camera(a) -> int:
             _out(a, o, lines)
             return 0
         if a.cmd == "choose":
+            if a.by == "owner" and os.environ.get("STUDIO_JOB"):
+                print("✗ inside a job only the owner picks, on the Camera page (use --by claude --source note)",
+                      file=sys.stderr)
+                return 2
             if a.by == "claude" and not _claude_may_choose(d, a.source):
                 print("✗ the Camera review is on: the owner picks (or answer a Camera note with --source note)",
                       file=sys.stderr)
