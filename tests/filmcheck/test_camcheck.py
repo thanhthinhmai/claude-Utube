@@ -123,5 +123,70 @@ class Rules(unittest.TestCase):
         self.assertEqual([i["rule"] for i in got], ["cam_zoom"])
 
 
+class Fit(unittest.TestCase):
+    """camera fit: the track reads flat art 25 % short; one round scales the keyed zoom, the next measure passes."""
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp(prefix="camfit."))
+        d = self.d = self.root / "films" / "f2"
+        (d / "ae").mkdir(parents=True)
+        (d / "ae" / "shots.jsx").write_text("// shots\n")
+        (d / "animatic" / "shots").mkdir(parents=True)
+        for s in ("S1", "S2", "S3", "S4"):
+            (d / "animatic" / "shots" / f"{s}.mp4").write_bytes(b"x")
+        plan = {"S1": {"camera": CAM}, "S2": {"camera": {**CAM, "zoom_pct": 0.5}},
+                "S3": {"camera": {**CAM, "zoom_pct": 8.0}}, "S4": {"camera": {**CAM, "zoom_pct": 6.0}}}
+        (d / "film.json").write_text(json.dumps({"engine": "ae", "shots": list(plan), "ae_files": ["shots.jsx"],
+                                                 "shot_plan": plan}))
+        self.drafts = []
+        self.length = camcheck._length
+        camcheck._length = lambda p: 3.0
+
+    def tearDown(self):
+        camcheck._length = self.length
+        shutil.rmtree(self.root, ignore_errors=True)
+
+    def measure(self, path, t0, t1, a, b):
+        sid = Path(path).stem
+        cam = json.loads((self.d / "film.json").read_text())["shot_plan"][sid]["camera"]
+        z = cam["zoom_pct"] * cam.get("fit_k", 1.0) * 0.75
+        if sid == "S4":
+            z = -z                                           # going the wrong way: cam_dir, never fitted
+        return {"move": "push" if z > 0 else "pull", "zoom_pct": z, "ease": EASE, "reliable": True}
+
+    def draft(self, d, shots):
+        self.drafts.append(shots)
+        return 0
+
+    def test_one_round_fixes_the_zoom(self):
+        f = camcheck.fit(self.d, measure=self.measure, draft=self.draft)
+        self.assertEqual(self.drafts, [["S1", "S3"]])
+        self.assertEqual(sorted(f["rounds"][0]), ["S1", "S3"])
+        plan = json.loads((self.d / "film.json").read_text())["shot_plan"]
+        self.assertAlmostEqual(plan["S1"]["camera"]["fit_k"], 1.333, places=3)
+        self.assertNotIn("fit_k", plan["S2"]["camera"])        # within 1 point: left alone
+        self.assertNotIn("fit_k", plan["S4"]["camera"])
+        off = {i["shot"] for i in f["result"]["issues"]}
+        self.assertEqual(off, {"S4"})
+        self.assertEqual(f["own_camera"], [])
+
+    def test_failed_draft_stops(self):
+        with self.assertRaises(camcheck.CameraCheckError) as e:
+            camcheck.fit(self.d, measure=self.measure, draft=lambda d, s: 3)
+        self.assertEqual(e.exception.code, 3)
+
+    def test_factor_is_clamped(self):
+        plan = {"S1": {"camera": {**CAM, "zoom_pct": 9.0}}}
+        issues = [{"shot": "S1", "rule": "cam_zoom"}]
+        self.assertEqual(camcheck.fit_factors(plan, issues, {"S1": {"zoom_pct": 1.0}}), ({"S1": 3.0}, []))
+
+    def test_secant_and_own_camera(self):
+        plan = {"S1": {"camera": {**CAM, "zoom_pct": 8.0, "fit_k": 1.3}}}
+        issues = [{"shot": "S1", "rule": "cam_zoom"}]
+        ks, own = camcheck.fit_factors(plan, issues, {"S1": {"zoom_pct": 10.0}}, {"S1": [(1.0, 6.0)]})
+        self.assertEqual((ks, own), ({"S1": 1.15}, []))                  # through (1.0, 6) and (1.3, 10): 8 at 1.15
+        ks, own = camcheck.fit_factors(plan, issues, {"S1": {"zoom_pct": 6.1}}, {"S1": [(1.0, 6.0)]})
+        self.assertEqual((ks, own), ({}, ["S1"]))
+
+
 if __name__ == "__main__":
     unittest.main()

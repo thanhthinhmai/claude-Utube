@@ -97,6 +97,9 @@ def _check_plan(doc: dict) -> None:
                 raise FilmError("bad_film_json", f"film.json: shot_plan.{sid}.{key} must be text")
 
 
+FIT_K = (0.5, 3.0)        # specs/039 camera fit: keyed zoom = zoom_pct · fit_k (the track reads flat art short)
+
+
 def _num(v) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool)
 
@@ -121,6 +124,9 @@ def _check_camera(sid: str, cam) -> None:
         raise FilmError("bad_film_json", f"{where}.zoom_pct must be a number from -40 to 40")
     if not _num(cam.get("rate_pct_s")):
         raise FilmError("bad_film_json", f"{where}.rate_pct_s must be a number")
+    fk = cam.get("fit_k")
+    if fk is not None and not (_num(fk) and FIT_K[0] <= fk <= FIT_K[1]):
+        raise FilmError("bad_film_json", f"{where}.fit_k must be a number from {FIT_K[0]} to {FIT_K[1]} (camera fit)")
     e = cam.get("ease")
     if e is not None and not (isinstance(e, list) and len(e) == 3 and all(_num(x) and 0 <= x <= 1 for x in e)
                               and e[0] <= e[1] <= e[2]):

@@ -570,7 +570,8 @@ CU.camFromMotion = function (comp, motion, f0, z0) {
 // specs/039 R7: the camera chosen at the Camera review (the shot plan of film.json, bundled as data/camera.json).
 // CU.planCam(comp, "S3", skip) parents the layers to CAM like CU.camera and keys its start and end:
 //   start {scale, cx, cy}  zoom and the scene point (% of the comp) at the frame centre on the first frame
-//   zoom_pct, drift_px     end zoom = scale·(1 + zoom/100); the window moves drift_px (1080p screen px) by the end
+//   zoom_pct, drift_px     end zoom = scale·(1 + zoom·fit_k/100); the window moves drift_px (1080p screen px) by the end
+//   fit_k                  set by `camera fit` so the built picture measures the option's zoom (default 1)
 //   ease_ae [in, out]      speed-0 ease, out influence on the first key and in influence on the last
 // A measured path (data/motion/S#.json) still wins (CU.camera). Returns the CAM null, or null when the shot has no
 // camera block (the shot then keeps its own CU.camera frames).
@@ -583,7 +584,7 @@ CU.planCamBlock = function (id) {
   return CU.CAMPLAN[id] || null;
 };
 CU.planFrames = function (comp, c) {
-  var W = comp.width, H = comp.height, st = c.start, z0 = st.scale, z1 = st.scale * (1 + c.zoom_pct / 100);
+  var W = comp.width, H = comp.height, st = c.start, z0 = st.scale, z1 = st.scale * (1 + c.zoom_pct * (c.fit_k || 1) / 100);
   var fx = st.cx / 100 * W, fy = st.cy / 100 * H, d = c.drift_px || [0, 0];
   return [[0, fx, fy, z0], [comp.duration, fx + d[0] / z1, fy + d[1] / z1, z1]];
 };
@@ -602,7 +603,7 @@ CU.planCam = function (comp, id, skip) {
       try { p.setTemporalEaseAtKey(1, a, a); p.setTemporalEaseAtKey(2, b, b); break; } catch (er) { }
     }
   }
-  CU.say("camera " + id + ": " + c.move + " " + c.zoom_pct + "% (Camera review)");
+  CU.say("camera " + id + ": " + c.move + " " + c.zoom_pct + "%" + (c.fit_k ? " ×" + c.fit_k : "") + " (Camera review)");
   return cam;
 };
 CU.BOUNDS = {}; // comp name -> [x0, y0, x1, y1] drawn background area when it is larger than the comp

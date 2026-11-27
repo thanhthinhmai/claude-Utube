@@ -14,7 +14,8 @@ zooms about (40, 40): slow start, slow end. `parallax` (0..1): that share of the
 toward the subject instead of the lens, so near layers grow faster than the wall (the reference's layered 2D look:
 desk edges, frames and blinds slide against each other, measured 2026-11-27).
 specs/039: a camera block chosen at the Camera review (shot_plan.<S>.camera) wins over the plan's move when the shot
-passes no move or zoom of its own: a still camera, the lens zooming and the frame shifting (kit/camblock.py)."""
+passes no move or zoom of its own (frm, to and look still place the camera): a still camera, the lens zooming and the
+frame shifting (kit/camblock.py)."""
 import math
 
 import bpy
@@ -73,7 +74,7 @@ def cam(k, size: str = None, height: str = None, lens=None, move: str = None, fr
         dof: bool = False, fstop: float = 2.8, t0: float = 0.0, t1: float = None, exposure: float = None,
         zoom: float = None, shift=(0.0, 0.0), ease=(40, 40), parallax: float = 0.0, shift0=(0.0, 0.0)):
     plan = k.plan or {}
-    blk = plan.get("camera") if move is None and zoom is None and frm is None and to is None else None
+    blk = plan.get("camera") if move is None and zoom is None else None     # frm/to/look only place the still camera
     lens_scale = 1.0
     if blk:
         p = camblock.from_block(blk, k.size[0] / float(k.size[1]))

@@ -24,7 +24,7 @@ TIER = "camera"
 RULES = ("cam_zoom", "cam_dir", "cam_ease", "cam_parallax", "cam_transition")
 ZOOM_TOL = 1.0
 EASE_TOL = 0.10
-FIX = {"cam_zoom": "set the zoom of CU.planCam (or the Blender lens) to the chosen option",
+FIX = {"cam_zoom": "run `sh bin/studio camera fit <film>` (scales the keyed zoom until the picture measures the option)",
        "cam_dir": "the camera must move the way the chosen option does (push, pull or hold still)",
        "cam_ease": "use the option's ease (ease_ae) on the camera's two keys",
        "cam_parallax": "keep the camera 2D: scale and move the whole picture, no layer moving on its own depth",
@@ -32,7 +32,12 @@ FIX = {"cam_zoom": "set the zoom of CU.planCam (or the Blender lens) to the chos
 
 
 class CameraCheckError(Exception):
-    """Cannot check (exit code 2): not an AE film, no chosen camera, no clip for a shot."""
+    """Cannot check (exit code 2): not an AE film, no chosen camera, no clip for a shot. code 3: the draft could not
+    be made (no After Effects, Blender or GPU)."""
+
+    def __init__(self, message, code=2):
+        super().__init__(message)
+        self.code = code
 
 
 def _film(d: Path) -> dict:
@@ -170,3 +175,83 @@ def recompute(film_dir) -> dict:
     for i in r["issues"]:
         i.pop("excepted", None)
     return _finish(d, r["issues"], r.get("warnings") or [], r["measures"], r["fingerprint"], r.get("seconds", 0))
+
+
+# ---------- camera fit ----------
+FIT_ROUNDS = 3
+FIT_MIN_HAVE = 0.5           # a zoom read under 0.5 % cannot be scaled (a shot that barely moves: cam_dir, not fit)
+FIT_SAME = 0.2               # the measure moved less than this after fit_k changed: the shot sets its own camera
+
+
+def _draft(d: Path, shots: list) -> int:
+    import subprocess
+    repo = HERE.parent.parent
+    return subprocess.run(["sh", str(repo / "bin" / "studio"), "ae", "draft", d.name, "--dir", str(d),
+                           "--shots", ",".join(shots)]).returncode
+
+
+def _clamp(k: float) -> float:
+    from ae.film import FIT_K
+    return round(min(FIT_K[1], max(FIT_K[0], k)), 3)
+
+
+def fit_factors(plan: dict, issues: list, measured: dict, history=None) -> tuple:
+    """({sid: new fit_k}, [sids that ignore the plan camera]) for the shots whose only zoom fault is its size
+    (cam_zoom, same direction, readable). history {sid: [(fit_k, measured zoom), …]}: after two points the next
+    factor is the secant through the last two (the read is not proportional to the key in a busy picture)."""
+    history = history or {}
+    dirs = {i["shot"] for i in issues if i["rule"] == "cam_dir" and not i.get("excepted")}
+    out, own = {}, []
+    for i in issues:
+        sid = i["shot"]
+        if i["rule"] != "cam_zoom" or i.get("excepted") or sid in dirs:
+            continue
+        cam = (plan.get(sid) or {}).get("camera") or {}
+        want, have = float(cam.get("zoom_pct") or 0), float((measured.get(sid) or {}).get("zoom_pct") or 0)
+        if abs(have) < FIT_MIN_HAVE or want * have <= 0:
+            continue
+        k1 = float(cam.get("fit_k") or 1.0)
+        h = [p for p in history.get(sid, []) if p[0] != k1][-1:]
+        if h:
+            k0, h0 = h[0]
+            if abs(have - h0) < FIT_SAME:
+                own.append(sid)
+                continue
+            k = k1 + (want - have) * (k1 - k0) / (have - h0)
+        else:
+            k = k1 * want / have
+        out[sid] = _clamp(k)
+    return out, own
+
+
+def fit(film_dir, shots=None, rounds: int = FIT_ROUNDS, measure=None, draft=None) -> dict:
+    """Measure → scale each off shot's keyed zoom (shot_plan.<S>.camera.fit_k) → draft those shots again → measure,
+    at most `rounds` times. Only cam_zoom is corrected; the other faults stay for the shot's jsx. Returns
+    {rounds: [{shot: {have, want, fit_k}}], own_camera: [shots whose picture did not follow fit_k], result}."""
+    from filmcheck import camsuggest
+    d = Path(film_dir)
+    draft = draft or _draft
+    log, hist, own = [], {}, set()
+    r = run(d, shots, measure)
+    for _ in range(max(0, rounds)):
+        plan = _film(d).get("shot_plan") or {}
+        m = r["measures"]["shots"]
+        for s in m:
+            if (plan.get(s) or {}).get("camera"):
+                hist.setdefault(s, []).append((float(plan[s]["camera"].get("fit_k") or 1.0), float(m[s].get("zoom_pct") or 0)))
+        ks, o = fit_factors(plan, r["issues"], m, {s: v[:-1] for s, v in hist.items()})
+        own |= set(o)
+        ks = {s: k for s, k in ks.items() if s not in own and k != float(plan[s]["camera"].get("fit_k") or 1.0)}
+        if not ks:
+            break
+        log.append({s: {"have": m[s]["zoom_pct"], "want": plan[s]["camera"]["zoom_pct"], "fit_k": k} for s, k in ks.items()})
+
+        def put(raw, ks=ks):
+            for s, k in ks.items():
+                raw["shot_plan"][s]["camera"]["fit_k"] = k
+        camsuggest._write_film(d, put)
+        rc = draft(d, sorted(ks, key=lambda x: int(x[1:]) if x[1:].isdigit() else x))
+        if rc:
+            raise CameraCheckError(f"ae draft failed (exit {rc}) for {', '.join(ks)}", 3 if rc == 3 else 1)
+        r = run(d, shots, measure)
+    return {"rounds": log, "own_camera": sorted(own), "result": r}

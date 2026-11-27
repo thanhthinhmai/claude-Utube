@@ -26,6 +26,9 @@ def add_parser(sub) -> None:
     s.add_argument("--source", choices=["user", "note", "auto"], default="user"); s.add_argument("--json", action="store_true")
     s = ca.add_parser("retime", help="zoom and drift for the new shot lengths (rate per second kept)")
     s.add_argument("film"); s.add_argument("--json", action="store_true")
+    s = ca.add_parser("fit", help="after ae draft: scale each off shot's keyed zoom until the picture measures the option")
+    s.add_argument("film"); s.add_argument("--shots"); s.add_argument("--rounds", type=int, default=3)
+    s.add_argument("--json", action="store_true")
     s = ca.add_parser("show", help="options, choices and open notes")
     s.add_argument("film"); s.add_argument("--json", action="store_true")
     s = ca.add_parser("stills", help="a ¼ size first frame per option with the end-zoom box")
@@ -86,6 +89,24 @@ def cmd_camera(a) -> int:
             lines.append(f"✓ retimed {len(ch)} shot(s)" if ch else "✓ shot lengths unchanged")
             _out(a, {"changes": ch}, lines)
             return 0
+        if a.cmd == "fit":
+            from filmcheck import camcheck
+            try:
+                f = camcheck.fit(d, _shots(a.shots), rounds=a.rounds)
+            except camcheck.CameraCheckError as e:
+                print(f"✗ {e}", file=sys.stderr)
+                return e.code
+            r = f["result"]
+            lines = [f"  round {n}: " + ", ".join(f"{s} {v['have']:+.1f}→{v['want']:+.1f}% ×{v['fit_k']}" for s, v in rd.items())
+                     for n, rd in enumerate(f["rounds"], 1)]
+            if f["own_camera"]:
+                lines.append(f"! {', '.join(f['own_camera'])}: the picture did not follow fit_k: the shot sets its own "
+                             "camera (jsx: call CU.planCam / CU.end without a camera; Blender: k.cam() without move or zoom)")
+            off = sorted({i["shot"] for i in r["issues"] if not i.get("excepted")}, key=lambda x: (len(x), x))
+            lines.append(f"✓ camera fit: every shot measures its option ({len(f['rounds'])} round(s))" if r["pass"] else
+                         f"✗ camera fit: still off after {len(f['rounds'])} round(s): {', '.join(off)} (sh bin/studio qc camera {d.name})")
+            _out(a, f, lines)
+            return 0 if r["pass"] else 1
         if a.cmd == "show":
             o = camsuggest.load(d)
             if not o:
@@ -133,4 +154,4 @@ def cmd_camera(a) -> int:
     return 2
 
 
-COMMANDS = {("camera", k): cmd_camera for k in ("suggest", "choose", "retime", "show", "stills", "note")}
+COMMANDS = {("camera", k): cmd_camera for k in ("suggest", "choose", "retime", "show", "stills", "note", "fit")}
