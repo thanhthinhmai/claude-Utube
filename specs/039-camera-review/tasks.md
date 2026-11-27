@@ -79,7 +79,7 @@
 ## Phase 7: Polish
 
 - [X] T038 [P] Skill film-make `.claude/skills/film-make/SKILL.md`: sau Cast viết jsx của các shot (bối cảnh, chỗ đứng, thời lượng ước tính) trước Camera; bước Camera (suggest → stills → duyệt hoặc ★ ở giai đoạn thử → retime sau Voice → qc camera), luật "máy quay theo phương án có bằng chứng, không theo cảm nhận"; `tools/CLAUDE.md` thêm lệnh `camera …`, `learn camera`, `qc camera`; mục 039 ngắn trong `CLAUDE.md`
-- [ ] T039 Chạy đủ bộ test: `sh tests/run.sh`, `sh tests/learn/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ae/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`, `sh tests/render/run.sh`; ghi kết quả
+- [X] T039 Chạy đủ bộ test: `sh tests/run.sh`, `sh tests/learn/run.sh`, `sh tests/filmcheck/run.sh`, `sh tests/ae/run.sh`, `sh tests/ui/run.sh`, `sh tests/online/run.sh`, `sh tests/render/run.sh`; ghi kết quả
 - [ ] T040 Đối chiếu quickstart.md từ đầu đến cuối, cập nhật chỗ lệch
 
 ## Dependencies

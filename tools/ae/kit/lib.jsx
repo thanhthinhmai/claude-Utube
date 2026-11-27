@@ -596,10 +596,11 @@ CU.planCam = function (comp, id, skip) {
   for (k = 0; k < props.length; k++) {
     p = props[k];
     if (p.numKeys !== 2) { continue; }                       // a measured path keyed every frame: keep it
-    var dims = p.value.length || 1, i, a = [], b = [];
-    for (i = 0; i < dims; i++) { a.push(new KeyframeEase(0, e[1])); b.push(new KeyframeEase(0, e[0])); }
-    p.setTemporalEaseAtKey(1, a, a);
-    p.setTemporalEaseAtKey(2, b, b);
+    var j, q, a, b;                                          // Position takes 1 ease, Scale one per dimension
+    for (j = 1; j <= 3; j++) {
+      a = []; b = []; for (q = 0; q < j; q++) { a.push(new KeyframeEase(0, e[1])); b.push(new KeyframeEase(0, e[0])); }
+      try { p.setTemporalEaseAtKey(1, a, a); p.setTemporalEaseAtKey(2, b, b); break; } catch (er) { }
+    }
   }
   CU.say("camera " + id + ": " + c.move + " " + c.zoom_pct + "% (Camera review)");
   return cam;
