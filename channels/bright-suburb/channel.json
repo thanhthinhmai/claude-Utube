@@ -1,0 +1,30 @@
+{
+ "slug": "bright-suburb",
+ "name": "Bright Suburb",
+ "niche": "Second-person 'what if' superpower stories in an everyday suburb: home, school, work, then the whole world, with one or two real-world fact asides",
+ "audience": "English-speaking teens and young adults (13-25) who like long, funny, slightly dark thought experiments",
+ "language": "en",
+ "seconds": 630,
+ "style": "bright-suburb",
+ "voice": "am_michael",
+ "speed": 1.1,
+ "title_rules": "Start with 'What If'; second person; under 60 characters; one concrete power",
+ "thumbnail_rules": "Yellow-hooded sphere-head hero close-up with a strong expression, one pink glow label, bright room background, 2-3 word caps text",
+ "title_max": null,
+ "hashtags": [
+  "#whatif",
+  "#hypothetical"
+ ],
+ "banned": [],
+ "decisions": [
+  {
+   "date": "2026-11-28",
+   "text": "Follow the bright-suburb STRUCTURE.md (7 acts, time-stamp mini-scenes, consequences ladder, 'So would you...?' closer); stories, lines, characters and names stay our own."
+  }
+ ],
+ "updated": "2026-11-28T09:19:40Z",
+ "hero": {
+  "hoodie": "#f2c230",
+  "hair": "bald"
+ }
+}

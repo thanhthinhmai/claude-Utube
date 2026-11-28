@@ -45,6 +45,22 @@ class Rules(unittest.TestCase):
             doc = json.loads(json.dumps(self.doc)); cast.find(doc, "hero")["spec"] = spec
             self.assertIn(("hero", "bad_spec"), self.codes(doc), k)
 
+    def test_rig_catalog_keys(self):                                  # ball@3 adds age (kid|adult|toddler) and blush
+        from ae import rigs
+        doc = json.loads(json.dumps(self.doc)); r = rigs.latest("ball")
+        if "age" not in rigs.catalog(r).get("spec", []):
+            self.skipTest("no rig with age")
+        for c in doc["characters"]:
+            c["rig"] = r
+        cast.find(doc, "hero")["spec"].update({"age": "adult", "blush": True})
+        grp = next(c for c in doc["characters"] if c.get("kind") == "group")
+        grp["members"][0]["age"] = "toddler"
+        self.assertEqual([e for e in self.codes(doc) if e[1] == "bad_spec"], [])
+        cast.find(doc, "hero")["spec"]["age"] = "elder"
+        self.assertIn(("hero", "bad_spec"), self.codes(doc))
+        doc["characters"][0]["rig"] = "ball@1"; cast.find(doc, "hero")["spec"]["age"] = "kid"
+        self.assertIn(("hero", "bad_spec"), self.codes(doc))         # ball@1 has no age
+
     def test_ids_roles_rigs_groups(self):
         doc = json.loads(json.dumps(self.doc))
         doc["characters"][1]["id"] = "hero"                              # used twice
