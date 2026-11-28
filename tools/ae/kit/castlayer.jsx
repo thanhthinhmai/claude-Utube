@@ -75,6 +75,7 @@ CU.layerOptions = function (rig, job) {
   }
   if (w0 !== null) { walk.push([w0, dur + 0.5, 2, 46]); }
   if (walk.length) { o.walk = walk; }
+  var ch0 = CU.CAST[job.char]; if (ch0 && ch0.kind !== "group" && ch0.spec && ch0.spec.age) { o.age = ch0.spec.age; }   // ball@3 poses per age
   if (keys.length) { o.keys = CU.layerLife(rig, keys, dur, o); }
   if (job.member === null || job.member === undefined) {   // a lead is never quite still (measured 2026-11-27)
     var h0 = (o.headRot && o.headRot.length) ? o.headRot[0][1] : 0, hr = [[0, h0]], ht;
@@ -90,7 +91,7 @@ CU.layerLife = function (rig, keys, dur, o) {
   for (i = 0; i < keys.length; i++) {
     out.push(keys[i]);
     if (keys[i][1].pose !== "write") { continue; }
-    var p = rig.pose ? rig.pose("write", o.dir || 1) : null, end = i + 1 < keys.length ? keys[i + 1][0] : dur, n = 0;
+    var p = rig.pose ? rig.pose("write", o.dir || 1, o.age) : null, end = i + 1 < keys.length ? keys[i + 1][0] : dur, n = 0;
     if (!p || !p.HR) { continue; }
     for (t = keys[i][0] + 0.35; t < end - 0.2; t += 0.22, n++) {
       out.push([t, { HR: [p.HR[0] + (n % 2 ? 30 : -22), p.HR[1] + (n % 3 === 0 ? 10 : -8)] }]);
@@ -100,11 +101,11 @@ CU.layerLife = function (rig, keys, dur, o) {
 };
 
 // the reference way of acting (charisma-30, 2026-11-27): hold still between moves, each move anticipates, overshoots, settles
-CU.punchKeys = function (rig, keys, dir) {
+CU.punchKeys = function (rig, keys, dir, age) {   // age: ball@3 (specs/040); older rigs ignore it
   var out = [], prev = null, lastT = -1, i, k;
   var mix = function (a, b, u) { return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]; };
   for (i = 0; i < (keys || []).length; i++) {
-    var t = keys[i][0], v = keys[i][1], ps = v.pose ? rig.pose(v.pose, dir) : null, p = ps ? { HL: v.HL || ps.HL, HR: v.HR || ps.HR } : null;
+    var t = keys[i][0], v = keys[i][1], ps = v.pose ? rig.pose(v.pose, dir, age) : null, p = ps ? { HL: v.HL || ps.HL, HR: v.HR || ps.HR } : null;
     if (prev && p && t - 0.14 > lastT + 0.04) {
       out.push([t - 0.14, { HL: mix(prev.HL, p.HL, -0.15), HR: mix(prev.HR, p.HR, -0.15), crouch: 0.07 }]);
       out.push([t, { HL: mix(prev.HL, p.HL, 1.12), HR: mix(prev.HR, p.HR, 1.12), crouch: -0.03 }]);
@@ -130,7 +131,7 @@ CU.layerComp = function (job) {
   var o = CU.layerOptions(rig, job);
   if (job.member !== null && job.member !== undefined) { o.member = job.member; }
   var act = job.idle !== true && rig.pose;           // job.idle: true keeps the rig's idle sway (the old way)
-  if (act && o.keys) { o.keys = CU.punchKeys(rig, o.keys, o.dir || 1); }
+  if (act && o.keys) { o.keys = CU.punchKeys(rig, o.keys, o.dir || 1, ch.kind === "group" ? null : (ch.spec || {}).age); }
   var P = CU.char(id, o);
   if (act) { CU.holdStill(P); }
   var c = app.project.items.addComp("L " + job.name, S, S, 1, job.frames / CU.FPS, CU.FPS);

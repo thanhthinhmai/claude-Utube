@@ -27,6 +27,9 @@ def sheet(d: Path, cid: str, keys=("front",), tag="") -> None:
     (s / "sheet.json").write_text(json.dumps({"character": cid, "rig": "ball@1", "built_at": "x", "frames": rows}))
 
 
+from ae import rigs  # noqa: E402
+
+
 class Library(unittest.TestCase):
     def setUp(self):
         TMP.mkdir(exist_ok=True)
@@ -158,7 +161,7 @@ class Library(unittest.TestCase):
         rows = castlib.listing(self.acc)
         self.assertEqual(rows[0]["channel"], "default")
         hero = next(c for c in rows[0]["characters"] if c["id"] == "hero")
-        self.assertEqual((hero["latest"], hero["rig"], hero["films"], hero["new_rig"]), (1, "ball@1", ["f1"], "ball@2"))   # specs/038: ball@2 is the newest rig
+        self.assertEqual((hero["latest"], hero["rig"], hero["films"], hero["new_rig"]), (1, "ball@1", ["f1"], rigs.latest("ball")))   # the newest locked ball rig
 
 
 if __name__ == "__main__":

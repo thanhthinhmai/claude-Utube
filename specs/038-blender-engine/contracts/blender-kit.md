@@ -23,3 +23,6 @@ Luật:
 - Khung PNG ở `<work>/<run>/S<n>/f####.png`.
 - `log.txt` theo [bridge-api.md](bridge-api.md).
 - Lượt tính (`mode: "plan"`) không render, chỉ ghi `layers.json` và `card_angle_max`.
+
+## Bối cảnh có sẵn (`tools/blender/kit/sets/`)
+`auditorium`, `classroom`, `gym`, `hallway`, `office`; thêm ở specs/040: `kitchen` (tủ dưới xanh xám, tủ trên xanh đậm, ván kem, bếp, lò, bồn rửa dưới cửa sổ, tủ lạnh, bàn ăn và ghế, đèn treo; `k.objects` thêm `counter`, `table`, `chairs`) và `livingroom` (giấy dán tường chấm, tranh, cửa sổ có rèm, sofa, bàn nước trên thảm, TV và kệ, đèn bàn, cây, kệ sách; thêm `sofa`, `tv`). Hai phòng này đo theo phong cách what-if: ảnh ¼ cỡ có luma 0,44–0,58, tương phản 0,17–0,23, bão hoà 0,14–0,26 (look `Very High Contrast`, màu được pha về xám bằng `SOFT`).

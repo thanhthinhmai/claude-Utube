@@ -50,7 +50,7 @@ CU.sheetOptions = function (rig, fr, dur) {
 
 CU.sheetOne = function (c, fr, dur) {
   var ch = CU.CAST[fr.character];
-  var rig = CU.rig(ch.rig), sz = rig.size, spec = ch.spec || {};
+  var rig = CU.rig(ch.rig), spec = ch.spec || {}, sz = rig.sizeOf ? rig.sizeOf(spec) : rig.size;   // sizeOf: ball@3 ages (specs/040)
   var P = CU.char(fr.character, CU.sheetOptions(rig, fr, dur));
   var L = c.layers.add(P.comp); L.name = "B " + fr.character;
   var sc = spec.scale || 1;
@@ -58,7 +58,7 @@ CU.sheetOne = function (c, fr, dur) {
     CU.anc(L).setValue([sz.fx, sz.headY + 60]); CU.pos(L).setValue([CU.W / 2, CU.H * 0.52]);
     CU.scl(L).setValue([125, 125]);
   } else {                                       // whole body: 80 % of the frame, feet at 92 %
-    var s = 0.8 * CU.H / (sz.fy - (sz.headY - sz.R) + 40) * sc;
+    var zb = rig.size, s = 0.8 * CU.H / (zb.fy - (zb.headY - zb.R) + 40) * sc;   // one scale per rig: a toddler stays small
     CU.anc(L).setValue([sz.fx, sz.fy]); CU.pos(L).setValue([CU.W / 2, CU.H * 0.92]);
     CU.scl(L).setValue([s * 100, s * 100]);
   }

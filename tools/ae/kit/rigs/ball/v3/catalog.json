@@ -1,0 +1,75 @@
+{
+  "rig": "ball@3",
+  "views": [
+    "front",
+    "back",
+    "34"
+  ],
+  "expressions": [
+    "smile",
+    "grin",
+    "flat",
+    "frown",
+    "open",
+    "o",
+    "wide",
+    "yawn",
+    "sleepy",
+    "angry",
+    "worried",
+    "surprised",
+    "lookleft",
+    "lookright"
+  ],
+  "poses": [
+    "down",
+    "hips",
+    "wave",
+    "waveL",
+    "raise",
+    "raiseL",
+    "both",
+    "pointR",
+    "pointL",
+    "chest",
+    "desk",
+    "write",
+    "shrug",
+    "chin",
+    "yawn",
+    "stretch",
+    "watch",
+    "hold",
+    "guitar",
+    "eager",
+    "lap"
+  ],
+  "walk": true,
+  "spec": [
+    "hoodie",
+    "pants",
+    "shoes",
+    "headColor",
+    "rimColor",
+    "hat",
+    "hood",
+    "brows",
+    "pupils",
+    "blush",
+    "scale",
+    "age"
+  ],
+  "hats": [
+    "beanie",
+    "cap",
+    "curly",
+    "puffs",
+    "bun",
+    "none"
+  ],
+  "ages": [
+    "kid",
+    "adult",
+    "toddler"
+  ]
+}
