@@ -351,6 +351,7 @@ def cmd_status(a) -> int:
         v = " ".join(v) if isinstance(v, list) else v
         ok = "" if s["kind"] == "fake" or not v else ("" if Path(v).exists() else "  (missing)")
         print(f"{k}: {v or '-'}{ok}")
+    print(f"batch: {s.get('batchShots', local.BATCH_SHOTS)} shots per After Effects project (ae.json batchShots)")
     try:
         local.check(s)
         print(f"After Effects: ready ({s['kind']})")
