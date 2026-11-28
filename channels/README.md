@@ -4,4 +4,5 @@ Hồ sơ các kênh YouTube của chính xưởng (specs/012). Mỗi kênh nằm
 
 | Mã | Tên | Ngôn ngữ | Phong cách | Bài học |
 |---|---|---|---|---|
+| bright-suburb | Bright Suburb | en | bright-suburb | 0 |
 | dusk-hypothetical | Dusk Hypothetical | en | dusk-hypothetical | 0 |

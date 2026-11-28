@@ -89,12 +89,29 @@ def find(doc: dict, cid: str) -> dict:
 
 
 # ---------- validation (contracts/files.md) ----------
-def _check_spec(spec, where: str, cid: str, errs: list) -> None:
+def _rig_keys(rig) -> dict:
+    """Spec keys a rig version adds beyond the shared ones, from its catalog (ball@3: age, pupils, blush)."""
+    try:
+        cat = rigs.catalog(rig)
+    except Exception:
+        return {}
+    return {"keys": [k for k in cat.get("spec", []) if k not in SPEC_KEYS], "ages": cat.get("ages", [])}
+
+
+def _check_spec(spec, where: str, cid: str, errs: list, rig=None) -> None:
     if not isinstance(spec, dict):
         errs.append((cid, "bad_spec", f"{where} must be an object"))
         return
+    extra = _rig_keys(rig) if rig else {}
     for k, v in spec.items():
-        if k not in SPEC_KEYS:
+        if k in extra.get("keys", []):
+            if k == "age" and v not in extra.get("ages", []):
+                errs.append((cid, "bad_spec", f"{where}.age must be one of {', '.join(extra.get('ages', []))}"))
+            elif k == "blush" and not isinstance(v, bool):
+                errs.append((cid, "bad_spec", f"{where}.blush must be true or false"))
+            elif k == "pupils" and not (isinstance(v, str) and COLOR.fullmatch(v)):
+                errs.append((cid, "bad_spec", f"{where}.pupils must be a #rrggbb colour"))
+        elif k not in SPEC_KEYS:
             errs.append((cid, "bad_spec", f"{where}: unknown key {k!r} (allowed: {', '.join(SPEC_KEYS)})"))
         elif k in COLOR_KEYS and not (isinstance(v, str) and COLOR.fullmatch(v)):
             errs.append((cid, "bad_spec", f"{where}.{k} must be a #rrggbb colour"))
@@ -178,9 +195,9 @@ def validate(doc: dict) -> list:
                 errs.append((cid, "bad_members", "a group has 2 to 8 members"))
             else:
                 for i, s in enumerate(m):
-                    _check_spec(s, f"members[{i}]", cid, errs)
+                    _check_spec(s, f"members[{i}]", cid, errs, c.get("rig"))
         else:
-            _check_spec(c.get("spec", {}), "spec", cid, errs)
+            _check_spec(c.get("spec", {}), "spec", cid, errs, c.get("rig"))
         _check_needs(c.get("needs", {"expressions": [], "poses": [], "walk": False}), cid, errs)
         fl = c.get("from_library")
         if fl is not None and not (isinstance(fl, dict) and isinstance(fl.get("channel"), str) and fl.get("id")
