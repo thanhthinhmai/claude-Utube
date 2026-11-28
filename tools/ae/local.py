@@ -20,6 +20,7 @@ def config_path() -> Path:
 FAKE = Path(__file__).resolve().parents[2] / "desktop" / "test" / "fake-ae.mjs"
 START_TIMEOUT = 240           # a cold After Effects start took ~90 s (2026-11-24)
 SHOT_TIMEOUT = 300
+BATCH_SHOTS = 30          # specs/041: one After Effects project per 30 shots (163 shots in one needed ~15 GB of RAM)
 MIN_FREE = 2 * 1024 ** 3
 OM_TEMPLATE = "H.264 - Match Render Settings - 40 Mbps"
 EXIT = {"ae_missing": 3, "ae_unavailable": 3, "ae_scripting_off": 3, "bridge_lost": 3}
@@ -83,13 +84,26 @@ def settings() -> dict:
         return {"kind": "fake", "afterfx": [node, str(FAKE), "afterfx"], "aerender": [node, str(FAKE), "aerender"],
                 "work": os.environ.get("STUDIO_AE_WORK") or cfg.get("work") or "",   # a fake run never uses the real one
                 "shotTimeoutSec": int(cfg.get("shotTimeoutSec") or os.environ.get("STUDIO_AE_SHOT_TIMEOUT") or SHOT_TIMEOUT),
-                "startTimeoutSec": int(os.environ.get("STUDIO_AE_START_TIMEOUT") or START_TIMEOUT)}
+                "startTimeoutSec": int(os.environ.get("STUDIO_AE_START_TIMEOUT") or START_TIMEOUT),
+                "batchShots": _batch(cfg)}
     found = find_ae()
     fx = cfg.get("afterfx") or found.get("afterfx", "")
     kind = "windows" if fx.lower().endswith(".exe") else ("mac" if fx.endswith(".app") else "unknown")
     return {"kind": kind, "afterfx": fx, "aerender": cfg.get("aerender") or found.get("aerender", ""),
             "work": cfg.get("work", ""), "shotTimeoutSec": int(cfg.get("shotTimeoutSec") or SHOT_TIMEOUT),
-            "startTimeoutSec": int(os.environ.get("STUDIO_AE_START_TIMEOUT") or START_TIMEOUT)}
+            "startTimeoutSec": int(os.environ.get("STUDIO_AE_START_TIMEOUT") or START_TIMEOUT),
+            "batchShots": _batch(cfg)}
+
+
+def _batch(cfg: dict) -> int:
+    """Shots per After Effects project: ae.json → batchShots, else STUDIO_AE_BATCH, else 30 (0 or bad = 30)."""
+    for v in (cfg.get("batchShots"), os.environ.get("STUDIO_AE_BATCH")):
+        try:
+            if v is not None and int(v) > 0:
+                return int(v)
+        except (TypeError, ValueError):
+            pass
+    return BATCH_SHOTS
 
 
 def winpath(p) -> str:
@@ -195,9 +209,55 @@ def render(s: dict, aep: Path, out: Path, timeout: float) -> str:     # aerender
 
 
 def build(film_dir, shots=None, progress=None, s: dict = None, sheet: dict = None, draft: bool = False) -> dict:
-    """Build and render these shots on this machine; returns {master, marks, checks, log, dir}."""
+    """Build and render these shots on this machine; returns {master, marks, checks, log, dir}. More shots than
+    batchShots (specs/041): one After Effects project per batch, the batch videos joined by copy, marks offset."""
     s = s or settings()
     check(s)
+    size = int(s.get("batchShots") or BATCH_SHOTS)
+    want = list(shots) if shots else ([] if sheet else _film_shots(film_dir))
+    if sheet or len(want) <= size:
+        return _build_one(film_dir, shots, progress, s, sheet, draft)
+    batches = [want[i:i + size] for i in range(0, len(want), size)]
+    parts, marks, keys, checks, logs, off = [], [], {}, [], [], 0.0
+    for k, b in enumerate(batches):
+        def prog(p, k=k, b=b):
+            if progress and p.get("shot"):
+                done = k * size + int(p.get("index") or 0)
+                progress({**p, "index": min(done, len(want)), "total": len(want), "batch": f"{k + 1}/{len(batches)}"})
+        r = _build_one(film_dir, b, prog, s, None, draft)
+        for m in r["marks"]:
+            marks.append([round(float(m[0]) + off, 4), round(float(m[1]) + off, 4), *m[2:]])
+        off += float(r["duration"])
+        keys.update(r.get("keys") or {})
+        checks += list(r.get("checks") or [])
+        logs.append(f"BATCH {k + 1}/{len(batches)} {b[0]}-{b[-1]} {r['dir']}\n" + r["log"])
+        parts.append(r["master"])
+    folder = Path(parts[0]).parent.parent / (Path(parts[0]).parent.name + "-joined")
+    return {"master": _join(parts, folder), "marks": marks, "duration": round(off, 4), "checks": checks,
+            "log": "\n".join(logs), "dir": str(folder), "keys": keys, "batches": len(batches)}
+
+
+def _film_shots(film_dir) -> list:
+    try:
+        return list(json.loads((Path(film_dir) / "film.json").read_text(encoding="utf-8")).get("shots") or [])
+    except (OSError, ValueError):
+        return []
+
+
+def _join(parts: list, folder: Path) -> str:
+    """Join the batch videos without a new encode (one render template, so the streams match)."""
+    folder.mkdir(parents=True, exist_ok=True)
+    lst = folder / "list.txt"
+    lst.write_text("".join("file '%s'\n" % str(p).replace("'", "'\\''") for p in parts), encoding="utf-8")
+    out = folder / "master.mp4"
+    r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst), "-c", "copy",
+                        str(out)], capture_output=True, text=True)
+    if r.returncode or not out.is_file() or out.stat().st_size == 0:
+        raise AeError("render_error", "the batch videos could not be joined: " + r.stderr.strip()[-300:])
+    return str(out)
+
+
+def _build_one(film_dir, shots, progress, s: dict, sheet, draft) -> dict:
     work = Path(s["work"] or (Path.home() / ".cache" / "claude-utube-ae" if s["kind"] in ("fake", "mac") else ""))
     if not s["work"] and s["kind"] == "windows":
         raise AeError("bad_work", "set a work folder Windows can see: sh bin/studio config ae --work /mnt/e/claude-utube-ae/work")

@@ -309,6 +309,37 @@ class Cli(unittest.TestCase):
         finally:
             local.free_bytes = orig
 
+    def test_build_in_batches(self):
+        """specs/041: 7 shots in batches of 3 → 3 After Effects runs, one joined master, marks follow on."""
+        from ae import local
+        d = self.film(7)
+        seen = []
+        keep = {k: os.environ.get(k) for k in ("STUDIO_AE_FAKE", "STUDIO_AE_WORK")}
+        os.environ.update(STUDIO_AE_FAKE="1", STUDIO_AE_WORK=str(self.tmp / "w"))
+        self.addCleanup(lambda: [os.environ.pop(k, None) if v is None else os.environ.__setitem__(k, v)
+                                 for k, v in keep.items()])
+        orig = local._build_one
+        local._build_one = lambda *a, **k: seen.append(list(a[1])) or orig(*a, **k)
+        try:
+            r = local.build(d, None, s={**local.settings(), "batchShots": 3})
+        finally:
+            local._build_one = orig
+        self.assertEqual(seen, [["S1", "S2", "S3"], ["S4", "S5", "S6"], ["S7"]])
+        self.assertEqual(r["batches"], 3)
+        self.assertEqual([m[3] for m in r["marks"]], [f"S{i}" for i in range(1, 8)])
+        for a, b in zip(r["marks"], r["marks"][1:]):
+            self.assertAlmostEqual(a[1], b[0], places=3)
+        self.assertAlmostEqual(r["duration"], r["marks"][-1][1], places=3)
+        self.assertEqual(frames(r["master"]), round(r["duration"] * 30))
+        one = local.build(d, ["S1", "S2"], s={**local.settings(), "batchShots": 3})
+        self.assertNotIn("batches", one)
+
+    def test_batch_size_setting(self):
+        from ae import local
+        self.assertEqual(local._batch({}), local.BATCH_SHOTS)
+        self.assertEqual(local._batch({"batchShots": 12}), 12)
+        self.assertEqual(local._batch({"batchShots": 0}), local.BATCH_SHOTS)
+
     def test_fix_splices_into_the_film(self):
         d = self.film(3)
         testsrc(d / "f1.mp4", 6, size="320x180")              # the film: 3 shots of 2 s
