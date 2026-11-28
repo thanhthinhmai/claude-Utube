@@ -50,6 +50,7 @@ def _tokens(text: str, digits_as_number: bool) -> list:
     """Normalised words; a run of number words, or a written number, becomes one "#" (twenty-three thousand ↔ 23,000)."""
     out = []
     text = re.sub(r"(\d)\s*%", r"\1 percent", text)                 # the recogniser writes "eleven percent" as "11%"
+    text = re.sub(r"\bo\s+['’]\s*clock\b", "o'clock", text, flags=re.I)   # it also writes "3 o 'clock"
     text = "".join(c for c in unicodedata.normalize("NFKD", text) if not unicodedata.combining(c))   # café = cafe
     for raw in re.split(r"[\s\-–—]+", text.lower()):
         w = rhythm.norm(raw)

@@ -150,6 +150,7 @@ class VoiceCheck(unittest.TestCase):
     def test_percent_sign_is_a_word(self):
         self.assertGreaterEqual(voicecheck.similar("Your jumps go eleven percent higher.", "Your jumps go 11% higher."), 0.99)
         self.assertLess(voicecheck.similar("Your jumps go eleven percent higher.", "Your jumps go 11 higher."), 0.92)
+        self.assertGreaterEqual(voicecheck.similar("At three o'clock, gravity snaps back.", "At 3 o 'clock, gravity snaps back."), 0.99)
 
     def test_accents_fold(self):
         self.assertGreaterEqual(voicecheck.similar("At the café, the barista squints.", "At the cafe, the barista squints."), 0.99)
