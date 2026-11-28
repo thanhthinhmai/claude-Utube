@@ -1,0 +1,319 @@
+{
+ "schema": "style-learn/1",
+ "videos_measured": 12,
+ "measured_seconds": 2160.0,
+ "by_orientation": {
+  "landscape": {
+   "videos": 12,
+   "metrics": {
+    "luma_p50": {
+     "median": 0.5282,
+     "min": 0.443,
+     "max": 0.575,
+     "n": 12
+    },
+    "contrast_p50": {
+     "median": 0.1917,
+     "min": 0.1664,
+     "max": 0.2289,
+     "n": 12
+    },
+    "sat_p50": {
+     "median": 0.2056,
+     "min": 0.1371,
+     "max": 0.2609,
+     "n": 12
+    },
+    "dark_p50": {
+     "median": 0.0012,
+     "min": 0.0003,
+     "max": 0.0032,
+     "n": 12
+    },
+    "bright_p50": {
+     "median": 0.0002,
+     "min": 0.0,
+     "max": 0.0008,
+     "n": 12
+    },
+    "luma_p2": {
+     "median": 0.2196,
+     "min": 0.1268,
+     "max": 0.324,
+     "n": 12
+    },
+    "luma_p98": {
+     "median": 0.6967,
+     "min": 0.6267,
+     "max": 0.8255,
+     "n": 12
+    },
+    "still_ratio": {
+     "median": 0.796,
+     "min": 0.687,
+     "max": 0.8468,
+     "n": 12
+    },
+    "motion720_p50": {
+     "median": 0.1495,
+     "min": 0.102,
+     "max": 0.291,
+     "n": 12
+    },
+    "motion720_p90": {
+     "median": 1.093,
+     "min": 0.691,
+     "max": 1.462,
+     "n": 12
+    },
+    "shot_len_median": {
+     "median": 5.575,
+     "min": 3.567,
+     "max": 8.067,
+     "n": 12
+    },
+    "shot_len_mean": {
+     "median": 8.7855,
+     "min": 5.806,
+     "max": 13.846,
+     "n": 12
+    },
+    "cuts_per_min": {
+     "median": 5.1665,
+     "min": 2.667,
+     "max": 8.667,
+     "n": 12
+    },
+    "flashes_per_min": {
+     "median": 0.0,
+     "min": 0.0,
+     "max": 0.3333,
+     "n": 12
+    },
+    "lufs": {
+     "median": -13.8,
+     "min": -14.1,
+     "max": -13.5,
+     "n": 12
+    },
+    "lra": {
+     "median": 3.55,
+     "min": 2.9,
+     "max": 4.3,
+     "n": 12
+    },
+    "silence_per_min": {
+     "median": 0.0,
+     "min": 0.0,
+     "max": 0.0833,
+     "n": 12
+    },
+    "first_voice_t": {
+     "median": 0.0,
+     "min": 0.0,
+     "max": 0.0,
+     "n": 12
+    },
+    "speech_rate": {
+     "median": 3.5675,
+     "min": 3.037,
+     "max": 3.64,
+     "n": 12
+    }
+   },
+   "palette": [
+    {
+     "hex": "#d1cbc5",
+     "lab": [
+      81.97,
+      1.37,
+      3.82
+     ],
+     "share": 0.2797
+    },
+    {
+     "hex": "#312c3a",
+     "lab": [
+      19.09,
+      6.11,
+      -7.7
+     ],
+     "share": 0.1808
+    },
+    {
+     "hex": "#6b6e7c",
+     "lab": [
+      46.55,
+      2.6,
+      -7.87
+     ],
+     "share": 0.1016
+    },
+    {
+     "hex": "#9fa3a8",
+     "lab": [
+      66.81,
+      -0.0,
+      -2.79
+     ],
+     "share": 0.0982
+    },
+    {
+     "hex": "#909289",
+     "lab": [
+      60.28,
+      -1.94,
+      4.78
+     ],
+     "share": 0.0596
+    },
+    {
+     "hex": "#5d4f47",
+     "lab": [
+      34.6,
+      4.8,
+      6.91
+     ],
+     "share": 0.0448
+    },
+    {
+     "hex": "#4b5371",
+     "lab": [
+      35.87,
+      4.85,
+      -17.76
+     ],
+     "share": 0.0436
+    },
+    {
+     "hex": "#ab805b",
+     "lab": [
+      57.01,
+      12.09,
+      26.7
+     ],
+     "share": 0.0296
+    }
+   ],
+   "shot_grammar": {
+    "scale_ecu": {
+     "median": 0.036,
+     "min": 0.0,
+     "max": 0.136,
+     "n": 12
+    },
+    "scale_cu": {
+     "median": 0.0525,
+     "min": 0.017,
+     "max": 0.222,
+     "n": 12
+    },
+    "scale_med": {
+     "median": 0.445,
+     "min": 0.297,
+     "max": 0.527,
+     "n": 12
+    },
+    "scale_wide": {
+     "median": 0.31,
+     "min": 0.19,
+     "max": 0.46,
+     "n": 12
+    },
+    "scale_huge": {
+     "median": 0.116,
+     "min": 0.048,
+     "max": 0.234,
+     "n": 12
+    },
+    "angle_eye": {
+     "median": 0.823,
+     "min": 0.737,
+     "max": 0.912,
+     "n": 12
+    },
+    "angle_low": {
+     "median": 0.017,
+     "min": 0.0,
+     "max": 0.105,
+     "n": 12
+    },
+    "angle_high": {
+     "median": 0.0665,
+     "min": 0.0,
+     "max": 0.14,
+     "n": 12
+    },
+    "angle_top": {
+     "median": 0.0075,
+     "min": 0.0,
+     "max": 0.053,
+     "n": 12
+    },
+    "angle_ots": {
+     "median": 0.0565,
+     "min": 0.015,
+     "max": 0.196,
+     "n": 12
+    },
+    "scale_change_share": {
+     "median": 0.6455,
+     "min": 0.521,
+     "max": 0.766,
+     "n": 12
+    },
+    "longest_same_scale": {
+     "median": 5.0,
+     "min": 3.0,
+     "max": 9.0,
+     "n": 12
+    },
+    "focused_share_p50": {
+     "median": 0.7915,
+     "min": 0.583,
+     "max": 0.833,
+     "n": 12
+    },
+    "subject_sharp_share": {
+     "median": 1.0,
+     "min": 0.965,
+     "max": 1.0,
+     "n": 12
+    },
+    "foreground_blur_share": {
+     "median": 0.0805,
+     "min": 0.017,
+     "max": 0.286,
+     "n": 12
+    },
+    "sets": {
+     "median": 14.5,
+     "min": 10.0,
+     "max": 20.0,
+     "n": 12
+    },
+    "top_set_share": {
+     "median": 0.258,
+     "min": 0.133,
+     "max": 0.484,
+     "n": 12
+    },
+    "set_change_s_p50": {
+     "median": 4.67,
+     "min": 4.15,
+     "max": 9.38,
+     "n": 12
+    }
+   }
+  }
+ },
+ "majority_orientation": "landscape",
+ "dispersion_warnings": [
+  "motion720_p90",
+  "speech_rate"
+ ],
+ "low_count_warning": false,
+ "no_speech": [],
+ "audio_unverified": [],
+ "skipped_count": 0
+}

@@ -1,0 +1,20 @@
+{
+ "line": "Long second-person what-if stories acted by sphere-headed toy figures in bright, soft 3D suburban rooms, a yellow-hooded hero, glowing labels and a slow push on every shot.",
+ "line_cn": "",
+ "borrows": [],
+ "size": "1920x1080",
+ "slug": "bright-suburb",
+ "en": "Bright Suburb Hypothetical",
+ "cn": "",
+ "based_on": "memphis-diorama",
+ "library_version": "bebbbe1",
+ "created": "2026-11-28",
+ "source": "learned",
+ "reference": {
+  "videos": 12,
+  "measured_seconds": 2160.0,
+  "formats": [
+   "landscape"
+  ]
+ }
+}

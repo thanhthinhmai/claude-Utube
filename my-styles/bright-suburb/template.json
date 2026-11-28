@@ -1,0 +1,397 @@
+{
+ "version": 1,
+ "set": "whatif-long",
+ "framing": {
+  "by_scale": {
+   "huge": {
+    "off_centre": 0.178,
+    "middle": 0.822,
+    "focused_share": [
+     0.5,
+     0.917
+    ],
+    "foreground_blur": 0.055
+   },
+   "med": {
+    "off_centre": 0.161,
+    "middle": 0.839,
+    "focused_share": [
+     0.667,
+     0.917
+    ],
+    "foreground_blur": 0.137
+   },
+   "ecu": {
+    "off_centre": 0.0,
+    "middle": 1.0,
+    "focused_share": [
+     0.417,
+     1.0
+    ],
+    "foreground_blur": 0.05
+   },
+   "wide": {
+    "off_centre": 0.149,
+    "middle": 0.851,
+    "focused_share": [
+     0.583,
+     0.917
+    ],
+    "foreground_blur": 0.072
+   },
+   "cu": {
+    "off_centre": 0.036,
+    "middle": 0.964,
+    "focused_share": [
+     0.417,
+     0.833
+    ],
+    "foreground_blur": 0.073
+   }
+  }
+ },
+ "light": {
+  "warm_share": [
+   0.0024,
+   0.0375
+  ],
+  "range": [
+   0.403,
+   0.584
+  ],
+  "raking": 0.741
+ },
+ "motion": {
+  "still_ratio": [
+   0.131,
+   0.291
+  ],
+  "still_ratio_p50": 0.208,
+  "shift_still_ratio": [
+   0.439,
+   0.819
+  ],
+  "motion720_p50": [
+   0.102,
+   0.291
+  ],
+  "rise_s": [
+   0.271,
+   1.167
+  ],
+  "rise_s_p50": 0.75,
+  "person_still_cam_active": [
+   0.531,
+   1.0
+  ],
+  "person_still_cam_none": 0.01,
+  "still_person_min_s": 2.0,
+  "dead_share_max": 0.05,
+  "cam_by_scale": {
+   "huge": {
+    "moving": 0.849,
+    "push": 0.507,
+    "drift_px_s": [
+     10.585,
+     31.495
+    ],
+    "zoom_pct_s": [
+     1.619,
+     4.521
+    ]
+   },
+   "med": {
+    "moving": 0.816,
+    "push": 0.667,
+    "drift_px_s": [
+     6.265,
+     38.885
+    ],
+    "zoom_pct_s": [
+     0.856,
+     2.698
+    ]
+   },
+   "ecu": {
+    "moving": 0.65,
+    "push": 0.4,
+    "drift_px_s": [
+     178.51,
+     675.65
+    ],
+    "zoom_pct_s": [
+     0.653,
+     2.796
+    ]
+   },
+   "wide": {
+    "moving": 0.836,
+    "push": 0.626,
+    "drift_px_s": [
+     7.02,
+     30.09
+    ],
+    "zoom_pct_s": [
+     0.765,
+     2.564
+    ]
+   },
+   "cu": {
+    "moving": 0.745,
+    "push": 0.691,
+    "drift_px_s": [
+     17.17,
+     54.81
+    ],
+    "zoom_pct_s": [
+     0.675,
+     2.477
+    ]
+   },
+   "insert": {
+    "moving": 0.529,
+    "push": 0.412,
+    "drift_px_s": [
+     35.47,
+     35.47
+    ],
+    "zoom_pct_s": [
+     2.066,
+     2.85
+    ]
+   }
+  }
+ },
+ "transitions": {
+  "cut": 0.9757,
+  "fade_s": [
+   0.467,
+   0.533
+  ],
+  "fade_per_film": 0.0,
+  "fade_max_per_film": 0,
+  "dip_s": [
+   0.1,
+   0.15
+  ],
+  "streak_s": 0.067
+ },
+ "voice": {
+  "wpm": [
+   144.0,
+   180.0
+  ],
+  "wpm_p50": 144.0,
+  "pause_in": [
+   0.26,
+   0.42
+  ],
+  "pause_sent": [
+   0.42,
+   0.56
+  ],
+  "pause_para": [
+   0.7,
+   1.0
+  ],
+  "pre_number": [
+   0.52,
+   0.9
+  ]
+ },
+ "sound": {
+  "music_share": 0.962,
+  "music_under_voice_db": [
+   -13.2,
+   -7.9
+  ],
+  "sfx_per_min": [
+   11.8,
+   13.4
+  ],
+  "tempo": [
+   115,
+   148
+  ],
+  "lufs": -13.8,
+  "lra": [
+   2.9,
+   4.3
+  ]
+ },
+ "beats": {
+  "hook": {
+   "shot_s": [
+    1.61,
+    3.1
+   ],
+   "cam_moving": 0.844,
+   "acting": 1.0,
+   "insert_share": 0.006,
+   "sfx_per_min": 12.5,
+   "wpm": 138.0,
+   "music_db": -10.1,
+   "top_scales": [
+    "wide → med → med",
+    "med → med → med",
+    "med → med → wide"
+   ]
+  },
+  "explain": {
+   "shot_s": [
+    2.43,
+    4.13
+   ],
+   "cam_moving": 0.96,
+   "acting": 1.0,
+   "insert_share": 0.0,
+   "sfx_per_min": 12.5,
+   "wpm": 138.0,
+   "music_db": -9.8,
+   "top_scales": [
+    "wide → wide → wide",
+    "med → wide → wide",
+    "med → med → wide"
+   ]
+  },
+  "benefit": {
+   "shot_s": [
+    1.98,
+    3.6
+   ],
+   "cam_moving": 0.731,
+   "acting": 1.0,
+   "insert_share": 0.0,
+   "sfx_per_min": 12.5,
+   "wpm": 150.0,
+   "music_db": -9.0,
+   "top_scales": [
+    "med → med → med",
+    "wide → med → wide",
+    "wide → wide → wide"
+   ]
+  },
+  "scale": {
+   "shot_s": [
+    2.01,
+    3.8
+   ],
+   "cam_moving": 0.791,
+   "acting": 1.0,
+   "insert_share": 0.091,
+   "sfx_per_min": 12.5,
+   "wpm": 132.0,
+   "music_db": -11.0,
+   "top_scales": [
+    "wide → wide → med",
+    "wide → med → med",
+    "med → med → med"
+   ]
+  },
+  "cost": {
+   "shot_s": [
+    2.25,
+    3.71
+   ],
+   "cam_moving": 0.785,
+   "acting": 0.905,
+   "insert_share": 0.047,
+   "sfx_per_min": 12.5,
+   "wpm": 150.0,
+   "music_db": -10.8,
+   "top_scales": [
+    "wide → med → wide",
+    "med → med → med",
+    "wide → wide → med"
+   ]
+  },
+  "crisis": {
+   "shot_s": [
+    2.17,
+    3.82
+   ],
+   "cam_moving": 0.836,
+   "acting": 0.971,
+   "insert_share": 0.038,
+   "sfx_per_min": 12.5,
+   "wpm": 147.0,
+   "music_db": -11.3,
+   "top_scales": [
+    "med → med → med",
+    "med → med → wide",
+    "wide → med → med"
+   ]
+  },
+  "ending": {
+   "shot_s": [
+    2.17,
+    3.82
+   ],
+   "cam_moving": 0.836,
+   "acting": 0.971,
+   "insert_share": 0.0,
+   "sfx_per_min": 8.0,
+   "wpm": 150.0,
+   "music_db": -11.3,
+   "top_scales": [
+    "med → med → wide",
+    "wide → med → med",
+    "med → wide → wide"
+   ]
+  },
+  "sting": {
+   "shot_s": [
+    2.17,
+    3.82
+   ],
+   "cam_moving": 0.836,
+   "acting": 0.971,
+   "insert_share": 0.0,
+   "sfx_per_min": 8.0,
+   "wpm": 150.0,
+   "music_db": -11.3,
+   "top_scales": [
+    "med → med → wide",
+    "wide → med → med",
+    "med → wide → wide"
+   ]
+  },
+  "end-card": {
+   "shot_s": [
+    2.17,
+    3.82
+   ],
+   "cam_moving": 0.836,
+   "acting": 0.971,
+   "insert_share": 0.0,
+   "sfx_per_min": 8.0,
+   "wpm": 0.0,
+   "music_db": -11.3,
+   "top_scales": [
+    "med → med → wide",
+    "wide → med → med",
+    "med → wide → wide"
+   ]
+  }
+ },
+ "source": {
+  "framing": "craft-summary.json → framing.by_scale (sharpest tile, focused_share p25–p75, foreground_blur; 12 films, 598 shot cells)",
+  "light": "craft-summary.json → light.all (shot-sheet cells, p25–p75)",
+  "motion": "craft-summary.json → motion (learn craft, 10 films; acting on still-camera person shots)",
+  "motion.still_person_min_s": "studio rule from specs/023 (1 % of still-camera person shots show no movement)",
+  "motion.dead_share_max": "studio ceiling; reference none_share 0.01",
+  "transitions": "craft-summary.json → transitions; 16 of 17 dissolves are sampler joins (corrections #5), so fade_max_per_film 0",
+  "transitions.dip_s": "studio default for a dip to dark on a time jump (no dips measured)",
+  "transitions.streak_s": "craft-summary.json → transitions.dur_s.streak (1 event)",
+  "voice": "craft-summary.json → voice (words.json; p50–p75 for wpm, p25–p75 for pauses)",
+  "sound": "craft-summary.json → sound",
+  "sound.sfx_per_min": "sfx.json of v01–v04: confident fx 11.8–13.4 per minute (sound-script #17)",
+  "sound.tempo": "sound.json tempo 115–148 BPM over 11 films, confidence low",
+  "sound.lufs": "summary.json → lufs",
+  "sound.lra": "summary.json → lra",
+  "beats": "craft-summary.json → beats (12 films, beats.json); sfx_per_min from sfx.json (v01–v04) for every beat",
+  "beats.ending": "not sampled (last 20 % has transcripts only): shots copied from crisis, wpm from words-end.json",
+  "beats.sting": "not sampled: closer question over a held shot, words-end.json",
+  "beats.end-card": "not sampled: ≈ 1.8 s after the last word, music tail only (words-end.json)"
+ }
+}
