@@ -1,0 +1,8 @@
+{
+ "pieces": 3,
+ "still_ratio": 0.667,
+ "motion720_p50": 0.0078,
+ "moving_share": 1.0,
+ "clip": "/home/thinhmt/claude-Utube/references/whatif-long/proof/out/s9_r2.mp4",
+ "pass": false
+}

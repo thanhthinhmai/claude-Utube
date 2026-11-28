@@ -1,0 +1,187 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="/core/fonts/fonts.css">
+<style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block;position:absolute;left:0;top:0}</style>
+</head><body>
+<script type="module">
+import * as THREE from '/node_modules/three/build/three.module.js';
+const W = innerWidth, H = innerHeight;
+window.DUR = 6;
+
+const gl = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+gl.setPixelRatio(1); gl.setSize(W, H);
+gl.outputColorSpace = THREE.SRGBColorSpace;
+gl.shadowMap.enabled = true; gl.shadowMap.type = THREE.PCFSoftShadowMap;
+gl.domElement.style.visibility = 'hidden';
+document.body.appendChild(gl.domElement);
+const cv = document.createElement('canvas'); cv.width = W; cv.height = H; document.body.appendChild(cv);
+const g = cv.getContext('2d');
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#d6cfc6');
+const cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 100);
+
+// light: soft warm key from the left, cool fill
+scene.add(new THREE.HemisphereLight('#fff6ea', '#9a9cae', 2.3));
+const key = new THREE.DirectionalLight('#ffe9cf', 0.75);
+key.position.set(-2, 7, 6); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048); key.shadow.radius = 14; key.shadow.blurSamples = 20; key.shadow.bias = -0.0005;
+Object.assign(key.shadow.camera, { left: -6, right: 6, top: 6, bottom: -2 });
+scene.add(key);
+
+// toon material: flat colour + one soft gradient, and an inverted-hull outline a shade darker
+const ramp = new THREE.DataTexture(new Uint8Array([150, 150, 150, 255, 205, 205, 205, 255, 255, 255, 255, 255]), 3, 1);
+ramp.needsUpdate = true; ramp.minFilter = ramp.magFilter = THREE.LinearFilter;
+const mat = (c, o = {}) => new THREE.MeshToonMaterial({ color: c, gradientMap: ramp, ...o });
+function line(mesh, w = 0.018, col) {
+  const c = new THREE.Color(col || mesh.material.color).multiplyScalar(0.32);
+  const m = new THREE.Mesh(mesh.geometry, new THREE.MeshBasicMaterial({ color: c, side: THREE.BackSide }));
+  m.scale.setScalar(1);
+  m.onBeforeRender = () => {};
+  m.material.customProgramCacheKey = () => "ol" + w;
+  m.material.onBeforeCompile = (s) => {
+    s.vertexShader = s.vertexShader.replace('#include <begin_vertex>',
+      `vec3 transformed = position + normal * ${w.toFixed(4)};`);
+  };
+  mesh.add(m);
+  return mesh;
+}
+function add(geo, c, pos, o = {}) {
+  const m = new THREE.Mesh(geo, o.mat || mat(c));
+  m.position.set(...pos);
+  if (o.rot) m.rotation.set(...o.rot);
+  m.castShadow = o.shadow !== false; m.receiveShadow = true;
+  if (o.line !== false) line(m, o.lw || 0.03, o.lc);
+  (o.parent || scene).add(m);
+  return m;
+}
+const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+const cyl = (r, h, s = 24) => new THREE.CylinderGeometry(r, r, h, s);
+const sph = (r) => new THREE.SphereGeometry(r, 48, 32);
+const cap = (r, h) => new THREE.CapsuleGeometry(r, h, 8, 20);
+
+// ---- room: living room (wall, dado stripe, floor, window, sofa, lamp, side table, frames)
+add(box(14, 0.1, 8), '#cdb08e', [0, -0.05, 1], { line: false, shadow: false });            // wood floor
+add(box(14, 6, 0.2), '#ece4d8', [0, 3, -2.1], { line: false, shadow: false });              // back wall
+add(box(14, 0.12, 0.05), '#f2ece2', [0, 1.0, -1.98], { lw: 0.006 });                        // dado rail
+add(box(14, 1.0, 0.04), '#7fa79a', [0, 0.5, -1.99], { line: false });                       // lower wall
+add(box(2.4, 1.7, 0.05), '#9cc4dd', [2.6, 2.6, -1.97], { lw: 0.01 });                       // window glass
+add(box(2.6, 0.1, 0.12), '#f2ece2', [2.6, 1.72, -1.93], { lw: 0.008 });
+add(box(0.08, 1.7, 0.08), '#f2ece2', [2.6, 2.6, -1.93], { lw: 0.006 });
+add(box(2.4, 0.08, 0.08), '#f2ece2', [2.6, 2.6, -1.93], { lw: 0.006 });
+add(sph(0.35), '#e98a3c', [3.3, 2.15, -1.94], { line: false, shadow: false }).scale.set(1, 1, 0.1); // tree outside
+add(box(0.9, 0.7, 0.04), '#c9b08a', [-2.6, 2.7, -1.97], { lw: 0.01 });                      // frame
+add(box(0.7, 0.5, 0.02), '#8aa0b8', [-2.6, 2.7, -1.94], { line: false });
+// sofa
+add(box(3.0, 0.5, 0.95), '#5f8a7b', [-0.4, 0.45, -1.35]);
+add(box(3.0, 0.85, 0.3), '#5f8a7b', [-0.4, 1.05, -1.72]);
+add(box(0.32, 0.75, 0.95), '#557c6e', [-1.95, 0.6, -1.35]);
+add(box(0.32, 0.75, 0.95), '#557c6e', [1.15, 0.6, -1.35]);
+add(box(0.6, 0.45, 0.2), '#e7b04a', [-1.3, 0.9, -1.45], { rot: [0.1, 0.2, 0.15] });        // cushion
+// lamp + side table
+add(box(0.6, 0.6, 0.6), '#a77852', [-2.7, 0.3, -1.3]);
+add(cyl(0.05, 0.6), '#6b6e7c', [-2.7, 0.9, -1.3]);
+add(new THREE.CylinderGeometry(0.18, 0.3, 0.35, 24), '#f4e3c0', [-2.7, 1.35, -1.3], { mat: mat('#f4e3c0', { emissive: '#7a5a20' }) });
+
+// ---- sphere-head figure (one rig): head, face marks, torso, tube limbs, ball hands, sneakers
+function figure(o) {
+  const root = new THREE.Group(); root.position.set(...o.pos); root.rotation.y = o.turn || 0; scene.add(root);
+  const s = o.scale || 1, legH = o.legs * s, torsoH = o.torso * s, hr = 0.42 * s;
+  const leg = (x) => { add(cap(0.075 * s, legH - 0.15 * s), o.pants, [x, legH / 2 + 0.06, 0], { parent: root, lw: 0.035 });
+    add(box(0.2 * s, 0.12 * s, 0.32 * s), '#f4f4f2', [x, 0.06, 0.06 * s], { parent: root, lw: 0.01 }); };
+  leg(-0.12 * s); leg(0.12 * s);
+  const torso = add(cap(0.24 * s, torsoH - 0.48 * s), o.top, [0, legH + torsoH / 2, 0], { parent: root, lw: 0.04 });
+  torso.scale.set(1, 1, 0.75);
+  const arm = (side, a) => {
+    const sh = new THREE.Group(); sh.position.set(side * 0.27 * s, legH + torsoH - 0.12 * s, 0); sh.rotation.set(a[0], 0, side * a[1]); root.add(sh);
+    add(cap(0.07 * s, 0.5 * s), o.top, [0, -0.3 * s, 0], { parent: sh, lw: 0.035 });
+    add(sph(0.1 * s), o.head, [0, -0.62 * s, 0], { parent: sh, lw: 0.01, mat: new THREE.MeshPhongMaterial({ color: o.head, shininess: 60, specular: '#333' }) });
+    return sh;
+  };
+  o.armL = arm(-1, o.poseL || [0, 0.18]); o.armR = arm(1, o.poseR || [0, 0.18]);
+  const head = add(sph(hr), o.head, [0, legH + torsoH + hr * 0.92, 0],
+    { parent: root, lw: 0.04, lc: '#3a3446', mat: new THREE.MeshPhongMaterial({ color: o.head, shininess: 70, specular: '#2c2c34' }) });
+  if (o.hair) o.hair(head, hr);
+  // face: off-centre toward the look direction
+  const face = new THREE.Group(); face.rotation.y = o.look || 0; face.rotation.x = -0.05; head.add(face);
+  const eye = (x) => {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(hr * 0.27, 32, 16), new THREE.MeshBasicMaterial({ color: '#ffffff' }));
+    e.position.set(x * hr * 0.95, hr * 0.16, hr * 0.9); e.scale.set(1, 1.18, 0.45); face.add(e); line(e, 0.006, '#1a1820');
+    const p = new THREE.Mesh(new THREE.SphereGeometry(hr * 0.1, 16, 12), new THREE.MeshBasicMaterial({ color: '#141218' }));
+    p.position.set(x * hr * 0.95 + (o.gaze || [0, 0])[0] * hr * 0.08, hr * 0.16 + (o.gaze || [0, 0])[1] * hr * 0.08, hr * 1.02); p.scale.z = 0.3; face.add(p);
+    const hl = new THREE.Mesh(new THREE.SphereGeometry(hr * 0.03, 8, 6), new THREE.MeshBasicMaterial({ color: '#ffffff' }));
+    hl.position.set(p.position.x + hr * 0.04, p.position.y + hr * 0.04, hr * 1.05); face.add(hl);
+  };
+  eye(-0.3); eye(0.3);
+  const mouth = new THREE.Mesh(new THREE.TorusGeometry(hr * 0.13, hr * 0.022, 6, 24, Math.PI * 0.8), new THREE.MeshBasicMaterial({ color: '#f2eef0' }));
+  mouth.position.set(0, -hr * 0.28, hr * 0.92); mouth.rotation.z = Math.PI * 1.1; face.add(mouth);
+  if (o.blush) for (const x of [-0.5, 0.5]) { const b = new THREE.Mesh(new THREE.CircleGeometry(hr * 0.09, 20), new THREE.MeshBasicMaterial({ color: '#e0607e', transparent: true, opacity: 0.7 }));
+    b.position.set(x * hr, -hr * 0.1, hr * 0.87); b.lookAt(x * hr * 3, -hr * 0.3, hr * 4); face.add(b); }
+  o.root = root; o.headMesh = head;
+  return o;
+}
+
+// hero: kid, yellow hoodie, holding a phone, looking at it, then at mum
+const hero = figure({ pos: [-0.6, 0, 0.2], turn: 0.2, scale: 0.92, legs: 0.62, torso: 0.95, top: '#f2c230', pants: '#2f3a5c', head: '#19191c',
+  poseL: [-1.0, 0.3], poseR: [-1.1, -0.1], look: 0.05, gaze: [0.2, -0.6], blush: true });
+const phone = add(box(0.2, 0.34, 0.03), '#2a2a33', [0, -0.66, 0.12], { parent: hero.armR, lw: 0.008 });
+const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.17, 0.3), new THREE.MeshBasicMaterial({ color: '#9fe3ff' }));
+screen.position.z = 0.017; phone.add(screen); phone.rotation.x = -0.4;
+// mum: adult, teal cardigan, bun hair, standing right, turned toward the hero
+const mum = figure({ pos: [1.05, 0, -0.35], turn: -0.35, legs: 1.05, torso: 1.25, top: '#3f7f86', pants: '#4b5371', head: '#211d1e',
+  poseL: [0, 0.22], poseR: [-0.3, 0.6], look: -0.1, gaze: [-0.7, -0.5],
+  hair: (head, r) => { add(new THREE.SphereGeometry(r * 1.05, 40, 24, 0, Math.PI * 2, 0, Math.PI * 0.42), '#6b4535', [0, r * 0.06, -r * 0.05], { parent: head, lw: 0.012 });
+    add(sph(r * 0.33), '#6b4535', [0, r * 1.02, -r * 0.35], { parent: head, lw: 0.012 }); } });
+
+// ---- 2D overlay: pink rim glow (projected), word-by-word bubble, vignette
+const v3 = new THREE.Vector3();
+const toScreen = (obj, dy = 0) => { obj.getWorldPosition(v3); v3.y += dy; v3.project(cam); return [(v3.x + 1) / 2 * W, (1 - v3.y) / 2 * H]; };
+const ease = (x) => x < 0 ? 0 : x > 1 ? 1 : x * x * (3 - 2 * x);
+function bubble(x, y, words, t0, t) {
+  const n = Math.min(words.length, Math.floor((t - t0) / 0.28) + 1); if (t < t0) return;
+  const txt = words.slice(0, n).join(' ');
+  g.font = `800 ${Math.round(H * 0.045)}px Nunito, Fredoka, sans-serif`;
+  const tw = Math.max(g.measureText(words.join(' ')).width, H * 0.08), pad = H * 0.022, bh = H * 0.075, a = ease((t - t0) / 0.2);
+  g.save(); g.globalAlpha = a; g.translate(x, y); g.scale(0.85 + 0.15 * a, 0.85 + 0.15 * a);
+  g.fillStyle = '#ffffff'; g.strokeStyle = '#2b2933'; g.lineWidth = H * 0.003;
+  const rr = (x, y, w, h, r) => { g.beginPath(); g.moveTo(x + r, y); g.lineTo(x + w - r, y); g.quadraticCurveTo(x + w, y, x + w, y + r); g.lineTo(x + w, y + h - r); g.quadraticCurveTo(x + w, y + h, x + w - r, y + h); g.lineTo(x + r, y + h); g.quadraticCurveTo(x, y + h, x, y + h - r); g.lineTo(x, y + r); g.quadraticCurveTo(x, y, x + r, y); g.closePath(); };
+  rr(-tw / 2 - pad, -bh, tw + pad * 2, bh, H * 0.018); g.fill(); g.stroke();
+  g.beginPath(); g.moveTo(-H * 0.012, -1); g.lineTo(0, H * 0.02); g.lineTo(H * 0.014, -1); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#1d1b22'; g.textAlign = 'left'; g.textBaseline = 'middle';
+  g.fillText(txt, -tw / 2, -bh / 2); g.restore();
+}
+
+window.render = (t) => {
+  // 2D eased push: 1.7 %/s on a centred zoom, 0.3 s ease in and out
+  const k = 0.3, push = 0.017 * (t < k ? t * t / (2 * k) : t > DUR - k ? DUR - k / 2 - (DUR - t) ** 2 / (2 * k) : t - k / 2);
+  cam.position.set(0.2, 1.55, 8.6); cam.lookAt(0.2, 1.5, 0); cam.zoom = 1 + push; cam.updateProjectionMatrix();
+  // acting: hero lifts the phone and turns his eyes up to mum at 1.4 s; mum's hand gestures at 2.2 s; blinks
+  const look = ease((t - 1.4) / 0.35);
+  hero.armR.rotation.x = -1.1 - 0.25 * ease((t - 0.3) / 0.5);
+  hero.headMesh.rotation.y = 0.3 * look; hero.headMesh.rotation.x = -0.12 * look;
+  mum.armR.rotation.x = -0.3 - 0.7 * ease((t - 2.2) / 0.4) + 0.12 * Math.sin(Math.max(0, t - 2.6) * 5) * ease((t - 2.6) / 0.3);
+  mum.headMesh.rotation.z = 0.06 * Math.sin(t * 1.3);
+  const blink = (tt) => { const d = Math.abs(t - tt); return d < 0.08 ? 0.15 : 1; };
+  hero.headMesh.children.forEach(c => { if (c.isGroup) c.scale.y = blink(3.1) * blink(5.2); });
+  mum.headMesh.children.forEach(c => { if (c.isGroup) c.scale.y = blink(1.0) * blink(4.4); });
+  gl.render(scene, cam);
+  g.clearRect(0, 0, W, H);
+  // rim glow drawn under the picture: blurred pink silhouette of the hero
+  g.drawImage(gl.domElement, 0, 0);
+  const [hx, hy] = toScreen(hero.headMesh);
+  g.save(); g.globalCompositeOperation = 'screen';
+  const gr = g.createRadialGradient(hx, hy + H * 0.12, H * 0.05, hx, hy + H * 0.12, H * 0.3);
+  gr.addColorStop(0, 'rgba(255,80,170,0)'); gr.addColorStop(0.55, 'rgba(255,80,170,0.10)'); gr.addColorStop(1, 'rgba(255,80,170,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, W, H); g.restore();
+  // vignette
+  const vg = g.createRadialGradient(W / 2, H / 2, H * 0.45, W / 2, H / 2, H * 1.0);
+  vg.addColorStop(0, 'rgba(30,26,40,0)'); vg.addColorStop(1, 'rgba(30,26,40,0.28)');
+  g.fillStyle = vg; g.fillRect(0, 0, W, H);
+  const [mx, my] = toScreen(hero.headMesh, 0.55);
+  bubble(mx, my, ['Who', 'is', 'texting', 'you?'], 2.4, t);
+};
+await document.fonts.ready;
+window.render(0);
+window.READY = true;
+</script>
+</body></html>
